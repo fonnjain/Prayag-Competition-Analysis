@@ -43,6 +43,8 @@ const STOPWORDS = new Set([
   "isi",
   "mark",
   "tin",
+  "inch",
+  "inches",
 ]);
 
 function tokenWeight(token: string): number {
@@ -73,6 +75,13 @@ function normSize(s: string | null | undefined): string {
   return String(s ?? "")
     .toLowerCase()
     .replace(/\u2044/g, "/")
+    // Collapse mixed numbers ("1 1/2", "1-1/2") to an unambiguous improper
+    // fraction ("3/2") so they compare equal regardless of spacing/hyphenation
+    // and don't smear into a bogus "11/2" when whitespace is later stripped.
+    .replace(
+      /(\d+)[\s-]+(\d+)\s*\/\s*(\d+)/g,
+      (_m, w, n, d) => `${Number(w) * Number(d) + Number(n)}/${d}`,
+    )
     .replace(/inches?|inch/g, "")
     .replace(/[×]/g, "x")
     .replace(/\bmm\b/g, "")
@@ -89,13 +98,27 @@ function normSize(s: string | null | undefined): string {
 export function parseSizeFromName(name: string | null | undefined): string | null {
   if (!name) return null;
   const s = String(name).replace(/\u2044/g, "/");
-  const re = /(\d[\d.\/]*(?:\s*[x×]\s*\d[\d.\/]*)*)\s*mm\b/gi;
+  // Prefer an explicit mm dimension — it is the precise nominal size.
+  const mmRe = /(\d[\d.\/]*(?:\s*[x×]\s*\d[\d.\/]*)*)\s*mm\b/gi;
   let m: RegExpExecArray | null;
-  let last: string | null = null;
-  while ((m = re.exec(s)) !== null) last = m[1];
-  if (last == null) return null;
-  const canonical = last.replace(/\s*[x×]\s*/gi, "x").replace(/\s+/g, "");
-  return `${canonical} mm`;
+  let lastMm: string | null = null;
+  while ((m = mmRe.exec(s)) !== null) lastMm = m[1];
+  if (lastMm != null) {
+    const canonical = lastMm.replace(/\s*[x×]\s*/gi, "x").replace(/\s+/g, "");
+    return `${canonical} mm`;
+  }
+  // No mm value: many taps, showers and handles carry only an inch/fraction
+  // size in the name, e.g. `(5")`, `3/4 inch`, `1 1/2 inch`. Pull out the last
+  // such size so a competitor's bare `3/4"` still matches on the size channel.
+  // A mixed number ("1 1/2") is kept verbatim here; normSize collapses it to a
+  // canonical improper fraction for comparison.
+  const inchRe =
+    /(\d+(?:[\s-]+\d+\s*\/\s*\d+)?(?:\.\d+)?|\d+\s*\/\s*\d+)\s*(?:"|”|inch(?:es)?\b)/gi;
+  let lastInch: string | null = null;
+  while ((m = inchRe.exec(s)) !== null) lastInch = m[1];
+  if (lastInch == null) return null;
+  const canonical = lastInch.replace(/\s*\/\s*/g, "/").replace(/[\s-]+/g, " ").trim();
+  return `${canonical} inch`;
 }
 
 function weightedTokens(s: string | null | undefined): Map<string, number> {
