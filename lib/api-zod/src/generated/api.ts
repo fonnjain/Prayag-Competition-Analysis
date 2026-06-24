@@ -434,6 +434,7 @@ export const GetComparisonQueryParams = zod.object({
   "competitor": zod.coerce.string().optional(),
   "category": zod.coerce.string().optional(),
   "matchStatus": zod.coerce.string().optional(),
+  "confidence": zod.coerce.string().optional().describe('Filter by match confidence tier (High, Medium, Low).'),
   "search": zod.coerce.string().optional(),
   "expensiveOnly": zod.coerce.boolean().optional().describe('Only rows where Prayag is more expensive than the competitor.'),
   "page": zod.coerce.number().optional(),
@@ -452,6 +453,7 @@ export const GetComparisonResponse = zod.object({
   "effectiveDate": zod.string().nullish(),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
+  "matchConfidence": zod.string().nullish(),
   "prayagProductName": zod.string().nullish(),
   "prayagMrp": zod.number().nullable(),
   "prayagEffectiveDate": zod.string().nullish(),
@@ -480,6 +482,12 @@ export const GetComparisonSummaryResponse = zod.object({
   "prayagCheaperPct": zod.number().nullable(),
   "avgDiffPct": zod.number().nullish(),
   "reviewCount": zod.number(),
+  "confidenceCounts": zod.object({
+  "high": zod.number(),
+  "medium": zod.number(),
+  "low": zod.number(),
+  "none": zod.number()
+}).optional(),
   "categoryWinRates": zod.array(zod.object({
   "category": zod.string(),
   "comparable": zod.number(),
@@ -496,7 +504,40 @@ export const GetComparisonSummaryResponse = zod.object({
 export const GetComparisonFiltersResponse = zod.object({
   "competitors": zod.array(zod.string()),
   "categories": zod.array(zod.string()),
-  "matchStatuses": zod.array(zod.string())
+  "matchStatuses": zod.array(zod.string()),
+  "confidences": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Side-by-side matrix — one row per Prayag product with each competitor's price and live diff%
+ */
+export const GetComparisonMatrixQueryParams = zod.object({
+  "category": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "expensiveOnly": zod.coerce.boolean().optional().describe('Only rows where Prayag is more expensive than at least one competitor.'),
+  "page": zod.coerce.number().optional(),
+  "pageSize": zod.coerce.number().optional()
+})
+
+export const GetComparisonMatrixResponse = zod.object({
+  "competitors": zod.array(zod.string()),
+  "rows": zod.array(zod.object({
+  "prayagCode": zod.string(),
+  "prayagProductName": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "prayagMrp": zod.number().nullable(),
+  "cells": zod.array(zod.object({
+  "competitor": zod.string(),
+  "price": zod.number().nullable(),
+  "diffPct": zod.number().nullable(),
+  "prayagCheaper": zod.boolean().nullable(),
+  "matchConfidence": zod.string().nullish()
+}))
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
 })
 
 
@@ -505,6 +546,7 @@ export const GetComparisonFiltersResponse = zod.object({
  */
 export const GetMappingReviewQueryParams = zod.object({
   "competitor": zod.coerce.string().optional(),
+  "confidence": zod.coerce.string().optional().describe('Filter by match confidence tier (Low, etc.).'),
   "search": zod.coerce.string().optional(),
   "page": zod.coerce.number().optional(),
   "pageSize": zod.coerce.number().optional()
@@ -520,7 +562,8 @@ export const GetMappingReviewResponse = zod.object({
   "price": zod.number(),
   "unit": zod.string().nullish(),
   "matchedPrayagCode": zod.string().nullable(),
-  "matchStatus": zod.string()
+  "matchStatus": zod.string(),
+  "matchConfidence": zod.string().nullish()
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -537,7 +580,8 @@ export const UpdateCompetitorMappingParams = zod.object({
 
 export const UpdateCompetitorMappingBody = zod.object({
   "matchedPrayagCode": zod.string().nullable(),
-  "matchStatus": zod.string()
+  "matchStatus": zod.string(),
+  "matchConfidence": zod.string().nullish()
 })
 
 export const UpdateCompetitorMappingResponse = zod.object({
@@ -551,6 +595,7 @@ export const UpdateCompetitorMappingResponse = zod.object({
   "effectiveDate": zod.string().nullish(),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
+  "matchConfidence": zod.string().nullish(),
   "prayagProductName": zod.string().nullish(),
   "prayagMrp": zod.number().nullable(),
   "prayagEffectiveDate": zod.string().nullish(),

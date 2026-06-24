@@ -27,6 +27,12 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 - Canonical `match_status` enum is exactly `"matched"` | `"no match (review)"` — backend, PATCH validation, and the Mapping Review dropdown must all use these two. Mapping-review/review counts key off `status != "matched"`.
 - Generic competitor upload is idempotent per competitor: it DELETEs that competitor's existing rows before inserting. Auto-match only trusts a fallback (non-header) code column if overlap ≥ max(5, 25% of rows), else leaves rows unmatched.
 
+## Match confidence + side-by-side matrix
+- Competitor rows carry an optional `match_confidence` (High/Medium/Low) text column. Seed source is the workbook's prebuilt Mapping sheet: High/Medium → matched (code set), Low/No-match → review (code null, Low keeps confidence). Exact-code uploads and manual PATCH matches default to "High".
+- The provided Ashirvad↔Prayag mapping is **coarse/many-to-one**: ~1399 High+Medium mapping rows collapse to only ~373 distinct Prayag codes (many different competitor SKUs map to one Prayag code, e.g. several socket/coupler variants all → code 5721). This is the source data's nature, not a bug.
+- **Side-by-side matrix** (`GET /catalog/comparison/matrix`) groups matched rows by `normCode` and keeps the **cheapest** competitor price per (Prayag code, competitor). Its `total` = distinct Prayag codes across all competitors (~431), which is correctly far smaller than the per-competitor matched-row counts (~1380 each).
+- **Gotcha:** the comparison *list* endpoint caps `pageSize` at 200, so counting distinct codes from one page of `rows` undercounts wildly. Trust the matrix endpoint / DB for distinct-code counts, not a single list page.
+
 ## Filters gotcha
 - The same category name can appear under multiple divisions; dedupe category names before rendering the Select or you get duplicate React keys/values. Backend filter param is a category *name*, so dedup is also semantically correct.
 

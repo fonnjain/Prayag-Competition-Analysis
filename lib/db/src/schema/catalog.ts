@@ -97,6 +97,11 @@ export const competitorPricesTable = pgTable(
     effectiveDate: date("effective_date"),
     matchedPrayagCode: text("matched_prayag_code"),
     matchStatus: text("match_status").notNull().default("no match (review)"),
+    // Mapping quality tier: "High" | "Medium" | "Low" | null. Provided by
+    // prebuilt competitor mappings (e.g. Ashirvad) or "High" for exact-code
+    // matches; null when unknown. High/Medium are auto-accepted; Low + no-match
+    // go to manual review.
+    matchConfidence: text("match_confidence"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

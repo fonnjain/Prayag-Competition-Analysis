@@ -6,17 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetComparisonParams = {
-competitor?: string;
+export type GetComparisonMatrixParams = {
 category?: string;
-matchStatus?: string;
-/**
- * Filter by match confidence tier (High, Medium, Low).
- */
-confidence?: string;
 search?: string;
 /**
- * Only rows where Prayag is more expensive than the competitor.
+ * Only rows where Prayag is more expensive than at least one competitor.
  */
 expensiveOnly?: boolean;
 page?: number;

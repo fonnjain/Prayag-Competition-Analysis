@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ComparisonFilters {
-  competitors: string[];
-  categories: string[];
-  matchStatuses: string[];
-  confidences: string[];
+export interface ConfidenceCounts {
+  high: number;
+  medium: number;
+  low: number;
+  none: number;
 }

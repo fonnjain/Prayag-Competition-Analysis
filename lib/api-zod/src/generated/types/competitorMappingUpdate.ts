@@ -10,4 +10,6 @@ export interface CompetitorMappingUpdate {
   /** @nullable */
   matchedPrayagCode: string | null;
   matchStatus: string;
+  /** @nullable */
+  matchConfidence?: string | null;
 }

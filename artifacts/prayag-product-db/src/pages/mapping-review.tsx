@@ -14,12 +14,30 @@ import { Search, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
+
+function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
+  if (!confidence) return <span className="text-muted-foreground text-xs">-</span>;
+  const tier = confidence.toLowerCase();
+  const styles =
+    tier === "high"
+      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+      : tier === "medium"
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  return (
+    <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide", styles)}>
+      {confidence}
+    </span>
+  );
+}
 
 export default function MappingReviewPage() {
   const [search, setSearch] = useState("");
   const [competitor, setCompetitor] = useState<string>("all");
+  const [confidence, setConfidence] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [editingRows, setEditingRows] = useState<Record<number, { code: string, status: string }>>({});
 
@@ -28,13 +46,14 @@ export default function MappingReviewPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, competitor]);
+  }, [search, competitor, confidence]);
 
   const { data: filters } = useGetComparisonFilters();
 
   const { data: mappingData, isLoading } = useGetMappingReview({
     search: search || undefined,
     competitor: competitor !== "all" ? competitor : undefined,
+    confidence: confidence !== "all" ? confidence : undefined,
     page,
     pageSize: PAGE_SIZE
   }, {
@@ -42,6 +61,7 @@ export default function MappingReviewPage() {
       queryKey: getGetMappingReviewQueryKey({
         search: search || undefined,
         competitor: competitor !== "all" ? competitor : undefined,
+        confidence: confidence !== "all" ? confidence : undefined,
         page,
         pageSize: PAGE_SIZE
       })
@@ -139,6 +159,18 @@ export default function MappingReviewPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Select value={confidence} onValueChange={setConfidence}>
+          <SelectTrigger className="w-[170px]">
+            <SelectValue placeholder="Confidence" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Confidence</SelectItem>
+            {(filters?.confidences ?? []).map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="border rounded-md bg-card">
@@ -151,6 +183,7 @@ export default function MappingReviewPage() {
                 <th className="px-4 py-3 font-medium text-muted-foreground">Description</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Size</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground text-right">Price</th>
+                <th className="px-4 py-3 font-medium text-muted-foreground w-28">Confidence</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground w-48">Prayag Code</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground w-40">Status</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground w-20"></th>
@@ -159,11 +192,11 @@ export default function MappingReviewPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Loading pending reviews...</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Loading pending reviews...</td>
                 </tr>
               ) : mappingData?.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No reviews pending.</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No reviews pending.</td>
                 </tr>
               ) : (
                 mappingData?.rows.map((row) => {
@@ -171,6 +204,7 @@ export default function MappingReviewPage() {
                   const codeVal = editState?.code ?? (row.matchedPrayagCode || "");
                   const statusVal = editState?.status ?? (row.matchStatus || "no match (review)");
                   const hasChanges = editState !== undefined;
+                  const invalidMatch = statusVal === "matched" && !codeVal.trim();
 
                   return (
                     <tr key={row.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
@@ -185,13 +219,19 @@ export default function MappingReviewPage() {
                         {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
                       </td>
                       <td className="px-4 py-3">
+                        <ConfidenceBadge confidence={row.matchConfidence} />
+                      </td>
+                      <td className="px-4 py-3">
                         <Input 
                           size={1}
-                          className="h-8 font-mono uppercase" 
+                          className={cn("h-8 font-mono uppercase", invalidMatch && "border-destructive focus-visible:ring-destructive")}
                           value={codeVal}
                           onChange={(e) => handleRowChange(row.id, 'code', e.target.value)}
                           placeholder="Code..."
                         />
+                        {invalidMatch && (
+                          <div className="text-[10px] text-destructive mt-1">Enter a code to mark matched</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Select 
@@ -210,7 +250,7 @@ export default function MappingReviewPage() {
                       <td className="px-4 py-3 text-right">
                         <Button 
                           size="sm" 
-                          disabled={!hasChanges || updateMapping.isPending}
+                          disabled={!hasChanges || invalidMatch || updateMapping.isPending}
                           onClick={() => handleSave(row.id)}
                           variant={hasChanges ? "default" : "secondary"}
                         >

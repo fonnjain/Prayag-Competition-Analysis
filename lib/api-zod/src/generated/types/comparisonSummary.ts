@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ComparisonCategoryWinRate } from './comparisonCategoryWinRate';
+import type { ConfidenceCounts } from './confidenceCounts';
 
 export interface ComparisonSummary {
   /** @nullable */
@@ -19,5 +20,6 @@ export interface ComparisonSummary {
   /** @nullable */
   avgDiffPct?: number | null;
   reviewCount: number;
+  confidenceCounts?: ConfidenceCounts;
   categoryWinRates: ComparisonCategoryWinRate[];
 }

@@ -24,6 +24,8 @@ export interface ComparisonRow {
   matchedPrayagCode: string | null;
   matchStatus: string;
   /** @nullable */
+  matchConfidence?: string | null;
+  /** @nullable */
   prayagProductName?: string | null;
   /** @nullable */
   prayagMrp: number | null;

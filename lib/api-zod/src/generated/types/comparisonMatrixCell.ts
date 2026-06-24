@@ -6,21 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface MappingReviewRow {
-  id: number;
+export interface ComparisonMatrixCell {
   competitor: string;
   /** @nullable */
-  category?: string | null;
+  price: number | null;
   /** @nullable */
-  description?: string | null;
+  diffPct: number | null;
   /** @nullable */
-  size?: string | null;
-  price: number;
-  /** @nullable */
-  unit?: string | null;
-  /** @nullable */
-  matchedPrayagCode: string | null;
-  matchStatus: string;
+  prayagCheaper: boolean | null;
   /** @nullable */
   matchConfidence?: string | null;
 }

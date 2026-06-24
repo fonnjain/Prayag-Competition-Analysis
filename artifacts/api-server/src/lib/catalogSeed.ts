@@ -54,6 +54,7 @@ interface SeedCompetitorPrice {
   effectiveDate: string | null;
   matchedPrayagCode: string | null;
   matchStatus: string;
+  matchConfidence?: string | null;
 }
 interface CompetitorSeedFile {
   competitors: SeedCompetitorPrice[];
@@ -135,6 +136,7 @@ export async function loadCatalogSeed(): Promise<void> {
         effectiveDate: c.effectiveDate,
         matchedPrayagCode: c.matchedPrayagCode,
         matchStatus: c.matchStatus,
+        matchConfidence: c.matchConfidence ?? null,
       })),
     ),
   );

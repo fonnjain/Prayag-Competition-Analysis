@@ -374,6 +374,8 @@ export interface ComparisonRow {
   matchedPrayagCode: string | null;
   matchStatus: string;
   /** @nullable */
+  matchConfidence?: string | null;
+  /** @nullable */
   prayagProductName?: string | null;
   /** @nullable */
   prayagMrp: number | null;
@@ -402,6 +404,13 @@ export interface ComparisonCategoryWinRate {
   avgDiffPct?: number | null;
 }
 
+export interface ConfidenceCounts {
+  high: number;
+  medium: number;
+  low: number;
+  none: number;
+}
+
 export interface ComparisonSummary {
   /** @nullable */
   competitor: string | null;
@@ -414,6 +423,7 @@ export interface ComparisonSummary {
   /** @nullable */
   avgDiffPct?: number | null;
   reviewCount: number;
+  confidenceCounts?: ConfidenceCounts;
   categoryWinRates: ComparisonCategoryWinRate[];
 }
 
@@ -421,6 +431,7 @@ export interface ComparisonFilters {
   competitors: string[];
   categories: string[];
   matchStatuses: string[];
+  confidences: string[];
 }
 
 export interface MappingReviewRow {
@@ -438,6 +449,8 @@ export interface MappingReviewRow {
   /** @nullable */
   matchedPrayagCode: string | null;
   matchStatus: string;
+  /** @nullable */
+  matchConfidence?: string | null;
 }
 
 export interface MappingReviewList {
@@ -451,6 +464,39 @@ export interface CompetitorMappingUpdate {
   /** @nullable */
   matchedPrayagCode: string | null;
   matchStatus: string;
+  /** @nullable */
+  matchConfidence?: string | null;
+}
+
+export interface ComparisonMatrixCell {
+  competitor: string;
+  /** @nullable */
+  price: number | null;
+  /** @nullable */
+  diffPct: number | null;
+  /** @nullable */
+  prayagCheaper: boolean | null;
+  /** @nullable */
+  matchConfidence?: string | null;
+}
+
+export interface ComparisonMatrixRow {
+  prayagCode: string;
+  /** @nullable */
+  prayagProductName: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  prayagMrp: number | null;
+  cells: ComparisonMatrixCell[];
+}
+
+export interface ComparisonMatrix {
+  competitors: string[];
+  rows: ComparisonMatrixRow[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export type GetProductsParams = {
@@ -482,6 +528,10 @@ export type GetComparisonParams = {
 competitor?: string;
 category?: string;
 matchStatus?: string;
+/**
+ * Filter by match confidence tier (High, Medium, Low).
+ */
+confidence?: string;
 search?: string;
 /**
  * Only rows where Prayag is more expensive than the competitor.
@@ -495,8 +545,23 @@ export type GetComparisonSummaryParams = {
 competitor?: string;
 };
 
+export type GetComparisonMatrixParams = {
+category?: string;
+search?: string;
+/**
+ * Only rows where Prayag is more expensive than at least one competitor.
+ */
+expensiveOnly?: boolean;
+page?: number;
+pageSize?: number;
+};
+
 export type GetMappingReviewParams = {
 competitor?: string;
+/**
+ * Filter by match confidence tier (Low, etc.).
+ */
+confidence?: string;
 search?: string;
 page?: number;
 pageSize?: number;

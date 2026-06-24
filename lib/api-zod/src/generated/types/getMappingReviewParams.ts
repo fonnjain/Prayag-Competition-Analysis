@@ -8,6 +8,10 @@
 
 export type GetMappingReviewParams = {
 competitor?: string;
+/**
+ * Filter by match confidence tier (Low, etc.).
+ */
+confidence?: string;
 search?: string;
 page?: number;
 pageSize?: number;

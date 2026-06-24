@@ -634,6 +634,7 @@ router.post(
           effectiveDate: r.effectiveDate,
           matchedPrayagCode: isMatched ? (canonical.get(norm!) ?? norm) : null,
           matchStatus: isMatched ? "matched" : "no match (review)",
+          matchConfidence: isMatched ? "High" : null,
         };
       });
 

@@ -82,6 +82,7 @@ function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
     effectiveDate: c.effectiveDate,
     matchedPrayagCode: c.matchedPrayagCode,
     matchStatus: c.matchStatus,
+    matchConfidence: c.matchConfidence,
     prayagProductName: prayag?.productName ?? null,
     prayagMrp,
     prayagEffectiveDate: prayag?.effectiveDate ?? null,
@@ -99,6 +100,7 @@ router.get("/catalog/comparison", async (req, res) => {
   const competitor = strParam(req.query.competitor);
   const category = strParam(req.query.category);
   const matchStatus = strParam(req.query.matchStatus);
+  const confidence = strParam(req.query.confidence);
   const search = strParam(req.query.search);
   const expensiveOnly = req.query.expensiveOnly === "true";
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -108,6 +110,8 @@ router.get("/catalog/comparison", async (req, res) => {
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
+  if (confidence)
+    conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
     conditions.push(
@@ -147,6 +151,13 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   const comparable = rows.filter((r) => r.diffPct != null);
   const cheaper = comparable.filter((r) => r.prayagCheaper);
   const reviewRows = rows.filter((r) => r.matchStatus !== "matched");
+
+  const confidenceCounts = {
+    high: rows.filter((r) => r.matchConfidence === "High").length,
+    medium: rows.filter((r) => r.matchConfidence === "Medium").length,
+    low: rows.filter((r) => r.matchConfidence === "Low").length,
+    none: rows.filter((r) => !r.matchConfidence).length,
+  };
 
   const avgDiffPct =
     comparable.length > 0
@@ -195,6 +206,7 @@ router.get("/catalog/comparison/summary", async (req, res) => {
         : null,
     avgDiffPct,
     reviewCount: reviewRows.length,
+    confidenceCounts,
     categoryWinRates,
   });
 });
@@ -213,6 +225,20 @@ router.get("/catalog/comparison/filters", async (_req, res) => {
     .selectDistinct({ matchStatus: competitorPricesTable.matchStatus })
     .from(competitorPricesTable)
     .orderBy(asc(competitorPricesTable.matchStatus));
+  const confRows = await db
+    .selectDistinct({ matchConfidence: competitorPricesTable.matchConfidence })
+    .from(competitorPricesTable);
+
+  // Stable, meaningful order for the confidence tiers rather than alphabetical.
+  const CONF_ORDER = ["High", "Medium", "Low"];
+  const confidences = confRows
+    .map((r) => r.matchConfidence)
+    .filter((c): c is string => !!c)
+    .sort((a, b) => {
+      const ia = CONF_ORDER.indexOf(a);
+      const ib = CONF_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
 
   res.json({
     competitors: compRows.map((r) => r.competitor).filter((c): c is string => !!c),
@@ -220,18 +246,22 @@ router.get("/catalog/comparison/filters", async (_req, res) => {
     matchStatuses: statusRows
       .map((r) => r.matchStatus)
       .filter((c): c is string => !!c),
+    confidences,
   });
 });
 
 // GET /catalog/mapping-review — competitor rows needing manual mapping.
 router.get("/catalog/mapping-review", async (req, res) => {
   const competitor = strParam(req.query.competitor);
+  const confidence = strParam(req.query.confidence);
   const search = strParam(req.query.search);
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
   const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (confidence)
+    conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
     conditions.push(
@@ -257,6 +287,7 @@ router.get("/catalog/mapping-review", async (req, res) => {
       unit: competitorPricesTable.unit,
       matchedPrayagCode: competitorPricesTable.matchedPrayagCode,
       matchStatus: competitorPricesTable.matchStatus,
+      matchConfidence: competitorPricesTable.matchConfidence,
     })
     .from(competitorPricesTable)
     .where(whereExpr)
@@ -271,6 +302,113 @@ router.get("/catalog/mapping-review", async (req, res) => {
   res.json({ rows, total, page, pageSize });
 });
 
+// GET /catalog/comparison/matrix — side-by-side view: one row per Prayag
+// product with each competitor's price + live diff%. Only matched rows
+// contribute, so unreliable (review) mappings never pollute the matrix.
+router.get("/catalog/comparison/matrix", async (req, res) => {
+  const category = strParam(req.query.category);
+  const search = strParam(req.query.search);
+  const expensiveOnly = req.query.expensiveOnly === "true";
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
+
+  const maps = await getPrayagMaps();
+
+  const all = await db
+    .select()
+    .from(competitorPricesTable)
+    .where(eq(competitorPricesTable.matchStatus, "matched"));
+
+  const competitors = [...new Set(all.map((c) => c.competitor))].sort();
+
+  interface Cell {
+    competitor: string;
+    price: number | null;
+    diffPct: number | null;
+    prayagCheaper: boolean | null;
+    matchConfidence: string | null;
+  }
+  interface MatrixRow {
+    prayagCode: string;
+    prayagProductName: string | null;
+    category: string | null;
+    prayagMrp: number | null;
+    cells: Cell[];
+  }
+
+  const byCode = new Map<string, MatrixRow>();
+  for (const c of all) {
+    if (!c.matchedPrayagCode) continue;
+    const key = normCode(c.matchedPrayagCode);
+    const prayag = maps.get(key);
+    let group = byCode.get(key);
+    if (!group) {
+      group = {
+        prayagCode: c.matchedPrayagCode,
+        prayagProductName: prayag?.productName ?? null,
+        category: c.category ?? null,
+        prayagMrp: prayag?.mrp ?? null,
+        cells: [],
+      };
+      byCode.set(key, group);
+    }
+    const prayagMrp = group.prayagMrp;
+    let diffPct: number | null = null;
+    let prayagCheaper: boolean | null = null;
+    if (prayagMrp != null && c.price > 0) {
+      diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
+      prayagCheaper = prayagMrp <= c.price;
+    }
+    // If a competitor has multiple rows mapped to the same Prayag code, keep
+    // the cheapest (most aggressive) competitor price for that competitor.
+    const existing = group.cells.find((x) => x.competitor === c.competitor);
+    if (!existing) {
+      group.cells.push({
+        competitor: c.competitor,
+        price: c.price,
+        diffPct,
+        prayagCheaper,
+        matchConfidence: c.matchConfidence,
+      });
+    } else if (existing.price == null || c.price < existing.price) {
+      existing.price = c.price;
+      existing.diffPct = diffPct;
+      existing.prayagCheaper = prayagCheaper;
+      existing.matchConfidence = c.matchConfidence;
+    }
+  }
+
+  let rows = [...byCode.values()];
+  if (category) rows = rows.filter((r) => r.category === category);
+  if (search) {
+    const s = search.toLowerCase();
+    rows = rows.filter(
+      (r) =>
+        (r.prayagProductName ?? "").toLowerCase().includes(s) ||
+        r.prayagCode.toLowerCase().includes(s),
+    );
+  }
+  if (expensiveOnly) {
+    rows = rows.filter((r) => r.cells.some((c) => c.prayagCheaper === false));
+  }
+  rows.sort(
+    (a, b) =>
+      (a.category ?? "").localeCompare(b.category ?? "") ||
+      (a.prayagProductName ?? "").localeCompare(b.prayagProductName ?? "") ||
+      a.prayagCode.localeCompare(b.prayagCode),
+  );
+
+  const total = rows.length;
+  const start = (page - 1) * pageSize;
+  res.json({
+    competitors,
+    rows: rows.slice(start, start + pageSize),
+    total,
+    page,
+    pageSize,
+  });
+});
+
 // PATCH /catalog/competitor-prices/:id — assign/correct a row's mapping.
 router.patch("/catalog/competitor-prices/:id", async (req, res) => {
   const id = Number(req.params.id);
@@ -281,6 +419,7 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
   const body = req.body as {
     matchedPrayagCode?: string | null;
     matchStatus?: string;
+    matchConfidence?: string | null;
   };
   const matchedPrayagCode =
     typeof body.matchedPrayagCode === "string" && body.matchedPrayagCode.trim()
@@ -288,18 +427,28 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
       : null;
   // Canonical statuses: "matched" vs "no match (review)". Anything else is
   // coerced from whether a code was supplied, keeping API + UI consistent.
+  // Invariant: a row can only be "matched" when it has a non-empty code, so a
+  // null code always forces review status (never a phantom matched+null row).
   const ALLOWED_STATUSES = new Set(["matched", "no match (review)"]);
   const requested =
     typeof body.matchStatus === "string" ? body.matchStatus.trim() : "";
-  const matchStatus = ALLOWED_STATUSES.has(requested)
-    ? requested
-    : matchedPrayagCode
-      ? "matched"
-      : "no match (review)";
+  const matchStatus = !matchedPrayagCode
+    ? "no match (review)"
+    : ALLOWED_STATUSES.has(requested)
+      ? requested
+      : "matched";
+  // A manual mapping correction is authoritative: default it to High confidence
+  // unless the caller explicitly passes a tier. Clear confidence when unmatched.
+  const matchConfidence =
+    matchStatus !== "matched"
+      ? null
+      : typeof body.matchConfidence === "string" && body.matchConfidence.trim()
+        ? body.matchConfidence.trim()
+        : "High";
 
   const updated = await db
     .update(competitorPricesTable)
-    .set({ matchedPrayagCode, matchStatus, updatedAt: new Date() })
+    .set({ matchedPrayagCode, matchStatus, matchConfidence, updatedAt: new Date() })
     .where(eq(competitorPricesTable.id, id))
     .returning();
   const row = updated[0];

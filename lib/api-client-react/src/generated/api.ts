@@ -26,6 +26,7 @@ import type {
   CatalogProductList,
   ComparisonFilters,
   ComparisonList,
+  ComparisonMatrix,
   ComparisonRow,
   ComparisonSummary,
   ComparisonUpdate,
@@ -35,6 +36,7 @@ import type {
   DashboardSummary,
   ErrorResponse,
   GetCatalogProductsParams,
+  GetComparisonMatrixParams,
   GetComparisonParams,
   GetComparisonSummaryParams,
   GetMappingReviewParams,
@@ -1662,6 +1664,90 @@ export function useGetComparisonFilters<TData = Awaited<ReturnType<typeof getCom
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetComparisonFiltersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetComparisonMatrixUrl = (params?: GetComparisonMatrixParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/comparison/matrix?${stringifiedParams}` : `/api/catalog/comparison/matrix`
+}
+
+/**
+ * @summary Side-by-side matrix — one row per Prayag product with each competitor's price and live diff%
+ */
+export const getComparisonMatrix = async (params?: GetComparisonMatrixParams, options?: RequestInit): Promise<ComparisonMatrix> => {
+
+  return customFetch<ComparisonMatrix>(getGetComparisonMatrixUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetComparisonMatrixQueryKey = (params?: GetComparisonMatrixParams,) => {
+    return [
+    `/api/catalog/comparison/matrix`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetComparisonMatrixQueryOptions = <TData = Awaited<ReturnType<typeof getComparisonMatrix>>, TError = ErrorType<unknown>>(params?: GetComparisonMatrixParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonMatrix>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetComparisonMatrixQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonMatrix>>> = ({ signal }) => getComparisonMatrix(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonMatrix>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetComparisonMatrixQueryResult = NonNullable<Awaited<ReturnType<typeof getComparisonMatrix>>>
+export type GetComparisonMatrixQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Side-by-side matrix — one row per Prayag product with each competitor's price and live diff%
+ */
+
+export function useGetComparisonMatrix<TData = Awaited<ReturnType<typeof getComparisonMatrix>>, TError = ErrorType<unknown>>(
+ params?: GetComparisonMatrixParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonMatrix>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetComparisonMatrixQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
