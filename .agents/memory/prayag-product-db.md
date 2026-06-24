@@ -21,3 +21,10 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 
 ## Filters gotcha
 - The same category name can appear under multiple divisions; dedupe category names before rendering the Select or you get duplicate React keys/values. Backend filter param is a category *name*, so dedup is also semantically correct.
+
+## Consolidated MRP loads (per-row effective dates)
+- The seed loaded all prices with a single blanket `effective_date = 2026-05-01`. Real MRP files carry **per-row** effective dates that differ by division (e.g. PTMT 2026-04-20, Hardware 2026-03-01, CP/Pipe/Sanitary 2026-05-01).
+- **Limitation:** the in-app Load MRP route applies ONE effective date to the whole upload and auto-creates new products with null metadata. It does NOT read per-row dates. For a structured consolidated file (columns item_code/product_name/division/category/mrp/price_basis/effective_date/...), a dedicated loader is needed instead of the UI.
+- **How a consolidated load was done:** one-off esbuild-bundled node script importing `@workspace/db` + xlsx, INSERT with `onConflictDoNothing` on `(item_code, effective_date)` (idempotent — re-run inserts 0), match existing by `normCode` (trim+upper+strip-spaces), create only truly-new codes, then recompute is_current. Bundle needs the `createRequire` banner or xlsx's dynamic `require("stream")` fails.
+- **is_current = latest effective_date (NOT latest load_date).** Consequence: if a product was already seeded at 2026-05-01, a file row dated 2026-04-20/03-01 is preserved but does NOT become current. This is correct per spec but surprises users who expect "newest load wins".
+- **Persistent pending after a full load are real data gaps, not bugs:** catalog-only codes absent from the MRP file — conflict-split variants (`145-LSB-V1`/`-V2` where the file uses the original `145-LSB`), "Series" placeholder rows, and spacing near-duplicates (`DB-02 L` vs `DB-02L`, both normalize equal so only one gets history).
