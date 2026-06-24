@@ -832,4 +832,27 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
   res.json(buildComparisonRow(row, maps));
 });
 
+// DELETE /catalog/competitors/:competitor — remove all price rows for a brand
+// the team no longer tracks. The brand then disappears from comparison filters,
+// By Product columns, and summary KPIs (all computed live from these rows).
+router.delete("/catalog/competitors/:competitor", async (req, res) => {
+  const competitor = strParam(req.params.competitor);
+  if (!competitor) {
+    res.status(400).json({ error: "competitor name is required" });
+    return;
+  }
+
+  const deleted = await db
+    .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, competitor))
+    .returning({ id: competitorPricesTable.id });
+
+  if (deleted.length === 0) {
+    res.status(404).json({ error: "Competitor not found" });
+    return;
+  }
+
+  res.json({ ok: true, competitor, deleted: deleted.length });
+});
+
 export default router;

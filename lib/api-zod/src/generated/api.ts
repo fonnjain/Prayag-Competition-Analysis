@@ -654,3 +654,17 @@ export const UpdateCompetitorMappingResponse = zod.object({
 })
 
 
+/**
+ * @summary Delete all price rows for a competitor brand
+ */
+export const DeleteCatalogCompetitorParams = zod.object({
+  "competitor": zod.coerce.string()
+})
+
+export const DeleteCatalogCompetitorResponse = zod.object({
+  "ok": zod.boolean(),
+  "competitor": zod.string(),
+  "deleted": zod.number().describe('Number of competitor price rows removed.')
+})
+
+

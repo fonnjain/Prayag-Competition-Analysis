@@ -34,6 +34,7 @@ import type {
   CompetitorMappingUpdate,
   CompetitorUpdate,
   DashboardSummary,
+  DeleteCompetitorResult,
   ErrorResponse,
   GetCatalogProductsParams,
   GetComparisonByProductParams,
@@ -2000,5 +2001,75 @@ export const useUpdateCompetitorMapping = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateCompetitorMappingMutationOptions(options));
+    }
+
+export const getDeleteCatalogCompetitorUrl = (competitor: string,) => {
+
+
+
+
+  return `/api/catalog/competitors/${competitor}`
+}
+
+/**
+ * @summary Delete all price rows for a competitor brand
+ */
+export const deleteCatalogCompetitor = async (competitor: string, options?: RequestInit): Promise<DeleteCompetitorResult> => {
+
+  return customFetch<DeleteCompetitorResult>(getDeleteCatalogCompetitorUrl(competitor),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCatalogCompetitorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, TError,{competitor: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, TError,{competitor: string}, TContext> => {
+
+const mutationKey = ['deleteCatalogCompetitor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, {competitor: string}> = (props) => {
+          const {competitor} = props ?? {};
+
+          return  deleteCatalogCompetitor(competitor,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCatalogCompetitorMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCatalogCompetitor>>>
+
+    export type DeleteCatalogCompetitorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete all price rows for a competitor brand
+ */
+export const useDeleteCatalogCompetitor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, TError,{competitor: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCatalogCompetitor>>,
+        TError,
+        {competitor: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCatalogCompetitorMutationOptions(options));
     }
 

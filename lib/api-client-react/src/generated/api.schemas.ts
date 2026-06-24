@@ -146,6 +146,13 @@ export interface OkResponse {
   ok: boolean;
 }
 
+export interface DeleteCompetitorResult {
+  ok: boolean;
+  competitor: string;
+  /** Number of competitor price rows removed. */
+  deleted: number;
+}
+
 export type CompetitorCellBasis = typeof CompetitorCellBasis[keyof typeof CompetitorCellBasis];
 
 

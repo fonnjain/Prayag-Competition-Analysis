@@ -603,6 +603,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /catalog/competitors/{competitor}:
+    delete:
+      operationId: deleteCatalogCompetitor
+      tags: [comparison]
+      summary: Delete all price rows for a competitor brand
+      parameters:
+        - name: competitor
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteCompetitorResult"
 components:
   schemas:
     ErrorResponse:
@@ -822,6 +840,17 @@ components:
       properties:
         ok:
           type: boolean
+    DeleteCompetitorResult:
+      type: object
+      required: [ok, competitor, deleted]
+      properties:
+        ok:
+          type: boolean
+        competitor:
+          type: string
+        deleted:
+          type: integer
+          description: Number of competitor price rows removed.
     CompetitorCell:
       type: object
       required: [competitor, basis, price, diffPct, isCheapest]

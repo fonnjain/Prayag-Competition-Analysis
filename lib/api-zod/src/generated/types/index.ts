@@ -35,6 +35,7 @@ export * from './competitorUpdate';
 export * from './competitorWinRate';
 export * from './confidenceCounts';
 export * from './dashboardSummary';
+export * from './deleteCompetitorResult';
 export * from './errorResponse';
 export * from './getCatalogProductsParams';
 export * from './getComparisonByProductParams';

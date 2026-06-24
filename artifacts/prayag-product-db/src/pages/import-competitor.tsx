@@ -3,23 +3,69 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, Upload } from "lucide-react";
+import { FileUp, Upload, Trash2, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  useGetComparisonFilters,
+  useDeleteCatalogCompetitor,
   getGetComparisonQueryKey,
+  getGetComparisonByProductQueryKey,
   getGetComparisonSummaryQueryKey,
   getGetComparisonFiltersQueryKey,
-  getGetMappingReviewQueryKey
+  getGetComparisonMatrixQueryKey,
+  getGetMappingReviewQueryKey,
 } from "@workspace/api-client-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function ImportCompetitorPage() {
   const [file, setFile] = useState<File | null>(null);
   const [competitor, setCompetitor] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: filters } = useGetComparisonFilters();
+  const competitors = filters?.competitors ?? [];
+
+  const invalidateComparisonQueries = () => {
+    queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonByProductQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonFiltersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonMatrixQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
+  };
+
+  const deleteMutation = useDeleteCatalogCompetitor({
+    mutation: {
+      onSuccess: (data) => {
+        toast({
+          title: "Brand Removed",
+          description: `Deleted ${data.deleted} price rows for ${data.competitor}.`,
+        });
+        invalidateComparisonQueries();
+      },
+      onError: (err: any) => {
+        toast({
+          title: "Delete Failed",
+          description: err?.message || "Could not remove competitor brand.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,12 +95,8 @@ export default function ImportCompetitorPage() {
         title: "Upload Successful",
         description: `Imported ${data.results.inserted} rows for ${data.results.competitor}.`,
       });
-      
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getGetComparisonFiltersQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
+
+      invalidateComparisonQueries();
 
       // Reset file input
       setFile(null);
@@ -152,6 +194,78 @@ export default function ImportCompetitorPage() {
           )}
         </div>
       )}
+
+      <div className="bg-card border rounded-lg p-6 space-y-4">
+        <div>
+          <h3 className="font-semibold text-lg">Tracked Competitor Brands</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Remove a brand you no longer track. This deletes all of its price rows
+            and removes it from the comparison filters, columns, and KPIs.
+          </p>
+        </div>
+
+        {competitors.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-4 text-center border border-dashed rounded-md">
+            No competitor brands loaded yet. Upload a price sheet above to get started.
+          </div>
+        ) : (
+          <ul className="divide-y border rounded-md">
+            {competitors.map((brand) => {
+              const isDeleting =
+                deleteMutation.isPending &&
+                deleteMutation.variables?.competitor === brand;
+              return (
+                <li
+                  key={brand}
+                  className="flex items-center justify-between gap-4 px-4 py-3"
+                >
+                  <span className="font-medium">{brand}</span>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={deleteMutation.isPending}
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4 mr-2" />
+                        )}
+                        Remove
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove {brand}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This permanently deletes all of {brand}'s price rows.
+                          The brand will disappear from the comparison filters,
+                          By Product columns, and summary KPIs. This cannot be
+                          undone — you would need to re-upload its price sheet to
+                          restore it.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() =>
+                            deleteMutation.mutate({ competitor: brand })
+                          }
+                        >
+                          Remove Brand
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
