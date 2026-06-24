@@ -563,7 +563,16 @@ export const GetMappingReviewResponse = zod.object({
   "unit": zod.string().nullish(),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
-  "matchConfidence": zod.string().nullish()
+  "matchConfidence": zod.string().nullish(),
+  "suggestions": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "currentMrp": zod.number().nullish(),
+  "confidence": zod.number(),
+  "confidenceLabel": zod.enum(['high', 'medium', 'low'])
+}))
 })),
   "total": zod.number(),
   "page": zod.number(),

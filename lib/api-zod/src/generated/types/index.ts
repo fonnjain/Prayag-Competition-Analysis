@@ -46,6 +46,8 @@ export * from './getRecommendationsParams';
 export * from './healthStatus';
 export * from './mappingReviewList';
 export * from './mappingReviewRow';
+export * from './mappingSuggestion';
+export * from './mappingSuggestionConfidenceLabel';
 export * from './mrpPriceRow';
 export * from './okResponse';
 export * from './productMatrix';

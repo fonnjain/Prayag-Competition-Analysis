@@ -1197,9 +1197,28 @@ components:
           type: array
           items:
             type: string
+    MappingSuggestion:
+      type: object
+      required: [itemCode, confidence, confidenceLabel]
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        currentMrp:
+          type: ["number", "null"]
+        confidence:
+          type: integer
+        confidenceLabel:
+          type: string
+          enum: [high, medium, low]
     MappingReviewRow:
       type: object
-      required: [id, competitor, price, matchStatus, matchedPrayagCode]
+      required: [id, competitor, price, matchStatus, matchedPrayagCode, suggestions]
       properties:
         id:
           type: integer
@@ -1221,6 +1240,10 @@ components:
           type: string
         matchConfidence:
           type: ["string", "null"]
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MappingSuggestion"
     MappingReviewList:
       type: object
       required: [rows, total, page, pageSize]

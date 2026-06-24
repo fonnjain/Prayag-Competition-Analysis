@@ -7,6 +7,7 @@ import {
   mrpPriceHistoryTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
+import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
 
 const router: IRouter = Router();
 
@@ -57,6 +58,41 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
     }
   }
   return map;
+}
+
+// Catalog products with their current MRP, prepared for fuzzy matching. Built
+// once per request so per-row scoring is cheap.
+async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
+  const products = await db
+    .select({
+      itemCode: catalogProductsTable.itemCode,
+      productName: catalogProductsTable.productName,
+      division: catalogProductsTable.division,
+      category: catalogProductsTable.category,
+      size: catalogProductsTable.size,
+    })
+    .from(catalogProductsTable);
+  const current = await db
+    .select({
+      itemCode: mrpPriceHistoryTable.itemCode,
+      mrp: mrpPriceHistoryTable.mrp,
+    })
+    .from(mrpPriceHistoryTable)
+    .where(eq(mrpPriceHistoryTable.isCurrent, true));
+
+  const mrpByCode = new Map<string, number | null>();
+  for (const c of current) mrpByCode.set(normCode(c.itemCode), c.mrp);
+
+  return products.map((p) =>
+    buildCandidate({
+      itemCode: p.itemCode,
+      productName: p.productName,
+      category: p.category,
+      division: p.division,
+      size: p.size,
+      currentMrp: mrpByCode.get(normCode(p.itemCode)) ?? null,
+    }),
+  );
 }
 
 type CompRow = typeof competitorPricesTable.$inferSelect;
@@ -299,7 +335,17 @@ router.get("/catalog/mapping-review", async (req, res) => {
     .limit(pageSize)
     .offset((page - 1) * pageSize);
 
-  res.json({ rows, total, page, pageSize });
+  // Attach fuzzy match suggestions for the rows on this page only.
+  const candidates = rows.length > 0 ? await getCatalogCandidates() : [];
+  const withSuggestions = rows.map((r) => ({
+    ...r,
+    suggestions: suggestMatches(
+      { category: r.category, description: r.description, size: r.size },
+      candidates,
+    ),
+  }));
+
+  res.json({ rows: withSuggestions, total, page, pageSize });
 });
 
 // GET /catalog/comparison/matrix — side-by-side view: one row per Prayag

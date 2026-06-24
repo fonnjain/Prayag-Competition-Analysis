@@ -5,6 +5,7 @@
  * Prayag Competition Console API
  * OpenAPI spec version: 0.1.0
  */
+import type { MappingSuggestion } from './mappingSuggestion';
 
 export interface MappingReviewRow {
   id: number;
@@ -23,4 +24,5 @@ export interface MappingReviewRow {
   matchStatus: string;
   /** @nullable */
   matchConfidence?: string | null;
+  suggestions: MappingSuggestion[];
 }

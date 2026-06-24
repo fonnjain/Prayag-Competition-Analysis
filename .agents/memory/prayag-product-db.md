@@ -33,6 +33,12 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 - **Side-by-side matrix** (`GET /catalog/comparison/matrix`) groups matched rows by `normCode` and keeps the **cheapest** competitor price per (Prayag code, competitor). Its `total` = distinct Prayag codes across all competitors (~431), which is correctly far smaller than the per-competitor matched-row counts (~1380 each).
 - **Gotcha:** the comparison *list* endpoint caps `pageSize` at 200, so counting distinct codes from one page of `rows` undercounts wildly. Trust the matrix endpoint / DB for distinct-code counts, not a single list page.
 
+## Fuzzy match suggestions (Mapping Review)
+- `GET /catalog/mapping-review` embeds 1-3 `suggestions` per row (top Prayag catalog candidates) scored live in `artifacts/api-server/src/lib/suggest.ts`. Catalog candidates are built once per request and only the page's rows are scored — N×catalog is trivial. This is independent of `match_confidence` (the seeded High/Medium/Low column): suggestions are computed fresh for unmatched rows to help assign a code, confidence reflects existing/assigned matches.
+- Scoring is a heuristic: weighted token overlap (digit tokens weight 2 — sizes/gauges are discriminative), category Jaccard, plus a size match boost. Catalog `size` is mostly null with the real size embedded in `productName`, so size matching falls back to substring search in the product text.
+- **Limitation:** competitor descriptions are sparse ("Coupler (PN 16)") and sizes are bare numbers ("20"), so suggestions surface same-category candidates but can mis-rank (a pipe whose name contains "10 KG 20 mm" can outrank a coupler). Confidence labels (high≥55, medium≥35, low) communicate this; do not treat suggestions as authoritative.
+- Accepting a suggestion in the UI calls the existing PATCH with `matchStatus:"matched"`; there is no separate accept endpoint.
+
 ## Filters gotcha
 - The same category name can appear under multiple divisions; dedupe category names before rendering the Select or you get duplicate React keys/values. Backend filter param is a category *name*, so dedup is also semantically correct.
 

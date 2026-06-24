@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { 
   useGetMappingReview,
   useUpdateCompetitorMapping,
@@ -10,7 +10,8 @@ import {
 } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -83,15 +84,12 @@ export default function MappingReviewPage() {
     });
   };
 
-  const handleSave = (id: number) => {
-    const edit = editingRows[id];
-    if (!edit) return;
-
+  const persistMapping = (id: number, code: string, status: string) => {
     updateMapping.mutate({
       id,
       data: {
-        matchedPrayagCode: edit.code || null,
-        matchStatus: edit.status
+        matchedPrayagCode: code || null,
+        matchStatus: status
       }
     }, {
       onSuccess: () => {
@@ -121,6 +119,16 @@ export default function MappingReviewPage() {
         });
       }
     });
+  };
+
+  const handleSave = (id: number) => {
+    const edit = editingRows[id];
+    if (!edit) return;
+    persistMapping(id, edit.code, edit.status);
+  };
+
+  const handleAcceptSuggestion = (id: number, code: string) => {
+    persistMapping(id, code, "matched");
   };
 
   const total = mappingData?.total ?? 0;
@@ -205,9 +213,11 @@ export default function MappingReviewPage() {
                   const statusVal = editState?.status ?? (row.matchStatus || "no match (review)");
                   const hasChanges = editState !== undefined;
                   const invalidMatch = statusVal === "matched" && !codeVal.trim();
+                  const suggestions = row.suggestions ?? [];
 
                   return (
-                    <tr key={row.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                    <Fragment key={row.id}>
+                    <tr className={`hover:bg-muted/50 transition-colors ${suggestions.length > 0 ? "" : "border-b last:border-0"}`}>
                       <td className="px-4 py-3 font-medium">{row.competitor}</td>
                       <td className="px-4 py-3 text-muted-foreground">{row.category || "-"}</td>
                       <td className="px-4 py-3 max-w-[250px] truncate" title={row.description || ""}>
@@ -258,6 +268,55 @@ export default function MappingReviewPage() {
                         </Button>
                       </td>
                     </tr>
+                    {suggestions.length > 0 && (
+                      <tr className="border-b last:border-0 bg-muted/20">
+                        <td colSpan={4}></td>
+                        <td colSpan={4} className="px-4 pb-3 pt-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Suggested:
+                            </span>
+                            {suggestions.map((s) => (
+                              <button
+                                key={s.itemCode}
+                                type="button"
+                                disabled={updateMapping.isPending}
+                                onClick={() => handleAcceptSuggestion(row.id, s.itemCode)}
+                                title={[
+                                  s.productName,
+                                  s.category,
+                                  s.size,
+                                  s.currentMrp != null ? `MRP ₹${s.currentMrp.toFixed(2)}` : null,
+                                ].filter(Boolean).join(" · ")}
+                                className="group flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+                              >
+                                <Check className="w-3 h-3 text-muted-foreground group-hover:text-primary" />
+                                <span className="font-mono font-medium uppercase">{s.itemCode}</span>
+                                {s.productName && (
+                                  <span className="max-w-[180px] truncate text-muted-foreground">
+                                    {s.productName}
+                                  </span>
+                                )}
+                                <Badge
+                                  variant={
+                                    s.confidenceLabel === "high"
+                                      ? "default"
+                                      : s.confidenceLabel === "medium"
+                                        ? "secondary"
+                                        : "outline"
+                                  }
+                                  className="ml-0.5 px-1.5 py-0 text-[10px]"
+                                >
+                                  {s.confidence}%
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })
               )}

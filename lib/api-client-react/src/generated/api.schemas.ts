@@ -434,6 +434,29 @@ export interface ComparisonFilters {
   confidences: string[];
 }
 
+export type MappingSuggestionConfidenceLabel = typeof MappingSuggestionConfidenceLabel[keyof typeof MappingSuggestionConfidenceLabel];
+
+
+export const MappingSuggestionConfidenceLabel = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export interface MappingSuggestion {
+  itemCode: string;
+  /** @nullable */
+  productName?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  currentMrp?: number | null;
+  confidence: number;
+  confidenceLabel: MappingSuggestionConfidenceLabel;
+}
+
 export interface MappingReviewRow {
   id: number;
   competitor: string;
@@ -451,6 +474,7 @@ export interface MappingReviewRow {
   matchStatus: string;
   /** @nullable */
   matchConfidence?: string | null;
+  suggestions: MappingSuggestion[];
 }
 
 export interface MappingReviewList {
