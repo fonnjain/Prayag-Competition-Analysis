@@ -19,6 +19,10 @@ search?: string;
  * Only rows where Prayag is more expensive than the competitor.
  */
 expensiveOnly?: boolean;
+/**
+ * Only rows whose unit basis is ambiguous (flagged for review).
+ */
+ambiguousOnly?: boolean;
 page?: number;
 pageSize?: number;
 };

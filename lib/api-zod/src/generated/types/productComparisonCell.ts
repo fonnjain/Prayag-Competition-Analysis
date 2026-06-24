@@ -9,7 +9,17 @@
 export interface ProductComparisonCell {
   competitor: string;
   price: number;
-  /** @nullable */
+  /**
+     * Competitor price reduced to ₹/metre, when length-normalizable.
+     * @nullable
+     */
+  perMetre?: number | null;
+  /**
+     * Diff% on the SKU's comparison basis (per metre when the Prayag SKU is length-based, else raw); null when this cell's unit is ambiguous.
+     * @nullable
+     */
   diffPct: number | null;
   isCheapest: boolean;
+  /** True when this cell's unit basis cannot be resolved. */
+  unitAmbiguous?: boolean;
 }

@@ -9,6 +9,11 @@ import {
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
 import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
+import {
+  computeCompareNorm,
+  normalizePerMetre,
+  type NormResult,
+} from "../lib/priceNormalize";
 
 const router: IRouter = Router();
 
@@ -141,6 +146,25 @@ function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
     diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
     prayagCheaper = prayagMrp <= c.price;
   }
+
+  // Reduce length-based prices (pipes/coils) to a per-metre basis so the diff
+  // is like-for-like; flag rows whose unit basis is ambiguous for review.
+  const norm = computeCompareNorm({
+    prayagName: prayag?.productName ?? null,
+    prayagMrp,
+    description: c.description,
+    size: c.size,
+    unit: c.unit,
+    price: c.price,
+  });
+  const effectiveDiffPct = norm.unitAmbiguous
+    ? null
+    : norm.lengthNormalized
+      ? norm.perMetreDiffPct
+      : diffPct;
+  const effectivePrayagCheaper =
+    effectiveDiffPct == null ? null : effectiveDiffPct <= 0;
+
   return {
     id: c.id,
     competitor: c.competitor,
@@ -158,6 +182,14 @@ function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
     prayagEffectiveDate: prayag?.effectiveDate ?? null,
     diffPct,
     prayagCheaper,
+    compPerMetre: norm.compPerMetre,
+    prayagPerMetre: norm.prayagPerMetre,
+    perMetreDiffPct: norm.perMetreDiffPct,
+    lengthNormalized: norm.lengthNormalized,
+    unitAmbiguous: norm.unitAmbiguous,
+    normalizationNote: norm.normalizationNote,
+    effectiveDiffPct,
+    effectivePrayagCheaper,
   };
 }
 
@@ -173,6 +205,7 @@ router.get("/catalog/comparison", async (req, res) => {
   const confidence = strParam(req.query.confidence);
   const search = strParam(req.query.search);
   const expensiveOnly = req.query.expensiveOnly === "true";
+  const ambiguousOnly = req.query.ambiguousOnly === "true";
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
@@ -200,7 +233,8 @@ router.get("/catalog/comparison", async (req, res) => {
   );
 
   let rows = all.map((c) => buildComparisonRow(c, maps));
-  if (expensiveOnly) rows = rows.filter((r) => r.prayagCheaper === false);
+  if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
+  if (ambiguousOnly) rows = rows.filter((r) => r.unitAmbiguous);
 
   const total = rows.length;
   const start = (page - 1) * pageSize;
@@ -237,7 +271,7 @@ router.get("/catalog/comparison/export", async (req, res) => {
   );
 
   let rows = all.map((c) => buildComparisonRow(c, maps));
-  if (expensiveOnly) rows = rows.filter((r) => r.prayagCheaper === false);
+  if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
 
   const header = [
     "Competitor",
@@ -252,6 +286,12 @@ router.get("/catalog/comparison/export", async (req, res) => {
     "Prayag MRP",
     "Prayag Effective Date",
     "Diff %",
+    "Competitor ₹/m",
+    "Prayag ₹/m",
+    "Per-metre Diff %",
+    "Effective Diff %",
+    "Unit Ambiguous",
+    "Normalization Note",
     "Status",
   ];
   const body = rows.map((r) => [
@@ -267,6 +307,12 @@ router.get("/catalog/comparison/export", async (req, res) => {
     r.prayagMrp,
     r.prayagEffectiveDate,
     r.diffPct,
+    r.compPerMetre,
+    r.prayagPerMetre,
+    r.perMetreDiffPct,
+    r.effectiveDiffPct,
+    r.unitAmbiguous ? "yes" : "",
+    r.normalizationNote,
     r.matchStatus,
   ]);
   sendSheet(res, [header, ...body], "Comparison", "prayag-comparison", format);
@@ -283,9 +329,12 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   const rows = all.map((c) => buildComparisonRow(c, maps));
 
   const matched = rows.filter((r) => !!r.matchedPrayagCode);
-  const comparable = rows.filter((r) => r.diffPct != null);
-  const cheaper = comparable.filter((r) => r.prayagCheaper);
+  // Comparable rows use the per-metre-normalized diff where it applies, and
+  // exclude rows whose unit basis is ambiguous (those go to manual review).
+  const comparable = rows.filter((r) => r.effectiveDiffPct != null);
+  const cheaper = comparable.filter((r) => r.effectivePrayagCheaper);
   const reviewRows = rows.filter((r) => r.matchStatus !== "matched");
+  const ambiguousRows = rows.filter((r) => r.unitAmbiguous);
 
   const confidenceCounts = {
     high: rows.filter((r) => r.matchConfidence === "High").length,
@@ -297,7 +346,7 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   const avgDiffPct =
     comparable.length > 0
       ? Math.round(
-          (comparable.reduce((s, r) => s + (r.diffPct ?? 0), 0) /
+          (comparable.reduce((s, r) => s + (r.effectiveDiffPct ?? 0), 0) /
             comparable.length) *
             10,
         ) / 10
@@ -311,8 +360,8 @@ router.get("/catalog/comparison/summary", async (req, res) => {
     const cat = r.category ?? "Uncategorized";
     const e = byCat.get(cat) ?? { comparable: 0, cheaper: 0, diffSum: 0 };
     e.comparable++;
-    if (r.prayagCheaper) e.cheaper++;
-    e.diffSum += r.diffPct ?? 0;
+    if (r.effectivePrayagCheaper) e.cheaper++;
+    e.diffSum += r.effectiveDiffPct ?? 0;
     byCat.set(cat, e);
   }
   const categoryWinRates = [...byCat.entries()]
@@ -341,6 +390,7 @@ router.get("/catalog/comparison/summary", async (req, res) => {
         : null,
     avgDiffPct,
     reviewCount: reviewRows.length,
+    ambiguousCount: ambiguousRows.length,
     confidenceCounts,
     categoryWinRates,
   });
@@ -513,12 +563,18 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     .where(and(...conditions));
 
   // Group competitor rows by the Prayag SKU they map to. A competitor can have
-  // several rows for one SKU (e.g. different sizes), so we keep the lowest price
-  // per competitor — the most aggressive rival quote for that SKU.
+  // several rows for one SKU (e.g. different sizes), so we keep every row and
+  // pick the most aggressive quote per competitor after per-metre normalization.
+  interface CompCandidate {
+    price: number;
+    description: string | null;
+    size: string | null;
+    unit: string | null;
+  }
   interface Group {
     itemCode: string;
     category: string | null;
-    byCompetitor: Map<string, number>;
+    byCompetitor: Map<string, CompCandidate[]>;
   }
   const groups = new Map<string, Group>();
   for (const c of matchedRows) {
@@ -534,48 +590,131 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       groups.set(key, g);
     }
     if (!g.category && c.category) g.category = c.category;
-    const prev = g.byCompetitor.get(c.competitor);
-    if (prev == null || c.price < prev) g.byCompetitor.set(c.competitor, c.price);
+    const list = g.byCompetitor.get(c.competitor) ?? [];
+    list.push({
+      price: c.price,
+      description: c.description,
+      size: c.size,
+      unit: c.unit,
+    });
+    g.byCompetitor.set(c.competitor, list);
   }
 
   let rows = [...groups.entries()].map(([key, g]) => {
     const prayag = maps.get(key);
     const prayagMrp = prayag?.mrp ?? null;
 
+    // Decide the row's comparison basis from the Prayag product: if it is a
+    // length-based SKU (a single pack length parseable from its name), every
+    // price for this SKU is compared per metre; otherwise per piece (raw).
+    const prNorm: NormResult | null =
+      prayagMrp != null
+        ? normalizePerMetre({
+            description: prayag?.productName ?? null,
+            size: null,
+            unit: null,
+            price: prayagMrp,
+          })
+        : null;
+    const isLenRow = prNorm?.status === "normalized";
+    const prayagBasis = isLenRow ? prNorm!.perMetre : prayagMrp;
+
+    // For one competitor, reduce each candidate row to the comparison basis and
+    // keep the cheapest. A row whose unit basis is ambiguous can't be placed on
+    // the per-metre axis, so it is surfaced (flagged) but never ranked/charted.
+    interface Picked {
+      competitor: string;
+      price: number;
+      perMetre: number | null;
+      basisPrice: number | null;
+      unitAmbiguous: boolean;
+    }
+    const picks: Picked[] = [];
+    for (const [competitor, candidates] of g.byCompetitor) {
+      let best: Picked | null = null;
+      for (const cand of candidates) {
+        let perMetre: number | null = null;
+        let basisPrice: number | null;
+        let ambiguous = false;
+        if (isLenRow) {
+          const n = normalizePerMetre({
+            description: cand.description,
+            size: cand.size,
+            unit: cand.unit,
+            price: cand.price,
+          });
+          if (n.status === "normalized") {
+            perMetre = n.perMetre;
+            basisPrice = n.perMetre;
+          } else {
+            basisPrice = null;
+            ambiguous = true;
+          }
+        } else {
+          basisPrice = cand.price;
+        }
+        const candPick: Picked = {
+          competitor,
+          price: cand.price,
+          perMetre,
+          basisPrice,
+          unitAmbiguous: ambiguous,
+        };
+        // Prefer rows that can be placed on the basis; among those, the cheapest.
+        if (!best) best = candPick;
+        else if (best.basisPrice == null && candPick.basisPrice != null) best = candPick;
+        else if (
+          candPick.basisPrice != null &&
+          best.basisPrice != null &&
+          candPick.basisPrice < best.basisPrice
+        )
+          best = candPick;
+      }
+      if (best) picks.push(best);
+    }
+
     let cheapestRival: number | null = null;
     let cheapestRivalName: string | null = null;
-    for (const [name, price] of g.byCompetitor) {
-      if (cheapestRival == null || price < cheapestRival) {
-        cheapestRival = price;
-        cheapestRivalName = name;
+    for (const p of picks) {
+      if (p.basisPrice == null) continue;
+      if (cheapestRival == null || p.basisPrice < cheapestRival) {
+        cheapestRival = p.basisPrice;
+        cheapestRivalName = p.competitor;
       }
     }
 
-    const competitors = [...g.byCompetitor.entries()]
-      .map(([competitor, price]) => {
+    const competitors = picks
+      .map((p) => {
         let diffPct: number | null = null;
-        if (prayagMrp != null && price > 0) {
-          diffPct = Math.round(((prayagMrp - price) / price) * 1000) / 10;
+        if (prayagBasis != null && p.basisPrice != null && p.basisPrice > 0) {
+          diffPct =
+            Math.round(((prayagBasis - p.basisPrice) / p.basisPrice) * 1000) / 10;
         }
         return {
-          competitor,
-          price,
+          competitor: p.competitor,
+          price: p.price,
+          perMetre: p.perMetre,
           diffPct,
-          isCheapest: competitor === cheapestRivalName,
+          isCheapest: p.competitor === cheapestRivalName,
+          unitAmbiguous: p.unitAmbiguous,
         };
       })
       .sort((a, b) => a.competitor.localeCompare(b.competitor));
 
     let diffPct: number | null = null;
-    if (prayagMrp != null && cheapestRival != null && cheapestRival > 0) {
-      diffPct = Math.round(((prayagMrp - cheapestRival) / cheapestRival) * 1000) / 10;
+    if (prayagBasis != null && cheapestRival != null && cheapestRival > 0) {
+      diffPct = Math.round(((prayagBasis - cheapestRival) / cheapestRival) * 1000) / 10;
     }
     const prayagLowest =
-      prayagMrp != null && cheapestRival != null && prayagMrp <= cheapestRival;
+      prayagBasis != null && cheapestRival != null && prayagBasis <= cheapestRival;
 
-    // Whole-market read across every loaded rival brand for this SKU. Median is
-    // the true sample median (avg of the two middle prices for an even count).
-    const rivalPrices = [...g.byCompetitor.values()].sort((a, b) => a - b);
+    // Whole-market read across every loaded rival brand for this SKU, on the
+    // comparison basis. Median is the true sample median (avg of the two middle
+    // prices for an even count).
+    const rivalPrices = picks
+      .map((p) => p.basisPrice)
+      .filter((v): v is number => v != null)
+      .sort((a, b) => a - b);
     let marketMin: number | null = null;
     let marketMedian: number | null = null;
     let marketMax: number | null = null;
@@ -594,10 +733,10 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     // engine): leader ≤ min, competitive ≤ median, above_market ≤ max, else
     // overpriced; no_data when there is no MRP or no rivals.
     let marketPosition: string = "no_data";
-    if (prayagMrp != null && rivalPrices.length > 0) {
-      if (prayagMrp <= marketMin!) marketPosition = "leader";
-      else if (prayagMrp <= marketMedian!) marketPosition = "competitive";
-      else if (prayagMrp <= marketMax!) marketPosition = "above_market";
+    if (prayagBasis != null && rivalPrices.length > 0) {
+      if (prayagBasis <= marketMin!) marketPosition = "leader";
+      else if (prayagBasis <= marketMedian!) marketPosition = "competitive";
+      else if (prayagBasis <= marketMax!) marketPosition = "above_market";
       else marketPosition = "overpriced";
     }
 
@@ -606,12 +745,15 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       prayagProductName: prayag?.productName ?? null,
       category: g.category,
       prayagMrp,
+      prayagPerMetre: isLenRow ? prNorm!.perMetre : null,
+      lengthNormalized: isLenRow,
+      unitAmbiguous: competitors.some((c) => c.unitAmbiguous),
       prayagEffectiveDate: prayag?.effectiveDate ?? null,
       competitors,
       cheapestRival,
       cheapestRivalName,
       prayagLowest,
-      rivalCount: competitors.length,
+      rivalCount: competitors.filter((c) => !c.unitAmbiguous).length,
       diffPct,
       marketMin,
       marketMedian,

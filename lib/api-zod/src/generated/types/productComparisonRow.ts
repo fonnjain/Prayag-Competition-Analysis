@@ -16,6 +16,15 @@ export interface ProductComparisonRow {
   category?: string | null;
   /** @nullable */
   prayagMrp: number | null;
+  /**
+     * Prayag MRP reduced to ₹/metre when this SKU is length-based.
+     * @nullable
+     */
+  prayagPerMetre?: number | null;
+  /** True when this SKU is compared on a per-metre basis. */
+  lengthNormalized?: boolean;
+  /** True when any competitor cell for this SKU has an ambiguous unit. */
+  unitAmbiguous?: boolean;
   /** @nullable */
   prayagEffectiveDate?: string | null;
   competitors: ProductComparisonCell[];

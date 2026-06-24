@@ -392,6 +392,40 @@ export interface ComparisonRow {
   diffPct: number | null;
   /** @nullable */
   prayagCheaper: boolean | null;
+  /**
+     * Competitor price reduced to ₹/metre, when length-normalizable.
+     * @nullable
+     */
+  compPerMetre?: number | null;
+  /**
+     * Prayag MRP reduced to ₹/metre, when length-normalizable.
+     * @nullable
+     */
+  prayagPerMetre?: number | null;
+  /**
+     * (prayagPerMetre − compPerMetre) / compPerMetre × 100.
+     * @nullable
+     */
+  perMetreDiffPct?: number | null;
+  /** True when both sides were compared on a per-metre basis. */
+  lengthNormalized?: boolean;
+  /** True when the row's unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review. */
+  unitAmbiguous?: boolean;
+  /**
+     * Human-readable explanation of how the row was normalized/flagged.
+     * @nullable
+     */
+  normalizationNote?: string | null;
+  /**
+     * The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.
+     * @nullable
+     */
+  effectiveDiffPct?: number | null;
+  /**
+     * True when effectiveDiffPct ≤ 0 (Prayag cheaper).
+     * @nullable
+     */
+  effectivePrayagCheaper?: boolean | null;
 }
 
 export interface ComparisonList {
@@ -404,9 +438,19 @@ export interface ComparisonList {
 export interface ProductComparisonCell {
   competitor: string;
   price: number;
-  /** @nullable */
+  /**
+     * Competitor price reduced to ₹/metre, when length-normalizable.
+     * @nullable
+     */
+  perMetre?: number | null;
+  /**
+     * Diff% on the SKU's comparison basis (per metre when the Prayag SKU is length-based, else raw); null when this cell's unit is ambiguous.
+     * @nullable
+     */
   diffPct: number | null;
   isCheapest: boolean;
+  /** True when this cell's unit basis cannot be resolved. */
+  unitAmbiguous?: boolean;
 }
 
 /**
@@ -431,6 +475,15 @@ export interface ProductComparisonRow {
   category?: string | null;
   /** @nullable */
   prayagMrp: number | null;
+  /**
+     * Prayag MRP reduced to ₹/metre when this SKU is length-based.
+     * @nullable
+     */
+  prayagPerMetre?: number | null;
+  /** True when this SKU is compared on a per-metre basis. */
+  lengthNormalized?: boolean;
+  /** True when any competitor cell for this SKU has an ambiguous unit. */
+  unitAmbiguous?: boolean;
   /** @nullable */
   prayagEffectiveDate?: string | null;
   competitors: ProductComparisonCell[];
@@ -489,6 +542,8 @@ export interface ComparisonSummary {
   /** @nullable */
   avgDiffPct?: number | null;
   reviewCount: number;
+  /** Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and therefore excluded from KPIs and flagged for manual review. */
+  ambiguousCount?: number;
   confidenceCounts?: ConfidenceCounts;
   categoryWinRates: ComparisonCategoryWinRate[];
 }
@@ -668,6 +723,10 @@ search?: string;
  * Only rows where Prayag is more expensive than the competitor.
  */
 expensiveOnly?: boolean;
+/**
+ * Only rows whose unit basis is ambiguous (flagged for review).
+ */
+ambiguousOnly?: boolean;
 page?: number;
 pageSize?: number;
 };

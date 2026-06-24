@@ -437,6 +437,7 @@ export const GetComparisonQueryParams = zod.object({
   "confidence": zod.coerce.string().optional().describe('Filter by match confidence tier (High, Medium, Low).'),
   "search": zod.coerce.string().optional(),
   "expensiveOnly": zod.coerce.boolean().optional().describe('Only rows where Prayag is more expensive than the competitor.'),
+  "ambiguousOnly": zod.coerce.boolean().optional().describe('Only rows whose unit basis is ambiguous (flagged for review).'),
   "page": zod.coerce.number().optional(),
   "pageSize": zod.coerce.number().optional()
 })
@@ -458,7 +459,15 @@ export const GetComparisonResponse = zod.object({
   "prayagMrp": zod.number().nullable(),
   "prayagEffectiveDate": zod.string().nullish(),
   "diffPct": zod.number().nullable(),
-  "prayagCheaper": zod.boolean().nullable()
+  "prayagCheaper": zod.boolean().nullable(),
+  "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
+  "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
+  "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
+  "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
+  "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -482,6 +491,7 @@ export const GetComparisonSummaryResponse = zod.object({
   "prayagCheaperPct": zod.number().nullable(),
   "avgDiffPct": zod.number().nullish(),
   "reviewCount": zod.number(),
+  "ambiguousCount": zod.number().optional().describe('Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and therefore excluded from KPIs and flagged for manual review.'),
   "confidenceCounts": zod.object({
   "high": zod.number(),
   "medium": zod.number(),
@@ -516,12 +526,17 @@ export const GetComparisonByProductResponse = zod.object({
   "prayagProductName": zod.string().nullish(),
   "category": zod.string().nullish(),
   "prayagMrp": zod.number().nullable(),
+  "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre when this SKU is length-based.'),
+  "lengthNormalized": zod.boolean().optional().describe('True when this SKU is compared on a per-metre basis.'),
+  "unitAmbiguous": zod.boolean().optional().describe('True when any competitor cell for this SKU has an ambiguous unit.'),
   "prayagEffectiveDate": zod.string().nullish(),
   "competitors": zod.array(zod.object({
   "competitor": zod.string(),
   "price": zod.number(),
-  "diffPct": zod.number().nullable(),
-  "isCheapest": zod.boolean()
+  "perMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
+  "diffPct": zod.number().nullable().describe('Diff% on the SKU\'s comparison basis (per metre when the Prayag SKU is length-based, else raw); null when this cell\'s unit is ambiguous.'),
+  "isCheapest": zod.boolean(),
+  "unitAmbiguous": zod.boolean().optional().describe('True when this cell\'s unit basis cannot be resolved.')
 })),
   "cheapestRival": zod.number().nullable(),
   "cheapestRivalName": zod.string().nullable(),
@@ -651,7 +666,15 @@ export const BulkUpdateCompetitorMappingsResponse = zod.object({
   "prayagMrp": zod.number().nullable(),
   "prayagEffectiveDate": zod.string().nullish(),
   "diffPct": zod.number().nullable(),
-  "prayagCheaper": zod.boolean().nullable()
+  "prayagCheaper": zod.boolean().nullable(),
+  "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
+  "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
+  "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
+  "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
+  "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
 }))
 })
 
@@ -700,7 +723,15 @@ export const UpdateCompetitorMappingResponse = zod.object({
   "prayagMrp": zod.number().nullable(),
   "prayagEffectiveDate": zod.string().nullish(),
   "diffPct": zod.number().nullable(),
-  "prayagCheaper": zod.boolean().nullable()
+  "prayagCheaper": zod.boolean().nullable(),
+  "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
+  "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
+  "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
+  "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
+  "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
 })
 
 

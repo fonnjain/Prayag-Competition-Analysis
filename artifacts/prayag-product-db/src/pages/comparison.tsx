@@ -11,7 +11,7 @@ import {
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
@@ -79,6 +79,18 @@ function DiffBadge({ diffPct, prayagCheaper }: { diffPct?: number | null; prayag
   );
 }
 
+function AmbiguousBadge({ note }: { note?: string | null }) {
+  return (
+    <span
+      title={note || "Unit basis is ambiguous — needs manual review"}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap cursor-help"
+    >
+      <AlertTriangle className="w-3 h-3" />
+      Review
+    </span>
+  );
+}
+
 export default function ComparisonPage() {
   const [view, setView] = useState<ViewMode>("byProduct");
   const [search, setSearch] = useState("");
@@ -87,11 +99,17 @@ export default function ComparisonPage() {
   const [matchStatus, setMatchStatus] = useState<string>("all");
   const [confidence, setConfidence] = useState<string>("all");
   const [expensiveOnly, setExpensiveOnly] = useState(false);
+  const [ambiguousOnly, setAmbiguousOnly] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     setPage(1);
-  }, [view, search, competitor, category, matchStatus, confidence, expensiveOnly]);
+  }, [view, search, competitor, category, matchStatus, confidence, expensiveOnly, ambiguousOnly]);
+
+  // The ambiguous filter only exists on the by-competitor list endpoint.
+  useEffect(() => {
+    if (view === "byProduct" && ambiguousOnly) setAmbiguousOnly(false);
+  }, [view, ambiguousOnly]);
 
   const { data: filters } = useGetComparisonFilters();
   
@@ -112,6 +130,7 @@ export default function ComparisonPage() {
     matchStatus: matchStatus !== "all" ? matchStatus : undefined,
     confidence: confidence !== "all" ? confidence : undefined,
     expensiveOnly: expensiveOnly ? true : undefined,
+    ambiguousOnly: ambiguousOnly ? true : undefined,
     page,
     pageSize: PAGE_SIZE
   };
@@ -153,6 +172,7 @@ export default function ComparisonPage() {
     if (matchStatus !== "all") params.set("matchStatus", matchStatus);
     if (confidence !== "all") params.set("confidence", confidence);
     if (expensiveOnly) params.set("expensiveOnly", "true");
+    if (ambiguousOnly) params.set("ambiguousOnly", "true");
     return `/api/catalog/comparison/export?${params.toString()}`;
   };
 
@@ -208,7 +228,7 @@ export default function ComparisonPage() {
       </div>
 
       {!summaryLoading && summaryData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <div className="bg-card border rounded-lg p-5">
             <div className="text-sm text-muted-foreground mb-1 flex items-center gap-2">
               <Scale className="w-4 h-4" />
@@ -270,6 +290,19 @@ export default function ComparisonPage() {
             )}
             <div className="text-xs text-muted-foreground mt-1">
               {summaryData.matchedRows} mapped of {summaryData.totalRows} rows
+            </div>
+          </div>
+
+          <div className="bg-card border rounded-lg p-5">
+            <div className="text-sm text-muted-foreground mb-1 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              Needs Review
+            </div>
+            <div className="text-3xl font-bold font-mono text-amber-600">
+              {summaryData.ambiguousCount ?? 0}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Ambiguous unit basis (per pc/mtr/ft)
             </div>
           </div>
         </div>
@@ -363,17 +396,32 @@ export default function ComparisonPage() {
           )}
         </div>
         
-        <div className="flex items-center space-x-2">
-          <Switch 
-            id="expensiveOnly" 
-            checked={expensiveOnly} 
-            onCheckedChange={setExpensiveOnly} 
-          />
-          <Label htmlFor="expensiveOnly" className="text-sm font-normal cursor-pointer">
-            {view === "byProduct"
-              ? "Show only where Prayag is more expensive than a competitor"
-              : "Show only where Prayag is more expensive"}
-          </Label>
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="expensiveOnly"
+              checked={expensiveOnly}
+              onCheckedChange={setExpensiveOnly}
+            />
+            <Label htmlFor="expensiveOnly" className="text-sm font-normal cursor-pointer">
+              {view === "byProduct"
+                ? "Show only where Prayag is more expensive than a competitor"
+                : "Show only where Prayag is more expensive"}
+            </Label>
+          </div>
+          {view === "byCompetitor" && (
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="ambiguousOnly"
+                checked={ambiguousOnly}
+                onCheckedChange={setAmbiguousOnly}
+              />
+              <Label htmlFor="ambiguousOnly" className="text-sm font-normal cursor-pointer flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                Show only ambiguous-unit rows (needs review)
+              </Label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -415,10 +463,23 @@ export default function ComparisonPage() {
                           <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={row.prayagProductName || ""}>
                             {row.prayagProductName || row.category || ""}
                           </div>
+                          {row.lengthNormalized && (
+                            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-sky-700 dark:text-sky-400">
+                              <Ruler className="w-3 h-3" />
+                              per-metre basis
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
                           {row.prayagMrp != null ? (
-                            <span className={cn(row.prayagLowest && "text-green-600 font-semibold")}>₹{row.prayagMrp.toFixed(2)}</span>
+                            <>
+                              <span className={cn(row.prayagLowest && "text-green-600 font-semibold")}>₹{row.prayagMrp.toFixed(2)}</span>
+                              {row.prayagPerMetre != null && (
+                                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                                  ₹{row.prayagPerMetre.toFixed(2)}/m
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
@@ -437,8 +498,17 @@ export default function ComparisonPage() {
                                 {cell.isCheapest && <Trophy className="w-3 h-3" />}
                                 ₹{cell.price.toFixed(2)}
                               </span>
+                              {cell.perMetre != null && (
+                                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                                  ₹{cell.perMetre.toFixed(2)}/m
+                                </div>
+                              )}
                               <div className="mt-1 flex justify-end">
-                                <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.diffPct != null ? cell.diffPct > 0 : null} />
+                                {cell.unitAmbiguous ? (
+                                  <AmbiguousBadge />
+                                ) : (
+                                  <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.diffPct != null ? cell.diffPct <= 0 : null} />
+                                )}
                               </div>
                             </td>
                           );
@@ -535,6 +605,11 @@ export default function ComparisonPage() {
                         <td className="px-4 py-3 text-right font-mono">
                           ₹{row.competitorPrice?.toFixed(2)}
                           {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
+                          {row.compPerMetre != null && (
+                            <div className="mt-0.5 text-[11px] text-muted-foreground">
+                              ₹{row.compPerMetre.toFixed(2)}/m
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {isMapped ? (
@@ -562,13 +637,27 @@ export default function ComparisonPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           {row.prayagMrp != null ? (
-                            <span className="font-mono">₹{row.prayagMrp.toFixed(2)}</span>
+                            <>
+                              <span className="font-mono">₹{row.prayagMrp.toFixed(2)}</span>
+                              {row.prayagPerMetre != null && (
+                                <div className="mt-0.5 text-[11px] text-muted-foreground font-mono">
+                                  ₹{row.prayagPerMetre.toFixed(2)}/m
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <DiffBadge diffPct={row.diffPct} prayagCheaper={row.prayagCheaper} />
+                          {row.unitAmbiguous ? (
+                            <AmbiguousBadge note={row.normalizationNote} />
+                          ) : (
+                            <DiffBadge
+                              diffPct={row.effectiveDiffPct}
+                              prayagCheaper={row.effectivePrayagCheaper}
+                            />
+                          )}
                         </td>
                       </tr>
                     );

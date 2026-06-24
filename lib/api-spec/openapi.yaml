@@ -409,6 +409,12 @@ paths:
           description: Only rows where Prayag is more expensive than the competitor.
           schema:
             type: boolean
+        - name: ambiguousOnly
+          in: query
+          required: false
+          description: Only rows whose unit basis is ambiguous (flagged for review).
+          schema:
+            type: boolean
         - name: page
           in: query
           required: false
@@ -1207,6 +1213,34 @@ components:
           type: ["number", "null"]
         prayagCheaper:
           type: ["boolean", "null"]
+        compPerMetre:
+          type: ["number", "null"]
+          description: Competitor price reduced to ₹/metre, when length-normalizable.
+        prayagPerMetre:
+          type: ["number", "null"]
+          description: Prayag MRP reduced to ₹/metre, when length-normalizable.
+        perMetreDiffPct:
+          type: ["number", "null"]
+          description: (prayagPerMetre − compPerMetre) / compPerMetre × 100.
+        lengthNormalized:
+          type: boolean
+          description: True when both sides were compared on a per-metre basis.
+        unitAmbiguous:
+          type: boolean
+          description: >-
+            True when the row's unit basis (per pc vs per mtr vs per ft) cannot
+            be resolved, so it is excluded from KPIs and flagged for review.
+        normalizationNote:
+          type: ["string", "null"]
+          description: Human-readable explanation of how the row was normalized/flagged.
+        effectiveDiffPct:
+          type: ["number", "null"]
+          description: >-
+            The diff% to trust: per-metre diff when length-normalized, raw diff
+            otherwise, null when unit-ambiguous.
+        effectivePrayagCheaper:
+          type: ["boolean", "null"]
+          description: True when effectiveDiffPct ≤ 0 (Prayag cheaper).
     ComparisonList:
       type: object
       required: [rows, total, page, pageSize]
@@ -1229,10 +1263,19 @@ components:
           type: string
         price:
           type: number
+        perMetre:
+          type: ["number", "null"]
+          description: Competitor price reduced to ₹/metre, when length-normalizable.
         diffPct:
           type: ["number", "null"]
+          description: >-
+            Diff% on the SKU's comparison basis (per metre when the Prayag SKU is
+            length-based, else raw); null when this cell's unit is ambiguous.
         isCheapest:
           type: boolean
+        unitAmbiguous:
+          type: boolean
+          description: True when this cell's unit basis cannot be resolved.
     ProductComparisonRow:
       type: object
       required:
@@ -1257,6 +1300,15 @@ components:
           type: ["string", "null"]
         prayagMrp:
           type: ["number", "null"]
+        prayagPerMetre:
+          type: ["number", "null"]
+          description: Prayag MRP reduced to ₹/metre when this SKU is length-based.
+        lengthNormalized:
+          type: boolean
+          description: True when this SKU is compared on a per-metre basis.
+        unitAmbiguous:
+          type: boolean
+          description: True when any competitor cell for this SKU has an ambiguous unit.
         prayagEffectiveDate:
           type: ["string", "null"]
         competitors:
@@ -1347,6 +1399,11 @@ components:
           type: ["number", "null"]
         reviewCount:
           type: integer
+        ambiguousCount:
+          type: integer
+          description: >-
+            Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and
+            therefore excluded from KPIs and flagged for manual review.
         confidenceCounts:
           $ref: "#/components/schemas/ConfidenceCounts"
         categoryWinRates:

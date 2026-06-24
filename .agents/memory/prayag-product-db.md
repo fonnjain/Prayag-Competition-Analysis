@@ -46,6 +46,13 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 - **How to apply:** when adding a competitor, follow the High/Medium→matched (code must exist in catalog via `normCode`), Low→review-keeps-Low, No-match→review-null rules; set `unit` to the file's `price_basis`. Caveat for any future cross-competitor analytics: they are not basis-comparable (MRP vs ex-GST).
 - **Gotcha:** the seed JSON is imported at api-server startup, so after editing `competitor-seed.json` you must restart the api-server workflow before `POST /catalog/reset` picks up the new rows.
 
+## Per-metre length normalization (effective diff is authoritative)
+- Length-based SKUs are normalized to a common per-metre basis before comparing: feet→metre via `1 ft = 0.3048`; pack lengths ("3 Mtr"/"6 Mtr") divide price by length. Prayag MRP is per-piece but scales linearly with pack length, so per-metre is valid. Computed LIVE, additive — no schema change.
+- `'` in a size means **inch, not feet**; only the words ft/feet/foot mean feet. Multi-length forms like "3 & 5 mtr" (& / and / , / +) are **ambiguous**, not a single length → flagged for manual review, excluded from KPIs and ranking.
+- Each row carries both raw (`diffPct`/`prayagCheaper`) and per-metre `effectiveDiffPct`/`effectivePrayagCheaper`. **`effective*` is the authoritative comparison; raw is display-only.** They diverge only when Prayag and the competitor quote on *different* length bases.
+- **Why:** any filter/KPI that branches on the raw `prayagCheaper` silently ignores normalization and can return wrong rows (caught in review: `expensiveOnly` was filtering on raw `prayagCheaper`).
+- **How to apply:** any server filter, KPI, or color decision on length-comparable rows must use `effectivePrayagCheaper`/`effectiveDiffPct`, never raw. Frontend badge green = `diffPct <= 0` (≤0 = Prayag cheaper). The unused `/matrix` endpoint is intentionally left non-normalized.
+
 ## Filters gotcha
 - The same category name can appear under multiple divisions; dedupe category names before rendering the Select or you get duplicate React keys/values. Backend filter param is a category *name*, so dedup is also semantically correct.
 

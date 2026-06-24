@@ -35,4 +35,38 @@ export interface ComparisonRow {
   diffPct: number | null;
   /** @nullable */
   prayagCheaper: boolean | null;
+  /**
+     * Competitor price reduced to ₹/metre, when length-normalizable.
+     * @nullable
+     */
+  compPerMetre?: number | null;
+  /**
+     * Prayag MRP reduced to ₹/metre, when length-normalizable.
+     * @nullable
+     */
+  prayagPerMetre?: number | null;
+  /**
+     * (prayagPerMetre − compPerMetre) / compPerMetre × 100.
+     * @nullable
+     */
+  perMetreDiffPct?: number | null;
+  /** True when both sides were compared on a per-metre basis. */
+  lengthNormalized?: boolean;
+  /** True when the row's unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review. */
+  unitAmbiguous?: boolean;
+  /**
+     * Human-readable explanation of how the row was normalized/flagged.
+     * @nullable
+     */
+  normalizationNote?: string | null;
+  /**
+     * The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.
+     * @nullable
+     */
+  effectiveDiffPct?: number | null;
+  /**
+     * True when effectiveDiffPct ≤ 0 (Prayag cheaper).
+     * @nullable
+     */
+  effectivePrayagCheaper?: boolean | null;
 }

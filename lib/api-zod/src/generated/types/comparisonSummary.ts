@@ -20,6 +20,8 @@ export interface ComparisonSummary {
   /** @nullable */
   avgDiffPct?: number | null;
   reviewCount: number;
+  /** Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and therefore excluded from KPIs and flagged for manual review. */
+  ambiguousCount?: number;
   confidenceCounts?: ConfidenceCounts;
   categoryWinRates: ComparisonCategoryWinRate[];
 }
