@@ -10,7 +10,6 @@ const STOPWORDS = new Set([
   "per",
   "pc",
   "pcs",
-  "mtr",
   "each",
   "type",
   "series",
@@ -18,32 +17,85 @@ const STOPWORDS = new Set([
   "grade",
   "set",
   "nos",
+  // Units, pressure/weight ratings and packaging words. These are incidental
+  // noise for product-type matching — the dedicated size score handles the
+  // actual dimension, so leaving these in the text channel only lets a wrong
+  // product type win on a shared "mm"/"kg"/"class" token.
+  "mm",
+  "cm",
+  "kg",
+  "kgs",
+  "gm",
+  "gms",
+  "mtr",
+  "mtrs",
+  "meter",
+  "meters",
+  "metre",
+  "metres",
+  "ltr",
+  "ml",
+  "oz",
+  "sch",
+  "sdr",
+  "pn",
+  "class",
+  "isi",
+  "mark",
+  "tin",
 ]);
 
 function tokenWeight(token: string): number {
-  // Tokens carrying a digit (sizes, dimensions, gauges) are far more
-  // discriminative than plain words, so they count double.
-  return /\d/.test(token) ? 2 : 1;
+  // Product-type words ("coupler", "elbow", "adapter") are what should decide
+  // a match, so plain alphabetic words count double. Numeric/dimension tokens
+  // (sizes, gauges, pressure classes) count single because the dedicated size
+  // score already handles the real dimension — otherwise an incidental number
+  // like a "10 KG" rating would let the wrong product type outrank the right
+  // one purely on a shared digit.
+  return /\d/.test(token) ? 1 : 2;
 }
 
 function tokenize(s: string | null | undefined): string[] {
   if (!s) return [];
   return String(s)
     .toLowerCase()
+    .replace(/\u2044/g, "/") // unicode fraction slash → ascii so 3⁄4 ≈ 3/4
     .replace(/[^a-z0-9./-]+/g, " ")
     .split(/\s+/)
     .map((t) => t.replace(/^[-./]+|[-./]+$/g, "").trim())
     .filter((t) => t.length >= 2 && !STOPWORDS.has(t));
 }
 
-// Normalize a size string for comparison: drop quotes and whitespace so
-// `1/2"`, `1/2 "` and `1/2` all collapse to the same token.
+// Normalize a size string for comparison so the same nominal size written
+// different ways collapses to one token: `1/2"`, `1/2 "` and `1/2` → `1/2`;
+// `20 mm`, `20mm` and the competitor's bare `20` → `20`; `20 x 15 mm` → `20x15`.
 function normSize(s: string | null | undefined): string {
   return String(s ?? "")
     .toLowerCase()
+    .replace(/\u2044/g, "/")
     .replace(/inches?|inch/g, "")
+    .replace(/[×]/g, "x")
+    .replace(/\bmm\b/g, "")
+    .replace(/\s*x\s*/g, "x")
     .replace(/["”'\s]+/g, "")
     .trim();
+}
+
+// The Prayag catalog `size` column is mostly null — the real nominal size is
+// embedded in the product name (e.g. "COUPLER 75 mm - 2.5 KG"). Pull out the
+// last `<num> mm` group so size matching is exact rather than a substring scan.
+// Returns a canonical string like "20 mm" or "20x15 mm", or null when the name
+// carries no mm dimension (taps, handles, showers, etc.).
+export function parseSizeFromName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const s = String(name).replace(/\u2044/g, "/");
+  const re = /(\d[\d.\/]*(?:\s*[x×]\s*\d[\d.\/]*)*)\s*mm\b/gi;
+  let m: RegExpExecArray | null;
+  let last: string | null = null;
+  while ((m = re.exec(s)) !== null) last = m[1];
+  if (last == null) return null;
+  const canonical = last.replace(/\s*[x×]\s*/gi, "x").replace(/\s+/g, "");
+  return `${canonical} mm`;
 }
 
 function weightedTokens(s: string | null | undefined): Map<string, number> {
@@ -73,7 +125,6 @@ export interface CatalogCandidate {
   textTokens: Map<string, number>;
   catTokens: Set<string>;
   sizeNorm: string;
-  textJoined: string;
 }
 
 export function buildCandidate(p: {
@@ -84,15 +135,20 @@ export function buildCandidate(p: {
   size: string | null;
   currentMrp: number | null;
 }): CatalogCandidate {
-  const text = [p.productName, p.category, p.division, p.size]
-    .filter(Boolean)
-    .join(" ");
+  // The catalog size column is usually null; fall back to the size embedded in
+  // the product name so size matching is exact instead of a substring scan.
+  const effectiveSize = p.size ?? parseSizeFromName(p.productName);
+  // The text channel carries product-type signal only (name + size). Category
+  // and division are scored separately via catTokens — folding them in here too
+  // would double-count structural words ("agri", "fittings") and let them drown
+  // out the discriminating product-type word ("coupler" vs "pipe").
+  const text = [p.productName, effectiveSize].filter(Boolean).join(" ");
   return {
     ...p,
+    size: effectiveSize,
     textTokens: weightedTokens(text),
     catTokens: new Set([...tokenize(p.category), ...tokenize(p.division)]),
-    sizeNorm: normSize(p.size),
-    textJoined: tokenize(text).join(" "),
+    sizeNorm: normSize(effectiveSize),
   };
 }
 
@@ -134,9 +190,12 @@ function score(
   const hasSize = comp.sizeNorm.length > 0;
   let sizeScore = 0;
   if (hasSize) {
+    // Exact, token-level matching only. A loose substring scan would treat
+    // "200" as a match for "20" (200 contains 20) and let a wildly different
+    // size win; now that the catalog size column is parsed from the name, the
+    // normalized sizes compare cleanly.
     if (cand.sizeNorm && cand.sizeNorm === comp.sizeNorm) sizeScore = 1;
     else if (cand.textTokens.has(comp.sizeNorm)) sizeScore = 0.8;
-    else if (cand.textJoined.includes(comp.sizeNorm)) sizeScore = 0.6;
   }
 
   let num = textRecall * 0.45 + catSim * 0.35;
@@ -159,7 +218,9 @@ export function suggestMatches(
   row: CompetitorRowInput,
   candidates: CatalogCandidate[],
 ): Suggestion[] {
-  const textTokens = weightedTokens(`${row.category ?? ""} ${row.description ?? ""}`);
+  // Description only — category is compared via catTokens below, so keeping it
+  // out of the text channel preserves the product-type signal in the wording.
+  const textTokens = weightedTokens(row.description);
   let textWeight = 0;
   for (const w of textTokens.values()) textWeight += w;
   const comp = {

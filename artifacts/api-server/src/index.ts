@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
-import { seedCatalogIfEmpty } from "./lib/catalogSeed";
+import { seedCatalogIfEmpty, backfillCatalogSizes } from "./lib/catalogSeed";
 
 const rawPort = process.env["PORT"];
 
@@ -33,6 +33,7 @@ app.listen(port, async (err) => {
 
   try {
     await seedCatalogIfEmpty();
+    await backfillCatalogSizes();
   } catch (seedErr) {
     logger.error({ err: seedErr }, "Failed to seed product catalog");
   }

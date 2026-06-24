@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   catalogProductsTable,
@@ -9,6 +10,7 @@ import catalogSeedData from "../seed/catalog-seed.json";
 import competitorSeedData from "../seed/competitor-seed.json";
 import { logger } from "./logger";
 import { recomputeCurrentFlags } from "./catalog";
+import { parseSizeFromName } from "./suggest";
 
 interface SeedCatalogProduct {
   itemCode: string;
@@ -87,7 +89,9 @@ export async function loadCatalogSeed(): Promise<void> {
         division: p.division,
         category: p.category,
         seriesRange: p.seriesRange,
-        size: p.size,
+        // Persist the nominal size parsed from the product name when the source
+        // size is blank, so size matching is exact for downstream consumers.
+        size: p.size ?? parseSizeFromName(p.productName),
         uom: p.uom || "NOS",
         kgCost: null,
         isActive: p.isActive,
@@ -151,4 +155,45 @@ export async function seedCatalogIfEmpty(): Promise<void> {
     await loadCatalogSeed();
     logger.info("Catalog seed complete");
   }
+}
+
+// Populate the `size` column from the product name for rows where it is still
+// blank. Idempotent and cheap: only touches rows that both lack a size and
+// have a parseable nominal size in their name, so re-running is a no-op once
+// the catalog is filled. Lets already-seeded databases benefit without a
+// destructive full re-seed.
+export async function backfillCatalogSizes(): Promise<void> {
+  const rows = await db
+    .select({
+      id: catalogProductsTable.id,
+      productName: catalogProductsTable.productName,
+    })
+    .from(catalogProductsTable)
+    .where(
+      sql`(${catalogProductsTable.size} IS NULL OR ${catalogProductsTable.size} = '')`,
+    );
+
+  const updates: { id: number; size: string }[] = [];
+  for (const r of rows) {
+    const parsed = parseSizeFromName(r.productName);
+    if (parsed) updates.push({ id: r.id, size: parsed });
+  }
+  if (updates.length === 0) return;
+
+  for (let i = 0; i < updates.length; i += 500) {
+    const batch = updates.slice(i, i + 500);
+    const cases = batch.map(
+      (u) => sql`WHEN ${u.id} THEN ${u.size}`,
+    );
+    const ids = batch.map((u) => u.id);
+    await db.execute(sql`
+      UPDATE catalog_products
+      SET size = CASE id ${sql.join(cases, sql` `)} END
+      WHERE id IN (${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )})
+    `);
+  }
+  logger.info({ updated: updates.length }, "Backfilled catalog sizes from product names");
 }
