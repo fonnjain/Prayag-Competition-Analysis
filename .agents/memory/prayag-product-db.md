@@ -39,6 +39,13 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 - **Limitation:** competitor descriptions are sparse ("Coupler (PN 16)") and sizes are bare numbers ("20"), so suggestions surface same-category candidates but can mis-rank (a pipe whose name contains "10 KG 20 mm" can outrank a coupler). Confidence labels (high≥55, medium≥35, low) communicate this; do not treat suggestions as authoritative.
 - Accepting a suggestion in the UI calls the existing PATCH with `matchStatus:"matched"`; there is no separate accept endpoint.
 
+## Competitor price basis is NOT normalized
+- Different competitors can quote on different bases: Prayag + Ashirvad are MRP, but Astral is "Rate (ex-GST)". There is no per-row basis field — the basis label is stashed in `competitor_prices.unit` (e.g. "Rate (ex-GST)") purely for display/export transparency.
+- diff% and all KPIs compare Prayag MRP directly against the competitor price **with no basis adjustment**. This is intentional: each mapping workbook's own `price_diff` column already computes `PrayagMRP − CompPrice` directly (no GST gross-up), so we match the provider's intent.
+- **Why:** changing the comparison to gross-up ex-GST → MRP-equivalent would silently diverge from the source file's numbers and surprise the user. Adding a new competitor is a pure data change (append to `competitor-seed.json`); no schema/API/frontend edits needed because the generic shape + multi-competitor UI already exist.
+- **How to apply:** when adding a competitor, follow the High/Medium→matched (code must exist in catalog via `normCode`), Low→review-keeps-Low, No-match→review-null rules; set `unit` to the file's `price_basis`. Caveat for any future cross-competitor analytics: they are not basis-comparable (MRP vs ex-GST).
+- **Gotcha:** the seed JSON is imported at api-server startup, so after editing `competitor-seed.json` you must restart the api-server workflow before `POST /catalog/reset` picks up the new rows.
+
 ## Filters gotcha
 - The same category name can appear under multiple divisions; dedupe category names before rendering the Select or you get duplicate React keys/values. Backend filter param is a category *name*, so dedup is also semantically correct.
 
