@@ -573,6 +573,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MappingReviewList"
+  /catalog/competitor-prices/bulk:
+    patch:
+      operationId: bulkUpdateCompetitorMappings
+      tags: [comparison]
+      summary: Apply mapping updates to many competitor rows at once
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkMappingUpdate"
+      responses:
+        "200":
+          description: Bulk update result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkMappingResult"
+  /catalog/mapping-review/auto-accept:
+    post:
+      operationId: autoAcceptMappings
+      tags: [comparison]
+      summary: Auto-accept top suggestions at/above a confidence tier across the current filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutoAcceptRequest"
+      responses:
+        "200":
+          description: Auto-accept result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoAcceptResult"
   /catalog/competitor-prices/{id}:
     patch:
       operationId: updateCompetitorMapping
@@ -1420,6 +1456,55 @@ components:
           type: string
         matchConfidence:
           type: ["string", "null"]
+    BulkMappingUpdateItem:
+      type: object
+      required: [id, matchedPrayagCode, matchStatus]
+      properties:
+        id:
+          type: integer
+        matchedPrayagCode:
+          type: ["string", "null"]
+        matchStatus:
+          type: string
+        matchConfidence:
+          type: ["string", "null"]
+    BulkMappingUpdate:
+      type: object
+      required: [updates]
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkMappingUpdateItem"
+    BulkMappingResult:
+      type: object
+      required: [updated, rows]
+      properties:
+        updated:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComparisonRow"
+    AutoAcceptRequest:
+      type: object
+      required: [minConfidence]
+      properties:
+        competitor:
+          type: ["string", "null"]
+        confidence:
+          type: ["string", "null"]
+        search:
+          type: ["string", "null"]
+        minConfidence:
+          type: string
+          enum: [high, medium, low]
+    AutoAcceptResult:
+      type: object
+      required: [matched]
+      properties:
+        matched:
+          type: integer
     ComparisonMatrixCell:
       type: object
       required: [competitor, price, diffPct, prayagCheaper]

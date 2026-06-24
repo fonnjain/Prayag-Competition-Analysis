@@ -6,6 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './autoAcceptRequest';
+export * from './autoAcceptRequestMinConfidence';
+export * from './autoAcceptResult';
+export * from './bulkMappingResult';
+export * from './bulkMappingUpdate';
+export * from './bulkMappingUpdateItem';
 export * from './catalogCategoryOption';
 export * from './catalogConflict';
 export * from './catalogDataHealth';

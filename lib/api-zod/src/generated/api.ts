@@ -622,6 +622,56 @@ export const GetMappingReviewResponse = zod.object({
 
 
 /**
+ * @summary Apply mapping updates to many competitor rows at once
+ */
+export const BulkUpdateCompetitorMappingsBody = zod.object({
+  "updates": zod.array(zod.object({
+  "id": zod.number(),
+  "matchedPrayagCode": zod.string().nullable(),
+  "matchStatus": zod.string(),
+  "matchConfidence": zod.string().nullish()
+}))
+})
+
+export const BulkUpdateCompetitorMappingsResponse = zod.object({
+  "updated": zod.number(),
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "competitor": zod.string(),
+  "category": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "competitorPrice": zod.number(),
+  "unit": zod.string().nullish(),
+  "effectiveDate": zod.string().nullish(),
+  "matchedPrayagCode": zod.string().nullable(),
+  "matchStatus": zod.string(),
+  "matchConfidence": zod.string().nullish(),
+  "prayagProductName": zod.string().nullish(),
+  "prayagMrp": zod.number().nullable(),
+  "prayagEffectiveDate": zod.string().nullish(),
+  "diffPct": zod.number().nullable(),
+  "prayagCheaper": zod.boolean().nullable()
+}))
+})
+
+
+/**
+ * @summary Auto-accept top suggestions at/above a confidence tier across the current filter
+ */
+export const AutoAcceptMappingsBody = zod.object({
+  "competitor": zod.string().nullish(),
+  "confidence": zod.string().nullish(),
+  "search": zod.string().nullish(),
+  "minConfidence": zod.enum(['high', 'medium', 'low'])
+})
+
+export const AutoAcceptMappingsResponse = zod.object({
+  "matched": zod.number()
+})
+
+
+/**
  * @summary Assign or correct a competitor row's matched Prayag code and status
  */
 export const UpdateCompetitorMappingParams = zod.object({

@@ -558,6 +558,47 @@ export interface CompetitorMappingUpdate {
   matchConfidence?: string | null;
 }
 
+export interface BulkMappingUpdateItem {
+  id: number;
+  /** @nullable */
+  matchedPrayagCode: string | null;
+  matchStatus: string;
+  /** @nullable */
+  matchConfidence?: string | null;
+}
+
+export interface BulkMappingUpdate {
+  updates: BulkMappingUpdateItem[];
+}
+
+export interface BulkMappingResult {
+  updated: number;
+  rows: ComparisonRow[];
+}
+
+export type AutoAcceptRequestMinConfidence = typeof AutoAcceptRequestMinConfidence[keyof typeof AutoAcceptRequestMinConfidence];
+
+
+export const AutoAcceptRequestMinConfidence = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export interface AutoAcceptRequest {
+  /** @nullable */
+  competitor?: string | null;
+  /** @nullable */
+  confidence?: string | null;
+  /** @nullable */
+  search?: string | null;
+  minConfidence: AutoAcceptRequestMinConfidence;
+}
+
+export interface AutoAcceptResult {
+  matched: number;
+}
+
 export interface ComparisonMatrixCell {
   competitor: string;
   /** @nullable */

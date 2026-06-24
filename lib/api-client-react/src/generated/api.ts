@@ -20,6 +20,10 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AutoAcceptRequest,
+  AutoAcceptResult,
+  BulkMappingResult,
+  BulkMappingUpdate,
   CatalogDataHealth,
   CatalogFilters,
   CatalogProductDetail,
@@ -1930,6 +1934,148 @@ export function useGetMappingReview<TData = Awaited<ReturnType<typeof getMapping
 
 
 
+
+export const getBulkUpdateCompetitorMappingsUrl = () => {
+
+
+
+
+  return `/api/catalog/competitor-prices/bulk`
+}
+
+/**
+ * @summary Apply mapping updates to many competitor rows at once
+ */
+export const bulkUpdateCompetitorMappings = async (bulkMappingUpdate: BulkMappingUpdate, options?: RequestInit): Promise<BulkMappingResult> => {
+
+  return customFetch<BulkMappingResult>(getBulkUpdateCompetitorMappingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bulkMappingUpdate,)
+  }
+);}
+
+
+
+
+export const getBulkUpdateCompetitorMappingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, TError,{data: BodyType<BulkMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, TError,{data: BodyType<BulkMappingUpdate>}, TContext> => {
+
+const mutationKey = ['bulkUpdateCompetitorMappings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, {data: BodyType<BulkMappingUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkUpdateCompetitorMappings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkUpdateCompetitorMappingsMutationResult = NonNullable<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>>
+    export type BulkUpdateCompetitorMappingsMutationBody = BodyType<BulkMappingUpdate>
+    export type BulkUpdateCompetitorMappingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Apply mapping updates to many competitor rows at once
+ */
+export const useBulkUpdateCompetitorMappings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, TError,{data: BodyType<BulkMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>,
+        TError,
+        {data: BodyType<BulkMappingUpdate>},
+        TContext
+      > => {
+      return useMutation(getBulkUpdateCompetitorMappingsMutationOptions(options));
+    }
+
+export const getAutoAcceptMappingsUrl = () => {
+
+
+
+
+  return `/api/catalog/mapping-review/auto-accept`
+}
+
+/**
+ * @summary Auto-accept top suggestions at/above a confidence tier across the current filter
+ */
+export const autoAcceptMappings = async (autoAcceptRequest: AutoAcceptRequest, options?: RequestInit): Promise<AutoAcceptResult> => {
+
+  return customFetch<AutoAcceptResult>(getAutoAcceptMappingsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      autoAcceptRequest,)
+  }
+);}
+
+
+
+
+export const getAutoAcceptMappingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof autoAcceptMappings>>, TError,{data: BodyType<AutoAcceptRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof autoAcceptMappings>>, TError,{data: BodyType<AutoAcceptRequest>}, TContext> => {
+
+const mutationKey = ['autoAcceptMappings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof autoAcceptMappings>>, {data: BodyType<AutoAcceptRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  autoAcceptMappings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AutoAcceptMappingsMutationResult = NonNullable<Awaited<ReturnType<typeof autoAcceptMappings>>>
+    export type AutoAcceptMappingsMutationBody = BodyType<AutoAcceptRequest>
+    export type AutoAcceptMappingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Auto-accept top suggestions at/above a confidence tier across the current filter
+ */
+export const useAutoAcceptMappings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof autoAcceptMappings>>, TError,{data: BodyType<AutoAcceptRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof autoAcceptMappings>>,
+        TError,
+        {data: BodyType<AutoAcceptRequest>},
+        TContext
+      > => {
+      return useMutation(getAutoAcceptMappingsMutationOptions(options));
+    }
 
 export const getUpdateCompetitorMappingUrl = (id: number,) => {
 

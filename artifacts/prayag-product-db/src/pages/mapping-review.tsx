@@ -1,7 +1,9 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, Fragment, useMemo } from "react";
 import { 
   useGetMappingReview,
   useUpdateCompetitorMapping,
+  useBulkUpdateCompetitorMappings,
+  useAutoAcceptMappings,
   useGetComparisonFilters,
   getGetMappingReviewQueryKey,
   getGetComparisonQueryKey,
@@ -11,14 +13,33 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Zap, Download } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
+
+const TIER_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
+
+const THRESHOLD_LABELS: Record<string, string> = {
+  high: "High only",
+  medium: "Medium & up",
+  low: "All suggestions",
+};
 
 function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
   if (!confidence) return <span className="text-muted-foreground text-xs">-</span>;
@@ -42,6 +63,9 @@ export default function MappingReviewPage() {
   const [confidence, setConfidence] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [editingRows, setEditingRows] = useState<Record<number, { code: string, status: string }>>({});
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [threshold, setThreshold] = useState<string>("high");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,6 +73,12 @@ export default function MappingReviewPage() {
   useEffect(() => {
     setPage(1);
   }, [search, competitor, confidence]);
+
+  // Selection is scoped to the current filter/page; reset it whenever the
+  // visible set changes so stale ids never get accepted.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [search, competitor, confidence, page]);
 
   const { data: filters } = useGetComparisonFilters();
 
@@ -132,6 +162,108 @@ export default function MappingReviewPage() {
     persistMapping(id, code, "matched");
   };
 
+  const bulkUpdate = useBulkUpdateCompetitorMappings();
+  const autoAccept = useAutoAcceptMappings();
+  const bulkBusy = bulkUpdate.isPending || autoAccept.isPending;
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetComparisonFiltersQueryKey() });
+  };
+
+  const rows = mappingData?.rows ?? [];
+
+  // Rows on this page that have at least one suggestion can be bulk-accepted.
+  const selectableRows = useMemo(
+    () => rows.filter((r) => (r.suggestions ?? []).length > 0),
+    [rows],
+  );
+  const allSelected =
+    selectableRows.length > 0 &&
+    selectableRows.every((r) => selected.has(r.id));
+
+  const toggleRow = (id: number, on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (on: boolean) => {
+    setSelected(on ? new Set(selectableRows.map((r) => r.id)) : new Set());
+  };
+
+  const acceptSelected = () => {
+    const updates = selectableRows
+      .filter((r) => selected.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        matchedPrayagCode: r.suggestions![0].itemCode,
+        matchStatus: "matched",
+      }));
+    if (updates.length === 0) return;
+    bulkUpdate.mutate(
+      { data: { updates } },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: "Matches accepted",
+            description: `Matched ${res.updated} row${res.updated === 1 ? "" : "s"} from your selection.`,
+          });
+          setSelected(new Set());
+          setEditingRows({});
+          invalidateAll();
+        },
+        onError: (err: any) => {
+          toast({
+            title: "Bulk accept failed",
+            description: err.message || "Failed to accept selected matches.",
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const runAutoAccept = () => {
+    setConfirmOpen(false);
+    autoAccept.mutate(
+      {
+        data: {
+          competitor: competitor !== "all" ? competitor : null,
+          confidence: confidence !== "all" ? confidence : null,
+          search: search || null,
+          minConfidence: threshold as "high" | "medium" | "low",
+        },
+      },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: "Auto-accept complete",
+            description:
+              res.matched > 0
+                ? `Matched ${res.matched} row${res.matched === 1 ? "" : "s"} at ${THRESHOLD_LABELS[threshold].toLowerCase()} confidence.`
+                : "No rows met the confidence threshold.",
+          });
+          setSelected(new Set());
+          setEditingRows({});
+          invalidateAll();
+        },
+        onError: (err: any) => {
+          toast({
+            title: "Auto-accept failed",
+            description: err.message || "Failed to auto-accept matches.",
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   const total = mappingData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -207,11 +339,76 @@ export default function MappingReviewPage() {
         </Select>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3 mb-4 rounded-md border bg-muted/30 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Auto-accept</span>
+          <Select value={threshold} onValueChange={setThreshold} disabled={bulkBusy}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="high">{THRESHOLD_LABELS.high}</SelectItem>
+              <SelectItem value="medium">{THRESHOLD_LABELS.medium}</SelectItem>
+              <SelectItem value="low">{THRESHOLD_LABELS.low}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={() => setConfirmOpen(true)}
+            disabled={bulkBusy || total === 0}
+          >
+            <Zap className="w-4 h-4 mr-1.5" />
+            {autoAccept.isPending ? "Accepting…" : "Auto-accept all"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Applies the top suggestion across {competitor !== "all" ? competitor : "all competitors"} ({total} pending).
+          </span>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {selected.size} selected
+          </span>
+          <Button
+            variant="secondary"
+            onClick={acceptSelected}
+            disabled={bulkBusy || selected.size === 0}
+          >
+            <Check className="w-4 h-4 mr-1.5" />
+            {bulkUpdate.isPending ? "Accepting…" : "Accept selected"}
+          </Button>
+        </div>
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Auto-accept matches?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will accept the top suggestion for every pending row in the
+              current filter ({total} row{total === 1 ? "" : "s"}) whose best
+              match is <strong>{THRESHOLD_LABELS[threshold].toLowerCase()}</strong> confidence.
+              You can still re-review any row afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={runAutoAccept}>Accept matches</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="border rounded-md bg-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
               <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    disabled={selectableRows.length === 0 || bulkBusy}
+                    onCheckedChange={(v) => toggleAll(v === true)}
+                    aria-label="Select all suggestible rows on this page"
+                  />
+                </th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Competitor</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Description</th>
@@ -226,11 +423,11 @@ export default function MappingReviewPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Loading pending reviews...</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">Loading pending reviews...</td>
                 </tr>
               ) : mappingData?.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No reviews pending.</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">No reviews pending.</td>
                 </tr>
               ) : (
                 mappingData?.rows.map((row) => {
@@ -243,7 +440,15 @@ export default function MappingReviewPage() {
 
                   return (
                     <Fragment key={row.id}>
-                    <tr className={`hover:bg-muted/50 transition-colors ${suggestions.length > 0 ? "" : "border-b last:border-0"}`}>
+                    <tr className={`hover:bg-muted/50 transition-colors ${suggestions.length > 0 ? "" : "border-b last:border-0"} ${selected.has(row.id) ? "bg-primary/5" : ""}`}>
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selected.has(row.id)}
+                          disabled={suggestions.length === 0 || bulkBusy}
+                          onCheckedChange={(v) => toggleRow(row.id, v === true)}
+                          aria-label={`Select ${row.competitor} row`}
+                        />
+                      </td>
                       <td className="px-4 py-3 font-medium">{row.competitor}</td>
                       <td className="px-4 py-3 text-muted-foreground">{row.category || "-"}</td>
                       <td className="px-4 py-3 max-w-[250px] truncate" title={row.description || ""}>
@@ -296,8 +501,8 @@ export default function MappingReviewPage() {
                     </tr>
                     {suggestions.length > 0 && (
                       <tr className="border-b last:border-0 bg-muted/20">
-                        <td colSpan={4}></td>
-                        <td colSpan={4} className="px-4 pb-3 pt-0">
+                        <td colSpan={5}></td>
+                        <td colSpan={5} className="px-4 pb-3 pt-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                               <Sparkles className="w-3.5 h-3.5" />

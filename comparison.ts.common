@@ -1,6 +1,5 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter } from "express";
 import { sql, eq, ne, asc, and } from "drizzle-orm";
-import * as XLSX from "xlsx";
 import {
   db,
   competitorPricesTable,
@@ -11,39 +10,6 @@ import { normCode } from "../lib/catalog";
 import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
 
 const router: IRouter = Router();
-
-// Stream an array-of-arrays as a CSV or XLSX download.
-function sendSheet(
-  res: Response,
-  aoa: (string | number | null)[][],
-  sheetName: string,
-  fileBase: string,
-  format: string,
-): void {
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  if (format === "csv") {
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${fileBase}.csv"`,
-    );
-    res.send(csv);
-    return;
-  }
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  );
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="${fileBase}.xlsx"`,
-  );
-  res.send(buf);
-}
 
 interface PrayagInfo {
   mrp: number | null;
@@ -207,71 +173,6 @@ router.get("/catalog/comparison", async (req, res) => {
   res.json({ rows: rows.slice(start, start + pageSize), total, page, pageSize });
 });
 
-// GET /catalog/comparison/export — full filtered comparison as CSV/XLSX.
-router.get("/catalog/comparison/export", async (req, res) => {
-  const competitor = strParam(req.query.competitor);
-  const category = strParam(req.query.category);
-  const matchStatus = strParam(req.query.matchStatus);
-  const search = strParam(req.query.search);
-  const expensiveOnly = req.query.expensiveOnly === "true";
-  const format = String(req.query.format ?? "xlsx");
-
-  const conditions = [];
-  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
-  if (category) conditions.push(eq(competitorPricesTable.category, category));
-  if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
-  if (search) {
-    const like = `%${search.toLowerCase()}%`;
-    conditions.push(
-      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.matchedPrayagCode}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
-    );
-  }
-
-  const maps = await getPrayagMaps();
-  let q = db.select().from(competitorPricesTable).$dynamic();
-  if (conditions.length > 0) q = q.where(and(...conditions));
-  const all = await q.orderBy(
-    asc(competitorPricesTable.category),
-    asc(competitorPricesTable.description),
-    asc(competitorPricesTable.id),
-  );
-
-  let rows = all.map((c) => buildComparisonRow(c, maps));
-  if (expensiveOnly) rows = rows.filter((r) => r.prayagCheaper === false);
-
-  const header = [
-    "Competitor",
-    "Category",
-    "Description",
-    "Size",
-    "Competitor Price",
-    "Unit",
-    "Effective Date",
-    "Prayag Code",
-    "Prayag Product Name",
-    "Prayag MRP",
-    "Prayag Effective Date",
-    "Diff %",
-    "Status",
-  ];
-  const body = rows.map((r) => [
-    r.competitor,
-    r.category,
-    r.description,
-    r.size,
-    r.competitorPrice,
-    r.unit,
-    r.effectiveDate,
-    r.matchedPrayagCode,
-    r.prayagProductName,
-    r.prayagMrp,
-    r.prayagEffectiveDate,
-    r.diffPct,
-    r.matchStatus,
-  ]);
-  sendSheet(res, [header, ...body], "Comparison", "prayag-comparison", format);
-});
-
 // GET /catalog/comparison/summary — competitive share KPI + category win-rate.
 router.get("/catalog/comparison/summary", async (req, res) => {
   const competitor = strParam(req.query.competitor);
@@ -343,310 +244,6 @@ router.get("/catalog/comparison/summary", async (req, res) => {
     reviewCount: reviewRows.length,
     confidenceCounts,
     categoryWinRates,
-  });
-});
-
-// Normalize an incoming mapping update into canonical fields. Mirrors the
-// single-row PATCH invariants so bulk and single accepts behave identically.
-function normalizeMapping(body: {
-  matchedPrayagCode?: string | null;
-  matchStatus?: string;
-  matchConfidence?: string | null;
-}): { matchedPrayagCode: string | null; matchStatus: string; matchConfidence: string | null } {
-  const matchedPrayagCode =
-    typeof body.matchedPrayagCode === "string" && body.matchedPrayagCode.trim()
-      ? body.matchedPrayagCode.trim()
-      : null;
-  const ALLOWED_STATUSES = new Set(["matched", "no match (review)"]);
-  const requested =
-    typeof body.matchStatus === "string" ? body.matchStatus.trim() : "";
-  const matchStatus = !matchedPrayagCode
-    ? "no match (review)"
-    : ALLOWED_STATUSES.has(requested)
-      ? requested
-      : "matched";
-  const matchConfidence =
-    matchStatus !== "matched"
-      ? null
-      : typeof body.matchConfidence === "string" && body.matchConfidence.trim()
-        ? body.matchConfidence.trim()
-        : "High";
-  return { matchedPrayagCode, matchStatus, matchConfidence };
-}
-
-// PATCH /catalog/competitor-prices/bulk — apply mapping updates to many rows at
-// once (per-row "Accept selected"). Registered before the :id route so "bulk"
-// is never parsed as an id.
-router.patch("/catalog/competitor-prices/bulk", async (req, res) => {
-  const body = req.body as {
-    updates?: Array<{
-      id?: number;
-      matchedPrayagCode?: string | null;
-      matchStatus?: string;
-      matchConfidence?: string | null;
-    }>;
-  };
-  const updates = Array.isArray(body.updates) ? body.updates : [];
-  const valid = updates.filter((u) => Number.isInteger(u.id));
-  if (valid.length === 0) {
-    res.json({ updated: 0, rows: [] });
-    return;
-  }
-
-  const updatedRows: CompRow[] = [];
-  for (const u of valid) {
-    const { matchedPrayagCode, matchStatus, matchConfidence } =
-      normalizeMapping(u);
-    const result = await db
-      .update(competitorPricesTable)
-      .set({ matchedPrayagCode, matchStatus, matchConfidence, updatedAt: new Date() })
-      .where(eq(competitorPricesTable.id, u.id!))
-      .returning();
-    if (result[0]) updatedRows.push(result[0]);
-  }
-
-  const maps = await getPrayagMaps();
-  res.json({
-    updated: updatedRows.length,
-    rows: updatedRows.map((r) => buildComparisonRow(r, maps)),
-  });
-});
-
-// POST /catalog/mapping-review/auto-accept — for every unmatched row in the
-// current filter, accept its top fuzzy suggestion when that suggestion's tier
-// meets the requested minimum. Computes suggestions server-side so it can clear
-// the whole backlog (all pages), not just what's on screen.
-router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
-  const body = req.body as {
-    competitor?: string | null;
-    confidence?: string | null;
-    search?: string | null;
-    minConfidence?: string;
-  };
-  const competitor = strParam(body.competitor);
-  const confidence = strParam(body.confidence);
-  const search = strParam(body.search);
-  const TIERS = ["low", "medium", "high"] as const;
-  const minTierRaw =
-    typeof body.minConfidence === "string"
-      ? body.minConfidence.trim().toLowerCase()
-      : "high";
-  const minTier = (TIERS as readonly string[]).includes(minTierRaw)
-    ? (minTierRaw as (typeof TIERS)[number])
-    : "high";
-  const minRank = TIERS.indexOf(minTier);
-
-  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
-  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
-  if (confidence)
-    conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
-  if (search) {
-    const like = `%${search.toLowerCase()}%`;
-    conditions.push(
-      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.category}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
-    );
-  }
-
-  const rows = await db
-    .select({
-      id: competitorPricesTable.id,
-      category: competitorPricesTable.category,
-      description: competitorPricesTable.description,
-      size: competitorPricesTable.size,
-    })
-    .from(competitorPricesTable)
-    .where(and(...conditions));
-
-  if (rows.length === 0) {
-    res.json({ matched: 0 });
-    return;
-  }
-
-  const candidates = await getCatalogCandidates();
-  let matched = 0;
-  for (const r of rows) {
-    const top = suggestMatches(
-      { category: r.category, description: r.description, size: r.size },
-      candidates,
-    )[0];
-    if (!top) continue;
-    if (TIERS.indexOf(top.confidenceLabel) < minRank) continue;
-    await db
-      .update(competitorPricesTable)
-      .set({
-        matchedPrayagCode: top.itemCode,
-        matchStatus: "matched",
-        matchConfidence: "High",
-        updatedAt: new Date(),
-      })
-      .where(eq(competitorPricesTable.id, r.id));
-    matched++;
-  }
-
-  res.json({ matched });
-});
-
-// GET /catalog/comparison/by-product — one row per matched Prayag SKU with a
-// price cell for each competitor brand, so the user can compare Prayag against
-// several brands side by side (cheapest rival highlighted per SKU).
-router.get("/catalog/comparison/by-product", async (req, res) => {
-  const category = strParam(req.query.category);
-  const search = strParam(req.query.search);
-  const expensiveOnly = req.query.expensiveOnly === "true";
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
-
-  const conditions = [eq(competitorPricesTable.matchStatus, "matched")];
-  if (category) conditions.push(eq(competitorPricesTable.category, category));
-  if (search) {
-    const like = `%${search.toLowerCase()}%`;
-    conditions.push(
-      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.matchedPrayagCode}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
-    );
-  }
-
-  const maps = await getPrayagMaps();
-
-  const matchedRows = await db
-    .select()
-    .from(competitorPricesTable)
-    .where(and(...conditions));
-
-  // Group competitor rows by the Prayag SKU they map to. A competitor can have
-  // several rows for one SKU (e.g. different sizes), so we keep the lowest price
-  // per competitor — the most aggressive rival quote for that SKU.
-  interface Group {
-    itemCode: string;
-    category: string | null;
-    byCompetitor: Map<string, number>;
-  }
-  const groups = new Map<string, Group>();
-  for (const c of matchedRows) {
-    if (!c.matchedPrayagCode) continue;
-    const key = normCode(c.matchedPrayagCode);
-    let g = groups.get(key);
-    if (!g) {
-      g = {
-        itemCode: c.matchedPrayagCode,
-        category: c.category,
-        byCompetitor: new Map(),
-      };
-      groups.set(key, g);
-    }
-    if (!g.category && c.category) g.category = c.category;
-    const prev = g.byCompetitor.get(c.competitor);
-    if (prev == null || c.price < prev) g.byCompetitor.set(c.competitor, c.price);
-  }
-
-  let rows = [...groups.entries()].map(([key, g]) => {
-    const prayag = maps.get(key);
-    const prayagMrp = prayag?.mrp ?? null;
-
-    let cheapestRival: number | null = null;
-    let cheapestRivalName: string | null = null;
-    for (const [name, price] of g.byCompetitor) {
-      if (cheapestRival == null || price < cheapestRival) {
-        cheapestRival = price;
-        cheapestRivalName = name;
-      }
-    }
-
-    const competitors = [...g.byCompetitor.entries()]
-      .map(([competitor, price]) => {
-        let diffPct: number | null = null;
-        if (prayagMrp != null && price > 0) {
-          diffPct = Math.round(((prayagMrp - price) / price) * 1000) / 10;
-        }
-        return {
-          competitor,
-          price,
-          diffPct,
-          isCheapest: competitor === cheapestRivalName,
-        };
-      })
-      .sort((a, b) => a.competitor.localeCompare(b.competitor));
-
-    let diffPct: number | null = null;
-    if (prayagMrp != null && cheapestRival != null && cheapestRival > 0) {
-      diffPct = Math.round(((prayagMrp - cheapestRival) / cheapestRival) * 1000) / 10;
-    }
-    const prayagLowest =
-      prayagMrp != null && cheapestRival != null && prayagMrp <= cheapestRival;
-
-    // Whole-market read across every loaded rival brand for this SKU. Median is
-    // the true sample median (avg of the two middle prices for an even count).
-    const rivalPrices = [...g.byCompetitor.values()].sort((a, b) => a - b);
-    let marketMin: number | null = null;
-    let marketMedian: number | null = null;
-    let marketMax: number | null = null;
-    if (rivalPrices.length > 0) {
-      marketMin = rivalPrices[0]!;
-      marketMax = rivalPrices[rivalPrices.length - 1]!;
-      const mid = Math.floor(rivalPrices.length / 2);
-      const med =
-        rivalPrices.length % 2 === 1
-          ? rivalPrices[mid]!
-          : (rivalPrices[mid - 1]! + rivalPrices[mid]!) / 2;
-      marketMedian = Math.round(med * 100) / 100;
-    }
-
-    // Prayag's position vs the whole market (same thresholds as the Console
-    // engine): leader ≤ min, competitive ≤ median, above_market ≤ max, else
-    // overpriced; no_data when there is no MRP or no rivals.
-    let marketPosition: string = "no_data";
-    if (prayagMrp != null && rivalPrices.length > 0) {
-      if (prayagMrp <= marketMin!) marketPosition = "leader";
-      else if (prayagMrp <= marketMedian!) marketPosition = "competitive";
-      else if (prayagMrp <= marketMax!) marketPosition = "above_market";
-      else marketPosition = "overpriced";
-    }
-
-    return {
-      itemCode: g.itemCode,
-      prayagProductName: prayag?.productName ?? null,
-      category: g.category,
-      prayagMrp,
-      prayagEffectiveDate: prayag?.effectiveDate ?? null,
-      competitors,
-      cheapestRival,
-      cheapestRivalName,
-      prayagLowest,
-      rivalCount: competitors.length,
-      diffPct,
-      marketMin,
-      marketMedian,
-      marketMax,
-      marketPosition,
-    };
-  });
-
-  if (expensiveOnly) {
-    rows = rows.filter(
-      (r) =>
-        r.prayagMrp != null && r.cheapestRival != null && !r.prayagLowest,
-    );
-  }
-
-  rows.sort(
-    (a, b) =>
-      (a.category ?? "").localeCompare(b.category ?? "") ||
-      a.itemCode.localeCompare(b.itemCode),
-  );
-
-  // Column set: every brand present across the filtered SKUs, so the table
-  // header is stable across pages.
-  const competitorSet = new Set<string>();
-  for (const r of rows) for (const c of r.competitors) competitorSet.add(c.competitor);
-  const competitors = [...competitorSet].sort((a, b) => a.localeCompare(b));
-
-  const total = rows.length;
-  const start = (page - 1) * pageSize;
-  res.json({
-    competitors,
-    rows: rows.slice(start, start + pageSize),
-    total,
-    page,
-    pageSize,
   });
 });
 
@@ -870,7 +467,30 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
     matchStatus?: string;
     matchConfidence?: string | null;
   };
-  const { matchedPrayagCode, matchStatus, matchConfidence } = normalizeMapping(body);
+  const matchedPrayagCode =
+    typeof body.matchedPrayagCode === "string" && body.matchedPrayagCode.trim()
+      ? body.matchedPrayagCode.trim()
+      : null;
+  // Canonical statuses: "matched" vs "no match (review)". Anything else is
+  // coerced from whether a code was supplied, keeping API + UI consistent.
+  // Invariant: a row can only be "matched" when it has a non-empty code, so a
+  // null code always forces review status (never a phantom matched+null row).
+  const ALLOWED_STATUSES = new Set(["matched", "no match (review)"]);
+  const requested =
+    typeof body.matchStatus === "string" ? body.matchStatus.trim() : "";
+  const matchStatus = !matchedPrayagCode
+    ? "no match (review)"
+    : ALLOWED_STATUSES.has(requested)
+      ? requested
+      : "matched";
+  // A manual mapping correction is authoritative: default it to High confidence
+  // unless the caller explicitly passes a tier. Clear confidence when unmatched.
+  const matchConfidence =
+    matchStatus !== "matched"
+      ? null
+      : typeof body.matchConfidence === "string" && body.matchConfidence.trim()
+        ? body.matchConfidence.trim()
+        : "High";
 
   const updated = await db
     .update(competitorPricesTable)
@@ -885,91 +505,6 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
 
   const maps = await getPrayagMaps();
   res.json(buildComparisonRow(row, maps));
-});
-
-// GET /catalog/mapping-review/export — full filtered review list as CSV/XLSX.
-router.get("/catalog/mapping-review/export", async (req, res) => {
-  const competitor = strParam(req.query.competitor);
-  const search = strParam(req.query.search);
-  const format = String(req.query.format ?? "xlsx");
-
-  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
-  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
-  if (search) {
-    const like = `%${search.toLowerCase()}%`;
-    conditions.push(
-      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.category}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
-    );
-  }
-
-  const maps = await getPrayagMaps();
-  const all = await db
-    .select()
-    .from(competitorPricesTable)
-    .where(and(...conditions))
-    .orderBy(
-      asc(competitorPricesTable.category),
-      asc(competitorPricesTable.description),
-      asc(competitorPricesTable.id),
-    );
-  const rows = all.map((c) => buildComparisonRow(c, maps));
-
-  const header = [
-    "Competitor",
-    "Category",
-    "Description",
-    "Size",
-    "Competitor Price",
-    "Unit",
-    "Effective Date",
-    "Prayag Code",
-    "Prayag MRP",
-    "Diff %",
-    "Status",
-  ];
-  const body = rows.map((r) => [
-    r.competitor,
-    r.category,
-    r.description,
-    r.size,
-    r.competitorPrice,
-    r.unit,
-    r.effectiveDate,
-    r.matchedPrayagCode,
-    r.prayagMrp,
-    r.diffPct,
-    r.matchStatus,
-  ]);
-  sendSheet(
-    res,
-    [header, ...body],
-    "Mapping Review",
-    "prayag-mapping-review",
-    format,
-  );
-});
-
-// DELETE /catalog/competitors/:competitor — remove all price rows for a brand
-// the team no longer tracks. The brand then disappears from comparison filters,
-// By Product columns, and summary KPIs (all computed live from these rows).
-router.delete("/catalog/competitors/:competitor", async (req, res) => {
-  const competitor = strParam(req.params.competitor);
-  if (!competitor) {
-    res.status(400).json({ error: "competitor name is required" });
-    return;
-  }
-
-  const deleted = await db
-    .delete(competitorPricesTable)
-    .where(eq(competitorPricesTable.competitor, competitor))
-    .returning({ id: competitorPricesTable.id });
-
-  if (deleted.length === 0) {
-    res.status(404).json({ error: "Competitor not found" });
-    return;
-  }
-
-  res.json({ ok: true, competitor, deleted: deleted.length });
 });
 
 export default router;
