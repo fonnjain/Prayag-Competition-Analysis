@@ -6,6 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './catalogCategoryOption';
+export * from './catalogConflict';
+export * from './catalogDataHealth';
+export * from './catalogDuplicateSource';
+export * from './catalogFilters';
+export * from './catalogMissingPrice';
+export * from './catalogProduct';
+export * from './catalogProductDetail';
+export * from './catalogProductList';
+export * from './catalogProductListItem';
 export * from './categoryBreakdown';
 export * from './comparisonUpdate';
 export * from './competitor';
@@ -15,9 +25,12 @@ export * from './competitorCellBasis';
 export * from './competitorUpdate';
 export * from './competitorWinRate';
 export * from './dashboardSummary';
+export * from './errorResponse';
+export * from './getCatalogProductsParams';
 export * from './getProductsParams';
 export * from './getRecommendationsParams';
 export * from './healthStatus';
+export * from './mrpPriceRow';
 export * from './okResponse';
 export * from './productMatrix';
 export * from './productRow';

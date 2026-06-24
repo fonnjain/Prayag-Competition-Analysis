@@ -5,6 +5,139 @@
  * Prayag Competition Console API
  * OpenAPI spec version: 0.1.0
  */
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface CatalogProductListItem {
+  id: number;
+  itemCode: string;
+  /** @nullable */
+  productName?: string | null;
+  /** @nullable */
+  division?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  seriesRange?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  uom?: string | null;
+  isActive?: boolean;
+  /** @nullable */
+  dataFlag?: string | null;
+  hasPrice: boolean;
+  /** @nullable */
+  currentMrp?: number | null;
+  /** @nullable */
+  currentNet?: number | null;
+  /** @nullable */
+  currentBasis?: string | null;
+  /** @nullable */
+  effectiveDate?: string | null;
+}
+
+export interface CatalogProductList {
+  rows: CatalogProductListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CatalogProduct {
+  id: number;
+  itemCode: string;
+  /** @nullable */
+  productName?: string | null;
+  /** @nullable */
+  division?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  seriesRange?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  uom?: string | null;
+  /** @nullable */
+  kgCost?: number | null;
+  isActive?: boolean;
+  /** @nullable */
+  sourceFiles?: string | null;
+  /** @nullable */
+  dataFlag?: string | null;
+}
+
+export interface MrpPriceRow {
+  id: number;
+  itemCode: string;
+  /** @nullable */
+  mrp?: number | null;
+  /** @nullable */
+  netPrice?: number | null;
+  /** @nullable */
+  discountPct?: number | null;
+  priceBasis: string;
+  effectiveDate: string;
+  loadDate: string;
+  /** @nullable */
+  sourceFile?: string | null;
+  isCurrent: boolean;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface CatalogProductDetail {
+  product: CatalogProduct;
+  history: MrpPriceRow[];
+}
+
+export interface CatalogCategoryOption {
+  category: string;
+  /** @nullable */
+  division?: string | null;
+}
+
+export interface CatalogFilters {
+  divisions: string[];
+  categories: CatalogCategoryOption[];
+}
+
+export interface CatalogConflict {
+  itemCode: string;
+  /** @nullable */
+  conflictingNames?: string | null;
+  /** @nullable */
+  sources?: string | null;
+}
+
+export interface CatalogMissingPrice {
+  itemCode: string;
+  /** @nullable */
+  productName?: string | null;
+  /** @nullable */
+  division?: string | null;
+  /** @nullable */
+  category?: string | null;
+}
+
+export interface CatalogDuplicateSource {
+  sourceFiles: string;
+  count: number;
+}
+
+export interface CatalogDataHealth {
+  totalProducts: number;
+  pricedProducts: number;
+  pendingProducts: number;
+  conflictCount: number;
+  conflicts: CatalogConflict[];
+  missingPriceCount: number;
+  missingPrices: CatalogMissingPrice[];
+  duplicateSources: CatalogDuplicateSource[];
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -234,5 +367,17 @@ export type GetRecommendationsParams = {
 category?: string;
 search?: string;
 status?: string;
+};
+
+export type GetCatalogProductsParams = {
+division?: string;
+category?: string;
+search?: string;
+/**
+ * Filter by price presence. "priced" or "pending".
+ */
+priceStatus?: string;
+page?: number;
+pageSize?: number;
 };
 

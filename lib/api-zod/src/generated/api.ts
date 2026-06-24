@@ -306,3 +306,124 @@ export const ResetDataResponse = zod.object({
 })
 
 
+/**
+ * @summary List catalog products with current MRP
+ */
+export const GetCatalogProductsQueryParams = zod.object({
+  "division": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "priceStatus": zod.coerce.string().optional().describe('Filter by price presence. \"priced\" or \"pending\".'),
+  "page": zod.coerce.number().optional(),
+  "pageSize": zod.coerce.number().optional()
+})
+
+export const GetCatalogProductsResponse = zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "itemCode": zod.string(),
+  "productName": zod.string().nullish(),
+  "division": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "seriesRange": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "uom": zod.string().nullish(),
+  "isActive": zod.boolean().optional(),
+  "dataFlag": zod.string().nullish(),
+  "hasPrice": zod.boolean(),
+  "currentMrp": zod.number().nullish(),
+  "currentNet": zod.number().nullish(),
+  "currentBasis": zod.string().nullish(),
+  "effectiveDate": zod.string().nullish()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
+ * @summary Get a product with its full MRP price history
+ */
+export const GetCatalogProductParams = zod.object({
+  "itemCode": zod.coerce.string()
+})
+
+export const GetCatalogProductResponse = zod.object({
+  "product": zod.object({
+  "id": zod.number(),
+  "itemCode": zod.string(),
+  "productName": zod.string().nullish(),
+  "division": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "seriesRange": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "uom": zod.string().nullish(),
+  "kgCost": zod.number().nullish(),
+  "isActive": zod.boolean().optional(),
+  "sourceFiles": zod.string().nullish(),
+  "dataFlag": zod.string().nullish()
+}),
+  "history": zod.array(zod.object({
+  "id": zod.number(),
+  "itemCode": zod.string(),
+  "mrp": zod.number().nullish(),
+  "netPrice": zod.number().nullish(),
+  "discountPct": zod.number().nullish(),
+  "priceBasis": zod.string(),
+  "effectiveDate": zod.string(),
+  "loadDate": zod.string(),
+  "sourceFile": zod.string().nullish(),
+  "isCurrent": zod.boolean(),
+  "notes": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Available divisions and categories for filtering
+ */
+export const GetCatalogFiltersResponse = zod.object({
+  "divisions": zod.array(zod.string()),
+  "categories": zod.array(zod.object({
+  "category": zod.string(),
+  "division": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Data health report (conflicts, missing prices, duplicate sources)
+ */
+export const GetCatalogDataHealthResponse = zod.object({
+  "totalProducts": zod.number(),
+  "pricedProducts": zod.number(),
+  "pendingProducts": zod.number(),
+  "conflictCount": zod.number(),
+  "conflicts": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "conflictingNames": zod.string().nullish(),
+  "sources": zod.string().nullish()
+})),
+  "missingPriceCount": zod.number(),
+  "missingPrices": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullish(),
+  "division": zod.string().nullish(),
+  "category": zod.string().nullish()
+})),
+  "duplicateSources": zod.array(zod.object({
+  "sourceFiles": zod.string(),
+  "count": zod.number()
+}))
+})
+
+
+/**
+ * @summary Reset the product catalog to the original clean import
+ */
+export const ResetCatalogResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+

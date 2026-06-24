@@ -20,10 +20,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CatalogDataHealth,
+  CatalogFilters,
+  CatalogProductDetail,
+  CatalogProductList,
   ComparisonUpdate,
   Competitor,
   CompetitorUpdate,
   DashboardSummary,
+  ErrorResponse,
+  GetCatalogProductsParams,
   GetProductsParams,
   GetRecommendationsParams,
   HealthStatus,
@@ -1027,5 +1033,390 @@ export const useResetData = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResetDataMutationOptions(options));
+    }
+
+export const getGetCatalogProductsUrl = (params?: GetCatalogProductsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/products?${stringifiedParams}` : `/api/catalog/products`
+}
+
+/**
+ * @summary List catalog products with current MRP
+ */
+export const getCatalogProducts = async (params?: GetCatalogProductsParams, options?: RequestInit): Promise<CatalogProductList> => {
+
+  return customFetch<CatalogProductList>(getGetCatalogProductsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCatalogProductsQueryKey = (params?: GetCatalogProductsParams,) => {
+    return [
+    `/api/catalog/products`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCatalogProductsQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogProducts>>, TError = ErrorType<unknown>>(params?: GetCatalogProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProducts>>> = ({ signal }) => getCatalogProducts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogProducts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCatalogProductsQueryResult = NonNullable<Awaited<ReturnType<typeof getCatalogProducts>>>
+export type GetCatalogProductsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List catalog products with current MRP
+ */
+
+export function useGetCatalogProducts<TData = Awaited<ReturnType<typeof getCatalogProducts>>, TError = ErrorType<unknown>>(
+ params?: GetCatalogProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCatalogProductsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCatalogProductUrl = (itemCode: string,) => {
+
+
+
+
+  return `/api/catalog/products/${itemCode}`
+}
+
+/**
+ * @summary Get a product with its full MRP price history
+ */
+export const getCatalogProduct = async (itemCode: string, options?: RequestInit): Promise<CatalogProductDetail> => {
+
+  return customFetch<CatalogProductDetail>(getGetCatalogProductUrl(itemCode),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCatalogProductQueryKey = (itemCode: string,) => {
+    return [
+    `/api/catalog/products/${itemCode}`
+    ] as const;
+    }
+
+
+export const getGetCatalogProductQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductQueryKey(itemCode);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProduct>>> = ({ signal }) => getCatalogProduct(itemCode, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCatalogProductQueryResult = NonNullable<Awaited<ReturnType<typeof getCatalogProduct>>>
+export type GetCatalogProductQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a product with its full MRP price history
+ */
+
+export function useGetCatalogProduct<TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(
+ itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCatalogProductQueryOptions(itemCode,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCatalogFiltersUrl = () => {
+
+
+
+
+  return `/api/catalog/filters`
+}
+
+/**
+ * @summary Available divisions and categories for filtering
+ */
+export const getCatalogFilters = async ( options?: RequestInit): Promise<CatalogFilters> => {
+
+  return customFetch<CatalogFilters>(getGetCatalogFiltersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCatalogFiltersQueryKey = () => {
+    return [
+    `/api/catalog/filters`
+    ] as const;
+    }
+
+
+export const getGetCatalogFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogFilters>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogFiltersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogFilters>>> = ({ signal }) => getCatalogFilters({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogFilters>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCatalogFiltersQueryResult = NonNullable<Awaited<ReturnType<typeof getCatalogFilters>>>
+export type GetCatalogFiltersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Available divisions and categories for filtering
+ */
+
+export function useGetCatalogFilters<TData = Awaited<ReturnType<typeof getCatalogFilters>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCatalogFiltersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCatalogDataHealthUrl = () => {
+
+
+
+
+  return `/api/catalog/data-health`
+}
+
+/**
+ * @summary Data health report (conflicts, missing prices, duplicate sources)
+ */
+export const getCatalogDataHealth = async ( options?: RequestInit): Promise<CatalogDataHealth> => {
+
+  return customFetch<CatalogDataHealth>(getGetCatalogDataHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCatalogDataHealthQueryKey = () => {
+    return [
+    `/api/catalog/data-health`
+    ] as const;
+    }
+
+
+export const getGetCatalogDataHealthQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogDataHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogDataHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogDataHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogDataHealth>>> = ({ signal }) => getCatalogDataHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogDataHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCatalogDataHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getCatalogDataHealth>>>
+export type GetCatalogDataHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Data health report (conflicts, missing prices, duplicate sources)
+ */
+
+export function useGetCatalogDataHealth<TData = Awaited<ReturnType<typeof getCatalogDataHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogDataHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCatalogDataHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getResetCatalogUrl = () => {
+
+
+
+
+  return `/api/catalog/reset`
+}
+
+/**
+ * @summary Reset the product catalog to the original clean import
+ */
+export const resetCatalog = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getResetCatalogUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResetCatalogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext> => {
+
+const mutationKey = ['resetCatalog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetCatalog>>, void> = () => {
+
+
+          return  resetCatalog(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof resetCatalog>>>
+
+    export type ResetCatalogMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset the product catalog to the original clean import
+ */
+export const useResetCatalog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetCatalog>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResetCatalogMutationOptions(options));
     }
 

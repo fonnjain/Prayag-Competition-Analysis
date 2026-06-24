@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/product-db/"
+title = "Prayag Product Database"
+version = "1.0.0"
+id = "artifacts/prayag-product-db"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/product-db/" ]
+localPort = 24978
+
+[services.development]
+run = "pnpm --filter @workspace/prayag-product-db run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/prayag-product-db", "run", "build" ]
+publicDir = "artifacts/prayag-product-db/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24978"
+BASE_PATH = "/product-db/"

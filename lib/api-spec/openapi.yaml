@@ -267,8 +267,316 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OkResponse"
+  /catalog/products:
+    get:
+      operationId: getCatalogProducts
+      tags: [catalog]
+      summary: List catalog products with current MRP
+      parameters:
+        - name: division
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: priceStatus
+          in: query
+          required: false
+          description: Filter by price presence. "priced" or "pending".
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogProductList"
+  /catalog/products/{itemCode}:
+    get:
+      operationId: getCatalogProduct
+      tags: [catalog]
+      summary: Get a product with its full MRP price history
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product detail with history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogProductDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /catalog/filters:
+    get:
+      operationId: getCatalogFilters
+      tags: [catalog]
+      summary: Available divisions and categories for filtering
+      responses:
+        "200":
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogFilters"
+  /catalog/data-health:
+    get:
+      operationId: getCatalogDataHealth
+      tags: [catalog]
+      summary: Data health report (conflicts, missing prices, duplicate sources)
+      responses:
+        "200":
+          description: Data health report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogDataHealth"
+  /catalog/reset:
+    post:
+      operationId: resetCatalog
+      tags: [catalog]
+      summary: Reset the product catalog to the original clean import
+      responses:
+        "200":
+          description: Reset done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
 components:
   schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    CatalogProductListItem:
+      type: object
+      required: [id, itemCode, hasPrice]
+      properties:
+        id:
+          type: integer
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        seriesRange:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        uom:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        dataFlag:
+          type: ["string", "null"]
+        hasPrice:
+          type: boolean
+        currentMrp:
+          type: ["number", "null"]
+        currentNet:
+          type: ["number", "null"]
+        currentBasis:
+          type: ["string", "null"]
+        effectiveDate:
+          type: ["string", "null"]
+    CatalogProductList:
+      type: object
+      required: [rows, total, page, pageSize]
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogProductListItem"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+    CatalogProduct:
+      type: object
+      required: [id, itemCode]
+      properties:
+        id:
+          type: integer
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        seriesRange:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        uom:
+          type: ["string", "null"]
+        kgCost:
+          type: ["number", "null"]
+        isActive:
+          type: boolean
+        sourceFiles:
+          type: ["string", "null"]
+        dataFlag:
+          type: ["string", "null"]
+    MrpPriceRow:
+      type: object
+      required: [id, itemCode, effectiveDate, loadDate, priceBasis, isCurrent]
+      properties:
+        id:
+          type: integer
+        itemCode:
+          type: string
+        mrp:
+          type: ["number", "null"]
+        netPrice:
+          type: ["number", "null"]
+        discountPct:
+          type: ["number", "null"]
+        priceBasis:
+          type: string
+        effectiveDate:
+          type: string
+        loadDate:
+          type: string
+        sourceFile:
+          type: ["string", "null"]
+        isCurrent:
+          type: boolean
+        notes:
+          type: ["string", "null"]
+    CatalogProductDetail:
+      type: object
+      required: [product, history]
+      properties:
+        product:
+          $ref: "#/components/schemas/CatalogProduct"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpPriceRow"
+    CatalogFilters:
+      type: object
+      required: [divisions, categories]
+      properties:
+        divisions:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogCategoryOption"
+    CatalogCategoryOption:
+      type: object
+      required: [category]
+      properties:
+        category:
+          type: string
+        division:
+          type: ["string", "null"]
+    CatalogConflict:
+      type: object
+      required: [itemCode]
+      properties:
+        itemCode:
+          type: string
+        conflictingNames:
+          type: ["string", "null"]
+        sources:
+          type: ["string", "null"]
+    CatalogMissingPrice:
+      type: object
+      required: [itemCode]
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+    CatalogDuplicateSource:
+      type: object
+      required: [sourceFiles, count]
+      properties:
+        sourceFiles:
+          type: string
+        count:
+          type: integer
+    CatalogDataHealth:
+      type: object
+      required:
+        [
+          totalProducts,
+          pricedProducts,
+          pendingProducts,
+          conflictCount,
+          conflicts,
+          missingPrices,
+          missingPriceCount,
+          duplicateSources,
+        ]
+      properties:
+        totalProducts:
+          type: integer
+        pricedProducts:
+          type: integer
+        pendingProducts:
+          type: integer
+        conflictCount:
+          type: integer
+        conflicts:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogConflict"
+        missingPriceCount:
+          type: integer
+        missingPrices:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogMissingPrice"
+        duplicateSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogDuplicateSource"
     HealthStatus:
       type: object
       properties:
