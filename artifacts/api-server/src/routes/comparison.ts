@@ -1,5 +1,6 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { sql, eq, ne, asc, and } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import {
   db,
   competitorPricesTable,
@@ -10,6 +11,39 @@ import { normCode } from "../lib/catalog";
 import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
 
 const router: IRouter = Router();
+
+// Stream an array-of-arrays as a CSV or XLSX download.
+function sendSheet(
+  res: Response,
+  aoa: (string | number | null)[][],
+  sheetName: string,
+  fileBase: string,
+  format: string,
+): void {
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  if (format === "csv") {
+    const csv = XLSX.utils.sheet_to_csv(ws);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileBase}.csv"`,
+    );
+    res.send(csv);
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${fileBase}.xlsx"`,
+  );
+  res.send(buf);
+}
 
 interface PrayagInfo {
   mrp: number | null;
@@ -171,6 +205,71 @@ router.get("/catalog/comparison", async (req, res) => {
   const total = rows.length;
   const start = (page - 1) * pageSize;
   res.json({ rows: rows.slice(start, start + pageSize), total, page, pageSize });
+});
+
+// GET /catalog/comparison/export — full filtered comparison as CSV/XLSX.
+router.get("/catalog/comparison/export", async (req, res) => {
+  const competitor = strParam(req.query.competitor);
+  const category = strParam(req.query.category);
+  const matchStatus = strParam(req.query.matchStatus);
+  const search = strParam(req.query.search);
+  const expensiveOnly = req.query.expensiveOnly === "true";
+  const format = String(req.query.format ?? "xlsx");
+
+  const conditions = [];
+  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (category) conditions.push(eq(competitorPricesTable.category, category));
+  if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
+  if (search) {
+    const like = `%${search.toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.matchedPrayagCode}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
+    );
+  }
+
+  const maps = await getPrayagMaps();
+  let q = db.select().from(competitorPricesTable).$dynamic();
+  if (conditions.length > 0) q = q.where(and(...conditions));
+  const all = await q.orderBy(
+    asc(competitorPricesTable.category),
+    asc(competitorPricesTable.description),
+    asc(competitorPricesTable.id),
+  );
+
+  let rows = all.map((c) => buildComparisonRow(c, maps));
+  if (expensiveOnly) rows = rows.filter((r) => r.prayagCheaper === false);
+
+  const header = [
+    "Competitor",
+    "Category",
+    "Description",
+    "Size",
+    "Competitor Price",
+    "Unit",
+    "Effective Date",
+    "Prayag Code",
+    "Prayag Product Name",
+    "Prayag MRP",
+    "Prayag Effective Date",
+    "Diff %",
+    "Status",
+  ];
+  const body = rows.map((r) => [
+    r.competitor,
+    r.category,
+    r.description,
+    r.size,
+    r.competitorPrice,
+    r.unit,
+    r.effectiveDate,
+    r.matchedPrayagCode,
+    r.prayagProductName,
+    r.prayagMrp,
+    r.prayagEffectiveDate,
+    r.diffPct,
+    r.matchStatus,
+  ]);
+  sendSheet(res, [header, ...body], "Comparison", "prayag-comparison", format);
 });
 
 // GET /catalog/comparison/summary — competitive share KPI + category win-rate.
@@ -585,6 +684,68 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
     page,
     pageSize,
   });
+});
+
+// GET /catalog/mapping-review/export — full filtered review list as CSV/XLSX.
+router.get("/catalog/mapping-review/export", async (req, res) => {
+  const competitor = strParam(req.query.competitor);
+  const search = strParam(req.query.search);
+  const format = String(req.query.format ?? "xlsx");
+
+  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (search) {
+    const like = `%${search.toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.category}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
+    );
+  }
+
+  const maps = await getPrayagMaps();
+  const all = await db
+    .select()
+    .from(competitorPricesTable)
+    .where(and(...conditions))
+    .orderBy(
+      asc(competitorPricesTable.category),
+      asc(competitorPricesTable.description),
+      asc(competitorPricesTable.id),
+    );
+  const rows = all.map((c) => buildComparisonRow(c, maps));
+
+  const header = [
+    "Competitor",
+    "Category",
+    "Description",
+    "Size",
+    "Competitor Price",
+    "Unit",
+    "Effective Date",
+    "Prayag Code",
+    "Prayag MRP",
+    "Diff %",
+    "Status",
+  ];
+  const body = rows.map((r) => [
+    r.competitor,
+    r.category,
+    r.description,
+    r.size,
+    r.competitorPrice,
+    r.unit,
+    r.effectiveDate,
+    r.matchedPrayagCode,
+    r.prayagMrp,
+    r.diffPct,
+    r.matchStatus,
+  ]);
+  sendSheet(
+    res,
+    [header, ...body],
+    "Mapping Review",
+    "prayag-mapping-review",
+    format,
+  );
 });
 
 // PATCH /catalog/competitor-prices/:id — assign/correct a row's mapping.

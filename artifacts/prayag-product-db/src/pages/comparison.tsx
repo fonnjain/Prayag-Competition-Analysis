@@ -11,8 +11,9 @@ import {
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -115,6 +116,17 @@ export default function ComparisonPage() {
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
+  const exportUrl = (format: "csv" | "xlsx") => {
+    const params = new URLSearchParams({ format });
+    if (search) params.set("search", search);
+    if (competitor !== "all") params.set("competitor", competitor);
+    if (category !== "all") params.set("category", category);
+    if (matchStatus !== "all") params.set("matchStatus", matchStatus);
+    if (confidence !== "all") params.set("confidence", confidence);
+    if (expensiveOnly) params.set("expensiveOnly", "true");
+    return `/api/catalog/comparison/export?${params.toString()}`;
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
@@ -124,27 +136,45 @@ export default function ComparisonPage() {
             Analyze Prayag prices against competitor brands.
           </p>
         </div>
-        <div className="inline-flex rounded-md border bg-card p-1">
-          <button
-            onClick={() => setView("byProduct")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
-              view === "byProduct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Columns3 className="w-4 h-4" />
-            By Product
-          </button>
-          <button
-            onClick={() => setView("byCompetitor")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
-              view === "byCompetitor" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Rows3 className="w-4 h-4" />
-            By Competitor Row
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-md border bg-card p-1">
+            <button
+              onClick={() => setView("byProduct")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
+                view === "byProduct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Columns3 className="w-4 h-4" />
+              By Product
+            </button>
+            <button
+              onClick={() => setView("byCompetitor")}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
+                view === "byCompetitor" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Rows3 className="w-4 h-4" />
+              By Competitor Row
+            </button>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <a href={exportUrl("xlsx")} download>Excel (.xlsx)</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={exportUrl("csv")} download>CSV (.csv)</a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

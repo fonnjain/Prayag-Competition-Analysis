@@ -11,8 +11,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Download } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -136,13 +137,38 @@ export default function MappingReviewPage() {
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
+  const exportUrl = (format: "csv" | "xlsx") => {
+    const params = new URLSearchParams({ format });
+    if (search) params.set("search", search);
+    if (competitor !== "all") params.set("competitor", competitor);
+    return `/api/catalog/mapping-review/export?${params.toString()}`;
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Mapping Review</h1>
-        <p className="text-muted-foreground mt-1">
-          Review and map competitor products to Prayag item codes.
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Mapping Review</h1>
+          <p className="text-muted-foreground mt-1">
+            Review and map competitor products to Prayag item codes.
+          </p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <a href={exportUrl("xlsx")} download>Excel (.xlsx)</a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href={exportUrl("csv")} download>CSV (.csv)</a>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="flex gap-4 mb-6">
