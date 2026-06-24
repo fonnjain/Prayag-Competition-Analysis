@@ -247,6 +247,138 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   });
 });
 
+// GET /catalog/comparison/by-product — one row per matched Prayag SKU with a
+// price cell for each competitor brand, so the user can compare Prayag against
+// several brands side by side (cheapest rival highlighted per SKU).
+router.get("/catalog/comparison/by-product", async (req, res) => {
+  const category = strParam(req.query.category);
+  const search = strParam(req.query.search);
+  const expensiveOnly = req.query.expensiveOnly === "true";
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
+
+  const conditions = [eq(competitorPricesTable.matchStatus, "matched")];
+  if (category) conditions.push(eq(competitorPricesTable.category, category));
+  if (search) {
+    const like = `%${search.toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.matchedPrayagCode}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
+    );
+  }
+
+  const maps = await getPrayagMaps();
+
+  const matchedRows = await db
+    .select()
+    .from(competitorPricesTable)
+    .where(and(...conditions));
+
+  // Group competitor rows by the Prayag SKU they map to. A competitor can have
+  // several rows for one SKU (e.g. different sizes), so we keep the lowest price
+  // per competitor — the most aggressive rival quote for that SKU.
+  interface Group {
+    itemCode: string;
+    category: string | null;
+    byCompetitor: Map<string, number>;
+  }
+  const groups = new Map<string, Group>();
+  for (const c of matchedRows) {
+    if (!c.matchedPrayagCode) continue;
+    const key = normCode(c.matchedPrayagCode);
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        itemCode: c.matchedPrayagCode,
+        category: c.category,
+        byCompetitor: new Map(),
+      };
+      groups.set(key, g);
+    }
+    if (!g.category && c.category) g.category = c.category;
+    const prev = g.byCompetitor.get(c.competitor);
+    if (prev == null || c.price < prev) g.byCompetitor.set(c.competitor, c.price);
+  }
+
+  let rows = [...groups.entries()].map(([key, g]) => {
+    const prayag = maps.get(key);
+    const prayagMrp = prayag?.mrp ?? null;
+
+    let cheapestRival: number | null = null;
+    let cheapestRivalName: string | null = null;
+    for (const [name, price] of g.byCompetitor) {
+      if (cheapestRival == null || price < cheapestRival) {
+        cheapestRival = price;
+        cheapestRivalName = name;
+      }
+    }
+
+    const competitors = [...g.byCompetitor.entries()]
+      .map(([competitor, price]) => {
+        let diffPct: number | null = null;
+        if (prayagMrp != null && price > 0) {
+          diffPct = Math.round(((prayagMrp - price) / price) * 1000) / 10;
+        }
+        return {
+          competitor,
+          price,
+          diffPct,
+          isCheapest: competitor === cheapestRivalName,
+        };
+      })
+      .sort((a, b) => a.competitor.localeCompare(b.competitor));
+
+    let diffPct: number | null = null;
+    if (prayagMrp != null && cheapestRival != null && cheapestRival > 0) {
+      diffPct = Math.round(((prayagMrp - cheapestRival) / cheapestRival) * 1000) / 10;
+    }
+    const prayagLowest =
+      prayagMrp != null && cheapestRival != null && prayagMrp <= cheapestRival;
+
+    return {
+      itemCode: g.itemCode,
+      prayagProductName: prayag?.productName ?? null,
+      category: g.category,
+      prayagMrp,
+      prayagEffectiveDate: prayag?.effectiveDate ?? null,
+      competitors,
+      cheapestRival,
+      cheapestRivalName,
+      prayagLowest,
+      rivalCount: competitors.length,
+      diffPct,
+    };
+  });
+
+  if (expensiveOnly) {
+    rows = rows.filter(
+      (r) =>
+        r.prayagMrp != null && r.cheapestRival != null && !r.prayagLowest,
+    );
+  }
+
+  rows.sort(
+    (a, b) =>
+      (a.category ?? "").localeCompare(b.category ?? "") ||
+      a.itemCode.localeCompare(b.itemCode),
+  );
+
+  // Column set: every brand present across the filtered SKUs, so the table
+  // header is stable across pages.
+  const competitorSet = new Set<string>();
+  for (const r of rows) for (const c of r.competitors) competitorSet.add(c.competitor);
+  const competitors = [...competitorSet].sort((a, b) => a.localeCompare(b));
+
+  const total = rows.length;
+  const start = (page - 1) * pageSize;
+  res.json({
+    competitors,
+    rows: rows.slice(start, start + pageSize),
+    total,
+    page,
+    pageSize,
+  });
+});
+
 // GET /catalog/comparison/filters — competitors, categories, match statuses.
 router.get("/catalog/comparison/filters", async (_req, res) => {
   const compRows = await db

@@ -499,6 +499,43 @@ export const GetComparisonSummaryResponse = zod.object({
 
 
 /**
+ * @summary Per-Prayag-SKU side-by-side comparison across all competitor brands
+ */
+export const GetComparisonByProductQueryParams = zod.object({
+  "category": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "expensiveOnly": zod.coerce.boolean().optional().describe('Only SKUs where Prayag is pricier than the cheapest rival.'),
+  "page": zod.coerce.number().optional(),
+  "pageSize": zod.coerce.number().optional()
+})
+
+export const GetComparisonByProductResponse = zod.object({
+  "competitors": zod.array(zod.string()),
+  "rows": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "prayagProductName": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "prayagMrp": zod.number().nullable(),
+  "prayagEffectiveDate": zod.string().nullish(),
+  "competitors": zod.array(zod.object({
+  "competitor": zod.string(),
+  "price": zod.number(),
+  "diffPct": zod.number().nullable(),
+  "isCheapest": zod.boolean()
+})),
+  "cheapestRival": zod.number().nullable(),
+  "cheapestRivalName": zod.string().nullable(),
+  "prayagLowest": zod.boolean(),
+  "rivalCount": zod.number(),
+  "diffPct": zod.number().nullable()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
  * @summary Available competitors, categories, and match statuses for filtering
  */
 export const GetComparisonFiltersResponse = zod.object({

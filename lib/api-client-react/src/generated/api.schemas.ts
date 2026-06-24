@@ -394,6 +394,43 @@ export interface ComparisonList {
   pageSize: number;
 }
 
+export interface ProductComparisonCell {
+  competitor: string;
+  price: number;
+  /** @nullable */
+  diffPct: number | null;
+  isCheapest: boolean;
+}
+
+export interface ProductComparisonRow {
+  itemCode: string;
+  /** @nullable */
+  prayagProductName?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  prayagMrp: number | null;
+  /** @nullable */
+  prayagEffectiveDate?: string | null;
+  competitors: ProductComparisonCell[];
+  /** @nullable */
+  cheapestRival: number | null;
+  /** @nullable */
+  cheapestRivalName: string | null;
+  prayagLowest: boolean;
+  rivalCount: number;
+  /** @nullable */
+  diffPct: number | null;
+}
+
+export interface ProductComparisonList {
+  competitors: string[];
+  rows: ProductComparisonRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface ComparisonCategoryWinRate {
   category: string;
   comparable: number;
@@ -567,6 +604,17 @@ pageSize?: number;
 
 export type GetComparisonSummaryParams = {
 competitor?: string;
+};
+
+export type GetComparisonByProductParams = {
+category?: string;
+search?: string;
+/**
+ * Only SKUs where Prayag is pricier than the cheapest rival.
+ */
+expensiveOnly?: boolean;
+page?: number;
+pageSize?: number;
 };
 
 export type GetComparisonMatrixParams = {

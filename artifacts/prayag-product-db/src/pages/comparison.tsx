@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import { 
   useGetComparison, 
+  useGetComparisonByProduct,
   useGetComparisonSummary, 
   useGetComparisonFilters,
-  useGetComparisonMatrix,
   getGetComparisonQueryKey,
-  getGetComparisonSummaryQueryKey,
-  getGetComparisonMatrixQueryKey
+  getGetComparisonByProductQueryKey,
+  getGetComparisonSummaryQueryKey
 } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 
-type ViewMode = "rows" | "matrix";
+type ViewMode = "byProduct" | "byCompetitor";
 
 function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
   if (!confidence) return null;
@@ -50,7 +50,7 @@ function DiffBadge({ diffPct, prayagCheaper }: { diffPct?: number | null; prayag
 }
 
 export default function ComparisonPage() {
-  const [view, setView] = useState<ViewMode>("rows");
+  const [view, setView] = useState<ViewMode>("byProduct");
   const [search, setSearch] = useState("");
   const [competitor, setCompetitor] = useState<string>("all");
   const [category, setCategory] = useState<string>("all");
@@ -86,14 +86,14 @@ export default function ComparisonPage() {
     pageSize: PAGE_SIZE
   };
 
-  const { data: comparisonData, isLoading } = useGetComparison(rowsParams, {
+  const { data: comparisonData, isLoading: rowLoading } = useGetComparison(rowsParams, {
     query: {
-      enabled: view === "rows",
+      enabled: view === "byCompetitor",
       queryKey: getGetComparisonQueryKey(rowsParams)
     }
   });
 
-  const matrixParams = {
+  const productParams = {
     search: search || undefined,
     category: category !== "all" ? category : undefined,
     expensiveOnly: expensiveOnly ? true : undefined,
@@ -101,21 +101,19 @@ export default function ComparisonPage() {
     pageSize: PAGE_SIZE
   };
 
-  const { data: matrixData, isLoading: matrixLoading } = useGetComparisonMatrix(matrixParams, {
+  const { data: productData, isLoading: productLoading } = useGetComparisonByProduct(productParams, {
     query: {
-      enabled: view === "matrix",
-      queryKey: getGetComparisonMatrixQueryKey(matrixParams)
+      enabled: view === "byProduct",
+      queryKey: getGetComparisonByProductQueryKey(productParams)
     }
   });
 
-  const activeData = view === "rows" ? comparisonData : matrixData;
-  const activeLoading = view === "rows" ? isLoading : matrixLoading;
-  const total = activeData?.total ?? 0;
+  const isLoading = view === "byProduct" ? productLoading : rowLoading;
+  const activeLoading = isLoading;
+  const total = (view === "byProduct" ? productData?.total : comparisonData?.total) ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * PAGE_SIZE, total);
-
-  const matrixCompetitors = matrixData?.competitors ?? [];
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -128,24 +126,24 @@ export default function ComparisonPage() {
         </div>
         <div className="inline-flex rounded-md border bg-card p-1">
           <button
-            onClick={() => setView("rows")}
+            onClick={() => setView("byProduct")}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
-              view === "rows" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Rows3 className="w-4 h-4" />
-            By competitor
-          </button>
-          <button
-            onClick={() => setView("matrix")}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
-              view === "matrix" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              view === "byProduct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Columns3 className="w-4 h-4" />
-            Side-by-side
+            By Product
+          </button>
+          <button
+            onClick={() => setView("byCompetitor")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors",
+              view === "byCompetitor" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Rows3 className="w-4 h-4" />
+            By Competitor Row
           </button>
         </div>
       </div>
@@ -251,7 +249,7 @@ export default function ComparisonPage() {
             />
           </div>
           
-          {view === "rows" && (
+          {view === "byCompetitor" && (
             <Select value={competitor} onValueChange={setCompetitor}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Competitor" />
@@ -277,7 +275,7 @@ export default function ComparisonPage() {
             </SelectContent>
           </Select>
 
-          {view === "rows" && (
+          {view === "byCompetitor" && (
             <>
               <Select value={matchStatus} onValueChange={setMatchStatus}>
                 <SelectTrigger className="w-[180px]">
@@ -313,16 +311,110 @@ export default function ComparisonPage() {
             onCheckedChange={setExpensiveOnly} 
           />
           <Label htmlFor="expensiveOnly" className="text-sm font-normal cursor-pointer">
-            {view === "matrix"
+            {view === "byProduct"
               ? "Show only where Prayag is more expensive than a competitor"
               : "Show only where Prayag is more expensive"}
           </Label>
         </div>
       </div>
 
-      <div className="border rounded-md bg-card">
-        <div className="overflow-x-auto">
-          {view === "rows" ? (
+      {view === "byProduct" ? (
+        <div className="border rounded-md bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-3 font-medium text-muted-foreground sticky left-0 bg-muted/50 z-10">Prayag Product</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Prayag MRP</th>
+                  {(productData?.competitors ?? []).map((c) => (
+                    <th key={c} className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">{c}</th>
+                  ))}
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">Cheapest Rival</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Diff %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={(productData?.competitors.length ?? 0) + 4} className="px-4 py-8 text-center text-muted-foreground">Loading comparison...</td>
+                  </tr>
+                ) : (productData?.rows.length ?? 0) === 0 ? (
+                  <tr>
+                    <td colSpan={(productData?.competitors.length ?? 0) + 4} className="px-4 py-8 text-center text-muted-foreground">No matched products found. Map competitor rows on the Mapping Review page.</td>
+                  </tr>
+                ) : (
+                  productData?.rows.map((row) => {
+                    const cellByComp = new Map(row.competitors.map((c) => [c.competitor, c]));
+                    return (
+                      <tr key={row.itemCode} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 sticky left-0 bg-card z-10">
+                          <Link href={`/product/${row.itemCode}`}>
+                            <span className="font-medium text-primary hover:underline cursor-pointer">{row.itemCode}</span>
+                          </Link>
+                          <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={row.prayagProductName || ""}>
+                            {row.prayagProductName || row.category || ""}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {row.prayagMrp != null ? (
+                            <span className={cn(row.prayagLowest && "text-green-600 font-semibold")}>₹{row.prayagMrp.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        {(productData?.competitors ?? []).map((comp) => {
+                          const cell = cellByComp.get(comp);
+                          if (!cell) {
+                            return <td key={comp} className="px-4 py-3 text-right text-muted-foreground">-</td>;
+                          }
+                          return (
+                            <td key={comp} className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                              <span className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded",
+                                cell.isCheapest && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-semibold"
+                              )}>
+                                {cell.isCheapest && <Trophy className="w-3 h-3" />}
+                                ₹{cell.price.toFixed(2)}
+                              </span>
+                              <div className="mt-1 flex justify-end">
+                                <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.diffPct != null ? cell.diffPct > 0 : null} />
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-3 text-right font-mono">
+                          {row.cheapestRival != null ? (
+                            <div>
+                              <div className="font-semibold">₹{row.cheapestRival.toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">{row.cheapestRivalName}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {row.diffPct != null ? (
+                            <span className={cn(
+                              "font-mono font-medium px-2 py-0.5 rounded",
+                              row.prayagLowest ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-destructive dark:bg-red-900/30 dark:text-red-400"
+                            )}>
+                              {row.diffPct > 0 ? "+" : ""}{row.diffPct.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="border rounded-md bg-card">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -402,64 +494,9 @@ export default function ComparisonPage() {
                 )}
               </tbody>
             </table>
-          ) : (
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Prayag Product</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground text-right">Prayag MRP</th>
-                  {matrixCompetitors.map((c) => (
-                    <th key={c} className="px-4 py-3 font-medium text-muted-foreground text-right">{c}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {matrixLoading ? (
-                  <tr>
-                    <td colSpan={2 + matrixCompetitors.length} className="px-4 py-8 text-center text-muted-foreground">Loading side-by-side comparison...</td>
-                  </tr>
-                ) : (matrixData?.rows.length ?? 0) === 0 ? (
-                  <tr>
-                    <td colSpan={2 + Math.max(1, matrixCompetitors.length)} className="px-4 py-8 text-center text-muted-foreground">No matched products found.</td>
-                  </tr>
-                ) : (
-                  matrixData?.rows.map((row) => (
-                    <tr key={row.prayagCode} className="border-b last:border-0 hover:bg-muted/50 transition-colors align-top">
-                      <td className="px-4 py-3">
-                        <Link href={`/product/${row.prayagCode}`}>
-                          <span className="font-medium text-primary hover:underline cursor-pointer">{row.prayagCode}</span>
-                        </Link>
-                        <div className="text-xs text-muted-foreground truncate max-w-[260px]" title={row.prayagProductName || ""}>
-                          {row.prayagProductName || "-"}
-                        </div>
-                        {row.category && <div className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{row.category}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
-                        {row.prayagMrp != null ? `₹${row.prayagMrp.toFixed(2)}` : <span className="text-muted-foreground">-</span>}
-                      </td>
-                      {matrixCompetitors.map((c) => {
-                        const cell = row.cells.find((x) => x.competitor === c);
-                        if (!cell || cell.price == null) {
-                          return <td key={c} className="px-4 py-3 text-right text-muted-foreground">-</td>;
-                        }
-                        return (
-                          <td key={c} className="px-4 py-3 text-right whitespace-nowrap">
-                            <div className="font-mono">₹{cell.price.toFixed(2)}</div>
-                            <div className="flex items-center justify-end gap-1.5 mt-1">
-                              <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.prayagCheaper} />
-                              <ConfidenceBadge confidence={cell.matchConfidence} />
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-between mt-4">
         <p className="text-sm text-muted-foreground font-mono">
