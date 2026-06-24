@@ -24,15 +24,24 @@ import type {
   CatalogFilters,
   CatalogProductDetail,
   CatalogProductList,
+  ComparisonFilters,
+  ComparisonList,
+  ComparisonRow,
+  ComparisonSummary,
   ComparisonUpdate,
   Competitor,
+  CompetitorMappingUpdate,
   CompetitorUpdate,
   DashboardSummary,
   ErrorResponse,
   GetCatalogProductsParams,
+  GetComparisonParams,
+  GetComparisonSummaryParams,
+  GetMappingReviewParams,
   GetProductsParams,
   GetRecommendationsParams,
   HealthStatus,
+  MappingReviewList,
   OkResponse,
   ProductMatrix,
   ProductRow,
@@ -1418,5 +1427,406 @@ export const useResetCatalog = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResetCatalogMutationOptions(options));
+    }
+
+export const getGetComparisonUrl = (params?: GetComparisonParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/comparison?${stringifiedParams}` : `/api/catalog/comparison`
+}
+
+/**
+ * @summary Competitor price points joined to Prayag's current MRP with live diff%
+ */
+export const getComparison = async (params?: GetComparisonParams, options?: RequestInit): Promise<ComparisonList> => {
+
+  return customFetch<ComparisonList>(getGetComparisonUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetComparisonQueryKey = (params?: GetComparisonParams,) => {
+    return [
+    `/api/catalog/comparison`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetComparisonQueryOptions = <TData = Awaited<ReturnType<typeof getComparison>>, TError = ErrorType<unknown>>(params?: GetComparisonParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetComparisonQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparison>>> = ({ signal }) => getComparison(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparison>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetComparisonQueryResult = NonNullable<Awaited<ReturnType<typeof getComparison>>>
+export type GetComparisonQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Competitor price points joined to Prayag's current MRP with live diff%
+ */
+
+export function useGetComparison<TData = Awaited<ReturnType<typeof getComparison>>, TError = ErrorType<unknown>>(
+ params?: GetComparisonParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetComparisonQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetComparisonSummaryUrl = (params?: GetComparisonSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/comparison/summary?${stringifiedParams}` : `/api/catalog/comparison/summary`
+}
+
+/**
+ * @summary Competitive-share KPI and per-category Prayag win-rate
+ */
+export const getComparisonSummary = async (params?: GetComparisonSummaryParams, options?: RequestInit): Promise<ComparisonSummary> => {
+
+  return customFetch<ComparisonSummary>(getGetComparisonSummaryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetComparisonSummaryQueryKey = (params?: GetComparisonSummaryParams,) => {
+    return [
+    `/api/catalog/comparison/summary`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetComparisonSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getComparisonSummary>>, TError = ErrorType<unknown>>(params?: GetComparisonSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetComparisonSummaryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonSummary>>> = ({ signal }) => getComparisonSummary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetComparisonSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getComparisonSummary>>>
+export type GetComparisonSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Competitive-share KPI and per-category Prayag win-rate
+ */
+
+export function useGetComparisonSummary<TData = Awaited<ReturnType<typeof getComparisonSummary>>, TError = ErrorType<unknown>>(
+ params?: GetComparisonSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetComparisonSummaryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetComparisonFiltersUrl = () => {
+
+
+
+
+  return `/api/catalog/comparison/filters`
+}
+
+/**
+ * @summary Available competitors, categories, and match statuses for filtering
+ */
+export const getComparisonFilters = async ( options?: RequestInit): Promise<ComparisonFilters> => {
+
+  return customFetch<ComparisonFilters>(getGetComparisonFiltersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetComparisonFiltersQueryKey = () => {
+    return [
+    `/api/catalog/comparison/filters`
+    ] as const;
+    }
+
+
+export const getGetComparisonFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getComparisonFilters>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetComparisonFiltersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonFilters>>> = ({ signal }) => getComparisonFilters({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetComparisonFiltersQueryResult = NonNullable<Awaited<ReturnType<typeof getComparisonFilters>>>
+export type GetComparisonFiltersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Available competitors, categories, and match statuses for filtering
+ */
+
+export function useGetComparisonFilters<TData = Awaited<ReturnType<typeof getComparisonFilters>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetComparisonFiltersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMappingReviewUrl = (params?: GetMappingReviewParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/mapping-review?${stringifiedParams}` : `/api/catalog/mapping-review`
+}
+
+/**
+ * @summary Competitor rows needing manual mapping (unmatched / ambiguous)
+ */
+export const getMappingReview = async (params?: GetMappingReviewParams, options?: RequestInit): Promise<MappingReviewList> => {
+
+  return customFetch<MappingReviewList>(getGetMappingReviewUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMappingReviewQueryKey = (params?: GetMappingReviewParams,) => {
+    return [
+    `/api/catalog/mapping-review`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMappingReviewQueryOptions = <TData = Awaited<ReturnType<typeof getMappingReview>>, TError = ErrorType<unknown>>(params?: GetMappingReviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMappingReview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMappingReviewQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMappingReview>>> = ({ signal }) => getMappingReview(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMappingReview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMappingReviewQueryResult = NonNullable<Awaited<ReturnType<typeof getMappingReview>>>
+export type GetMappingReviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Competitor rows needing manual mapping (unmatched / ambiguous)
+ */
+
+export function useGetMappingReview<TData = Awaited<ReturnType<typeof getMappingReview>>, TError = ErrorType<unknown>>(
+ params?: GetMappingReviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMappingReview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMappingReviewQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateCompetitorMappingUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/competitor-prices/${id}`
+}
+
+/**
+ * @summary Assign or correct a competitor row's matched Prayag code and status
+ */
+export const updateCompetitorMapping = async (id: number,
+    competitorMappingUpdate: CompetitorMappingUpdate, options?: RequestInit): Promise<ComparisonRow> => {
+
+  return customFetch<ComparisonRow>(getUpdateCompetitorMappingUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      competitorMappingUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateCompetitorMappingMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCompetitorMapping>>, TError,{id: number;data: BodyType<CompetitorMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCompetitorMapping>>, TError,{id: number;data: BodyType<CompetitorMappingUpdate>}, TContext> => {
+
+const mutationKey = ['updateCompetitorMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCompetitorMapping>>, {id: number;data: BodyType<CompetitorMappingUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCompetitorMapping(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCompetitorMappingMutationResult = NonNullable<Awaited<ReturnType<typeof updateCompetitorMapping>>>
+    export type UpdateCompetitorMappingMutationBody = BodyType<CompetitorMappingUpdate>
+    export type UpdateCompetitorMappingMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Assign or correct a competitor row's matched Prayag code and status
+ */
+export const useUpdateCompetitorMapping = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCompetitorMapping>>, TError,{id: number;data: BodyType<CompetitorMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCompetitorMapping>>,
+        TError,
+        {id: number;data: BodyType<CompetitorMappingUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateCompetitorMappingMutationOptions(options));
     }
 

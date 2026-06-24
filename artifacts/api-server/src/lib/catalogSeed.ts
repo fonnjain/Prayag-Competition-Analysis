@@ -3,8 +3,10 @@ import {
   catalogProductsTable,
   mrpPriceHistoryTable,
   codeConflictsTable,
+  competitorPricesTable,
 } from "@workspace/db";
 import catalogSeedData from "../seed/catalog-seed.json";
+import competitorSeedData from "../seed/competitor-seed.json";
 import { logger } from "./logger";
 import { recomputeCurrentFlags } from "./catalog";
 
@@ -42,8 +44,23 @@ interface CatalogSeedFile {
   priceHistory: SeedPriceRow[];
   conflicts: SeedConflict[];
 }
+interface SeedCompetitorPrice {
+  competitor: string;
+  category: string | null;
+  description: string | null;
+  size: string | null;
+  price: number;
+  unit: string | null;
+  effectiveDate: string | null;
+  matchedPrayagCode: string | null;
+  matchStatus: string;
+}
+interface CompetitorSeedFile {
+  competitors: SeedCompetitorPrice[];
+}
 
 const data = catalogSeedData as CatalogSeedFile;
+const competitorData = competitorSeedData as CompetitorSeedFile;
 
 async function chunkedInsert<T>(
   rows: T[],
@@ -59,6 +76,7 @@ export async function loadCatalogSeed(): Promise<void> {
   await db.delete(mrpPriceHistoryTable);
   await db.delete(catalogProductsTable);
   await db.delete(codeConflictsTable);
+  await db.delete(competitorPricesTable);
 
   await chunkedInsert(data.products, (batch) =>
     db.insert(catalogProductsTable).values(
@@ -104,6 +122,22 @@ export async function loadCatalogSeed(): Promise<void> {
       })),
     );
   }
+
+  await chunkedInsert(competitorData.competitors, (batch) =>
+    db.insert(competitorPricesTable).values(
+      batch.map((c) => ({
+        competitor: c.competitor,
+        category: c.category,
+        description: c.description,
+        size: c.size,
+        price: c.price,
+        unit: c.unit,
+        effectiveDate: c.effectiveDate,
+        matchedPrayagCode: c.matchedPrayagCode,
+        matchStatus: c.matchStatus,
+      })),
+    ),
+  );
 
   await recomputeCurrentFlags();
 }

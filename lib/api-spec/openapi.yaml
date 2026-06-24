@@ -371,6 +371,148 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OkResponse"
+  /catalog/comparison:
+    get:
+      operationId: getComparison
+      tags: [comparison]
+      summary: Competitor price points joined to Prayag's current MRP with live diff%
+      parameters:
+        - name: competitor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: matchStatus
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: expensiveOnly
+          in: query
+          required: false
+          description: Only rows where Prayag is more expensive than the competitor.
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comparison rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonList"
+  /catalog/comparison/summary:
+    get:
+      operationId: getComparisonSummary
+      tags: [comparison]
+      summary: Competitive-share KPI and per-category Prayag win-rate
+      parameters:
+        - name: competitor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comparison summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonSummary"
+  /catalog/comparison/filters:
+    get:
+      operationId: getComparisonFilters
+      tags: [comparison]
+      summary: Available competitors, categories, and match statuses for filtering
+      responses:
+        "200":
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonFilters"
+  /catalog/mapping-review:
+    get:
+      operationId: getMappingReview
+      tags: [comparison]
+      summary: Competitor rows needing manual mapping (unmatched / ambiguous)
+      parameters:
+        - name: competitor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Mapping review rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MappingReviewList"
+  /catalog/competitor-prices/{id}:
+    patch:
+      operationId: updateCompetitorMapping
+      tags: [comparison]
+      summary: Assign or correct a competitor row's matched Prayag code and status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompetitorMappingUpdate"
+      responses:
+        "200":
+          description: Updated comparison row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonRow"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     ErrorResponse:
@@ -866,3 +1008,165 @@ components:
       properties:
         minimumMarginPct:
           type: number
+    ComparisonRow:
+      type: object
+      required:
+        - id
+        - competitor
+        - matchStatus
+        - competitorPrice
+        - matchedPrayagCode
+        - prayagMrp
+        - diffPct
+        - prayagCheaper
+      properties:
+        id:
+          type: integer
+        competitor:
+          type: string
+        category:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        competitorPrice:
+          type: number
+        unit:
+          type: ["string", "null"]
+        effectiveDate:
+          type: ["string", "null"]
+        matchedPrayagCode:
+          type: ["string", "null"]
+        matchStatus:
+          type: string
+        prayagProductName:
+          type: ["string", "null"]
+        prayagMrp:
+          type: ["number", "null"]
+        prayagEffectiveDate:
+          type: ["string", "null"]
+        diffPct:
+          type: ["number", "null"]
+        prayagCheaper:
+          type: ["boolean", "null"]
+    ComparisonList:
+      type: object
+      required: [rows, total, page, pageSize]
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComparisonRow"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+    ComparisonCategoryWinRate:
+      type: object
+      required: [category, comparable, prayagCheaper, prayagCheaperPct]
+      properties:
+        category:
+          type: string
+        comparable:
+          type: integer
+        prayagCheaper:
+          type: integer
+        prayagCheaperPct:
+          type: ["number", "null"]
+        avgDiffPct:
+          type: ["number", "null"]
+    ComparisonSummary:
+      type: object
+      required:
+        - competitor
+        - totalRows
+        - matchedRows
+        - comparableRows
+        - prayagCheaperCount
+        - prayagCheaperPct
+        - reviewCount
+        - categoryWinRates
+      properties:
+        competitor:
+          type: ["string", "null"]
+        totalRows:
+          type: integer
+        matchedRows:
+          type: integer
+        comparableRows:
+          type: integer
+        prayagCheaperCount:
+          type: integer
+        prayagCheaperPct:
+          type: ["number", "null"]
+        avgDiffPct:
+          type: ["number", "null"]
+        reviewCount:
+          type: integer
+        categoryWinRates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComparisonCategoryWinRate"
+    ComparisonFilters:
+      type: object
+      required: [competitors, categories, matchStatuses]
+      properties:
+        competitors:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+        matchStatuses:
+          type: array
+          items:
+            type: string
+    MappingReviewRow:
+      type: object
+      required: [id, competitor, price, matchStatus, matchedPrayagCode]
+      properties:
+        id:
+          type: integer
+        competitor:
+          type: string
+        category:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        price:
+          type: number
+        unit:
+          type: ["string", "null"]
+        matchedPrayagCode:
+          type: ["string", "null"]
+        matchStatus:
+          type: string
+    MappingReviewList:
+      type: object
+      required: [rows, total, page, pageSize]
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/MappingReviewRow"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+    CompetitorMappingUpdate:
+      type: object
+      required: [matchedPrayagCode, matchStatus]
+      properties:
+        matchedPrayagCode:
+          type: ["string", "null"]
+        matchStatus:
+          type: string

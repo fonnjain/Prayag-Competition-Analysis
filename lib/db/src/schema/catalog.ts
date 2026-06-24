@@ -80,6 +80,38 @@ export const codeConflictsTable = pgTable("code_conflicts", {
   sources: text("sources"),
 });
 
+// Competitor price points (one row per competitor SKU). Kept generic via the
+// `competitor` column so other brands (Finolex, Astral, Supreme, ...) load in
+// the same shape. matched_prayag_code links to catalog_products.item_code when
+// a mapping exists; diff% vs Prayag's current MRP is always computed live.
+export const competitorPricesTable = pgTable(
+  "competitor_prices",
+  {
+    id: serial("id").primaryKey(),
+    competitor: text("competitor").notNull(),
+    category: text("category"),
+    description: text("description"),
+    size: text("size"),
+    price: doublePrecision("price").notNull(),
+    unit: text("unit"),
+    effectiveDate: date("effective_date"),
+    matchedPrayagCode: text("matched_prayag_code"),
+    matchStatus: text("match_status").notNull().default("no match (review)"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("competitor_prices_matched_code_idx").on(t.matchedPrayagCode),
+    index("competitor_prices_competitor_idx").on(t.competitor),
+    index("competitor_prices_category_idx").on(t.category),
+  ],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 export type CodeConflict = typeof codeConflictsTable.$inferSelect;
+export type CompetitorPrice = typeof competitorPricesTable.$inferSelect;

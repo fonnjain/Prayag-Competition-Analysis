@@ -8,6 +8,9 @@ import CatalogPage from "@/pages/catalog";
 import ProductDetailPage from "@/pages/product-detail";
 import LoadMrpPage from "@/pages/load-mrp";
 import DataHealthPage from "@/pages/data-health";
+import ComparisonPage from "@/pages/comparison";
+import MappingReviewPage from "@/pages/mapping-review";
+import ImportCompetitorPage from "@/pages/import-competitor";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +21,9 @@ function Router() {
       <Route path="/product/:itemCode" component={ProductDetailPage} />
       <Route path="/load-mrp" component={LoadMrpPage} />
       <Route path="/data-health" component={DataHealthPage} />
+      <Route path="/comparison" component={ComparisonPage} />
+      <Route path="/mapping-review" component={MappingReviewPage} />
+      <Route path="/import-competitor" component={ImportCompetitorPage} />
       <Route component={NotFound} />
     </Switch>
   );

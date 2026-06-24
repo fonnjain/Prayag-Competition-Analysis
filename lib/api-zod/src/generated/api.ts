@@ -427,3 +427,135 @@ export const ResetCatalogResponse = zod.object({
 })
 
 
+/**
+ * @summary Competitor price points joined to Prayag's current MRP with live diff%
+ */
+export const GetComparisonQueryParams = zod.object({
+  "competitor": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "matchStatus": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "expensiveOnly": zod.coerce.boolean().optional().describe('Only rows where Prayag is more expensive than the competitor.'),
+  "page": zod.coerce.number().optional(),
+  "pageSize": zod.coerce.number().optional()
+})
+
+export const GetComparisonResponse = zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "competitor": zod.string(),
+  "category": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "competitorPrice": zod.number(),
+  "unit": zod.string().nullish(),
+  "effectiveDate": zod.string().nullish(),
+  "matchedPrayagCode": zod.string().nullable(),
+  "matchStatus": zod.string(),
+  "prayagProductName": zod.string().nullish(),
+  "prayagMrp": zod.number().nullable(),
+  "prayagEffectiveDate": zod.string().nullish(),
+  "diffPct": zod.number().nullable(),
+  "prayagCheaper": zod.boolean().nullable()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
+ * @summary Competitive-share KPI and per-category Prayag win-rate
+ */
+export const GetComparisonSummaryQueryParams = zod.object({
+  "competitor": zod.coerce.string().optional()
+})
+
+export const GetComparisonSummaryResponse = zod.object({
+  "competitor": zod.string().nullable(),
+  "totalRows": zod.number(),
+  "matchedRows": zod.number(),
+  "comparableRows": zod.number(),
+  "prayagCheaperCount": zod.number(),
+  "prayagCheaperPct": zod.number().nullable(),
+  "avgDiffPct": zod.number().nullish(),
+  "reviewCount": zod.number(),
+  "categoryWinRates": zod.array(zod.object({
+  "category": zod.string(),
+  "comparable": zod.number(),
+  "prayagCheaper": zod.number(),
+  "prayagCheaperPct": zod.number().nullable(),
+  "avgDiffPct": zod.number().nullish()
+}))
+})
+
+
+/**
+ * @summary Available competitors, categories, and match statuses for filtering
+ */
+export const GetComparisonFiltersResponse = zod.object({
+  "competitors": zod.array(zod.string()),
+  "categories": zod.array(zod.string()),
+  "matchStatuses": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Competitor rows needing manual mapping (unmatched / ambiguous)
+ */
+export const GetMappingReviewQueryParams = zod.object({
+  "competitor": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().optional(),
+  "pageSize": zod.coerce.number().optional()
+})
+
+export const GetMappingReviewResponse = zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "competitor": zod.string(),
+  "category": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "price": zod.number(),
+  "unit": zod.string().nullish(),
+  "matchedPrayagCode": zod.string().nullable(),
+  "matchStatus": zod.string()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
+ * @summary Assign or correct a competitor row's matched Prayag code and status
+ */
+export const UpdateCompetitorMappingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCompetitorMappingBody = zod.object({
+  "matchedPrayagCode": zod.string().nullable(),
+  "matchStatus": zod.string()
+})
+
+export const UpdateCompetitorMappingResponse = zod.object({
+  "id": zod.number(),
+  "competitor": zod.string(),
+  "category": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "competitorPrice": zod.number(),
+  "unit": zod.string().nullish(),
+  "effectiveDate": zod.string().nullish(),
+  "matchedPrayagCode": zod.string().nullable(),
+  "matchStatus": zod.string(),
+  "prayagProductName": zod.string().nullish(),
+  "prayagMrp": zod.number().nullable(),
+  "prayagEffectiveDate": zod.string().nullish(),
+  "diffPct": zod.number().nullable(),
+  "prayagCheaper": zod.boolean().nullable()
+})
+
+

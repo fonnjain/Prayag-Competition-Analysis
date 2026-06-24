@@ -6,6 +6,7 @@ import {
   db,
   catalogProductsTable,
   mrpPriceHistoryTable,
+  competitorPricesTable,
 } from "@workspace/db";
 import { recomputeCurrentFlags, normCode } from "../lib/catalog";
 
@@ -421,5 +422,246 @@ router.get("/catalog/export", async (req, res) => {
   );
   res.send(buf);
 });
+
+interface ParsedCompetitorRow {
+  category: string | null;
+  description: string | null;
+  size: string | null;
+  price: number;
+  unit: string | null;
+  effectiveDate: string | null;
+  matchedPrayagCode: string | null;
+}
+
+// Locate a column whose header contains any of the keywords (excluding some).
+function findCol(
+  headers: string[],
+  include: string[],
+  exclude: string[] = [],
+): number {
+  for (let c = 0; c < headers.length; c++) {
+    const h = headers[c] ?? "";
+    if (!h) continue;
+    if (exclude.some((k) => h.includes(k))) continue;
+    if (include.some((k) => h.includes(k))) return c;
+  }
+  return -1;
+}
+
+function toDateStr(v: unknown): string | null {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (!d) return null;
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.y}-${p(d.m)}-${p(d.d)}`;
+  }
+  const s = String(v).trim();
+  const m = s.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : s.slice(0, 10) || null;
+}
+
+function parseCompetitorSheet(
+  grid: unknown[][],
+  knownCodes: Set<string>,
+): ParsedCompetitorRow[] {
+  const maxCols = Math.max(0, ...grid.map((r) => r.length));
+  let headerRow = 0;
+  for (let r = 0; r < Math.min(grid.length, 15); r++) {
+    const strs = (grid[r] ?? []).filter(
+      (v) => typeof v === "string" && norm(v).length > 0 && isNaN(Number(v)),
+    );
+    if (strs.length >= 2) {
+      headerRow = r;
+      break;
+    }
+  }
+  const headers = (grid[headerRow] ?? []).map((h) => norm(h).toLowerCase());
+
+  // Matched Prayag code column: prefer an explicit "matched"/"prayag code"
+  // header, else the column with the most overlap against known codes.
+  let codeCol = findCol(headers, ["matched", "prayag_code", "prayag code"]);
+  if (codeCol === -1) {
+    // Fallback: pick the column with the most overlap against known Prayag
+    // codes, but only if the overlap is strong enough. This guards against
+    // numeric columns (size/diameter) coincidentally matching numeric codes.
+    const dataRows = Math.max(0, grid.length - 1);
+    const minOverlap = Math.max(5, Math.floor(dataRows * 0.25));
+    let best = 0;
+    let bestCol = -1;
+    for (let c = 0; c < maxCols; c++) {
+      let overlap = 0;
+      for (let r = 0; r < grid.length; r++) {
+        if (r === headerRow) continue;
+        if (knownCodes.has(normCode(grid[r]?.[c]))) overlap++;
+      }
+      if (overlap > best) {
+        best = overlap;
+        bestCol = c;
+      }
+    }
+    if (best >= minOverlap) codeCol = bestCol;
+  }
+
+  // Price column: a "price"/"rate"/"cost" header that is not the Prayag MRP
+  // snapshot or a diff column; else the first mostly-numeric column.
+  let priceCol = findCol(
+    headers,
+    ["price", "rate", "cost", "mrp"],
+    ["prayag", "diff"],
+  );
+  if (priceCol === -1) {
+    for (let c = 0; c < maxCols; c++) {
+      if (c === codeCol) continue;
+      let numericCount = 0;
+      for (let r = 0; r < grid.length; r++) {
+        if (r === headerRow) continue;
+        const v = grid[r]?.[c];
+        if (v != null && v !== "" && !isNaN(Number(v))) numericCount++;
+      }
+      if (numericCount > grid.length / 3) {
+        priceCol = c;
+        break;
+      }
+    }
+  }
+  if (priceCol === -1) return [];
+
+  const catCol = findCol(headers, ["category"]);
+  const descCol = findCol(headers, ["desc", "name", "product"]);
+  const sizeCol = findCol(headers, ["size"]);
+  const unitCol = findCol(headers, ["unit"]);
+  const dateCol = findCol(headers, ["eff", "date"]);
+
+  const rows: ParsedCompetitorRow[] = [];
+  for (let r = 0; r < grid.length; r++) {
+    if (r === headerRow) continue;
+    const row = grid[r] ?? [];
+    const price = Number(row[priceCol]);
+    if (isNaN(price) || price <= 0) continue;
+    const rawCode = codeCol !== -1 ? normCode(row[codeCol]) : "";
+    rows.push({
+      category: catCol !== -1 ? norm(row[catCol]) || null : null,
+      description: descCol !== -1 ? norm(row[descCol]) || null : null,
+      size: sizeCol !== -1 ? norm(row[sizeCol]) || null : null,
+      price,
+      unit: unitCol !== -1 ? norm(row[unitCol]) || null : null,
+      effectiveDate: dateCol !== -1 ? toDateStr(row[dateCol]) : null,
+      matchedPrayagCode: rawCode || null,
+    });
+  }
+  return rows;
+}
+
+// POST /catalog/load-competitor — upload a competitor workbook (any brand).
+router.post(
+  "/catalog/load-competitor",
+  upload.single("file"),
+  async (req, res) => {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const competitor =
+      typeof req.body.competitor === "string" && req.body.competitor.trim()
+        ? req.body.competitor.trim()
+        : null;
+    if (!competitor) {
+      res.status(400).json({ error: "competitor name is required" });
+      return;
+    }
+
+    const name = file.originalname;
+    const ext = name.toLowerCase().split(".").pop() ?? "";
+    if (!["xlsx", "xls", "csv"].includes(ext)) {
+      res.status(400).json({ error: "Upload an .xlsx, .xls, or .csv file" });
+      return;
+    }
+
+    try {
+      const existingProducts = await db
+        .select({ itemCode: catalogProductsTable.itemCode })
+        .from(catalogProductsTable);
+      const knownCodes = new Set(
+        existingProducts.map((p) => normCode(p.itemCode)),
+      );
+      const canonical = new Map<string, string>(
+        existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
+      );
+
+      const wb = XLSX.read(file.buffer, { type: "buffer" });
+      let parsed: ParsedCompetitorRow[] = [];
+      for (const sheetName of wb.SheetNames) {
+        const sheet = wb.Sheets[sheetName];
+        if (!sheet) continue;
+        const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+          header: 1,
+          defval: null,
+        });
+        const sheetRows = parseCompetitorSheet(grid, knownCodes);
+        if (sheetRows.length > parsed.length) parsed = sheetRows;
+      }
+
+      if (parsed.length === 0) {
+        res.json({
+          results: {
+            competitor,
+            file: name,
+            totalRows: 0,
+            inserted: 0,
+            matched: 0,
+            unmatched: 0,
+            message:
+              "No price rows detected. Check the sheet has a price column.",
+          },
+        });
+        return;
+      }
+
+      let matched = 0;
+      const values = parsed.map((r) => {
+        const norm = r.matchedPrayagCode;
+        const isMatched = !!norm && knownCodes.has(norm);
+        if (isMatched) matched++;
+        return {
+          competitor,
+          category: r.category,
+          description: r.description,
+          size: r.size,
+          price: r.price,
+          unit: r.unit,
+          effectiveDate: r.effectiveDate,
+          matchedPrayagCode: isMatched ? (canonical.get(norm!) ?? norm) : null,
+          matchStatus: isMatched ? "matched" : "no match (review)",
+        };
+      });
+
+      // Re-uploading a competitor replaces that competitor's existing rows so
+      // repeated uploads stay idempotent instead of duplicating data.
+      await db
+        .delete(competitorPricesTable)
+        .where(eq(competitorPricesTable.competitor, competitor));
+
+      for (let i = 0; i < values.length; i += 500) {
+        await db.insert(competitorPricesTable).values(values.slice(i, i + 500));
+      }
+
+      res.json({
+        results: {
+          competitor,
+          file: name,
+          totalRows: parsed.length,
+          inserted: values.length,
+          matched,
+          unmatched: values.length - matched,
+        },
+      });
+    } catch (err) {
+      req.log.error({ err, file: name }, "load-competitor failed");
+      res.status(500).json({ error: "Failed to parse and load file" });
+    }
+  },
+);
 
 export default router;

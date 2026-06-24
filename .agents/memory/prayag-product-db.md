@@ -19,6 +19,14 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 - **Why:** a hardcoded `"/api/catalog/health"` typo silently no-ops invalidation (real key is `/api/catalog/data-health`); helpers stay correct across spec changes and Orval prefix-matches.
 - **How to apply:** after any catalog mutation (load-mrp, reset), invalidate products + filters + data-health keys via the helpers.
 
+## Competitor comparison (diff% is INVERSE of the Console)
+- Competitor prices live in `competitor_prices` (one row per competitor SKU; `matched_prayag_code` nullable, `match_status`). Loaded from seed on reset, plus a generic `POST /catalog/load-competitor` upload.
+- **diff% convention here = `(PrayagCurrentMRP − CompPrice) / CompPrice × 100`, computed LIVE per request from current MRP — negative = Prayag cheaper = GREEN/good, positive = RED.** This is the *opposite sign* of the Competition Console's convention (there positive = Prayag cheaper). Do not copy the Console's formula.
+- **Why:** the two apps genuinely use opposite sign conventions; mixing them silently flips every color and KPI.
+- **How to apply:** never store diff%; join competitor rows to live current MRP via `normCode` and compute on the fly. Guard `competitorPrice > 0` (divide-by-zero) and null MRP → null diff.
+- Canonical `match_status` enum is exactly `"matched"` | `"no match (review)"` — backend, PATCH validation, and the Mapping Review dropdown must all use these two. Mapping-review/review counts key off `status != "matched"`.
+- Generic competitor upload is idempotent per competitor: it DELETEs that competitor's existing rows before inserting. Auto-match only trusts a fallback (non-header) code column if overlap ≥ max(5, 25% of rows), else leaves rows unmatched.
+
 ## Filters gotcha
 - The same category name can appear under multiple divisions; dedupe category names before rendering the Select or you get duplicate React keys/values. Backend filter param is a category *name*, so dedup is also semantically correct.
 

@@ -8,6 +8,7 @@ import settingsRouter from "./settings";
 import importExportRouter from "./importExport";
 import catalogRouter from "./catalog";
 import catalogImportExportRouter from "./catalogImportExport";
+import comparisonRouter from "./comparison";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(settingsRouter);
 router.use(importExportRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
+router.use(comparisonRouter);
 
 export default router;

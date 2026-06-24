@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Box, Database, FileSpreadsheet, LayoutGrid } from "lucide-react";
+import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -11,7 +11,10 @@ export function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { href: "/", label: "Catalog", icon: Box },
+    { href: "/comparison", label: "Comparison", icon: BarChart2 },
+    { href: "/mapping-review", label: "Mapping Review", icon: LinkIcon },
     { href: "/load-mrp", label: "Load MRP", icon: FileSpreadsheet },
+    { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
     { href: "/data-health", label: "Data Health", icon: Database },
   ];
 
@@ -25,7 +28,7 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
         
-        <nav className="flex-1 px-4 space-y-1">
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));

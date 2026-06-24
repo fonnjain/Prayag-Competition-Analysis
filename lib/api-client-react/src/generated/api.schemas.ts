@@ -356,6 +356,103 @@ export interface SettingsInput {
   minimumMarginPct: number;
 }
 
+export interface ComparisonRow {
+  id: number;
+  competitor: string;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  size?: string | null;
+  competitorPrice: number;
+  /** @nullable */
+  unit?: string | null;
+  /** @nullable */
+  effectiveDate?: string | null;
+  /** @nullable */
+  matchedPrayagCode: string | null;
+  matchStatus: string;
+  /** @nullable */
+  prayagProductName?: string | null;
+  /** @nullable */
+  prayagMrp: number | null;
+  /** @nullable */
+  prayagEffectiveDate?: string | null;
+  /** @nullable */
+  diffPct: number | null;
+  /** @nullable */
+  prayagCheaper: boolean | null;
+}
+
+export interface ComparisonList {
+  rows: ComparisonRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ComparisonCategoryWinRate {
+  category: string;
+  comparable: number;
+  prayagCheaper: number;
+  /** @nullable */
+  prayagCheaperPct: number | null;
+  /** @nullable */
+  avgDiffPct?: number | null;
+}
+
+export interface ComparisonSummary {
+  /** @nullable */
+  competitor: string | null;
+  totalRows: number;
+  matchedRows: number;
+  comparableRows: number;
+  prayagCheaperCount: number;
+  /** @nullable */
+  prayagCheaperPct: number | null;
+  /** @nullable */
+  avgDiffPct?: number | null;
+  reviewCount: number;
+  categoryWinRates: ComparisonCategoryWinRate[];
+}
+
+export interface ComparisonFilters {
+  competitors: string[];
+  categories: string[];
+  matchStatuses: string[];
+}
+
+export interface MappingReviewRow {
+  id: number;
+  competitor: string;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  size?: string | null;
+  price: number;
+  /** @nullable */
+  unit?: string | null;
+  /** @nullable */
+  matchedPrayagCode: string | null;
+  matchStatus: string;
+}
+
+export interface MappingReviewList {
+  rows: MappingReviewRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CompetitorMappingUpdate {
+  /** @nullable */
+  matchedPrayagCode: string | null;
+  matchStatus: string;
+}
+
 export type GetProductsParams = {
 category?: string;
 search?: string;
@@ -377,6 +474,30 @@ search?: string;
  * Filter by price presence. "priced" or "pending".
  */
 priceStatus?: string;
+page?: number;
+pageSize?: number;
+};
+
+export type GetComparisonParams = {
+competitor?: string;
+category?: string;
+matchStatus?: string;
+search?: string;
+/**
+ * Only rows where Prayag is more expensive than the competitor.
+ */
+expensiveOnly?: boolean;
+page?: number;
+pageSize?: number;
+};
+
+export type GetComparisonSummaryParams = {
+competitor?: string;
+};
+
+export type GetMappingReviewParams = {
+competitor?: string;
+search?: string;
 page?: number;
 pageSize?: number;
 };
