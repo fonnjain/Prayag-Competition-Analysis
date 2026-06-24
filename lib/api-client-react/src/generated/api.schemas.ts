@@ -402,6 +402,20 @@ export interface ProductComparisonCell {
   isCheapest: boolean;
 }
 
+/**
+ * Prayag's position vs the whole market of loaded rival brands for this SKU. leader = at/under market min, competitive = at/under median, above_market = at/under max, overpriced = above max, no_data = no Prayag MRP or no rivals.
+ */
+export type ProductComparisonRowMarketPosition = typeof ProductComparisonRowMarketPosition[keyof typeof ProductComparisonRowMarketPosition];
+
+
+export const ProductComparisonRowMarketPosition = {
+  leader: 'leader',
+  competitive: 'competitive',
+  above_market: 'above_market',
+  overpriced: 'overpriced',
+  no_data: 'no_data',
+} as const;
+
 export interface ProductComparisonRow {
   itemCode: string;
   /** @nullable */
@@ -421,6 +435,14 @@ export interface ProductComparisonRow {
   rivalCount: number;
   /** @nullable */
   diffPct: number | null;
+  /** @nullable */
+  marketMin: number | null;
+  /** @nullable */
+  marketMedian: number | null;
+  /** @nullable */
+  marketMax: number | null;
+  /** Prayag's position vs the whole market of loaded rival brands for this SKU. leader = at/under market min, competitive = at/under median, above_market = at/under max, overpriced = above max, no_data = no Prayag MRP or no rivals. */
+  marketPosition: ProductComparisonRowMarketPosition;
 }
 
 export interface ProductComparisonList {

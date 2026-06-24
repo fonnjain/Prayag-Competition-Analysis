@@ -527,7 +527,11 @@ export const GetComparisonByProductResponse = zod.object({
   "cheapestRivalName": zod.string().nullable(),
   "prayagLowest": zod.boolean(),
   "rivalCount": zod.number(),
-  "diffPct": zod.number().nullable()
+  "diffPct": zod.number().nullable(),
+  "marketMin": zod.number().nullable(),
+  "marketMedian": zod.number().nullable(),
+  "marketMax": zod.number().nullable(),
+  "marketPosition": zod.enum(['leader', 'competitive', 'above_market', 'overpriced', 'no_data']).describe('Prayag\'s position vs the whole market of loaded rival brands for this SKU. leader = at\/under market min, competitive = at\/under median, above_market = at\/under max, overpriced = above max, no_data = no Prayag MRP or no rivals.')
 })),
   "total": zod.number(),
   "page": zod.number(),

@@ -433,6 +433,34 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     const prayagLowest =
       prayagMrp != null && cheapestRival != null && prayagMrp <= cheapestRival;
 
+    // Whole-market read across every loaded rival brand for this SKU. Median is
+    // the true sample median (avg of the two middle prices for an even count).
+    const rivalPrices = [...g.byCompetitor.values()].sort((a, b) => a - b);
+    let marketMin: number | null = null;
+    let marketMedian: number | null = null;
+    let marketMax: number | null = null;
+    if (rivalPrices.length > 0) {
+      marketMin = rivalPrices[0]!;
+      marketMax = rivalPrices[rivalPrices.length - 1]!;
+      const mid = Math.floor(rivalPrices.length / 2);
+      const med =
+        rivalPrices.length % 2 === 1
+          ? rivalPrices[mid]!
+          : (rivalPrices[mid - 1]! + rivalPrices[mid]!) / 2;
+      marketMedian = Math.round(med * 100) / 100;
+    }
+
+    // Prayag's position vs the whole market (same thresholds as the Console
+    // engine): leader ≤ min, competitive ≤ median, above_market ≤ max, else
+    // overpriced; no_data when there is no MRP or no rivals.
+    let marketPosition: string = "no_data";
+    if (prayagMrp != null && rivalPrices.length > 0) {
+      if (prayagMrp <= marketMin!) marketPosition = "leader";
+      else if (prayagMrp <= marketMedian!) marketPosition = "competitive";
+      else if (prayagMrp <= marketMax!) marketPosition = "above_market";
+      else marketPosition = "overpriced";
+    }
+
     return {
       itemCode: g.itemCode,
       prayagProductName: prayag?.productName ?? null,
@@ -445,6 +473,10 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       prayagLowest,
       rivalCount: competitors.length,
       diffPct,
+      marketMin,
+      marketMedian,
+      marketMax,
+      marketPosition,
     };
   });
 

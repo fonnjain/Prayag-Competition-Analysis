@@ -1179,6 +1179,10 @@ components:
         - prayagLowest
         - rivalCount
         - diffPct
+        - marketMin
+        - marketMedian
+        - marketMax
+        - marketPosition
       properties:
         itemCode:
           type: string
@@ -1204,6 +1208,20 @@ components:
           type: integer
         diffPct:
           type: ["number", "null"]
+        marketMin:
+          type: ["number", "null"]
+        marketMedian:
+          type: ["number", "null"]
+        marketMax:
+          type: ["number", "null"]
+        marketPosition:
+          type: string
+          enum: [leader, competitive, above_market, overpriced, no_data]
+          description: >-
+            Prayag's position vs the whole market of loaded rival brands for
+            this SKU. leader = at/under market min, competitive = at/under
+            median, above_market = at/under max, overpriced = above max,
+            no_data = no Prayag MRP or no rivals.
     ProductComparisonList:
       type: object
       required: [competitors, rows, total, page, pageSize]

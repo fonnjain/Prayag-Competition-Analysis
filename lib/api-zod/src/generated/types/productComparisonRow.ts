@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProductComparisonCell } from './productComparisonCell';
+import type { ProductComparisonRowMarketPosition } from './productComparisonRowMarketPosition';
 
 export interface ProductComparisonRow {
   itemCode: string;
@@ -26,4 +27,12 @@ export interface ProductComparisonRow {
   rivalCount: number;
   /** @nullable */
   diffPct: number | null;
+  /** @nullable */
+  marketMin: number | null;
+  /** @nullable */
+  marketMedian: number | null;
+  /** @nullable */
+  marketMax: number | null;
+  /** Prayag's position vs the whole market of loaded rival brands for this SKU. leader = at/under market min, competitive = at/under median, above_market = at/under max, overpriced = above max, no_data = no Prayag MRP or no rivals. */
+  marketPosition: ProductComparisonRowMarketPosition;
 }

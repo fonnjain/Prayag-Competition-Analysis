@@ -54,6 +54,7 @@ export * from './okResponse';
 export * from './productComparisonCell';
 export * from './productComparisonList';
 export * from './productComparisonRow';
+export * from './productComparisonRowMarketPosition';
 export * from './productMatrix';
 export * from './productRow';
 export * from './productRowBasis';

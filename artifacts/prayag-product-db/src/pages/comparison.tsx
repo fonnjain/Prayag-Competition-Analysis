@@ -38,6 +38,35 @@ function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
   );
 }
 
+const MARKET_POSITION_META: Record<string, { label: string; styles: string }> = {
+  leader: {
+    label: "Leader",
+    styles: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  },
+  competitive: {
+    label: "Competitive",
+    styles: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  },
+  above_market: {
+    label: "Above Market",
+    styles: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  },
+  overpriced: {
+    label: "Overpriced",
+    styles: "bg-red-100 text-destructive dark:bg-red-900/30 dark:text-red-400",
+  },
+};
+
+function MarketPositionBadge({ position }: { position?: string | null }) {
+  const meta = position ? MARKET_POSITION_META[position] : undefined;
+  if (!meta) return <span className="text-muted-foreground">-</span>;
+  return (
+    <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap", meta.styles)}>
+      {meta.label}
+    </span>
+  );
+}
+
 function DiffBadge({ diffPct, prayagCheaper }: { diffPct?: number | null; prayagCheaper?: boolean | null }) {
   if (diffPct == null) return <span className="text-muted-foreground">-</span>;
   return (
@@ -359,6 +388,8 @@ export default function ComparisonPage() {
                   {(productData?.competitors ?? []).map((c) => (
                     <th key={c} className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">{c}</th>
                   ))}
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">Market (min · med · max)</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground text-center whitespace-nowrap">Position</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">Cheapest Rival</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground text-right">Diff %</th>
                 </tr>
@@ -366,11 +397,11 @@ export default function ComparisonPage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={(productData?.competitors.length ?? 0) + 4} className="px-4 py-8 text-center text-muted-foreground">Loading comparison...</td>
+                    <td colSpan={(productData?.competitors.length ?? 0) + 6} className="px-4 py-8 text-center text-muted-foreground">Loading comparison...</td>
                   </tr>
                 ) : (productData?.rows.length ?? 0) === 0 ? (
                   <tr>
-                    <td colSpan={(productData?.competitors.length ?? 0) + 4} className="px-4 py-8 text-center text-muted-foreground">No matched products found. Map competitor rows on the Mapping Review page.</td>
+                    <td colSpan={(productData?.competitors.length ?? 0) + 6} className="px-4 py-8 text-center text-muted-foreground">No matched products found. Map competitor rows on the Mapping Review page.</td>
                   </tr>
                 ) : (
                   productData?.rows.map((row) => {
@@ -412,6 +443,27 @@ export default function ComparisonPage() {
                             </td>
                           );
                         })}
+                        <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                          {row.marketMin != null && row.marketMax != null ? (
+                            <div>
+                              <div className="text-sm">
+                                ₹{row.marketMin.toFixed(2)}
+                                <span className="text-muted-foreground"> · </span>
+                                <span className="font-semibold">₹{row.marketMedian!.toFixed(2)}</span>
+                                <span className="text-muted-foreground"> · </span>
+                                ₹{row.marketMax.toFixed(2)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {row.rivalCount} {row.rivalCount === 1 ? "brand" : "brands"}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <MarketPositionBadge position={row.marketPosition} />
+                        </td>
                         <td className="px-4 py-3 text-right font-mono">
                           {row.cheapestRival != null ? (
                             <div>
