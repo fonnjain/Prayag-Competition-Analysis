@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Prayag Competition Console"
+version = "1.0.0"
+id = "artifacts/prayag-console"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25384
+
+[services.development]
+run = "pnpm --filter @workspace/prayag-console run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/prayag-console", "run", "build" ]
+publicDir = "artifacts/prayag-console/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25384"
+BASE_PATH = "/"

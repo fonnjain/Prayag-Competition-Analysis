@@ -1,0 +1,2 @@
+- [Orval zod coerce.boolean trap](orval-zod-boolean.md) — z.coerce.boolean() turns any non-empty query string (incl. "false") into true; read raw query value for booleans.
+- [Prayag pricing engine](prayag-pricing-engine.md) — net-vs-MRP basis rules, status thresholds, and recommendation/floor math for the Competition Console.
