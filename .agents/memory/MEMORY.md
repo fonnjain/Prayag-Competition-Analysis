@@ -1,3 +1,4 @@
 - [Orval zod coerce.boolean trap](orval-zod-boolean.md) — z.coerce.boolean() turns any non-empty query string (incl. "false") into true; read raw query value for booleans.
 - [Prayag pricing engine](prayag-pricing-engine.md) — net-vs-MRP basis rules, status thresholds, and recommendation/floor math for the Competition Console.
 - [Prayag Product Database app](prayag-product-db.md) — append-only MRP history rules, unique-index backstop, invalidate via generated query-key helpers, dedupe category filters.
+- [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 separate web apps (home/, console/, product-db/) behind one proxy; cross-app links use raw absolute <a href>, never BASE_URL/wouter.
