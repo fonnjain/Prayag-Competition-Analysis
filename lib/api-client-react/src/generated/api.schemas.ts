@@ -820,6 +820,41 @@ export interface AnalysisOpportunities {
   priceThreats: AnalysisOpportunityItem[];
 }
 
+export interface AcceptBatch {
+  id: number;
+  /** "bulk" (Accept selected) or "auto" (Auto-accept all). */
+  kind: string;
+  /** @nullable */
+  competitor?: string | null;
+  competitorPriceIds: number[];
+  count: number;
+  createdAt: string;
+}
+
+export interface AcceptBatchList {
+  batches: AcceptBatch[];
+}
+
+export type RecordAcceptBatchKind = typeof RecordAcceptBatchKind[keyof typeof RecordAcceptBatchKind];
+
+
+export const RecordAcceptBatchKind = {
+  bulk: 'bulk',
+  auto: 'auto',
+} as const;
+
+export interface RecordAcceptBatch {
+  kind: RecordAcceptBatchKind;
+  /** @nullable */
+  competitor?: string | null;
+  ids: number[];
+}
+
+export interface AcceptBatchDeleteResult {
+  ok: boolean;
+  deleted: number;
+}
+
 /**
  * Filter by competitor brand. Repeatable.
  */

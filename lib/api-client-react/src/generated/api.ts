@@ -20,6 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AcceptBatch,
+  AcceptBatchDeleteResult,
+  AcceptBatchList,
   AnalysisBrandStat,
   AnalysisCategoryStat,
   AnalysisCoverageMatrix,
@@ -72,6 +75,7 @@ import type {
   ProductRow,
   ProductUpdate,
   Recommendation,
+  RecordAcceptBatch,
   Settings,
   SettingsInput
 } from './api.schemas';
@@ -2176,6 +2180,224 @@ export function useGetAutoAcceptPreview<TData = Awaited<ReturnType<typeof getAut
 
 
 
+
+export const getGetAcceptBatchesUrl = () => {
+
+
+
+
+  return `/api/catalog/mapping-review/accept-batches`
+}
+
+/**
+ * @summary Recent bulk/auto accept batches that can still be sent back to review
+ */
+export const getAcceptBatches = async ( options?: RequestInit): Promise<AcceptBatchList> => {
+
+  return customFetch<AcceptBatchList>(getGetAcceptBatchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAcceptBatchesQueryKey = () => {
+    return [
+    `/api/catalog/mapping-review/accept-batches`
+    ] as const;
+    }
+
+
+export const getGetAcceptBatchesQueryOptions = <TData = Awaited<ReturnType<typeof getAcceptBatches>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAcceptBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAcceptBatchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAcceptBatches>>> = ({ signal }) => getAcceptBatches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAcceptBatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAcceptBatchesQueryResult = NonNullable<Awaited<ReturnType<typeof getAcceptBatches>>>
+export type GetAcceptBatchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent bulk/auto accept batches that can still be sent back to review
+ */
+
+export function useGetAcceptBatches<TData = Awaited<ReturnType<typeof getAcceptBatches>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAcceptBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAcceptBatchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRecordAcceptBatchUrl = () => {
+
+
+
+
+  return `/api/catalog/mapping-review/accept-batches`
+}
+
+/**
+ * @summary Record an accepted batch so it can be reverted later
+ */
+export const recordAcceptBatch = async (recordAcceptBatch: RecordAcceptBatch, options?: RequestInit): Promise<AcceptBatch> => {
+
+  return customFetch<AcceptBatch>(getRecordAcceptBatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      recordAcceptBatch,)
+  }
+);}
+
+
+
+
+export const getRecordAcceptBatchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAcceptBatch>>, TError,{data: BodyType<RecordAcceptBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordAcceptBatch>>, TError,{data: BodyType<RecordAcceptBatch>}, TContext> => {
+
+const mutationKey = ['recordAcceptBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordAcceptBatch>>, {data: BodyType<RecordAcceptBatch>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordAcceptBatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordAcceptBatchMutationResult = NonNullable<Awaited<ReturnType<typeof recordAcceptBatch>>>
+    export type RecordAcceptBatchMutationBody = BodyType<RecordAcceptBatch>
+    export type RecordAcceptBatchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Record an accepted batch so it can be reverted later
+ */
+export const useRecordAcceptBatch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAcceptBatch>>, TError,{data: BodyType<RecordAcceptBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordAcceptBatch>>,
+        TError,
+        {data: BodyType<RecordAcceptBatch>},
+        TContext
+      > => {
+      return useMutation(getRecordAcceptBatchMutationOptions(options));
+    }
+
+export const getDeleteAcceptBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/mapping-review/accept-batches/${id}`
+}
+
+/**
+ * @summary Forget a recorded accept batch (e.g. after it was reverted)
+ */
+export const deleteAcceptBatch = async (id: number, options?: RequestInit): Promise<AcceptBatchDeleteResult> => {
+
+  return customFetch<AcceptBatchDeleteResult>(getDeleteAcceptBatchUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteAcceptBatchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAcceptBatch>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAcceptBatch>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteAcceptBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAcceptBatch>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteAcceptBatch(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAcceptBatchMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAcceptBatch>>>
+
+    export type DeleteAcceptBatchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Forget a recorded accept batch (e.g. after it was reverted)
+ */
+export const useDeleteAcceptBatch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAcceptBatch>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAcceptBatch>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteAcceptBatchMutationOptions(options));
+    }
 
 export const getUpdateCompetitorMappingUrl = (id: number,) => {
 

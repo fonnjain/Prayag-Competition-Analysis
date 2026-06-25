@@ -7,6 +7,10 @@ import {
   useGetAutoAcceptPreview,
   getGetAutoAcceptPreviewQueryKey,
   useGetComparisonFilters,
+  useGetAcceptBatches,
+  useRecordAcceptBatch,
+  useDeleteAcceptBatch,
+  getGetAcceptBatchesQueryKey,
   getGetMappingReviewQueryKey,
   getGetComparisonQueryKey,
   getGetComparisonSummaryQueryKey,
@@ -16,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Zap, Download } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Zap, Download, Undo2, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -43,6 +47,18 @@ const THRESHOLD_LABELS: Record<string, string> = {
   medium: "Medium & up",
   low: "All suggestions",
 };
+
+function formatBatchTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diffSec = Math.round((Date.now() - then) / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hr ago`;
+  return new Date(iso).toLocaleString();
+}
 
 function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
   if (!confidence) return <span className="text-muted-foreground text-xs">-</span>;
@@ -180,7 +196,19 @@ export default function MappingReviewPage() {
 
   const bulkUpdate = useBulkUpdateCompetitorMappings();
   const autoAccept = useAutoAcceptMappings();
+  const recordBatch = useRecordAcceptBatch();
+  const deleteBatch = useDeleteAcceptBatch();
   const bulkBusy = bulkUpdate.isPending || autoAccept.isPending;
+
+  // Persisted record of recent accept batches, so a reviewer can still revert
+  // one after dismissing the success toast or leaving the page.
+  const { data: batchData } = useGetAcceptBatches({
+    query: { queryKey: getGetAcceptBatchesQueryKey() },
+  });
+  const recentBatches = batchData?.batches ?? [];
+
+  const invalidateBatches = () =>
+    queryClient.invalidateQueries({ queryKey: getGetAcceptBatchesQueryKey() });
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
@@ -190,9 +218,56 @@ export default function MappingReviewPage() {
     queryClient.invalidateQueries({ queryKey: getGetAutoAcceptPreviewQueryKey() });
   };
 
-  // Revert a just-accepted batch back to "no match (review)" with cleared
-  // code/confidence, reusing the same bulk PATCH route as the accept paths.
-  const undoBatch = (ids: number[]) => {
+  // Persist a freshly accepted batch, then surface an Undo toast tied to it. If
+  // recording fails the accept still stands, so we fall back to an id-only undo.
+  const recordAndToast = (
+    kind: "bulk" | "auto",
+    ids: number[],
+    title: string,
+    description: string,
+  ) => {
+    if (ids.length === 0) {
+      toast({ title, description });
+      return;
+    }
+    const competitorLabel = competitor !== "all" ? competitor : null;
+    recordBatch.mutate(
+      { data: { kind, ids, competitor: competitorLabel } },
+      {
+        onSuccess: (batch) => {
+          invalidateBatches();
+          toast({
+            title,
+            description,
+            action: (
+              <ToastAction
+                altText="Undo this accept batch"
+                onClick={() => revertBatch(ids, batch.id)}
+              >
+                Undo
+              </ToastAction>
+            ),
+          });
+        },
+        onError: () => {
+          toast({
+            title,
+            description,
+            action: (
+              <ToastAction altText="Undo this accept batch" onClick={() => revertBatch(ids)}>
+                Undo
+              </ToastAction>
+            ),
+          });
+        },
+      },
+    );
+  };
+
+  // Revert an accepted batch back to "no match (review)" with cleared
+  // code/confidence, reusing the same bulk PATCH route as the accept paths. When
+  // a batchId is given, forget the persisted batch once the revert lands.
+  const revertBatch = (ids: number[], batchId?: number) => {
     if (ids.length === 0) return;
     bulkUpdate.mutate(
       {
@@ -213,6 +288,14 @@ export default function MappingReviewPage() {
           setSelected(new Set());
           setEditingRows({});
           invalidateAll();
+          if (batchId != null) {
+            deleteBatch.mutate(
+              { id: batchId },
+              { onSuccess: invalidateBatches, onError: invalidateBatches },
+            );
+          } else {
+            invalidateBatches();
+          }
         },
         onError: (err: any) => {
           toast({
@@ -258,23 +341,20 @@ export default function MappingReviewPage() {
         matchStatus: "matched",
       }));
     if (updates.length === 0) return;
-    const acceptedIds = updates.map((u) => u.id);
     bulkUpdate.mutate(
       { data: { updates } },
       {
         onSuccess: (res) => {
-          toast({
-            title: "Matches accepted",
-            description: `Matched ${res.updated} row${res.updated === 1 ? "" : "s"} from your selection.`,
-            action: (
-              <ToastAction altText="Undo accepting these matches" onClick={() => undoBatch(acceptedIds)}>
-                Undo
-              </ToastAction>
-            ),
-          });
+          const acceptedIds = res.rows.map((r) => r.id);
           setSelected(new Set());
           setEditingRows({});
           invalidateAll();
+          recordAndToast(
+            "bulk",
+            acceptedIds,
+            "Matches accepted",
+            `Matched ${res.updated} row${res.updated === 1 ? "" : "s"} from your selection.`,
+          );
         },
         onError: (err: any) => {
           toast({
@@ -300,22 +380,22 @@ export default function MappingReviewPage() {
       },
       {
         onSuccess: (res) => {
-          toast({
-            title: "Auto-accept complete",
-            description:
-              res.matched > 0
-                ? `Matched ${res.matched} row${res.matched === 1 ? "" : "s"} at ${THRESHOLD_LABELS[threshold].toLowerCase()} confidence.`
-                : "No rows met the confidence threshold.",
-            action:
-              res.matched > 0 ? (
-                <ToastAction altText="Undo this auto-accept batch" onClick={() => undoBatch(res.matchedIds)}>
-                  Undo
-                </ToastAction>
-              ) : undefined,
-          });
           setSelected(new Set());
           setEditingRows({});
           invalidateAll();
+          if (res.matched > 0) {
+            recordAndToast(
+              "auto",
+              res.matchedIds,
+              "Auto-accept complete",
+              `Matched ${res.matched} row${res.matched === 1 ? "" : "s"} at ${THRESHOLD_LABELS[threshold].toLowerCase()} confidence.`,
+            );
+          } else {
+            toast({
+              title: "Auto-accept complete",
+              description: "No rows met the confidence threshold.",
+            });
+          }
         },
         onError: (err: any) => {
           toast({
@@ -465,6 +545,50 @@ export default function MappingReviewPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {recentBatches.length > 0 && (
+        <div className="mb-6 rounded-md border bg-muted/20 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-medium">Recent accept batches</h2>
+            <span className="text-xs text-muted-foreground">
+              Sent matches back to review even after the toast is gone.
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {recentBatches.map((batch) => (
+              <li
+                key={batch.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-3 py-2"
+              >
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant={batch.kind === "auto" ? "default" : "secondary"}>
+                    {batch.kind === "auto" ? "Auto-accept" : "Accept selected"}
+                  </Badge>
+                  <span className="font-medium">
+                    {batch.count} row{batch.count === 1 ? "" : "s"}
+                  </span>
+                  {batch.competitor && (
+                    <span className="text-muted-foreground">· {batch.competitor}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    · {formatBatchTime(batch.createdAt)}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkBusy}
+                  onClick={() => revertBatch(batch.competitorPriceIds, batch.id)}
+                >
+                  <Undo2 className="mr-1.5 h-4 w-4" />
+                  Send back to review
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="border rounded-md bg-card">
         <div className="overflow-x-auto">

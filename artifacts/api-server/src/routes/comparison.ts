@@ -1,11 +1,12 @@
 import { Router, type IRouter, type Response } from "express";
-import { sql, eq, ne, asc, and } from "drizzle-orm";
+import { sql, eq, ne, asc, desc, and } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
   competitorPricesTable,
   catalogProductsTable,
   mrpPriceHistoryTable,
+  acceptBatchesTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
 import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
@@ -593,6 +594,71 @@ router.get("/catalog/mapping-review/auto-accept-preview", async (req, res) => {
   }
 
   res.json({ high, medium, low, total: rows.length });
+});
+
+const BATCH_LIST_LIMIT = 10;
+
+function serializeBatch(b: typeof acceptBatchesTable.$inferSelect) {
+  return {
+    id: b.id,
+    kind: b.kind,
+    competitor: b.competitor,
+    competitorPriceIds: b.competitorPriceIds,
+    count: b.count,
+    createdAt: b.createdAt.toISOString(),
+  };
+}
+
+// GET /catalog/mapping-review/accept-batches — recent bulk/auto accept batches
+// that a reviewer can still send back to review (newest first). Persisting them
+// means the undo survives dismissing the toast or navigating away.
+router.get("/catalog/mapping-review/accept-batches", async (_req, res) => {
+  const batches = await db
+    .select()
+    .from(acceptBatchesTable)
+    .orderBy(desc(acceptBatchesTable.createdAt), desc(acceptBatchesTable.id))
+    .limit(BATCH_LIST_LIMIT);
+  res.json({ batches: batches.map(serializeBatch) });
+});
+
+// POST /catalog/mapping-review/accept-batches — record a freshly accepted batch
+// (the exact competitor-price ids) so it can be reverted later.
+router.post("/catalog/mapping-review/accept-batches", async (req, res) => {
+  const body = req.body as {
+    kind?: string;
+    competitor?: string | null;
+    ids?: number[];
+  };
+  const kind = body.kind === "auto" ? "auto" : "bulk";
+  const competitor = strParam(body.competitor);
+  const ids = Array.isArray(body.ids)
+    ? body.ids.filter((id): id is number => Number.isInteger(id))
+    : [];
+  if (ids.length === 0) {
+    res.status(400).json({ error: "ids must be a non-empty array of integers" });
+    return;
+  }
+
+  const [batch] = await db
+    .insert(acceptBatchesTable)
+    .values({ kind, competitor, competitorPriceIds: ids, count: ids.length })
+    .returning();
+  res.json(serializeBatch(batch));
+});
+
+// DELETE /catalog/mapping-review/accept-batches/:id — forget a recorded batch
+// (after it was reverted, or to dismiss it from the recent list).
+router.delete("/catalog/mapping-review/accept-batches/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "invalid batch id" });
+    return;
+  }
+  const deleted = await db
+    .delete(acceptBatchesTable)
+    .where(eq(acceptBatchesTable.id, id))
+    .returning({ id: acceptBatchesTable.id });
+  res.json({ ok: true, deleted: deleted.length });
 });
 
 // GET /catalog/comparison/by-product — one row per matched Prayag SKU with a

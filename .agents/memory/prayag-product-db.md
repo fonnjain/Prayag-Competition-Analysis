@@ -33,6 +33,12 @@ Standalone web app (artifact `prayag-product-db`, previewPath `/product-db/`) sh
 - **Side-by-side matrix** (`GET /catalog/comparison/matrix`) groups matched rows by `normCode` and keeps the **cheapest** competitor price per (Prayag code, competitor). Its `total` = distinct Prayag codes across all competitors (~431), which is correctly far smaller than the per-competitor matched-row counts (~1380 each).
 - **Gotcha:** the comparison *list* endpoint caps `pageSize` at 200, so counting distinct codes from one page of `rows` undercounts wildly. Trust the matrix endpoint / DB for distinct-code counts, not a single list page.
 
+## Accept-batch undo (persistent revert)
+- Bulk/auto accepts are logged to `accept_batches` (kind, competitor, `competitor_price_ids` int[], count). The Mapping Review page lists recent batches (newest first, capped at 10) so a reviewer can "Send back to review" even after the toast is gone.
+- Revert reuses the existing bulk PATCH (`competitor-prices/bulk`) to set those ids → "no match (review)" with null code, then DELETEs the batch row. Recording happens client-side AFTER an accept succeeds (POST returns the batch id used by the toast's Undo).
+- **Why:** the toast-only undo was lost on navigation/dismissal; the table is the durable backstop. Reverting stale ids is harmless (just resets them to review).
+- **How to apply:** never record a batch inside the bulk PATCH route itself — that route is also used for the revert, so it would log undo actions as new batches. Keep batch recording on the accept paths only.
+
 ## Fuzzy match suggestions (Mapping Review)
 - `GET /catalog/mapping-review` embeds 1-3 `suggestions` per row (top Prayag catalog candidates) scored live in `artifacts/api-server/src/lib/suggest.ts`. Catalog candidates are built once per request and only the page's rows are scored — N×catalog is trivial. This is independent of `match_confidence` (the seeded High/Medium/Low column): suggestions are computed fresh for unmatched rows to help assign a code, confidence reflects existing/assigned matches.
 - Scoring is a heuristic: weighted token overlap (digit tokens weight 2 — sizes/gauges are discriminative), category Jaccard, plus a size match boost. Catalog `size` is mostly null with the real size embedded in `productName`, so size matching falls back to substring search in the product text.

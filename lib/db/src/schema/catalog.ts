@@ -1,6 +1,7 @@
 import {
   pgTable,
   serial,
+  integer,
   text,
   doublePrecision,
   boolean,
@@ -116,7 +117,28 @@ export const competitorPricesTable = pgTable(
   ],
 );
 
+// Audit trail of bulk/auto accept batches so reviewers can revert a batch even
+// after dismissing the success toast or navigating away. Each row records the
+// exact competitor_prices ids that were accepted together; a revert re-runs the
+// bulk PATCH against those ids and then deletes the batch.
+export const acceptBatchesTable = pgTable(
+  "accept_batches",
+  {
+    id: serial("id").primaryKey(),
+    // "bulk" (Accept selected) | "auto" (Auto-accept all).
+    kind: text("kind").notNull(),
+    competitor: text("competitor"),
+    competitorPriceIds: integer("competitor_price_ids").array().notNull(),
+    count: integer("count").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("accept_batches_created_idx").on(t.createdAt)],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 export type CodeConflict = typeof codeConflictsTable.$inferSelect;
 export type CompetitorPrice = typeof competitorPricesTable.$inferSelect;
+export type AcceptBatch = typeof acceptBatchesTable.$inferSelect;

@@ -713,6 +713,53 @@ export const GetAutoAcceptPreviewResponse = zod.object({
 
 
 /**
+ * @summary Recent bulk/auto accept batches that can still be sent back to review
+ */
+export const GetAcceptBatchesResponse = zod.object({
+  "batches": zod.array(zod.object({
+  "id": zod.number(),
+  "kind": zod.string().describe('\"bulk\" (Accept selected) or \"auto\" (Auto-accept all).'),
+  "competitor": zod.string().nullish(),
+  "competitorPriceIds": zod.array(zod.number()),
+  "count": zod.number(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Record an accepted batch so it can be reverted later
+ */
+export const RecordAcceptBatchBody = zod.object({
+  "kind": zod.enum(['bulk', 'auto']),
+  "competitor": zod.string().nullish(),
+  "ids": zod.array(zod.number())
+})
+
+export const RecordAcceptBatchResponse = zod.object({
+  "id": zod.number(),
+  "kind": zod.string().describe('\"bulk\" (Accept selected) or \"auto\" (Auto-accept all).'),
+  "competitor": zod.string().nullish(),
+  "competitorPriceIds": zod.array(zod.number()),
+  "count": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Forget a recorded accept batch (e.g. after it was reverted)
+ */
+export const DeleteAcceptBatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteAcceptBatchResponse = zod.object({
+  "ok": zod.boolean(),
+  "deleted": zod.number()
+})
+
+
+/**
  * @summary Assign or correct a competitor row's matched Prayag code and status
  */
 export const UpdateCompetitorMappingParams = zod.object({

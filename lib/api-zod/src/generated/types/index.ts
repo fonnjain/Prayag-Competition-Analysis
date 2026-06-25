@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './acceptBatch';
+export * from './acceptBatchDeleteResult';
+export * from './acceptBatchList';
 export * from './analysisBrandStat';
 export * from './analysisCategoryStat';
 export * from './analysisCoverageMatrix';
@@ -95,5 +98,7 @@ export * from './productUpdate';
 export * from './recommendation';
 export * from './recommendationBasis';
 export * from './recommendationStatus';
+export * from './recordAcceptBatch';
+export * from './recordAcceptBatchKind';
 export * from './settings';
 export * from './settingsInput';

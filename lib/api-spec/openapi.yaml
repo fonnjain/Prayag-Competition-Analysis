@@ -645,6 +645,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AutoAcceptPreview"
+  /catalog/mapping-review/accept-batches:
+    get:
+      operationId: getAcceptBatches
+      tags: [comparison]
+      summary: Recent bulk/auto accept batches that can still be sent back to review
+      responses:
+        "200":
+          description: Recent accept batches (newest first)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptBatchList"
+    post:
+      operationId: recordAcceptBatch
+      tags: [comparison]
+      summary: Record an accepted batch so it can be reverted later
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordAcceptBatch"
+      responses:
+        "200":
+          description: Recorded batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptBatch"
+  /catalog/mapping-review/accept-batches/{id}:
+    delete:
+      operationId: deleteAcceptBatch
+      tags: [comparison]
+      summary: Forget a recorded accept batch (e.g. after it was reverted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptBatchDeleteResult"
   /catalog/competitor-prices/{id}:
     patch:
       operationId: updateCompetitorMapping
@@ -2112,3 +2159,51 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AnalysisOpportunityItem"
+    AcceptBatch:
+      type: object
+      required: [id, kind, competitorPriceIds, count, createdAt]
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          description: '"bulk" (Accept selected) or "auto" (Auto-accept all).'
+        competitor:
+          type: ["string", "null"]
+        competitorPriceIds:
+          type: array
+          items:
+            type: integer
+        count:
+          type: integer
+        createdAt:
+          type: string
+    AcceptBatchList:
+      type: object
+      required: [batches]
+      properties:
+        batches:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcceptBatch"
+    RecordAcceptBatch:
+      type: object
+      required: [kind, ids]
+      properties:
+        kind:
+          type: string
+          enum: [bulk, auto]
+        competitor:
+          type: ["string", "null"]
+        ids:
+          type: array
+          items:
+            type: integer
+    AcceptBatchDeleteResult:
+      type: object
+      required: [ok, deleted]
+      properties:
+        ok:
+          type: boolean
+        deleted:
+          type: integer
