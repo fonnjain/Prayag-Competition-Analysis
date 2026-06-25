@@ -536,6 +536,59 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
   res.json({ matched });
 });
 
+// GET /catalog/mapping-review/auto-accept-preview — dry run of the auto-accept
+// above. For the current filter, compute each pending row's top suggestion and
+// count how many rows each confidence threshold would accept, so reviewers can
+// pick a safe tier before committing.
+router.get("/catalog/mapping-review/auto-accept-preview", async (req, res) => {
+  const competitor = strParam(req.query.competitor);
+  const confidence = strParam(req.query.confidence);
+  const search = strParam(req.query.search);
+  const TIERS = ["low", "medium", "high"] as const;
+
+  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (confidence)
+    conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
+  if (search) {
+    const like = `%${search.toLowerCase()}%`;
+    conditions.push(
+      sql`(lower(coalesce(${competitorPricesTable.description}, '')) like ${like} or lower(coalesce(${competitorPricesTable.category}, '')) like ${like} or lower(coalesce(${competitorPricesTable.size}, '')) like ${like})`,
+    );
+  }
+
+  const rows = await db
+    .select({
+      category: competitorPricesTable.category,
+      description: competitorPricesTable.description,
+      size: competitorPricesTable.size,
+    })
+    .from(competitorPricesTable)
+    .where(and(...conditions));
+
+  let high = 0;
+  let medium = 0;
+  let low = 0;
+  if (rows.length > 0) {
+    const candidates = await getCatalogCandidates();
+    for (const r of rows) {
+      const top = suggestMatches(
+        { category: r.category, description: r.description, size: r.size },
+        candidates,
+      )[0];
+      if (!top) continue;
+      const rank = TIERS.indexOf(top.confidenceLabel);
+      // A row counts toward every threshold at or below its top tier:
+      // a high suggestion is accepted by "high only", "medium & up", and "all".
+      low++;
+      if (rank >= TIERS.indexOf("medium")) medium++;
+      if (rank >= TIERS.indexOf("high")) high++;
+    }
+  }
+
+  res.json({ high, medium, low, total: rows.length });
+});
+
 // GET /catalog/comparison/by-product — one row per matched Prayag SKU with a
 // price cell for each competitor brand, so the user can compare Prayag against
 // several brands side by side (cheapest rival highlighted per SKU).

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './autoAcceptPreview';
 export * from './autoAcceptRequest';
 export * from './autoAcceptRequestMinConfidence';
 export * from './autoAcceptResult';
@@ -43,6 +44,7 @@ export * from './confidenceCounts';
 export * from './dashboardSummary';
 export * from './deleteCompetitorResult';
 export * from './errorResponse';
+export * from './getAutoAcceptPreviewParams';
 export * from './getCatalogProductsParams';
 export * from './getComparisonByProductParams';
 export * from './getComparisonMatrixParams';

@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AutoAcceptPreview,
   AutoAcceptRequest,
   AutoAcceptResult,
   BulkMappingResult,
@@ -40,6 +41,7 @@ import type {
   DashboardSummary,
   DeleteCompetitorResult,
   ErrorResponse,
+  GetAutoAcceptPreviewParams,
   GetCatalogProductsParams,
   GetComparisonByProductParams,
   GetComparisonMatrixParams,
@@ -2076,6 +2078,90 @@ export const useAutoAcceptMappings = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getAutoAcceptMappingsMutationOptions(options));
     }
+
+export const getGetAutoAcceptPreviewUrl = (params?: GetAutoAcceptPreviewParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/mapping-review/auto-accept-preview?${stringifiedParams}` : `/api/catalog/mapping-review/auto-accept-preview`
+}
+
+/**
+ * @summary Count how many rows each confidence threshold would auto-accept for the current filter
+ */
+export const getAutoAcceptPreview = async (params?: GetAutoAcceptPreviewParams, options?: RequestInit): Promise<AutoAcceptPreview> => {
+
+  return customFetch<AutoAcceptPreview>(getGetAutoAcceptPreviewUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAutoAcceptPreviewQueryKey = (params?: GetAutoAcceptPreviewParams,) => {
+    return [
+    `/api/catalog/mapping-review/auto-accept-preview`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAutoAcceptPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getAutoAcceptPreview>>, TError = ErrorType<unknown>>(params?: GetAutoAcceptPreviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutoAcceptPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAutoAcceptPreviewQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutoAcceptPreview>>> = ({ signal }) => getAutoAcceptPreview(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAutoAcceptPreview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAutoAcceptPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAutoAcceptPreview>>>
+export type GetAutoAcceptPreviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Count how many rows each confidence threshold would auto-accept for the current filter
+ */
+
+export function useGetAutoAcceptPreview<TData = Awaited<ReturnType<typeof getAutoAcceptPreview>>, TError = ErrorType<unknown>>(
+ params?: GetAutoAcceptPreviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAutoAcceptPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAutoAcceptPreviewQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getUpdateCompetitorMappingUrl = (id: number,) => {
 

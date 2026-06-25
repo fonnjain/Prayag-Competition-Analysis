@@ -695,6 +695,23 @@ export const AutoAcceptMappingsResponse = zod.object({
 
 
 /**
+ * @summary Count how many rows each confidence threshold would auto-accept for the current filter
+ */
+export const GetAutoAcceptPreviewQueryParams = zod.object({
+  "competitor": zod.coerce.string().optional(),
+  "confidence": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const GetAutoAcceptPreviewResponse = zod.object({
+  "high": zod.number().describe('Rows accepted at \"High only\".'),
+  "medium": zod.number().describe('Rows accepted at \"Medium & up\".'),
+  "low": zod.number().describe('Rows accepted at \"All suggestions\".'),
+  "total": zod.number().describe('Total pending rows in the current filter.')
+})
+
+
+/**
  * @summary Assign or correct a competitor row's matched Prayag code and status
  */
 export const UpdateCompetitorMappingParams = zod.object({

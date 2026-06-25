@@ -654,6 +654,17 @@ export interface AutoAcceptResult {
   matched: number;
 }
 
+export interface AutoAcceptPreview {
+  /** Rows accepted at "High only". */
+  high: number;
+  /** Rows accepted at "Medium & up". */
+  medium: number;
+  /** Rows accepted at "All suggestions". */
+  low: number;
+  /** Total pending rows in the current filter. */
+  total: number;
+}
+
 export interface ComparisonMatrixCell {
   competitor: string;
   /** @nullable */
@@ -766,5 +777,11 @@ confidence?: string;
 search?: string;
 page?: number;
 pageSize?: number;
+};
+
+export type GetAutoAcceptPreviewParams = {
+competitor?: string;
+confidence?: string;
+search?: string;
 };
 

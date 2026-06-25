@@ -615,6 +615,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AutoAcceptResult"
+  /catalog/mapping-review/auto-accept-preview:
+    get:
+      operationId: getAutoAcceptPreview
+      tags: [comparison]
+      summary: Count how many rows each confidence threshold would auto-accept for the current filter
+      parameters:
+        - name: competitor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: confidence
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Per-threshold acceptance counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutoAcceptPreview"
   /catalog/competitor-prices/{id}:
     patch:
       operationId: updateCompetitorMapping
@@ -1562,6 +1590,22 @@ components:
       properties:
         matched:
           type: integer
+    AutoAcceptPreview:
+      type: object
+      required: [high, medium, low, total]
+      properties:
+        high:
+          type: integer
+          description: Rows accepted at "High only".
+        medium:
+          type: integer
+          description: Rows accepted at "Medium & up".
+        low:
+          type: integer
+          description: Rows accepted at "All suggestions".
+        total:
+          type: integer
+          description: Total pending rows in the current filter.
     ComparisonMatrixCell:
       type: object
       required: [competitor, price, diffPct, prayagCheaper]

@@ -4,6 +4,8 @@ import {
   useUpdateCompetitorMapping,
   useBulkUpdateCompetitorMappings,
   useAutoAcceptMappings,
+  useGetAutoAcceptPreview,
+  getGetAutoAcceptPreviewQueryKey,
   useGetComparisonFilters,
   getGetMappingReviewQueryKey,
   getGetComparisonQueryKey,
@@ -82,6 +84,18 @@ export default function MappingReviewPage() {
 
   const { data: filters } = useGetComparisonFilters();
 
+  const previewParams = {
+    competitor: competitor !== "all" ? competitor : undefined,
+    confidence: confidence !== "all" ? confidence : undefined,
+    search: search || undefined,
+  };
+  const { data: autoAcceptPreview } = useGetAutoAcceptPreview(previewParams, {
+    query: { queryKey: getGetAutoAcceptPreviewQueryKey(previewParams) },
+  });
+  const thresholdCount = autoAcceptPreview
+    ? autoAcceptPreview[threshold as "high" | "medium" | "low"]
+    : undefined;
+
   const { data: mappingData, isLoading } = useGetMappingReview({
     search: search || undefined,
     competitor: competitor !== "all" ? competitor : undefined,
@@ -141,6 +155,7 @@ export default function MappingReviewPage() {
         queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetComparisonFiltersQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetAutoAcceptPreviewQueryKey() });
       },
       onError: (err: any) => {
         toast({
@@ -171,6 +186,7 @@ export default function MappingReviewPage() {
     queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetComparisonFiltersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetAutoAcceptPreviewQueryKey() });
   };
 
   const rows = mappingData?.rows ?? [];
@@ -354,13 +370,15 @@ export default function MappingReviewPage() {
           </Select>
           <Button
             onClick={() => setConfirmOpen(true)}
-            disabled={bulkBusy || total === 0}
+            disabled={bulkBusy || total === 0 || thresholdCount === 0}
           >
             <Zap className="w-4 h-4 mr-1.5" />
             {autoAccept.isPending ? "Accepting…" : "Auto-accept all"}
           </Button>
           <span className="text-xs text-muted-foreground">
-            Applies the top suggestion across {competitor !== "all" ? competitor : "all competitors"} ({total} pending).
+            {thresholdCount === undefined
+              ? `Applies the top suggestion across ${competitor !== "all" ? competitor : "all competitors"} (${total} pending).`
+              : `Would match ${thresholdCount} of ${total} pending row${total === 1 ? "" : "s"} across ${competitor !== "all" ? competitor : "all competitors"}.`}
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -383,9 +401,13 @@ export default function MappingReviewPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Auto-accept matches?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will accept the top suggestion for every pending row in the
-              current filter ({total} row{total === 1 ? "" : "s"}) whose best
-              match is <strong>{THRESHOLD_LABELS[threshold].toLowerCase()}</strong> confidence.
+              This will accept the top suggestion for{" "}
+              <strong>
+                {thresholdCount ?? 0} of {total} pending row
+                {total === 1 ? "" : "s"}
+              </strong>{" "}
+              in the current filter whose best match is{" "}
+              <strong>{THRESHOLD_LABELS[threshold].toLowerCase()}</strong> confidence.
               You can still re-review any row afterwards.
             </AlertDialogDescription>
           </AlertDialogHeader>
