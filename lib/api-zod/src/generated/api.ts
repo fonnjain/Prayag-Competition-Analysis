@@ -690,7 +690,8 @@ export const AutoAcceptMappingsBody = zod.object({
 })
 
 export const AutoAcceptMappingsResponse = zod.object({
-  "matched": zod.number()
+  "matched": zod.number(),
+  "matchedIds": zod.array(zod.number())
 })
 
 

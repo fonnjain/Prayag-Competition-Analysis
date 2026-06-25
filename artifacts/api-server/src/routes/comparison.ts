@@ -513,7 +513,7 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
   }
 
   const candidates = await getCatalogCandidates();
-  let matched = 0;
+  const matchedIds: number[] = [];
   for (const r of rows) {
     const top = suggestMatches(
       { category: r.category, description: r.description, size: r.size },
@@ -530,10 +530,10 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
         updatedAt: new Date(),
       })
       .where(eq(competitorPricesTable.id, r.id));
-    matched++;
+    matchedIds.push(r.id);
   }
 
-  res.json({ matched });
+  res.json({ matched: matchedIds.length, matchedIds });
 });
 
 // GET /catalog/mapping-review/auto-accept-preview — dry run of the auto-accept

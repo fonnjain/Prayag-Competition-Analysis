@@ -8,4 +8,5 @@
 
 export interface AutoAcceptResult {
   matched: number;
+  matchedIds: number[];
 }

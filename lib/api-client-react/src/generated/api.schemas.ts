@@ -652,6 +652,7 @@ export interface AutoAcceptRequest {
 
 export interface AutoAcceptResult {
   matched: number;
+  matchedIds: number[];
 }
 
 export interface AutoAcceptPreview {

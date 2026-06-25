@@ -1586,10 +1586,14 @@ components:
           enum: [high, medium, low]
     AutoAcceptResult:
       type: object
-      required: [matched]
+      required: [matched, matchedIds]
       properties:
         matched:
           type: integer
+        matchedIds:
+          type: array
+          items:
+            type: integer
     AutoAcceptPreview:
       type: object
       required: [high, medium, low, total]

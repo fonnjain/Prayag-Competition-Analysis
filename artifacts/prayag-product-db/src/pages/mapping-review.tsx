@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
@@ -189,6 +190,41 @@ export default function MappingReviewPage() {
     queryClient.invalidateQueries({ queryKey: getGetAutoAcceptPreviewQueryKey() });
   };
 
+  // Revert a just-accepted batch back to "no match (review)" with cleared
+  // code/confidence, reusing the same bulk PATCH route as the accept paths.
+  const undoBatch = (ids: number[]) => {
+    if (ids.length === 0) return;
+    bulkUpdate.mutate(
+      {
+        data: {
+          updates: ids.map((id) => ({
+            id,
+            matchedPrayagCode: null,
+            matchStatus: "no match (review)",
+          })),
+        },
+      },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: "Batch reverted",
+            description: `Sent ${res.updated} row${res.updated === 1 ? "" : "s"} back to review.`,
+          });
+          setSelected(new Set());
+          setEditingRows({});
+          invalidateAll();
+        },
+        onError: (err: any) => {
+          toast({
+            title: "Undo failed",
+            description: err.message || "Failed to revert the batch.",
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   const rows = mappingData?.rows ?? [];
 
   // Rows on this page that have at least one suggestion can be bulk-accepted.
@@ -222,6 +258,7 @@ export default function MappingReviewPage() {
         matchStatus: "matched",
       }));
     if (updates.length === 0) return;
+    const acceptedIds = updates.map((u) => u.id);
     bulkUpdate.mutate(
       { data: { updates } },
       {
@@ -229,6 +266,11 @@ export default function MappingReviewPage() {
           toast({
             title: "Matches accepted",
             description: `Matched ${res.updated} row${res.updated === 1 ? "" : "s"} from your selection.`,
+            action: (
+              <ToastAction altText="Undo accepting these matches" onClick={() => undoBatch(acceptedIds)}>
+                Undo
+              </ToastAction>
+            ),
           });
           setSelected(new Set());
           setEditingRows({});
@@ -264,6 +306,12 @@ export default function MappingReviewPage() {
               res.matched > 0
                 ? `Matched ${res.matched} row${res.matched === 1 ? "" : "s"} at ${THRESHOLD_LABELS[threshold].toLowerCase()} confidence.`
                 : "No rows met the confidence threshold.",
+            action:
+              res.matched > 0 ? (
+                <ToastAction altText="Undo this auto-accept batch" onClick={() => undoBatch(res.matchedIds)}>
+                  Undo
+                </ToastAction>
+              ) : undefined,
           });
           setSelected(new Set());
           setEditingRows({});
