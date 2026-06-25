@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "zlDYvtweiXJbOEVqYWDPM"
+uri = "file://Prayag_Project_Architecture.xlsx"
+type = "table"
+title = "Prayag Project Architecture"
