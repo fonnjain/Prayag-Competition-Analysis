@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
 import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
+import { catalogVersion, topSuggestionTier } from "../lib/suggestCache";
 import {
   computeCompareNorm,
   normalizePerMetre,
@@ -571,13 +572,18 @@ router.get("/catalog/mapping-review/auto-accept-preview", async (req, res) => {
   let low = 0;
   if (rows.length > 0) {
     const candidates = await getCatalogCandidates();
+    // Cache top tiers keyed by a catalog-version signature so flipping the
+    // competitor/confidence/search filter reuses prior scoring instead of
+    // re-running the full fuzzy match over every pending row each time.
+    const version = catalogVersion(candidates);
     for (const r of rows) {
-      const top = suggestMatches(
+      const tier = topSuggestionTier(
         { category: r.category, description: r.description, size: r.size },
         candidates,
-      )[0];
-      if (!top) continue;
-      const rank = TIERS.indexOf(top.confidenceLabel);
+        version,
+      );
+      if (tier === "none") continue;
+      const rank = TIERS.indexOf(tier);
       // A row counts toward every threshold at or below its top tier:
       // a high suggestion is accepted by "high only", "medium & up", and "all".
       low++;
