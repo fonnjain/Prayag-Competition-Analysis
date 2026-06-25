@@ -6,3 +6,15 @@ id = "zlDYvtweiXJbOEVqYWDPM"
 uri = "file://Prayag_Project_Architecture.xlsx"
 type = "table"
 title = "Prayag Project Architecture"
+
+[[outputs]]
+id = "nHONQ6y6ExkiddGDSLTJ5"
+uri = "file://deliverables/Prayag_Web_App_Data_Structure.xlsx"
+type = "table"
+title = "Prayag Web App — Full Data Structure (Excel)"
+
+[[outputs]]
+id = "tQNrUnwyJGUPb821dMSD5"
+uri = "file://deliverables/How_Supplier_Prices_Are_Read.docx"
+type = "word_document"
+title = "How Individual Supplier Prices Are Read (Word)"
