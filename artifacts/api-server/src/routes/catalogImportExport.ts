@@ -9,6 +9,16 @@ import {
   competitorPricesTable,
 } from "@workspace/db";
 import { recomputeCurrentFlags, normCode } from "../lib/catalog";
+import { effectivePrice } from "../lib/analysis";
+
+// Price-gap guardrail for auto-matched competitor imports. A correct match
+// between equivalent products has a realistic gap; a gap far outside this band
+// (e.g. a big assembly matched to a tiny fitting, or per-box vs per-pc) almost
+// always means the wrong products were linked, so we send it to manual review
+// instead of trusting the match. Gap% = (competitorEffectivePrice - prayagMrp)
+// / prayagMrp * 100 (positive = competitor more expensive than Prayag).
+const GAP_MIN_PCT = -80;
+const GAP_MAX_PCT = 100;
 
 const router: IRouter = Router();
 const upload = multer({
@@ -590,6 +600,19 @@ router.post(
         existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
       );
 
+      // Current MRP per normalized code, used by the price-gap guardrail.
+      const currentMrpRows = await db
+        .select({
+          itemCode: mrpPriceHistoryTable.itemCode,
+          mrp: mrpPriceHistoryTable.mrp,
+        })
+        .from(mrpPriceHistoryTable)
+        .where(eq(mrpPriceHistoryTable.isCurrent, true));
+      const currentMrp = new Map<string, number>();
+      for (const r of currentMrpRows) {
+        if (r.mrp != null) currentMrp.set(normCode(r.itemCode), r.mrp);
+      }
+
       const wb = XLSX.read(file.buffer, { type: "buffer" });
       let parsed: ParsedCompetitorRow[] = [];
       for (const sheetName of wb.SheetNames) {
@@ -620,9 +643,24 @@ router.post(
       }
 
       let matched = 0;
+      let rejectedByGap = 0;
       const values = parsed.map((r) => {
         const norm = r.matchedPrayagCode;
-        const isMatched = !!norm && knownCodes.has(norm);
+        let isMatched = !!norm && knownCodes.has(norm);
+        // Price-gap guardrail: even a code that exists is sent to review when
+        // the gap vs Prayag's current MRP is unrealistically large — that
+        // almost always means the wrong products were linked.
+        if (isMatched) {
+          const prayagMrp = currentMrp.get(norm!);
+          if (prayagMrp != null && prayagMrp > 0) {
+            const eff = effectivePrice(r.unit, r.price);
+            const gapPct = ((eff - prayagMrp) / prayagMrp) * 100;
+            if (gapPct < GAP_MIN_PCT || gapPct > GAP_MAX_PCT) {
+              isMatched = false;
+              rejectedByGap++;
+            }
+          }
+        }
         if (isMatched) matched++;
         return {
           competitor,
@@ -656,6 +694,7 @@ router.post(
           inserted: values.length,
           matched,
           unmatched: values.length - matched,
+          rejectedByGap,
         },
       });
     } catch (err) {
