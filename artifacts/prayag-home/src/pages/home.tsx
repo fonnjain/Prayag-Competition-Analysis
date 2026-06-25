@@ -1,4 +1,4 @@
-import { Factory, TrendingUp, PackageSearch, Activity, FileSpreadsheet, Hexagon } from "lucide-react";
+import { Factory, TrendingUp, PackageSearch, Activity, FileSpreadsheet, Hexagon, BarChart3, Scale } from "lucide-react";
 import React from "react";
 
 export default function Home() {
@@ -89,6 +89,39 @@ export default function Home() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <FileSpreadsheet className="w-4 h-4 text-primary/60" />
                 <span>MRP Uploads</span>
+              </div>
+            </div>
+          </a>
+
+          {/* Competition Analysis Card */}
+          <a 
+            href="/analysis/" 
+            className="group relative bg-card rounded-2xl p-8 border border-border shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col gap-6 hover:border-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            data-testid="link-analysis"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
+            
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300">
+              <BarChart3 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
+                Competition Analysis
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Live competitive pricing dashboard. Measure coverage against rival brands, see where Prayag is cheaper or exposed, and surface margin headroom and threats.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-auto pt-6 border-t border-border/50">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Scale className="w-4 h-4 text-primary/60" />
+                <span>Price Positioning</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <BarChart3 className="w-4 h-4 text-primary/60" />
+                <span>Coverage & Gaps</span>
               </div>
             </div>
           </a>

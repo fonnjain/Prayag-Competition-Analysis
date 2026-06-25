@@ -697,6 +697,154 @@ export interface ComparisonMatrix {
   pageSize: number;
 }
 
+export interface AnalysisFilters {
+  competitors: string[];
+  divisions: string[];
+  categories: string[];
+  matchConfidences: string[];
+  matchStatuses: string[];
+}
+
+export interface AnalysisOverview {
+  totalSkus: number;
+  matchedSkus: number;
+  unmatchedSkus: number;
+  /** @nullable */
+  coveragePct: number | null;
+  comparableSkus: number;
+  /** SKUs where competitor effective price > Prayag MRP (Prayag cheaper, good). */
+  prayagCheaperCount: number;
+  prayagCostlierCount: number;
+  /** @nullable */
+  prayagCheaperPct: number | null;
+  /**
+     * Mean of price_diff_pct over comparable SKUs. Positive = Prayag cheaper.
+     * @nullable
+     */
+  avgPriceDiffPct: number | null;
+  /** @nullable */
+  medianPriceDiffPct: number | null;
+  competitorCount: number;
+  matchQuality: ConfidenceCounts;
+}
+
+export interface AnalysisBrandStat {
+  competitor: string;
+  totalSkus: number;
+  matchedSkus: number;
+  /** @nullable */
+  coveragePct: number | null;
+  comparableSkus: number;
+  prayagCheaperCount: number;
+  prayagCostlierCount: number;
+  /** @nullable */
+  prayagCheaperPct: number | null;
+  /** @nullable */
+  avgPriceDiffPct: number | null;
+  /** @nullable */
+  medianPriceDiffPct: number | null;
+}
+
+export interface AnalysisCategoryStat {
+  category: string;
+  /** @nullable */
+  division: string | null;
+  totalSkus: number;
+  comparableSkus: number;
+  prayagCheaperCount: number;
+  prayagCostlierCount: number;
+  /** @nullable */
+  prayagCheaperPct: number | null;
+  /** @nullable */
+  avgPriceDiffPct: number | null;
+}
+
+export interface AnalysisPositioningBucket {
+  label: string;
+  /** @nullable */
+  min: number | null;
+  /** @nullable */
+  max: number | null;
+  count: number;
+  /** cheaper | costlier | parity */
+  side: string;
+}
+
+export interface AnalysisPositioning {
+  comparableSkus: number;
+  buckets: AnalysisPositioningBucket[];
+}
+
+export interface AnalysisCoverageRow {
+  competitor: string;
+  total: number;
+  matched: number;
+  unmatched: number;
+  /** @nullable */
+  coveragePct: number | null;
+  high: number;
+  medium: number;
+  low: number;
+  none: number;
+}
+
+export interface AnalysisCoverageMatrix {
+  rows: AnalysisCoverageRow[];
+  totals: AnalysisCoverageRow;
+}
+
+export interface AnalysisOpportunityItem {
+  id: number;
+  competitor: string;
+  /** @nullable */
+  prayagCode: string | null;
+  /** @nullable */
+  prayagProductName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  prayagMrp: number | null;
+  competitorPrice: number;
+  competitorEffectivePrice: number;
+  /** @nullable */
+  unit: string | null;
+  priceDiff: number;
+  priceDiffPct: number;
+}
+
+export interface AnalysisOpportunities {
+  thresholdPct: number;
+  marginHeadroom: AnalysisOpportunityItem[];
+  priceThreats: AnalysisOpportunityItem[];
+}
+
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+export type CompetitorFilterParameter = string[];
+
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+export type DivisionFilterParameter = string;
+
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+export type CategoryFilterParameter = string;
+
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+export type MatchConfidenceFilterParameter = string;
+
+/**
+ * Filter by match status.
+ */
+export type MatchStatusFilterParameter = string;
+
 export type GetProductsParams = {
 category?: string;
 search?: string;
@@ -785,4 +933,181 @@ competitor?: string;
 confidence?: string;
 search?: string;
 };
+
+export type GetAnalysisOverviewParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+};
+
+export type GetAnalysisByBrandParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+};
+
+export type GetAnalysisByCategoryParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+};
+
+export type GetAnalysisPositioningParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+};
+
+export type GetAnalysisCoverageMatrixParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+};
+
+export type GetAnalysisOpportunitiesParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+/**
+ * Minimum absolute price_diff_pct to qualify. Defaults to 10.
+ */
+thresholdPct?: number;
+};
+
+export type ExportAnalysisParams = {
+/**
+ * Filter by competitor brand. Repeatable.
+ */
+competitor?: CompetitorFilterParameter;
+/**
+ * Filter by Prayag division (matched SKUs only).
+ */
+division?: DivisionFilterParameter;
+/**
+ * Filter by Prayag category (matched SKUs only).
+ */
+category?: CategoryFilterParameter;
+/**
+ * Filter by mapping confidence tier (High/Medium/Low).
+ */
+matchConfidence?: MatchConfidenceFilterParameter;
+/**
+ * Filter by match status.
+ */
+matchStatus?: MatchStatusFilterParameter;
+/**
+ * File format, "xlsx" (default) or "csv".
+ */
+format?: ExportAnalysisFormat;
+};
+
+export type ExportAnalysisFormat = typeof ExportAnalysisFormat[keyof typeof ExportAnalysisFormat];
+
+
+export const ExportAnalysisFormat = {
+  xlsx: 'xlsx',
+  csv: 'csv',
+} as const;
 

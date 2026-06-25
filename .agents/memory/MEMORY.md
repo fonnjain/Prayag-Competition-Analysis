@@ -2,4 +2,5 @@
 - [Prayag pricing engine](prayag-pricing-engine.md) — net-vs-MRP basis rules, status thresholds, and recommendation/floor math for the Competition Console.
 - [Prayag suggestion scorer](prayag-suggestion-scorer.md) — catalog size lives in product names (parse last `<num> mm`); keep category out of the text channel; words beat numbers.
 - [Prayag Product Database app](prayag-product-db.md) — append-only MRP history rules, unique-index backstop, invalidate via generated query-key helpers, dedupe category filters.
+- [Prayag Competition Analysis dashboard](prayag-analysis-dashboard.md) — /analysis live-compute over existing tables; ex-GST×1.18 basis, comparability gate, green=Prayag-cheaper sign convention.
 - [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 separate web apps (home/, console/, product-db/) behind one proxy; cross-app links use raw absolute <a href>, never BASE_URL/wouter.

@@ -20,6 +20,8 @@ tags:
     description: Competitor management
   - name: settings
     description: App settings
+  - name: analysis
+    description: Competition analysis dashboard (live-computed, basis-normalized)
 paths:
   /healthz:
     get:
@@ -691,7 +693,211 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteCompetitorResult"
+  /analysis/filters:
+    get:
+      operationId: getAnalysisFilters
+      tags: [analysis]
+      summary: Available filter options
+      description: Distinct competitors, Prayag divisions/categories, match confidences and statuses for the analysis filter bar.
+      responses:
+        "200":
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisFilters"
+  /analysis/overview:
+    get:
+      operationId: getAnalysisOverview
+      tags: [analysis]
+      summary: Headline KPIs
+      description: Coverage, match-quality and price-gap KPIs across the filtered competitor SKUs.
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+      responses:
+        "200":
+          description: Overview KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisOverview"
+  /analysis/by-brand:
+    get:
+      operationId: getAnalysisByBrand
+      tags: [analysis]
+      summary: Per-competitor breakdown
+      description: Coverage and price-gap stats grouped by competitor brand.
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+      responses:
+        "200":
+          description: Per-brand stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisBrandStat"
+  /analysis/by-category:
+    get:
+      operationId: getAnalysisByCategory
+      tags: [analysis]
+      summary: Per-category breakdown
+      description: Price-gap stats grouped by Prayag product category (matched SKUs only).
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+      responses:
+        "200":
+          description: Per-category stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisCategoryStat"
+  /analysis/positioning:
+    get:
+      operationId: getAnalysisPositioning
+      tags: [analysis]
+      summary: Price-gap distribution
+      description: Histogram of price_diff_pct across comparable SKUs for a positioning chart.
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+      responses:
+        "200":
+          description: Positioning distribution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisPositioning"
+  /analysis/coverage-matrix:
+    get:
+      operationId: getAnalysisCoverageMatrix
+      tags: [analysis]
+      summary: Coverage and match-quality matrix
+      description: Per-competitor match coverage and confidence-tier breakdown (includes unmatched rows).
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+      responses:
+        "200":
+          description: Coverage matrix
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisCoverageMatrix"
+  /analysis/opportunities:
+    get:
+      operationId: getAnalysisOpportunities
+      tags: [analysis]
+      summary: Pricing opportunities and threats
+      description: SKUs where Prayag has the largest margin headroom (cheaper) or pricing threats (costlier), beyond the threshold.
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+        - name: thresholdPct
+          in: query
+          required: false
+          description: Minimum absolute price_diff_pct to qualify. Defaults to 10.
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Opportunities and threats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisOpportunities"
+  /analysis/export:
+    get:
+      operationId: exportAnalysis
+      tags: [analysis]
+      summary: Export comparable dataset
+      description: Download the filtered, basis-normalized comparison rows as CSV or XLSX.
+      parameters:
+        - $ref: "#/components/parameters/CompetitorFilter"
+        - $ref: "#/components/parameters/DivisionFilter"
+        - $ref: "#/components/parameters/CategoryFilter"
+        - $ref: "#/components/parameters/MatchConfidenceFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+        - name: format
+          in: query
+          required: false
+          description: File format, "xlsx" (default) or "csv".
+          schema:
+            type: string
+            enum: [xlsx, csv]
+      responses:
+        "200":
+          description: Spreadsheet file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
 components:
+  parameters:
+    CompetitorFilter:
+      name: competitor
+      in: query
+      required: false
+      description: Filter by competitor brand. Repeatable.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+    DivisionFilter:
+      name: division
+      in: query
+      required: false
+      description: Filter by Prayag division (matched SKUs only).
+      schema:
+        type: string
+    CategoryFilter:
+      name: category
+      in: query
+      required: false
+      description: Filter by Prayag category (matched SKUs only).
+      schema:
+        type: string
+    MatchConfidenceFilter:
+      name: matchConfidence
+      in: query
+      required: false
+      description: Filter by mapping confidence tier (High/Medium/Low).
+      schema:
+        type: string
+    MatchStatusFilter:
+      name: matchStatus
+      in: query
+      required: false
+      description: Filter by match status.
+      schema:
+        type: string
   schemas:
     ErrorResponse:
       type: object
@@ -1658,3 +1864,251 @@ components:
           type: integer
         pageSize:
           type: integer
+    AnalysisFilters:
+      type: object
+      required: [competitors, divisions, categories, matchConfidences, matchStatuses]
+      properties:
+        competitors:
+          type: array
+          items:
+            type: string
+        divisions:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+        matchConfidences:
+          type: array
+          items:
+            type: string
+        matchStatuses:
+          type: array
+          items:
+            type: string
+    AnalysisOverview:
+      type: object
+      required:
+        - totalSkus
+        - matchedSkus
+        - unmatchedSkus
+        - coveragePct
+        - comparableSkus
+        - prayagCheaperCount
+        - prayagCostlierCount
+        - prayagCheaperPct
+        - avgPriceDiffPct
+        - medianPriceDiffPct
+        - competitorCount
+        - matchQuality
+      properties:
+        totalSkus:
+          type: integer
+        matchedSkus:
+          type: integer
+        unmatchedSkus:
+          type: integer
+        coveragePct:
+          type: ["number", "null"]
+        comparableSkus:
+          type: integer
+        prayagCheaperCount:
+          type: integer
+          description: SKUs where competitor effective price > Prayag MRP (Prayag cheaper, good).
+        prayagCostlierCount:
+          type: integer
+        prayagCheaperPct:
+          type: ["number", "null"]
+        avgPriceDiffPct:
+          type: ["number", "null"]
+          description: Mean of price_diff_pct over comparable SKUs. Positive = Prayag cheaper.
+        medianPriceDiffPct:
+          type: ["number", "null"]
+        competitorCount:
+          type: integer
+        matchQuality:
+          $ref: "#/components/schemas/ConfidenceCounts"
+    AnalysisBrandStat:
+      type: object
+      required:
+        - competitor
+        - totalSkus
+        - matchedSkus
+        - coveragePct
+        - comparableSkus
+        - prayagCheaperCount
+        - prayagCostlierCount
+        - prayagCheaperPct
+        - avgPriceDiffPct
+        - medianPriceDiffPct
+      properties:
+        competitor:
+          type: string
+        totalSkus:
+          type: integer
+        matchedSkus:
+          type: integer
+        coveragePct:
+          type: ["number", "null"]
+        comparableSkus:
+          type: integer
+        prayagCheaperCount:
+          type: integer
+        prayagCostlierCount:
+          type: integer
+        prayagCheaperPct:
+          type: ["number", "null"]
+        avgPriceDiffPct:
+          type: ["number", "null"]
+        medianPriceDiffPct:
+          type: ["number", "null"]
+    AnalysisCategoryStat:
+      type: object
+      required:
+        - category
+        - division
+        - totalSkus
+        - comparableSkus
+        - prayagCheaperCount
+        - prayagCostlierCount
+        - prayagCheaperPct
+        - avgPriceDiffPct
+      properties:
+        category:
+          type: string
+        division:
+          type: ["string", "null"]
+        totalSkus:
+          type: integer
+        comparableSkus:
+          type: integer
+        prayagCheaperCount:
+          type: integer
+        prayagCostlierCount:
+          type: integer
+        prayagCheaperPct:
+          type: ["number", "null"]
+        avgPriceDiffPct:
+          type: ["number", "null"]
+    AnalysisPositioningBucket:
+      type: object
+      required: [label, min, max, count, side]
+      properties:
+        label:
+          type: string
+        min:
+          type: ["number", "null"]
+        max:
+          type: ["number", "null"]
+        count:
+          type: integer
+        side:
+          type: string
+          description: cheaper | costlier | parity
+    AnalysisPositioning:
+      type: object
+      required: [comparableSkus, buckets]
+      properties:
+        comparableSkus:
+          type: integer
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisPositioningBucket"
+    AnalysisCoverageRow:
+      type: object
+      required:
+        - competitor
+        - total
+        - matched
+        - unmatched
+        - coveragePct
+        - high
+        - medium
+        - low
+        - none
+      properties:
+        competitor:
+          type: string
+        total:
+          type: integer
+        matched:
+          type: integer
+        unmatched:
+          type: integer
+        coveragePct:
+          type: ["number", "null"]
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+        none:
+          type: integer
+    AnalysisCoverageMatrix:
+      type: object
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisCoverageRow"
+        totals:
+          $ref: "#/components/schemas/AnalysisCoverageRow"
+    AnalysisOpportunityItem:
+      type: object
+      required:
+        - id
+        - competitor
+        - prayagCode
+        - prayagProductName
+        - division
+        - category
+        - prayagMrp
+        - competitorPrice
+        - competitorEffectivePrice
+        - unit
+        - priceDiff
+        - priceDiffPct
+      properties:
+        id:
+          type: integer
+        competitor:
+          type: string
+        prayagCode:
+          type: ["string", "null"]
+        prayagProductName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        prayagMrp:
+          type: ["number", "null"]
+        competitorPrice:
+          type: number
+        competitorEffectivePrice:
+          type: number
+        unit:
+          type: ["string", "null"]
+        priceDiff:
+          type: number
+        priceDiffPct:
+          type: number
+    AnalysisOpportunities:
+      type: object
+      required: [thresholdPct, marginHeadroom, priceThreats]
+      properties:
+        thresholdPct:
+          type: number
+        marginHeadroom:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisOpportunityItem"
+        priceThreats:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisOpportunityItem"

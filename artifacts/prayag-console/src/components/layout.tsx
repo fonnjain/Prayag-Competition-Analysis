@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, ListChecks, Upload, Users, Settings, Target } from "lucide-react";
+import { LayoutDashboard, Upload, Users, Settings, Target, BarChart3, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -47,6 +47,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          <a
+            href="/analysis/"
+            className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            data-testid="link-analysis"
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span className="flex-1">Competition Analysis</span>
+            <ExternalLink className="w-3 h-3 opacity-50" />
+          </a>
         </nav>
       </aside>
 

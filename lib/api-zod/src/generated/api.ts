@@ -767,3 +767,223 @@ export const DeleteCatalogCompetitorResponse = zod.object({
 })
 
 
+/**
+ * Distinct competitors, Prayag divisions/categories, match confidences and statuses for the analysis filter bar.
+ * @summary Available filter options
+ */
+export const GetAnalysisFiltersResponse = zod.object({
+  "competitors": zod.array(zod.string()),
+  "divisions": zod.array(zod.string()),
+  "categories": zod.array(zod.string()),
+  "matchConfidences": zod.array(zod.string()),
+  "matchStatuses": zod.array(zod.string())
+})
+
+
+/**
+ * Coverage, match-quality and price-gap KPIs across the filtered competitor SKUs.
+ * @summary Headline KPIs
+ */
+export const GetAnalysisOverviewQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+})
+
+export const GetAnalysisOverviewResponse = zod.object({
+  "totalSkus": zod.number(),
+  "matchedSkus": zod.number(),
+  "unmatchedSkus": zod.number(),
+  "coveragePct": zod.number().nullable(),
+  "comparableSkus": zod.number(),
+  "prayagCheaperCount": zod.number().describe('SKUs where competitor effective price > Prayag MRP (Prayag cheaper, good).'),
+  "prayagCostlierCount": zod.number(),
+  "prayagCheaperPct": zod.number().nullable(),
+  "avgPriceDiffPct": zod.number().nullable().describe('Mean of price_diff_pct over comparable SKUs. Positive = Prayag cheaper.'),
+  "medianPriceDiffPct": zod.number().nullable(),
+  "competitorCount": zod.number(),
+  "matchQuality": zod.object({
+  "high": zod.number(),
+  "medium": zod.number(),
+  "low": zod.number(),
+  "none": zod.number()
+})
+})
+
+
+/**
+ * Coverage and price-gap stats grouped by competitor brand.
+ * @summary Per-competitor breakdown
+ */
+export const GetAnalysisByBrandQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+})
+
+export const GetAnalysisByBrandResponseItem = zod.object({
+  "competitor": zod.string(),
+  "totalSkus": zod.number(),
+  "matchedSkus": zod.number(),
+  "coveragePct": zod.number().nullable(),
+  "comparableSkus": zod.number(),
+  "prayagCheaperCount": zod.number(),
+  "prayagCostlierCount": zod.number(),
+  "prayagCheaperPct": zod.number().nullable(),
+  "avgPriceDiffPct": zod.number().nullable(),
+  "medianPriceDiffPct": zod.number().nullable()
+})
+export const GetAnalysisByBrandResponse = zod.array(GetAnalysisByBrandResponseItem)
+
+
+/**
+ * Price-gap stats grouped by Prayag product category (matched SKUs only).
+ * @summary Per-category breakdown
+ */
+export const GetAnalysisByCategoryQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+})
+
+export const GetAnalysisByCategoryResponseItem = zod.object({
+  "category": zod.string(),
+  "division": zod.string().nullable(),
+  "totalSkus": zod.number(),
+  "comparableSkus": zod.number(),
+  "prayagCheaperCount": zod.number(),
+  "prayagCostlierCount": zod.number(),
+  "prayagCheaperPct": zod.number().nullable(),
+  "avgPriceDiffPct": zod.number().nullable()
+})
+export const GetAnalysisByCategoryResponse = zod.array(GetAnalysisByCategoryResponseItem)
+
+
+/**
+ * Histogram of price_diff_pct across comparable SKUs for a positioning chart.
+ * @summary Price-gap distribution
+ */
+export const GetAnalysisPositioningQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+})
+
+export const GetAnalysisPositioningResponse = zod.object({
+  "comparableSkus": zod.number(),
+  "buckets": zod.array(zod.object({
+  "label": zod.string(),
+  "min": zod.number().nullable(),
+  "max": zod.number().nullable(),
+  "count": zod.number(),
+  "side": zod.string().describe('cheaper | costlier | parity')
+}))
+})
+
+
+/**
+ * Per-competitor match coverage and confidence-tier breakdown (includes unmatched rows).
+ * @summary Coverage and match-quality matrix
+ */
+export const GetAnalysisCoverageMatrixQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+})
+
+export const GetAnalysisCoverageMatrixResponse = zod.object({
+  "rows": zod.array(zod.object({
+  "competitor": zod.string(),
+  "total": zod.number(),
+  "matched": zod.number(),
+  "unmatched": zod.number(),
+  "coveragePct": zod.number().nullable(),
+  "high": zod.number(),
+  "medium": zod.number(),
+  "low": zod.number(),
+  "none": zod.number()
+})),
+  "totals": zod.object({
+  "competitor": zod.string(),
+  "total": zod.number(),
+  "matched": zod.number(),
+  "unmatched": zod.number(),
+  "coveragePct": zod.number().nullable(),
+  "high": zod.number(),
+  "medium": zod.number(),
+  "low": zod.number(),
+  "none": zod.number()
+})
+})
+
+
+/**
+ * SKUs where Prayag has the largest margin headroom (cheaper) or pricing threats (costlier), beyond the threshold.
+ * @summary Pricing opportunities and threats
+ */
+export const GetAnalysisOpportunitiesQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "thresholdPct": zod.coerce.number().optional().describe('Minimum absolute price_diff_pct to qualify. Defaults to 10.')
+})
+
+export const GetAnalysisOpportunitiesResponse = zod.object({
+  "thresholdPct": zod.number(),
+  "marginHeadroom": zod.array(zod.object({
+  "id": zod.number(),
+  "competitor": zod.string(),
+  "prayagCode": zod.string().nullable(),
+  "prayagProductName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "prayagMrp": zod.number().nullable(),
+  "competitorPrice": zod.number(),
+  "competitorEffectivePrice": zod.number(),
+  "unit": zod.string().nullable(),
+  "priceDiff": zod.number(),
+  "priceDiffPct": zod.number()
+})),
+  "priceThreats": zod.array(zod.object({
+  "id": zod.number(),
+  "competitor": zod.string(),
+  "prayagCode": zod.string().nullable(),
+  "prayagProductName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "prayagMrp": zod.number().nullable(),
+  "competitorPrice": zod.number(),
+  "competitorEffectivePrice": zod.number(),
+  "unit": zod.string().nullable(),
+  "priceDiff": zod.number(),
+  "priceDiffPct": zod.number()
+}))
+})
+
+
+/**
+ * Download the filtered, basis-normalized comparison rows as CSV or XLSX.
+ * @summary Export comparable dataset
+ */
+export const ExportAnalysisQueryParams = zod.object({
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
+  "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
+  "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
+  "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "format": zod.enum(['xlsx', 'csv']).optional().describe('File format, \"xlsx\" (default) or \"csv\".')
+})
+
+

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/analysis/"
+title = "Prayag Competition Analysis"
+version = "1.0.0"
+id = "artifacts/prayag-analysis"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/analysis/" ]
+localPort = 18537
+
+[services.development]
+run = "pnpm --filter @workspace/prayag-analysis run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/prayag-analysis", "run", "build" ]
+publicDir = "artifacts/prayag-analysis/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18537"
+BASE_PATH = "/analysis/"
