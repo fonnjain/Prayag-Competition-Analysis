@@ -426,6 +426,20 @@ function normalizeMapping(body: {
   return { matchedPrayagCode, matchStatus, matchConfidence };
 }
 
+// The analysis dashboard reads each row's persisted prayag_mrp_at_compare (never
+// a live catalog lookup), so any mapping change written here MUST re-snapshot it
+// in the same update: the catalog's current MRP for a confirmed match, null
+// otherwise. Skipping this leaves a remapped/unmatched row with a stale or
+// missing MRP, which silently corrupts the analysis gap.
+function snapshotPrayagMrp(
+  maps: Map<string, PrayagInfo>,
+  matchedPrayagCode: string | null,
+  matchStatus: string,
+): number | null {
+  if (matchStatus !== "matched" || !matchedPrayagCode) return null;
+  return maps.get(normCode(matchedPrayagCode))?.mrp ?? null;
+}
+
 // PATCH /catalog/competitor-prices/bulk — apply mapping updates to many rows at
 // once (per-row "Accept selected"). Registered before the :id route so "bulk"
 // is never parsed as an id.
@@ -445,19 +459,26 @@ router.patch("/catalog/competitor-prices/bulk", async (req, res) => {
     return;
   }
 
+  const maps = await getPrayagMaps();
   const updatedRows: CompRow[] = [];
   for (const u of valid) {
     const { matchedPrayagCode, matchStatus, matchConfidence } =
       normalizeMapping(u);
+    const prayagMrpAtCompare = snapshotPrayagMrp(maps, matchedPrayagCode, matchStatus);
     const result = await db
       .update(competitorPricesTable)
-      .set({ matchedPrayagCode, matchStatus, matchConfidence, updatedAt: new Date() })
+      .set({
+        matchedPrayagCode,
+        matchStatus,
+        matchConfidence,
+        prayagMrpAtCompare,
+        updatedAt: new Date(),
+      })
       .where(eq(competitorPricesTable.id, u.id!))
       .returning();
     if (result[0]) updatedRows.push(result[0]);
   }
 
-  const maps = await getPrayagMaps();
   res.json({
     updated: updatedRows.length,
     rows: updatedRows.map((r) => buildComparisonRow(r, maps)),
@@ -515,6 +536,7 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
   }
 
   const candidates = await getCatalogCandidates();
+  const maps = await getPrayagMaps();
   const matchedIds: number[] = [];
   for (const r of rows) {
     const top = suggestMatches(
@@ -529,6 +551,7 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
         matchedPrayagCode: top.itemCode,
         matchStatus: "matched",
         matchConfidence: "High",
+        prayagMrpAtCompare: snapshotPrayagMrp(maps, top.itemCode, "matched"),
         updatedAt: new Date(),
       })
       .where(eq(competitorPricesTable.id, r.id));
@@ -1139,9 +1162,17 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
   };
   const { matchedPrayagCode, matchStatus, matchConfidence } = normalizeMapping(body);
 
+  const maps = await getPrayagMaps();
+  const prayagMrpAtCompare = snapshotPrayagMrp(maps, matchedPrayagCode, matchStatus);
   const updated = await db
     .update(competitorPricesTable)
-    .set({ matchedPrayagCode, matchStatus, matchConfidence, updatedAt: new Date() })
+    .set({
+      matchedPrayagCode,
+      matchStatus,
+      matchConfidence,
+      prayagMrpAtCompare,
+      updatedAt: new Date(),
+    })
     .where(eq(competitorPricesTable.id, id))
     .returning();
   const row = updated[0];
@@ -1150,7 +1181,6 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
     return;
   }
 
-  const maps = await getPrayagMaps();
   res.json(buildComparisonRow(row, maps));
 });
 
