@@ -647,12 +647,17 @@ router.post(
       const values = parsed.map((r) => {
         const norm = r.matchedPrayagCode;
         let isMatched = !!norm && knownCodes.has(norm);
+        // Snapshot of the catalog's current MRP at import time. Raw competitor
+        // sheets carry no Prayag MRP, so we persist this onto the row so the
+        // analysis gap can use it directly (never a later catalog lookup).
+        let prayagMrpSnapshot: number | null = null;
         // Price-gap guardrail: even a code that exists is sent to review when
         // the gap vs Prayag's current MRP is unrealistically large — that
         // almost always means the wrong products were linked.
         if (isMatched) {
           const prayagMrp = currentMrp.get(norm!);
           if (prayagMrp != null && prayagMrp > 0) {
+            prayagMrpSnapshot = prayagMrp;
             const eff = effectivePrice(r.unit, r.price);
             const gapPct = ((eff - prayagMrp) / prayagMrp) * 100;
             if (gapPct < GAP_MIN_PCT || gapPct > GAP_MAX_PCT) {
@@ -661,6 +666,7 @@ router.post(
             }
           }
         }
+        if (!isMatched) prayagMrpSnapshot = null;
         if (isMatched) matched++;
         return {
           competitor,
@@ -673,6 +679,7 @@ router.post(
           matchedPrayagCode: isMatched ? (canonical.get(norm!) ?? norm) : null,
           matchStatus: isMatched ? "matched" : "no match (review)",
           matchConfidence: isMatched ? "High" : null,
+          prayagMrpAtCompare: prayagMrpSnapshot,
         };
       });
 

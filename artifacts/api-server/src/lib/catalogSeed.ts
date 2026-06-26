@@ -9,7 +9,7 @@ import {
 import catalogSeedData from "../seed/catalog-seed.json";
 import competitorSeedData from "../seed/competitor-seed.json";
 import { logger } from "./logger";
-import { recomputeCurrentFlags } from "./catalog";
+import { recomputeCurrentFlags, normCode } from "./catalog";
 import { parseSizeFromName } from "./suggest";
 
 interface SeedCatalogProduct {
@@ -128,20 +128,43 @@ export async function loadCatalogSeed(): Promise<void> {
     );
   }
 
+  // Snapshot of the seed's current Prayag MRP (latest effective date per code).
+  // The analysis gap reads ONLY the per-row prayagMrpAtCompare, so matched
+  // competitor rows must carry this value or they would become non-comparable
+  // after a reset. Mirrors recomputeCurrentFlags' "latest effective date wins".
+  const currentMrpByCode = new Map<string, number>();
+  const latestDateByCode = new Map<string, string>();
+  for (const r of data.priceHistory) {
+    if (r.mrp == null) continue;
+    const key = normCode(r.itemCode);
+    const prev = latestDateByCode.get(key);
+    if (prev == null || r.effectiveDate > prev) {
+      latestDateByCode.set(key, r.effectiveDate);
+      currentMrpByCode.set(key, r.mrp);
+    }
+  }
+
   await chunkedInsert(competitorData.competitors, (batch) =>
     db.insert(competitorPricesTable).values(
-      batch.map((c) => ({
-        competitor: c.competitor,
-        category: c.category,
-        description: c.description,
-        size: c.size,
-        price: c.price,
-        unit: c.unit,
-        effectiveDate: c.effectiveDate,
-        matchedPrayagCode: c.matchedPrayagCode,
-        matchStatus: c.matchStatus,
-        matchConfidence: c.matchConfidence ?? null,
-      })),
+      batch.map((c) => {
+        const matched = c.matchStatus === "matched" && c.matchedPrayagCode;
+        const prayagMrpAtCompare = matched
+          ? (currentMrpByCode.get(normCode(c.matchedPrayagCode!)) ?? null)
+          : null;
+        return {
+          competitor: c.competitor,
+          category: c.category,
+          description: c.description,
+          size: c.size,
+          price: c.price,
+          unit: c.unit,
+          effectiveDate: c.effectiveDate,
+          matchedPrayagCode: c.matchedPrayagCode,
+          matchStatus: c.matchStatus,
+          matchConfidence: c.matchConfidence ?? null,
+          prayagMrpAtCompare,
+        };
+      }),
     ),
   );
 

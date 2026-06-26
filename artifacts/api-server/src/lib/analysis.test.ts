@@ -44,6 +44,7 @@ function comp(partial: Partial<CompInput>): CompInput {
     matchStatus: "matched",
     matchConfidence: "High",
     matchedPrayagCode: "PG1",
+    prayagMrpAtCompare: 100,
     ...partial,
   };
 }
@@ -99,11 +100,22 @@ describe("buildRow comparability + diff conventions", () => {
     expect(r.prayagCheaper).toBeNull();
   });
 
-  it("is NOT comparable when Prayag MRP is missing", () => {
-    const noMrp = prayagMap({ PG1: { mrp: null } });
-    const r = buildRow(comp({ price: 120 }), noMrp);
+  it("is NOT comparable when the persisted Prayag MRP is missing", () => {
+    // Even though the catalog map carries an MRP, a row with no persisted
+    // prayagMrpAtCompare is not comparable — the catalog value is never used.
+    const r = buildRow(comp({ price: 120, prayagMrpAtCompare: null }), maps);
     expect(r.comparable).toBe(false);
     expect(r.priceDiff).toBeNull();
+  });
+
+  it("uses the persisted row MRP for the gap, not the catalog MRP", () => {
+    const staleCatalog = prayagMap({
+      PG1: { mrp: 999, division: "Pipes", category: "SWR" },
+    });
+    const r = buildRow(comp({ price: 120, prayagMrpAtCompare: 100 }), staleCatalog);
+    expect(r.prayagMrp).toBe(100); // persisted value, not the catalog's 999
+    expect(r.priceDiffPct).toBeCloseTo(20, 5);
+    expect(r.prayagCheaper).toBe(true);
   });
 
   it("pulls division/category from the matched catalog entry", () => {

@@ -36,6 +36,9 @@ export interface CompInput {
   matchStatus: string;
   matchConfidence: string | null;
   matchedPrayagCode: string | null;
+  // Period-matched Prayag MRP persisted on the row. This — NOT a catalog
+  // lookup — is the basis for the competitor gap and the displayed Prayag MRP.
+  prayagMrpAtCompare: number | null;
 }
 
 export interface AnalysisRow {
@@ -65,7 +68,11 @@ export function buildRow(c: CompInput, maps: Map<string, PrayagInfo>): AnalysisR
   // would leak a division/category/MRP onto a row that should not be compared.
   const key = matched && c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
-  const prayagMrp = prayag?.mrp ?? null;
+  // The competitor gap and the displayed "Prayag MRP" use the period-matched
+  // value persisted on the row (prayagMrpAtCompare), NOT a fresh catalog lookup.
+  // The catalog map supplies only descriptive attributes (division/category/
+  // name) for grouping and filtering — never the MRP used for the gap.
+  const prayagMrp = matched ? c.prayagMrpAtCompare ?? null : null;
   const effPrice = effectivePrice(c.unit, c.price);
 
   // A price gap is only meaningful for a confirmed match where both prices exist.
