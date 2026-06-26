@@ -25,6 +25,22 @@ a +1,000,000% gap. A realistic equivalent-product gap for pipes & fittings is
 roughly -60%..+50%; anything far outside almost always means the wrong products
 were linked (big assembly vs tiny fitting, or per-box vs per-pc).
 
+## Verified-sheet reload: header variations
+
+The verified "HighMatch" competitor sheets are NOT all identical. A reload loader
+must map columns by header name with these equivalences (case-insensitive):
+`group` → category (pipes brands use `category`, sanitaryware use `group`);
+`price_basis` → unit (value is usually "MRP", treated as-is); `competitor_product`
+→ description; `competitor_mrp` → price; `prayag_item_code` → matched_prayag_code;
+`match_status` defaults to "matched" and `match_confidence` to "High" when the
+column is absent (Parryware/Sparsh/Ashirvad omit `match_status`). There is **no**
+`competitor_code` column in `competitor_prices`, so the sheet's competitor SKU is
+dropped on load. Build the Prayag side from `0_Prayag_Master_Upload` (catalog +
+mrp tabs); fall back to the sheet's `prayag_description`/`prayag_mrp` only for codes
+missing from the master. The full sanitaryware set (13 brands) legitimately shows
+large positive median gaps (Astral/Truflo/Parryware/Ashirvad ~+22–24%); pipes run
+roughly −34%…+10%. These are real, not mapping errors.
+
 **How to apply:** the guardrail belongs only on the auto-matched import path.
 Human-verified bulk reuploads (the "HighMatch" files, loaded verbatim via a direct
 DB load) are trusted and intentionally bypass it — even though a handful of their
