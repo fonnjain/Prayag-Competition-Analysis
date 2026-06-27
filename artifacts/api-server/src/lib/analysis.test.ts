@@ -136,6 +136,77 @@ describe("buildRow comparability + diff conventions", () => {
   });
 });
 
+describe("buildRow Net-to-Net mode", () => {
+  const netOpts = (prayagDiscount = 5, compDiscount = 40) => ({
+    mode: "net" as const,
+    prayagDiscount,
+    discountFor: () => compDiscount,
+  });
+
+  it("computes the net gap from per-side discounts (docx spot check)", () => {
+    // comp MRP 149, prayag MRP 78, prayag 5% / comp 40%:
+    //   prayag_net = 78*0.95 = 74.1 ; comp_net = 149*0.6 = 89.4
+    //   gap% = (89.4-74.1)/74.1*100 = +20.6%
+    const maps = prayagMap({ PG1: { mrp: 78 } });
+    const r = buildRow(
+      comp({ price: 149, prayagMrpAtCompare: 78 }),
+      maps,
+      netOpts(5, 40),
+    );
+    expect(r.prayagMrp).toBeCloseTo(74.1, 5);
+    expect(r.competitorEffectivePrice).toBeCloseTo(89.4, 5);
+    expect(r.priceDiffPct).toBeCloseTo(20.6, 1);
+    expect(r.prayagCheaper).toBe(true);
+  });
+
+  it("MRP mode on the same inputs stays at the undiscounted gap", () => {
+    const maps = prayagMap({ PG1: { mrp: 78 } });
+    const r = buildRow(comp({ price: 149, prayagMrpAtCompare: 78 }), maps);
+    expect(r.prayagMrp).toBe(78);
+    expect(r.priceDiffPct).toBeCloseTo(91.0, 1);
+  });
+
+  it("can flip the sign vs MRP mode when the competitor discount is deep", () => {
+    // Equal MRPs (100 vs 100): MRP gap = 0. With prayag 5% / comp 40%,
+    // prayag_net=95, comp_net=60 => comp cheaper => Prayag costlier.
+    const maps = prayagMap({ PG1: { mrp: 100 } });
+    const r = buildRow(comp({ price: 100, prayagMrpAtCompare: 100 }), maps, netOpts(5, 40));
+    expect(r.priceDiffPct).toBeCloseTo(-36.8, 1);
+    expect(r.prayagCheaper).toBe(false);
+  });
+
+  it("applies ex-GST grossing before the competitor discount", () => {
+    // comp 100 ex-GST -> 118 effective, then *0.6 = 70.8 net.
+    const maps = prayagMap({ PG1: { mrp: 100 } });
+    const r = buildRow(
+      comp({ price: 100, unit: "Rate (ex-GST)", prayagMrpAtCompare: 100 }),
+      maps,
+      netOpts(5, 40),
+    );
+    expect(r.competitorEffectivePrice).toBeCloseTo(70.8, 5);
+    expect(r.prayagMrp).toBeCloseTo(95, 5);
+  });
+
+  it("resolves competitor discounts per brand", () => {
+    const maps = prayagMap({ PG1: { mrp: 100 } });
+    const discountFor = (c: string) => (c === "Astral" ? 40 : 10);
+    const r = buildRow(comp({ competitor: "Astral", price: 100, prayagMrpAtCompare: 100 }), maps, {
+      mode: "net",
+      prayagDiscount: 5,
+      discountFor,
+    });
+    // comp_net = 100*0.6 = 60 (Astral 40%), prayag_net = 95
+    expect(r.competitorEffectivePrice).toBeCloseTo(60, 5);
+  });
+
+  it("stays not-comparable in net mode when the persisted MRP is missing", () => {
+    const maps = prayagMap({ PG1: { mrp: 100 } });
+    const r = buildRow(comp({ price: 120, prayagMrpAtCompare: null }), maps, netOpts());
+    expect(r.comparable).toBe(false);
+    expect(r.priceDiffPct).toBeNull();
+  });
+});
+
 describe("applyFilters (shared filters)", () => {
   const maps = prayagMap({
     PG1: { mrp: 100, division: "Pipes", category: "SWR" },

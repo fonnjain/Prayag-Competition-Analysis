@@ -144,8 +144,27 @@ export const acceptBatchesTable = pgTable(
   (t) => [index("accept_batches_created_idx").on(t.createdAt)],
 );
 
+// Per-scope discount settings for the Net-to-Net comparison mode on the
+// Competition Analysis dashboard. One row per scope: scope "prayag" holds
+// Prayag's own discount; every other scope is a competitor brand name. Values
+// are percentages (0-100). Net prices are always computed live from these — the
+// discounts are never baked into stored prices.
+export const discountSettingsTable = pgTable(
+  "discount_settings",
+  {
+    id: serial("id").primaryKey(),
+    scope: text("scope").notNull(),
+    discountPct: doublePrecision("discount_pct").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("discount_settings_scope_idx").on(t.scope)],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 export type CodeConflict = typeof codeConflictsTable.$inferSelect;
 export type CompetitorPrice = typeof competitorPricesTable.$inferSelect;
 export type AcceptBatch = typeof acceptBatchesTable.$inferSelect;
+export type DiscountSetting = typeof discountSettingsTable.$inferSelect;

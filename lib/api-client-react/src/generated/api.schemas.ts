@@ -697,6 +697,23 @@ export interface ComparisonMatrix {
   pageSize: number;
 }
 
+export interface DiscountScope {
+  scope: string;
+  discountPct: number;
+}
+
+export interface DiscountSettings {
+  prayagDiscountPct: number;
+  competitors: DiscountScope[];
+  /** @nullable */
+  updatedAt: string | null;
+}
+
+export interface DiscountSettingsUpdate {
+  prayagDiscountPct?: number;
+  competitors?: DiscountScope[];
+}
+
 export interface AnalysisFilters {
   competitors: string[];
   divisions: string[];
@@ -880,6 +897,14 @@ export type MatchConfidenceFilterParameter = string;
  */
 export type MatchStatusFilterParameter = string;
 
+export type CompareModeFilterParameter = typeof CompareModeFilterParameter[keyof typeof CompareModeFilterParameter];
+
+
+export const CompareModeFilterParameter = {
+  mrp: 'mrp',
+  net: 'net',
+} as const;
+
 export type GetProductsParams = {
 category?: string;
 search?: string;
@@ -990,6 +1015,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  * Filter by match status.
  */
 matchStatus?: MatchStatusFilterParameter;
+/**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
 };
 
 export type GetAnalysisByBrandParams = {
@@ -1013,6 +1042,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  * Filter by match status.
  */
 matchStatus?: MatchStatusFilterParameter;
+/**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
 };
 
 export type GetAnalysisByCategoryParams = {
@@ -1036,6 +1069,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  * Filter by match status.
  */
 matchStatus?: MatchStatusFilterParameter;
+/**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
 };
 
 export type GetAnalysisPositioningParams = {
@@ -1059,6 +1096,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  * Filter by match status.
  */
 matchStatus?: MatchStatusFilterParameter;
+/**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
 };
 
 export type GetAnalysisCoverageMatrixParams = {
@@ -1106,6 +1147,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  */
 matchStatus?: MatchStatusFilterParameter;
 /**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
+/**
  * Minimum absolute price_diff_pct to qualify. Defaults to 10.
  */
 thresholdPct?: number;
@@ -1132,6 +1177,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  * Filter by match status.
  */
 matchStatus?: MatchStatusFilterParameter;
+/**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
 /**
  * File format, "xlsx" (default) or "csv".
  */

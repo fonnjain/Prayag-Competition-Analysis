@@ -61,7 +61,36 @@ export interface AnalysisRow {
   prayagCheaper: boolean | null;
 }
 
-export function buildRow(c: CompInput, maps: Map<string, PrayagInfo>): AnalysisRow {
+// ---------------------------------------------------------------------------
+// Comparison mode (MRP-to-MRP vs Net-to-Net)
+//
+// MRP-to-MRP (default, legacy behavior): compare Prayag MRP against the
+// competitor's (basis-normalized) MRP directly.
+// Net-to-Net: apply a per-scope discount to each side first, then compare:
+//   prayag_net     = prayagMrp     * (1 - prayagDiscount/100)
+//   competitor_net = compEffective * (1 - compDiscount/100)
+// The gap is computed on the net values. The discounts are read live from the
+// discount_settings table and never baked into stored prices.
+// ---------------------------------------------------------------------------
+export type CompareMode = "mrp" | "net";
+
+export const DEFAULT_PRAYAG_DISCOUNT = 5;
+export const DEFAULT_COMPETITOR_DISCOUNT = 40;
+
+export interface BuildRowOpts {
+  mode: CompareMode;
+  // Prayag's own discount, percent (0-100).
+  prayagDiscount: number;
+  // Resolve a competitor's discount percent by brand name.
+  discountFor: (competitor: string) => number;
+}
+
+export function buildRow(
+  c: CompInput,
+  maps: Map<string, PrayagInfo>,
+  opts?: BuildRowOpts,
+): AnalysisRow {
+  const mode: CompareMode = opts?.mode ?? "mrp";
   const matched = c.matchStatus === "matched";
   // Only hydrate Prayag catalog attributes for confirmed matches. A non-matched
   // row may still carry a stray matchedPrayagCode in the source data; trusting it
@@ -75,18 +104,31 @@ export function buildRow(c: CompInput, maps: Map<string, PrayagInfo>): AnalysisR
   const prayagMrp = matched ? c.prayagMrpAtCompare ?? null : null;
   const effPrice = effectivePrice(c.unit, c.price);
 
+  // Resolve the two prices that drive the comparison. In MRP mode these are the
+  // raw MRP / effective figures; in Net mode they are discounted nets.
+  let prayagBasis = prayagMrp;
+  let competitorBasis = effPrice;
+  if (mode === "net" && prayagMrp != null) {
+    const prayagDisc = opts?.prayagDiscount ?? DEFAULT_PRAYAG_DISCOUNT;
+    const compDisc = opts?.discountFor
+      ? opts.discountFor(c.competitor)
+      : DEFAULT_COMPETITOR_DISCOUNT;
+    prayagBasis = prayagMrp * (1 - prayagDisc / 100);
+    competitorBasis = effPrice * (1 - compDisc / 100);
+  }
+
   // A price gap is only meaningful for a confirmed match where both prices exist.
   const comparable =
-    matched && prayagMrp != null && prayagMrp > 0 && c.price != null;
+    matched && prayagBasis != null && prayagBasis > 0 && c.price != null;
 
   let priceDiff: number | null = null;
   let priceDiffPct: number | null = null;
   let prayagCheaper: boolean | null = null;
-  if (comparable && prayagMrp != null) {
-    priceDiff = effPrice - prayagMrp;
-    priceDiffPct = (priceDiff / prayagMrp) * 100;
+  if (comparable && prayagBasis != null) {
+    priceDiff = competitorBasis - prayagBasis;
+    priceDiffPct = (priceDiff / prayagBasis) * 100;
     // Competitor more expensive than Prayag => Prayag cheaper (good).
-    prayagCheaper = effPrice > prayagMrp;
+    prayagCheaper = competitorBasis > prayagBasis;
   }
 
   return {
@@ -94,13 +136,15 @@ export function buildRow(c: CompInput, maps: Map<string, PrayagInfo>): AnalysisR
     competitor: c.competitor,
     unit: c.unit,
     competitorPrice: c.price,
-    competitorEffectivePrice: effPrice,
+    // In net mode these carry the discounted net values so every downstream
+    // consumer (gapStats, opportunities, export) reflects the active mode.
+    competitorEffectivePrice: competitorBasis,
     matchStatus: c.matchStatus,
     matchConfidence: c.matchConfidence,
     matched,
     prayagCode: c.matchedPrayagCode,
     prayagProductName: prayag?.productName ?? null,
-    prayagMrp,
+    prayagMrp: matched ? prayagBasis : null,
     division: prayag?.division ?? null,
     category: prayag?.category ?? null,
     comparable,

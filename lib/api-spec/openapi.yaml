@@ -765,6 +765,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/CompareModeFilter"
       responses:
         "200":
           description: Overview KPIs
@@ -784,6 +785,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/CompareModeFilter"
       responses:
         "200":
           description: Per-brand stats
@@ -805,6 +807,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/CompareModeFilter"
       responses:
         "200":
           description: Per-category stats
@@ -826,6 +829,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/CompareModeFilter"
       responses:
         "200":
           description: Positioning distribution
@@ -864,6 +868,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/CompareModeFilter"
         - name: thresholdPct
           in: query
           required: false
@@ -889,6 +894,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/CompareModeFilter"
         - name: format
           in: query
           required: false
@@ -904,6 +910,43 @@ paths:
               schema:
                 type: string
                 format: binary
+  /analysis/discount-settings:
+    get:
+      operationId: getDiscountSettings
+      tags: [analysis]
+      summary: Net-to-Net discount settings
+      description: Prayag's discount and each competitor's discount (percent). Seeds defaults (Prayag 5%, competitors 40%) on first access.
+      responses:
+        "200":
+          description: Current discount settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscountSettings"
+    put:
+      operationId: updateDiscountSettings
+      tags: [analysis]
+      summary: Update Net-to-Net discount settings
+      description: Upsert Prayag's discount and/or per-competitor discounts. Each percent must be between 0 and 100.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscountSettingsUpdate"
+      responses:
+        "200":
+          description: Updated discount settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscountSettings"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   parameters:
     CompetitorFilter:
@@ -945,6 +988,18 @@ components:
       description: Filter by match status.
       schema:
         type: string
+    CompareModeFilter:
+      name: mode
+      in: query
+      required: false
+      description: >-
+        Comparison basis. "mrp" (default) compares Prayag MRP vs the
+        basis-normalized competitor MRP. "net" applies each side's configured
+        discount first (Net-to-Net).
+      schema:
+        type: string
+        enum: [mrp, net]
+        default: mrp
   schemas:
     ErrorResponse:
       type: object
@@ -1911,6 +1966,35 @@ components:
           type: integer
         pageSize:
           type: integer
+    DiscountScope:
+      type: object
+      required: [scope, discountPct]
+      properties:
+        scope:
+          type: string
+        discountPct:
+          type: number
+    DiscountSettings:
+      type: object
+      required: [prayagDiscountPct, competitors, updatedAt]
+      properties:
+        prayagDiscountPct:
+          type: number
+        competitors:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountScope"
+        updatedAt:
+          type: ["string", "null"]
+    DiscountSettingsUpdate:
+      type: object
+      properties:
+        prayagDiscountPct:
+          type: number
+        competitors:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountScope"
     AnalysisFilters:
       type: object
       required: [competitors, divisions, categories, matchConfidences, matchStatuses]

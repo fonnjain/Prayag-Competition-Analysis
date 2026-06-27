@@ -50,6 +50,8 @@ import type {
   CompetitorUpdate,
   DashboardSummary,
   DeleteCompetitorResult,
+  DiscountSettings,
+  DiscountSettingsUpdate,
   ErrorResponse,
   ExportAnalysisParams,
   GetAnalysisByBrandParams,
@@ -3269,4 +3271,154 @@ export function useExportAnalysis<TData = Awaited<ReturnType<typeof exportAnalys
 
 
 
+
+export const getGetDiscountSettingsUrl = () => {
+
+
+
+
+  return `/api/analysis/discount-settings`
+}
+
+/**
+ * Prayag's discount and each competitor's discount (percent). Seeds defaults (Prayag 5%, competitors 40%) on first access.
+ * @summary Net-to-Net discount settings
+ */
+export const getDiscountSettings = async ( options?: RequestInit): Promise<DiscountSettings> => {
+
+  return customFetch<DiscountSettings>(getGetDiscountSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDiscountSettingsQueryKey = () => {
+    return [
+    `/api/analysis/discount-settings`
+    ] as const;
+    }
+
+
+export const getGetDiscountSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getDiscountSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiscountSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDiscountSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiscountSettings>>> = ({ signal }) => getDiscountSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiscountSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDiscountSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getDiscountSettings>>>
+export type GetDiscountSettingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Net-to-Net discount settings
+ */
+
+export function useGetDiscountSettings<TData = Awaited<ReturnType<typeof getDiscountSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiscountSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDiscountSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateDiscountSettingsUrl = () => {
+
+
+
+
+  return `/api/analysis/discount-settings`
+}
+
+/**
+ * Upsert Prayag's discount and/or per-competitor discounts. Each percent must be between 0 and 100.
+ * @summary Update Net-to-Net discount settings
+ */
+export const updateDiscountSettings = async (discountSettingsUpdate: DiscountSettingsUpdate, options?: RequestInit): Promise<DiscountSettings> => {
+
+  return customFetch<DiscountSettings>(getUpdateDiscountSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      discountSettingsUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateDiscountSettingsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDiscountSettings>>, TError,{data: BodyType<DiscountSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDiscountSettings>>, TError,{data: BodyType<DiscountSettingsUpdate>}, TContext> => {
+
+const mutationKey = ['updateDiscountSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDiscountSettings>>, {data: BodyType<DiscountSettingsUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateDiscountSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDiscountSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateDiscountSettings>>>
+    export type UpdateDiscountSettingsMutationBody = BodyType<DiscountSettingsUpdate>
+    export type UpdateDiscountSettingsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update Net-to-Net discount settings
+ */
+export const useUpdateDiscountSettings = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDiscountSettings>>, TError,{data: BodyType<DiscountSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDiscountSettings>>,
+        TError,
+        {data: BodyType<DiscountSettingsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateDiscountSettingsMutationOptions(options));
+    }
 

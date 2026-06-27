@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CategoryFilterParameter } from './categoryFilterParameter';
+import type { CompareModeFilterParameter } from './compareModeFilterParameter';
 import type { CompetitorFilterParameter } from './competitorFilterParameter';
 import type { DivisionFilterParameter } from './divisionFilterParameter';
 import type { MatchConfidenceFilterParameter } from './matchConfidenceFilterParameter';
@@ -32,6 +33,10 @@ matchConfidence?: MatchConfidenceFilterParameter;
  * Filter by match status.
  */
 matchStatus?: MatchStatusFilterParameter;
+/**
+ * Comparison basis. "mrp" (default) compares Prayag MRP vs the basis-normalized competitor MRP. "net" applies each side's configured discount first (Net-to-Net).
+ */
+mode?: CompareModeFilterParameter;
 /**
  * Minimum absolute price_diff_pct to qualify. Defaults to 10.
  */

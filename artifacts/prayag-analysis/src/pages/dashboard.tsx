@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "wouter";
 import { useGetAnalysisFilters, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { 
   Card,
@@ -13,8 +14,9 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Download, RefreshCw, Filter, ChevronDown } from "lucide-react";
+import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { BrandComparison } from "@/components/dashboard/BrandComparison";
@@ -23,17 +25,25 @@ import { CategoryComparison } from "@/components/dashboard/CategoryComparison";
 import { CoverageMatrix } from "@/components/dashboard/CoverageMatrix";
 import { OpportunitiesThreats } from "@/components/dashboard/OpportunitiesThreats";
 
+export type CompareMode = "mrp" | "net";
+
 export type DashboardFilters = {
   competitor?: string[];
   division?: string;
   category?: string;
   matchConfidence?: string;
   matchStatus?: string;
+  mode?: CompareMode;
 };
 
 export default function Dashboard() {
-  const [filters, setFilters] = useState<DashboardFilters>({});
-  
+  const [mode, setMode] = useState<CompareMode>("mrp");
+  const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
+  // Mode rides along inside the filters object so every child hook + the export
+  // URL pick it up automatically. "mrp" is the default and is omitted.
+  const filters: DashboardFilters =
+    mode === "net" ? { ...baseFilters, mode } : baseFilters;
+
   const handleExport = (format: "xlsx" | "csv") => {
     const url = getExportAnalysisUrl({ ...filters, format });
     window.open(url, "_blank");
@@ -46,20 +56,29 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold tracking-tight">Competition Analysis</h1>
           <p className="text-sm text-muted-foreground font-mono mt-1">Prayag Pricing Cockpit</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
-            <Download className="h-4 w-4 mr-2" />
-            CSV
-          </Button>
-          <Button size="sm" onClick={() => handleExport("xlsx")}>
-            <Download className="h-4 w-4 mr-2" />
-            Excel Export
-          </Button>
+        <div className="flex items-center gap-3">
+          <ModeToggle mode={mode} onChange={setMode} />
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+            <Button size="sm" onClick={() => handleExport("xlsx")}>
+              <Download className="h-4 w-4 mr-2" />
+              Excel Export
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/settings/discounts">
+                <Settings className="h-4 w-4 mr-2" />
+                Discounts
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
       
       <main className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        <FilterBar filters={filters} onChange={setFilters} />
+        <FilterBar filters={baseFilters} onChange={setBaseFilters} />
         
         <OverviewCards filters={filters} />
         
@@ -85,6 +104,39 @@ export default function Dashboard() {
           <OpportunitiesThreats filters={filters} />
         </div>
       </main>
+    </div>
+  );
+}
+
+function ModeToggle({ mode, onChange }: { mode: CompareMode; onChange: (m: CompareMode) => void }) {
+  const options: { value: CompareMode; label: string }[] = [
+    { value: "mrp", label: "MRP-to-MRP" },
+    { value: "net", label: "Net-to-Net" },
+  ];
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1">
+        <Scale className="h-3 w-3" /> Comparison Basis
+      </span>
+      <div className="inline-flex rounded-md border bg-muted/40 p-0.5" role="group" aria-label="Comparison basis">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            aria-pressed={mode === o.value}
+            data-testid={`mode-${o.value}`}
+            className={cn(
+              "px-3 py-1 text-xs font-medium rounded-[5px] transition-colors",
+              mode === o.value
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -65,3 +65,26 @@ rather than clipping the few legitimate large-spread rows.
 Every endpoint accepts the same query filters: `competitor` (repeatable array),
 `division`, `category`, `matchConfidence`, `matchStatus`. They all flow through one
 `getFilteredRows()` pipeline so behavior is identical across endpoints.
+
+## Net-to-Net comparison mode (additive, never default)
+- Two comparison bases live behind one `mode` query param (`mrp` default, `net`).
+  MRP mode is untouched; net is purely additive. `buildRow` takes optional opts
+  (defaults to mrp) so all pre-existing tests/callers keep MRP behavior.
+- **Net math:** prayag_net = prayagMrpAtCompare × (1 − prayagDisc/100);
+  comp_net = effectivePrice × (1 − compDisc/100); gap% = (comp_net − prayag_net)/
+  prayag_net × 100. effectivePrice keeps the ex-GST×1.18 grossing, so net == mrp
+  basis when there is no ex-GST row. **Key trick:** in net mode the NET values are
+  written back into `prayagMrp` & `competitorEffectivePrice` on the row, so every
+  downstream consumer (gapStats, opportunities, export, comparability gate) works
+  unchanged — do NOT add a parallel net field.
+- Gaps are computed live every request; nothing net is ever stored.
+- **Discounts** live in `discount_settings` (scope unique; `prayag` global default
+  5%, one row per competitor default 40%). `getDiscounts()` MUST backfill missing
+  competitor scopes on EVERY call (not only when the table is empty) via
+  onConflictDoNothing, or competitors imported after first seed never get a
+  configurable row. PUT scope validation must trim BEFORE comparing to `prayag`,
+  else `" prayag "` bypasses the guard and overwrites the global row.
+- Frontend: segmented MRP/Net toggle in the dashboard header; `mode` rides inside
+  the same filters object so all child hooks + export URL pick it up. Discount
+  Settings page at `/settings/discounts`; saving invalidates all queries so net
+  figures refresh.

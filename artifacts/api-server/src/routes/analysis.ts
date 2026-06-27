@@ -6,6 +6,7 @@ import {
   competitorPricesTable,
   catalogProductsTable,
   mrpPriceHistoryTable,
+  discountSettingsTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
 import {
@@ -18,8 +19,13 @@ import {
   toOpportunityItem,
   pct,
   round1,
+  strParam,
+  DEFAULT_PRAYAG_DISCOUNT,
+  DEFAULT_COMPETITOR_DISCOUNT,
   type PrayagInfo,
   type AnalysisRow,
+  type CompareMode,
+  type BuildRowOpts,
 } from "../lib/analysis";
 
 const router: IRouter = Router();
@@ -66,12 +72,81 @@ async function getPrayagCatalogMap(): Promise<Map<string, PrayagInfo>> {
   return map;
 }
 
+const PRAYAG_SCOPE = "prayag";
+
+interface ResolvedDiscounts {
+  prayag: number;
+  byCompetitor: Map<string, number>;
+  updatedAt: string | null;
+}
+
+// Read the per-scope discounts, seeding defaults on first use: prayag = 5%, and
+// every distinct competitor in competitor_prices = 40%. Seeding is idempotent
+// (scope is unique) so concurrent requests cannot create duplicates.
+async function getDiscounts(): Promise<ResolvedDiscounts> {
+  let rows = await db.select().from(discountSettingsTable);
+  const existing = new Set(rows.map((r) => r.scope));
+
+  // Backfill any missing default rows on every call so newly imported
+  // competitors always get a configurable default-40% entry, not just on the
+  // very first access. onConflictDoNothing keeps this idempotent/concurrent-safe.
+  const comps = await db
+    .selectDistinct({ competitor: competitorPricesTable.competitor })
+    .from(competitorPricesTable);
+  const seed = [
+    { scope: PRAYAG_SCOPE, discountPct: DEFAULT_PRAYAG_DISCOUNT },
+    ...comps
+      .map((c) => c.competitor)
+      .filter((c): c is string => !!c && c.trim() !== "")
+      .map((competitor) => ({
+        scope: competitor,
+        discountPct: DEFAULT_COMPETITOR_DISCOUNT,
+      })),
+  ].filter((s) => !existing.has(s.scope));
+
+  if (seed.length > 0) {
+    await db
+      .insert(discountSettingsTable)
+      .values(seed)
+      .onConflictDoNothing({ target: discountSettingsTable.scope });
+    rows = await db.select().from(discountSettingsTable);
+  }
+
+  const byCompetitor = new Map<string, number>();
+  let prayag = DEFAULT_PRAYAG_DISCOUNT;
+  let updatedAt: string | null = null;
+  for (const r of rows) {
+    if (r.scope === PRAYAG_SCOPE) prayag = r.discountPct;
+    else byCompetitor.set(r.scope, r.discountPct);
+    const ts = r.updatedAt?.toISOString() ?? null;
+    if (ts && (!updatedAt || ts > updatedAt)) updatedAt = ts;
+  }
+  return { prayag, byCompetitor, updatedAt };
+}
+
+function parseMode(query: Record<string, unknown>): CompareMode {
+  return strParam(query.mode) === "net" ? "net" : "mrp";
+}
+
 async function getFilteredRows(query: Record<string, unknown>): Promise<AnalysisRow[]> {
-  const [maps, all] = await Promise.all([
+  const mode = parseMode(query);
+  const [maps, all, discounts] = await Promise.all([
     getPrayagCatalogMap(),
     db.select().from(competitorPricesTable),
+    mode === "net"
+      ? getDiscounts()
+      : Promise.resolve<ResolvedDiscounts>({
+          prayag: DEFAULT_PRAYAG_DISCOUNT,
+          byCompetitor: new Map(),
+          updatedAt: null,
+        }),
   ]);
-  const rows = all.map((c) => buildRow(c, maps));
+  const opts: BuildRowOpts = {
+    mode,
+    prayagDiscount: discounts.prayag,
+    discountFor: (c) => discounts.byCompetitor.get(c) ?? DEFAULT_COMPETITOR_DISCOUNT,
+  };
+  const rows = all.map((c) => buildRow(c, maps, opts));
   return applyFilters(rows, parseFilters(query));
 }
 
@@ -337,6 +412,93 @@ router.get("/analysis/export", async (req, res) => {
   ]);
 
   sendSheet(res, [header, ...body], "Analysis", "prayag-competition-analysis", format);
+});
+
+// ---------------------------------------------------------------------------
+// Discount settings (Net-to-Net mode)
+// ---------------------------------------------------------------------------
+
+// GET /analysis/discount-settings — current per-scope discounts (seeds defaults
+// on first access). Returns Prayag's discount plus one entry per competitor.
+router.get("/analysis/discount-settings", async (_req, res) => {
+  const discounts = await getDiscounts();
+  const competitors = [...discounts.byCompetitor.entries()]
+    .map(([scope, discountPct]) => ({ scope, discountPct }))
+    .sort((a, b) => a.scope.localeCompare(b.scope));
+  res.json({
+    prayagDiscountPct: discounts.prayag,
+    competitors,
+    updatedAt: discounts.updatedAt,
+  });
+});
+
+// PUT /analysis/discount-settings — upsert Prayag and/or competitor discounts.
+router.put("/analysis/discount-settings", async (req, res) => {
+  const body = req.body as {
+    prayagDiscountPct?: unknown;
+    competitors?: unknown;
+  };
+
+  const validPct = (v: unknown): v is number =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100;
+
+  const upserts: { scope: string; discountPct: number }[] = [];
+
+  if (body.prayagDiscountPct !== undefined) {
+    if (!validPct(body.prayagDiscountPct)) {
+      res
+        .status(400)
+        .json({ error: "prayagDiscountPct must be a number between 0 and 100." });
+      return;
+    }
+    upserts.push({ scope: PRAYAG_SCOPE, discountPct: body.prayagDiscountPct });
+  }
+
+  if (body.competitors !== undefined) {
+    if (!Array.isArray(body.competitors)) {
+      res.status(400).json({ error: "competitors must be an array." });
+      return;
+    }
+    for (const item of body.competitors) {
+      const scope = (item as { scope?: unknown })?.scope;
+      const discountPct = (item as { discountPct?: unknown })?.discountPct;
+      const normalized = typeof scope === "string" ? scope.trim() : "";
+      if (normalized === "" || normalized === PRAYAG_SCOPE) {
+        res.status(400).json({ error: "Each competitor needs a non-empty scope." });
+        return;
+      }
+      if (!validPct(discountPct)) {
+        res.status(400).json({
+          error: `Discount for "${normalized}" must be a number between 0 and 100.`,
+        });
+        return;
+      }
+      upserts.push({ scope: normalized, discountPct });
+    }
+  }
+
+  // Ensure defaults exist (and the table is seeded) before applying updates.
+  await getDiscounts();
+
+  for (const u of upserts) {
+    await db
+      .insert(discountSettingsTable)
+      .values({ scope: u.scope, discountPct: u.discountPct })
+      .onConflictDoUpdate({
+        target: discountSettingsTable.scope,
+        set: { discountPct: u.discountPct, updatedAt: new Date() },
+      });
+  }
+
+  const discounts = await getDiscounts();
+  const competitors = [...discounts.byCompetitor.entries()]
+    .map(([scope, discountPct]) => ({ scope, discountPct }))
+    .sort((a, b) => a.scope.localeCompare(b.scope));
+  res.json({
+    prayagDiscountPct: discounts.prayag,
+    competitors,
+    updatedAt: discounts.updatedAt,
+  });
 });
 
 export default router;

@@ -831,12 +831,15 @@ export const GetAnalysisFiltersResponse = zod.object({
  * Coverage, match-quality and price-gap KPIs across the filtered competitor SKUs.
  * @summary Headline KPIs
  */
+export const getAnalysisOverviewQueryModeDefault = `mrp`;
+
 export const GetAnalysisOverviewQueryParams = zod.object({
   "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
   "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
-  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "mode": zod.enum(['mrp', 'net']).default(getAnalysisOverviewQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).')
 })
 
 export const GetAnalysisOverviewResponse = zod.object({
@@ -864,12 +867,15 @@ export const GetAnalysisOverviewResponse = zod.object({
  * Coverage and price-gap stats grouped by competitor brand.
  * @summary Per-competitor breakdown
  */
+export const getAnalysisByBrandQueryModeDefault = `mrp`;
+
 export const GetAnalysisByBrandQueryParams = zod.object({
   "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
   "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
-  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "mode": zod.enum(['mrp', 'net']).default(getAnalysisByBrandQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).')
 })
 
 export const GetAnalysisByBrandResponseItem = zod.object({
@@ -891,12 +897,15 @@ export const GetAnalysisByBrandResponse = zod.array(GetAnalysisByBrandResponseIt
  * Price-gap stats grouped by Prayag product category (matched SKUs only).
  * @summary Per-category breakdown
  */
+export const getAnalysisByCategoryQueryModeDefault = `mrp`;
+
 export const GetAnalysisByCategoryQueryParams = zod.object({
   "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
   "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
-  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "mode": zod.enum(['mrp', 'net']).default(getAnalysisByCategoryQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).')
 })
 
 export const GetAnalysisByCategoryResponseItem = zod.object({
@@ -916,12 +925,15 @@ export const GetAnalysisByCategoryResponse = zod.array(GetAnalysisByCategoryResp
  * Histogram of price_diff_pct across comparable SKUs for a positioning chart.
  * @summary Price-gap distribution
  */
+export const getAnalysisPositioningQueryModeDefault = `mrp`;
+
 export const GetAnalysisPositioningQueryParams = zod.object({
   "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
   "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
-  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.')
+  "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "mode": zod.enum(['mrp', 'net']).default(getAnalysisPositioningQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).')
 })
 
 export const GetAnalysisPositioningResponse = zod.object({
@@ -978,12 +990,15 @@ export const GetAnalysisCoverageMatrixResponse = zod.object({
  * SKUs where Prayag has the largest margin headroom (cheaper) or pricing threats (costlier), beyond the threshold.
  * @summary Pricing opportunities and threats
  */
+export const getAnalysisOpportunitiesQueryModeDefault = `mrp`;
+
 export const GetAnalysisOpportunitiesQueryParams = zod.object({
   "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
   "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "mode": zod.enum(['mrp', 'net']).default(getAnalysisOpportunitiesQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
   "thresholdPct": zod.coerce.number().optional().describe('Minimum absolute price_diff_pct to qualify. Defaults to 10.')
 })
 
@@ -1024,13 +1039,52 @@ export const GetAnalysisOpportunitiesResponse = zod.object({
  * Download the filtered, basis-normalized comparison rows as CSV or XLSX.
  * @summary Export comparable dataset
  */
+export const exportAnalysisQueryModeDefault = `mrp`;
+
 export const ExportAnalysisQueryParams = zod.object({
   "competitor": zod.array(zod.coerce.string()).optional().describe('Filter by competitor brand. Repeatable.'),
   "division": zod.coerce.string().optional().describe('Filter by Prayag division (matched SKUs only).'),
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
+  "mode": zod.enum(['mrp', 'net']).default(exportAnalysisQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
   "format": zod.enum(['xlsx', 'csv']).optional().describe('File format, \"xlsx\" (default) or \"csv\".')
+})
+
+
+/**
+ * Prayag's discount and each competitor's discount (percent). Seeds defaults (Prayag 5%, competitors 40%) on first access.
+ * @summary Net-to-Net discount settings
+ */
+export const GetDiscountSettingsResponse = zod.object({
+  "prayagDiscountPct": zod.number(),
+  "competitors": zod.array(zod.object({
+  "scope": zod.string(),
+  "discountPct": zod.number()
+})),
+  "updatedAt": zod.string().nullable()
+})
+
+
+/**
+ * Upsert Prayag's discount and/or per-competitor discounts. Each percent must be between 0 and 100.
+ * @summary Update Net-to-Net discount settings
+ */
+export const UpdateDiscountSettingsBody = zod.object({
+  "prayagDiscountPct": zod.number().optional(),
+  "competitors": zod.array(zod.object({
+  "scope": zod.string(),
+  "discountPct": zod.number()
+})).optional()
+})
+
+export const UpdateDiscountSettingsResponse = zod.object({
+  "prayagDiscountPct": zod.number(),
+  "competitors": zod.array(zod.object({
+  "scope": zod.string(),
+  "discountPct": zod.number()
+})),
+  "updatedAt": zod.string().nullable()
 })
 
 
