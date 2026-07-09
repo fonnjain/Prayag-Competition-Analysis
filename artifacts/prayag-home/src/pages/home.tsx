@@ -1,4 +1,4 @@
-import { Factory, TrendingUp, PackageSearch, Activity, FileSpreadsheet, Hexagon, BarChart3, Scale } from "lucide-react";
+import { Factory, PackageSearch, FileSpreadsheet, Hexagon, BarChart3, Scale } from "lucide-react";
 import React from "react";
 
 export default function Home() {
@@ -27,39 +27,6 @@ export default function Home() {
         {/* Apps Grid */}
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           
-          {/* Console App Card */}
-          <a 
-            href="/console/" 
-            className="group relative bg-card rounded-2xl p-8 border border-border shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col gap-6 hover:border-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            data-testid="link-console"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
-            
-            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-
-            <div>
-              <h2 className="text-2xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
-                Competition Console
-              </h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Pricing intelligence and market positioning. Analyze competitor pricing, track win rates, and review automated pricing recommendations.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-auto pt-6 border-t border-border/50">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Activity className="w-4 h-4 text-primary/60" />
-                <span>Market Analysis</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <TrendingUp className="w-4 h-4 text-primary/60" />
-                <span>Pricing Recs</span>
-              </div>
-            </div>
-          </a>
-
           {/* Product DB Card */}
           <a 
             href="/product-db/" 

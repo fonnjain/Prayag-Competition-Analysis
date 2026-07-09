@@ -1,7 +1,6 @@
 - [Orval zod coerce.boolean trap](orval-zod-boolean.md) — z.coerce.boolean() turns any non-empty query string (incl. "false") into true; read raw query value for booleans.
-- [Prayag pricing engine](prayag-pricing-engine.md) — net-vs-MRP basis rules, status thresholds, and recommendation/floor math for the Competition Console.
 - [Prayag suggestion scorer](prayag-suggestion-scorer.md) — catalog size lives in product names (parse last `<num> mm`); keep category out of the text channel; words beat numbers.
 - [Prayag Product Database app](prayag-product-db.md) — append-only MRP history rules, unique-index backstop, invalidate via generated query-key helpers, dedupe category filters.
 - [Competitor import price-gap guardrail](competitor-import-guardrail.md) — auto-matched imports reject gap vs Prayag MRP outside ~-80%..+100%; verified manual reuploads bypass it.
 - [Prayag Competition Analysis dashboard](prayag-analysis-dashboard.md) — /analysis live-compute over existing tables; ex-GST×1.18 basis, comparability gate, green=Prayag-cheaper sign convention.
-- [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 separate web apps (home/, console/, product-db/) behind one proxy; cross-app links use raw absolute <a href>, never BASE_URL/wouter.
+- [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 web apps (home/, product-db/, analysis/) behind one proxy; console app deleted; cross-app links use raw absolute <a href>, never BASE_URL/wouter.

@@ -1,6 +1,15 @@
-# Prayag Competition Console
+# Prayag Polymers — Pricing Intelligence Hub
 
-A mobile-friendly internal pricing-intelligence app for Prayag Polymers that answers, per product: is Prayag's price competitive vs rival brands, and what should the price be?
+A mobile-friendly internal multi-app hub for Prayag Polymers: a master product catalog with MRP history, and a live competition-analysis dashboard that answers, per product: is Prayag's price competitive vs rival brands?
+
+## Apps
+
+- `prayag-home` (`/`) — launcher page linking to the other apps
+- `prayag-product-db` (`/product-db/`) — master catalog, MRP history, bulk MRP uploads, data health
+- `prayag-analysis` (`/analysis/`) — live competitive pricing dashboard (coverage, positioning, opportunities)
+- `api-server` (`/api`) — shared Express backend for all apps
+
+(The legacy Competition Console app was fully removed on 2026-07-09 — its artifact, API routes, engine/seed code, and DB tables no longer exist.)
 
 ## Run & Operate
 
@@ -9,6 +18,7 @@ A mobile-friendly internal pricing-intelligence app for Prayag Polymers that ans
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/api-server run test` — API server test suite
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -23,28 +33,20 @@ A mobile-friendly internal pricing-intelligence app for Prayag Polymers that ans
 ## Where things live
 
 - API contract (source of truth): `lib/api-spec/openapi.yaml` → run codegen to regenerate hooks (`lib/api-hooks`) + zod schemas (`lib/api-zod`)
-- DB schema (source of truth): `lib/db/src/schema/prayag.ts`
-- Pricing/competitiveness engine: `artifacts/api-server/src/lib/engine.ts`
-- Seeding + reset: `artifacts/api-server/src/lib/seed.ts` from `artifacts/api-server/src/seed/seed-data.json` (the original master comparison; reset restores it)
-- API routes: `artifacts/api-server/src/routes/` (dashboard, products, recommendations, competitors, settings, importExport)
-- Frontend: `artifacts/prayag-console/` (Dashboard, Recommendations, Import, Competitors, Settings)
+- DB schema (source of truth): `lib/db/src/schema/catalog.ts` (catalog_products, mrp_price_history, competitor_prices, code_conflicts, accept_batches, discount_settings)
+- Analysis engine: `artifacts/api-server/src/lib/analysis.ts` (live-computed per request)
+- Catalog seed: `artifacts/api-server/src/lib/catalogSeed.ts` from `artifacts/api-server/src/seed/catalog-seed.json` + `competitor-seed.json`
+- API routes: `artifacts/api-server/src/routes/` (health, catalog, catalogImportExport, comparison, analysis)
+- Frontends: `artifacts/prayag-home/`, `artifacts/prayag-product-db/`, `artifacts/prayag-analysis/`
 
 ## Architecture decisions
 
-- Net-vs-MRP basis correctness: each competitor compares on its own basis (net/mrp/mixed). A product's status is computed on net if any visible net rival exists (with prayagNet present), else mrp. Per-cell diff% always compares against the Prayag price of that cell's basis.
-- diff% convention: positive = Prayag cheaper (good). Status: leader (≤market_min), competitive (≤median), above_market (≤max), overpriced (>max), no_data.
-- Recommendations: suggested = market_median×0.98, aggressive = market_min×0.98, both floored at kgCost×(1+minMargin%); marginConstrained flags when the floor raises the suggestion. kgCost is null in seed data (no cost column), so floors are inactive until cost is entered.
-- The engine recomputes everything in-memory per request (897 products / 2304 comparisons — trivial), so edits and imports reflect instantly with no denormalized cache.
-- Import matches competitor sheets by Prayag item code (overlap detection picks the code column); brand + basis are auto-detected from headers/filename. Seed data has no product names, so name-based matching is not used.
-
-## Product
-
-- Dashboard: KPIs (competitive share, leader/competitive/above/overpriced counts), competitor win-rate chart, category breakdown, and an editable comparison matrix.
-- Recommendations: target price suggestions with margin-floor checks, filterable, exportable.
-- Import: upload competitor Excel/CSV/PDF sheets; auto-match by code and report matched/unmatched counts.
-- Competitors: hide/show columns, delete a competitor, reset all data to the original seed.
-- Settings: minimum margin %.
-- Export: comparison matrix and recommendations as CSV/XLSX.
+- Analysis basis: competitor prices are ex-GST; comparisons use ex-GST×1.18 vs Prayag MRP; comparability gate excludes null-price and unmatched rows; green = Prayag cheaper.
+- MRP history is append-only with a unique-index backstop; current price flagged via `is_current`.
+- diff% convention: positive = Prayag cheaper (good).
+- Competitor import guardrail: auto-matched imports reject price gaps vs Prayag MRP outside roughly −80%..+100%; verified manual re-uploads bypass it.
+- Analysis recomputes everything live per request over the existing tables (a few hundred rows — trivial), so edits and imports reflect instantly.
+- competitor_prices.price is nullable (quote rows without a price); null-price rows count toward coverage but are non-comparable. Never store price=0.
 
 ## User preferences
 

@@ -1,6 +1,5 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedIfEmpty } from "./lib/seed";
 import { seedCatalogIfEmpty, backfillCatalogSizes } from "./lib/catalogSeed";
 
 const rawPort = process.env["PORT"];
@@ -24,12 +23,6 @@ app.listen(port, async (err) => {
   }
 
   logger.info({ port }, "Server listening");
-
-  try {
-    await seedIfEmpty();
-  } catch (seedErr) {
-    logger.error({ err: seedErr }, "Failed to seed database");
-  }
 
   try {
     await seedCatalogIfEmpty();
