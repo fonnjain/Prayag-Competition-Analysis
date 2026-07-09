@@ -15,7 +15,8 @@ export interface ComparisonRow {
   description?: string | null;
   /** @nullable */
   size?: string | null;
-  competitorPrice: number;
+  /** @nullable */
+  competitorPrice: number | null;
   /** @nullable */
   unit?: string | null;
   /** @nullable */

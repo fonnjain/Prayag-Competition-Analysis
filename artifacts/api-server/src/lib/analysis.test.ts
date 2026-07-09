@@ -124,6 +124,33 @@ describe("buildRow comparability + diff conventions", () => {
     expect(r.category).toBe("SWR");
   });
 
+  it("is NOT comparable when the competitor price is null (verified mapping, MRP pending)", () => {
+    const r = buildRow(comp({ price: null }), maps);
+    expect(r.matched).toBe(true);
+    expect(r.comparable).toBe(false);
+    expect(r.competitorPrice).toBeNull();
+    expect(r.competitorEffectivePrice).toBeNull();
+    expect(r.priceDiff).toBeNull();
+    expect(r.priceDiffPct).toBeNull();
+    expect(r.prayagCheaper).toBeNull();
+    // The row still hydrates Prayag attributes for display/grouping.
+    expect(r.prayagMrp).toBe(100);
+    expect(r.division).toBe("Pipes");
+  });
+
+  it("keeps a null-price row non-comparable in Net-to-Net mode too", () => {
+    const r = buildRow(comp({ price: null, prayagMrpAtCompare: 100 }), maps, {
+      mode: "net" as const,
+      prayagDiscount: 5,
+      discountFor: () => 40,
+    });
+    expect(r.comparable).toBe(false);
+    expect(r.competitorEffectivePrice).toBeNull();
+    expect(r.priceDiffPct).toBeNull();
+    // Prayag's own net basis is still reported for display.
+    expect(r.prayagMrp).toBeCloseTo(95, 5);
+  });
+
   it("does NOT leak catalog attributes onto a non-matched row carrying a stray code", () => {
     const r = buildRow(
       comp({ matchStatus: "no match (review)", matchedPrayagCode: "PG1" }),

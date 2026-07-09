@@ -405,7 +405,7 @@ router.get("/analysis/export", async (req, res) => {
     r.prayagMrp,
     r.competitorPrice,
     r.unit,
-    round1(r.competitorEffectivePrice),
+    r.competitorEffectivePrice == null ? null : round1(r.competitorEffectivePrice),
     r.priceDiff == null ? null : round1(r.priceDiff),
     r.priceDiffPct == null ? null : round1(r.priceDiffPct),
     r.prayagCheaper == null ? "" : r.prayagCheaper ? "Yes" : "No",

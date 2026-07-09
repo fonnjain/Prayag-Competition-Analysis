@@ -650,7 +650,7 @@ export default function MappingReviewPage() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{row.size || "-"}</td>
                       <td className="px-4 py-3 text-right font-mono">
-                        ₹{row.price.toFixed(2)}
+                        {row.price == null ? "—" : `₹${row.price.toFixed(2)}`}
                         {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
                       </td>
                       <td className="px-4 py-3">

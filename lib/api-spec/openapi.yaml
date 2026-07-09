@@ -1528,7 +1528,9 @@ components:
         size:
           type: ["string", "null"]
         competitorPrice:
-          type: number
+          # Null when a verified mapping exists but the competitor's MRP is not
+          # yet known; such rows are stored but never comparable.
+          type: ["number", "null"]
         unit:
           type: ["string", "null"]
         effectiveDate:
@@ -1812,7 +1814,7 @@ components:
         size:
           type: ["string", "null"]
         price:
-          type: number
+          type: ["number", "null"]
         unit:
           type: ["string", "null"]
         matchedPrayagCode:

@@ -372,7 +372,8 @@ export interface ComparisonRow {
   description?: string | null;
   /** @nullable */
   size?: string | null;
-  competitorPrice: number;
+  /** @nullable */
+  competitorPrice: number | null;
   /** @nullable */
   unit?: string | null;
   /** @nullable */
@@ -587,7 +588,8 @@ export interface MappingReviewRow {
   description?: string | null;
   /** @nullable */
   size?: string | null;
-  price: number;
+  /** @nullable */
+  price: number | null;
   /** @nullable */
   unit?: string | null;
   /** @nullable */

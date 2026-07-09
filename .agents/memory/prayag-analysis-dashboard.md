@@ -53,13 +53,26 @@ in-memory per request (dataset is small: ~8.7k competitor rows).
   stray `matchedPrayagCode`. **Why:** otherwise unmatched rows would pollute
   per-category breakdowns.
 
+## Nullable competitor price (verified mapping, MRP pending)
+- `competitor_prices.price` is NULLABLE and `competitor_code` stores the rival's
+  own catalogue number (e.g. Sparsh Pearl "ED-950"). A verified mapping may exist
+  before the competitor's MRP is known — store the row with `price = NULL`, never
+  `0`. **Why:** price 0 corrupts every gap stat; NULL rows are stored but excluded
+  from all gap math (`comparable` requires a non-null competitor basis) while still
+  counting toward coverage/match-quality.
+- Null-price ripples are guarded in `lib/analysis.ts` (buildRow), both comparison
+  matrix builders, per-metre normalization (`NO_NORM` short-circuit), and the
+  by-product quote-candidate grouping (group kept, candidate skipped). OpenAPI
+  `ComparisonRow.competitorPrice` and `MappingReviewRow.price` are `["number","null"]`.
+
 ## Headline numbers
-With gaps computed from the persisted per-row `prayag_mrp_at_compare`, the KPIs are
-sane: ~3,218 comparable rows, ~52% Prayag-cheaper, avg gap ~+5%, median ~+1.5%.
-(The earlier ~1000% avg / ~44% median inflation came from comparing against
-mismatched-magnitude CATALOG MRPs; pinning each row to its own period-matched MRP
-removed that noise.) Median is still the robust headline; the mean stays honest
-rather than clipping the few legitimate large-spread rows.
+As of the July 2026 erase-and-load, the DB holds ONLY the verified Prayag vs
+Sparsh Pearl (PTMT) mapping: 150 competitor rows (all matched/High, all with
+`prayag_mrp_at_compare`), 140 comparable (10 Black Pearl rows have null price),
+median gap ≈ −1%, avg ≈ −1.6%, ~39% Prayag-cheaper. Categories = series names
+(Black Pearl 67, Standard 20, Diamond 19, Cobra 18, Quadra 14, Vitro 12),
+division "PTMT & Plastic Fittings". No auto-matching was used; gaps are always
+computed live. (Earlier multi-brand load of ~3.2k rows was wiped on request.)
 
 ## Shared filters
 Every endpoint accepts the same query filters: `competitor` (repeatable array),

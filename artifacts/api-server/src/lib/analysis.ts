@@ -32,7 +32,9 @@ export interface CompInput {
   id: number;
   competitor: string;
   unit: string | null;
-  price: number;
+  // Null when the competitor's MRP is not yet known for a verified mapping.
+  // Such rows are never comparable and are excluded from all gap stats.
+  price: number | null;
   matchStatus: string;
   matchConfidence: string | null;
   matchedPrayagCode: string | null;
@@ -45,8 +47,8 @@ export interface AnalysisRow {
   id: number;
   competitor: string;
   unit: string | null;
-  competitorPrice: number;
-  competitorEffectivePrice: number;
+  competitorPrice: number | null;
+  competitorEffectivePrice: number | null;
   matchStatus: string;
   matchConfidence: string | null;
   matched: boolean;
@@ -102,7 +104,7 @@ export function buildRow(
   // The catalog map supplies only descriptive attributes (division/category/
   // name) for grouping and filtering — never the MRP used for the gap.
   const prayagMrp = matched ? c.prayagMrpAtCompare ?? null : null;
-  const effPrice = effectivePrice(c.unit, c.price);
+  const effPrice = c.price != null ? effectivePrice(c.unit, c.price) : null;
 
   // Resolve the two prices that drive the comparison. In MRP mode these are the
   // raw MRP / effective figures; in Net mode they are discounted nets.
@@ -114,17 +116,17 @@ export function buildRow(
       ? opts.discountFor(c.competitor)
       : DEFAULT_COMPETITOR_DISCOUNT;
     prayagBasis = prayagMrp * (1 - prayagDisc / 100);
-    competitorBasis = effPrice * (1 - compDisc / 100);
+    competitorBasis = effPrice != null ? effPrice * (1 - compDisc / 100) : null;
   }
 
   // A price gap is only meaningful for a confirmed match where both prices exist.
   const comparable =
-    matched && prayagBasis != null && prayagBasis > 0 && c.price != null;
+    matched && prayagBasis != null && prayagBasis > 0 && competitorBasis != null;
 
   let priceDiff: number | null = null;
   let priceDiffPct: number | null = null;
   let prayagCheaper: boolean | null = null;
-  if (comparable && prayagBasis != null) {
+  if (comparable && prayagBasis != null && competitorBasis != null) {
     priceDiff = competitorBasis - prayagBasis;
     priceDiffPct = (priceDiff / prayagBasis) * 100;
     // Competitor more expensive than Prayag => Prayag cheaper (good).
@@ -315,7 +317,8 @@ export function toOpportunityItem(r: AnalysisRow) {
     category: r.category,
     prayagMrp: r.prayagMrp,
     competitorPrice: r.competitorPrice,
-    competitorEffectivePrice: round1(r.competitorEffectivePrice),
+    competitorEffectivePrice:
+      r.competitorEffectivePrice == null ? null : round1(r.competitorEffectivePrice),
     unit: r.unit,
     priceDiff: round1(r.priceDiff!),
     priceDiffPct: round1(r.priceDiffPct!),

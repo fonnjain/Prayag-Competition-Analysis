@@ -13,6 +13,7 @@ import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/su
 import { catalogVersion, topSuggestionTier } from "../lib/suggestCache";
 import {
   computeCompareNorm,
+  NO_NORM,
   normalizePerMetre,
   type NormResult,
 } from "../lib/priceNormalize";
@@ -144,21 +145,26 @@ function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
   const prayagMrp = prayag?.mrp ?? null;
   let diffPct: number | null = null;
   let prayagCheaper: boolean | null = null;
-  if (prayagMrp != null && c.price > 0) {
+  if (prayagMrp != null && c.price != null && c.price > 0) {
     diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
     prayagCheaper = prayagMrp <= c.price;
   }
 
   // Reduce length-based prices (pipes/coils) to a per-metre basis so the diff
   // is like-for-like; flag rows whose unit basis is ambiguous for review.
-  const norm = computeCompareNorm({
-    prayagName: prayag?.productName ?? null,
-    prayagMrp,
-    description: c.description,
-    size: c.size,
-    unit: c.unit,
-    price: c.price,
-  });
+  // Rows without a competitor price (verified mapping, MRP pending) skip
+  // normalization entirely — there is nothing to compare yet.
+  const norm =
+    c.price == null
+      ? NO_NORM
+      : computeCompareNorm({
+          prayagName: prayag?.productName ?? null,
+          prayagMrp,
+          description: c.description,
+          size: c.size,
+          unit: c.unit,
+          price: c.price,
+        });
   const effectiveDiffPct = norm.unitAmbiguous
     ? null
     : norm.lengthNormalized
@@ -738,6 +744,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       groups.set(key, g);
     }
     if (!g.category && c.category) g.category = c.category;
+    // A row without a price (verified mapping, MRP pending) cannot be a quote
+    // candidate; keep the group but skip the candidate.
+    if (c.price == null) continue;
     const list = g.byCompetitor.get(c.competitor) ?? [];
     list.push({
       price: c.price,
@@ -1094,7 +1103,7 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
     const prayagMrp = group.prayagMrp;
     let diffPct: number | null = null;
     let prayagCheaper: boolean | null = null;
-    if (prayagMrp != null && c.price > 0) {
+    if (prayagMrp != null && c.price != null && c.price > 0) {
       diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
       prayagCheaper = prayagMrp <= c.price;
     }
@@ -1109,7 +1118,10 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
         prayagCheaper,
         matchConfidence: c.matchConfidence,
       });
-    } else if (existing.price == null || c.price < existing.price) {
+    } else if (
+      c.price != null &&
+      (existing.price == null || c.price < existing.price)
+    ) {
       existing.price = c.price;
       existing.diffPct = diffPct;
       existing.prayagCheaper = prayagCheaper;

@@ -93,8 +93,14 @@ export const competitorPricesTable = pgTable(
     category: text("category"),
     description: text("description"),
     size: text("size"),
-    price: doublePrecision("price").notNull(),
+    // Nullable: a verified mapping can exist (competitor code known) before the
+    // competitor's MRP is available. Null-price rows are stored but excluded
+    // from all live gap computations.
+    price: doublePrecision("price"),
     unit: text("unit"),
+    // Competitor's own catalogue number (e.g. Sparsh Pearl "ED-950"), when the
+    // source sheet provides one.
+    competitorCode: text("competitor_code"),
     effectiveDate: date("effective_date"),
     matchedPrayagCode: text("matched_prayag_code"),
     matchStatus: text("match_status").notNull().default("no match (review)"),

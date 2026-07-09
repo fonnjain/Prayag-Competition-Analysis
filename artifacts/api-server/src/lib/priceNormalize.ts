@@ -188,7 +188,7 @@ export interface CompareNorm {
   normalizationNote: string | null;
 }
 
-const NO_NORM: CompareNorm = {
+export const NO_NORM: CompareNorm = {
   compPerMetre: null,
   prayagPerMetre: null,
   perMetreDiffPct: null,
