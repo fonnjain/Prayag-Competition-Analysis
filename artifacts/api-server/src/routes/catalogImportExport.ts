@@ -38,11 +38,20 @@ interface ParsedRow {
   price: number;
 }
 
+export interface SkippedRow {
+  rawCode: string;
+  rawPrice: string;
+  reason: string;
+}
+
 interface ParseResult {
   rows: ParsedRow[];
   basis: string;
   codeCol: number;
   priceCol: number;
+  codeColHeader: string;
+  priceColHeader: string;
+  skippedRows: SkippedRow[];
 }
 
 function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
@@ -59,7 +68,8 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       break;
     }
   }
-  const headers = (grid[headerRow] ?? []).map((h) => norm(h).toLowerCase());
+  const rawHeaders = (grid[headerRow] ?? []).map((h) => norm(h));
+  const headers = rawHeaders.map((h) => h.toLowerCase());
 
   // Columns whose headers signal serial numbers — never treat as item codes.
   const SERIAL_HEADER_TOKENS = ["s.no", "sno", "sr.no", "sl.no", "sr.", "sl.", "serial"];
@@ -135,7 +145,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     }
   }
   if (codeCol === -1) {
-    return { rows: [], basis: "Verify", codeCol: -1, priceCol: -1 };
+    return { rows: [], basis: "Verify", codeCol: -1, priceCol: -1, codeColHeader: "", priceColHeader: "", skippedRows: [] };
   }
 
   // Price column: header keyword, else first mostly-numeric column.
@@ -166,32 +176,58 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     }
   }
   if (priceCol === -1) {
-    return { rows: [], basis: "Verify", codeCol, priceCol: -1 };
+    return { rows: [], basis: "Verify", codeCol, priceCol: -1, codeColHeader: rawHeaders[codeCol] ?? String(codeCol), priceColHeader: "", skippedRows: [] };
   }
 
+  const codeColHeader = rawHeaders[codeCol] ?? String(codeCol);
+  const priceColHeader = rawHeaders[priceCol] ?? String(priceCol);
+
   const rows: ParsedRow[] = [];
+  const skippedRows: SkippedRow[] = [];
   for (let r = 0; r < grid.length; r++) {
     if (r === headerRow) continue;
     const row = grid[r] ?? [];
+    const rawCodeVal = norm(row[codeCol]);
+    const rawPriceVal = norm(row[priceCol]);
+    // Skip completely empty rows silently
+    if (!rawCodeVal && !rawPriceVal) continue;
     const code = normCode(row[codeCol]);
-    if (!code) continue;
+    if (!code) {
+      // Record whenever either column has content — blank-code rows with a
+      // valid price are a likely formatting issue the user needs to know about.
+      if (rawCodeVal || rawPriceVal) {
+        skippedRows.push({
+          rawCode: rawCodeVal || "(blank)",
+          rawPrice: rawPriceVal,
+          reason: rawCodeVal ? "Item code could not be parsed" : "Item code is blank",
+        });
+      }
+      continue;
+    }
     const price = Number(row[priceCol]);
-    if (isNaN(price) || price <= 0) continue;
+    if (isNaN(price) || price <= 0) {
+      skippedRows.push({ rawCode: rawCodeVal, rawPrice: rawPriceVal, reason: price <= 0 ? "Price is zero or negative" : "Price is not a number" });
+      continue;
+    }
     rows.push({ itemCode: code, price });
   }
 
-  return { rows, basis, codeCol, priceCol };
+  return { rows, basis, codeCol, priceCol, codeColHeader, priceColHeader, skippedRows };
 }
 
 interface LoadSummary {
   file: string;
   effectiveDate: string;
   basis: string;
+  codeColHeader: string;
+  priceColHeader: string;
   totalRows: number;
   matchedProducts: number;
   newProducts: number;
   newHistoryRows: number;
   skippedDuplicates: number;
+  skippedUnparseable: number;
+  unmatchedCodes: string[];
   message?: string;
 }
 
@@ -232,6 +268,10 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
     const wb = XLSX.read(file.buffer, { type: "buffer" });
     let parsedRows: ParsedRow[] = [];
     let basis = "Verify";
+    let detectedCodeColHeader = "";
+    let detectedPriceColHeader = "";
+    let totalSkippedUnparseable = 0;
+    const allSkippedRows: SkippedRow[] = [];
     for (const sheetName of wb.SheetNames) {
       const sheet = wb.Sheets[sheetName];
       if (!sheet) continue;
@@ -240,8 +280,18 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
         defval: null,
       });
       const parsed = parseSheet(grid, knownCodes);
+      // Accumulate skipped rows from every sheet
+      totalSkippedUnparseable += parsed.skippedRows.length;
+      allSkippedRows.push(...parsed.skippedRows);
       if (parsed.rows.length > 0) {
         parsedRows = parsedRows.concat(parsed.rows);
+        basis = parsed.basis;
+        if (!detectedCodeColHeader) detectedCodeColHeader = parsed.codeColHeader;
+        if (!detectedPriceColHeader) detectedPriceColHeader = parsed.priceColHeader;
+      } else {
+        // Even if no rows, record which columns were found (for diagnostics)
+        if (!detectedCodeColHeader && parsed.codeColHeader) detectedCodeColHeader = parsed.codeColHeader;
+        if (!detectedPriceColHeader && parsed.priceColHeader) detectedPriceColHeader = parsed.priceColHeader;
         basis = parsed.basis;
       }
     }
@@ -256,13 +306,19 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
           file: name,
           effectiveDate,
           basis,
+          codeColHeader: detectedCodeColHeader,
+          priceColHeader: detectedPriceColHeader,
           totalRows: 0,
           matchedProducts: 0,
           newProducts: 0,
           newHistoryRows: 0,
           skippedDuplicates: 0,
+          skippedUnparseable: totalSkippedUnparseable,
+          // unmatchedCodes is only meaningful when valid rows were parsed;
+          // in the zero-parse case there are no catalog-missing codes to report.
+          unmatchedCodes: [],
           message:
-            "No item-code + price rows detected. Check the sheet has a code column and a price/MRP column.",
+            "No valid code-and-price rows could be read from the file. Check the sheet has a recognisable item-code column and a price/MRP column.",
         } satisfies LoadSummary,
       });
       return;
@@ -273,11 +329,15 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
       file: name,
       effectiveDate,
       basis,
+      codeColHeader: detectedCodeColHeader,
+      priceColHeader: detectedPriceColHeader,
       totalRows: byCode.size,
       matchedProducts: 0,
       newProducts: 0,
       newHistoryRows: 0,
       skippedDuplicates: 0,
+      skippedUnparseable: totalSkippedUnparseable,
+      unmatchedCodes: [],
     };
 
     await db.transaction(async (tx) => {
@@ -312,6 +372,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
             dataFlag: "new_from_load",
           });
           summary.newProducts++;
+          summary.unmatchedCodes.push(storedCode);
           knownCodes.add(code);
         } else {
           summary.matchedProducts++;
