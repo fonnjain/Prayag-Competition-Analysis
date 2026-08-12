@@ -1,12 +1,143 @@
 import { useState, useEffect } from "react";
-import { useGetCatalogProducts, useGetCatalogFilters } from "@workspace/api-client-react";
+import {
+  useGetCatalogProducts,
+  useGetCatalogFilters,
+  usePatchCatalogProductMrp,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Download, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PAGE_SIZE = 50;
+
+interface InlineEditState {
+  itemCode: string;
+  mrp: string;
+  effectiveDate: string;
+}
+
+function MrpCell({
+  itemCode,
+  currentMrp,
+  hasPrice,
+  effectiveDate,
+}: {
+  itemCode: string;
+  currentMrp: number | null;
+  hasPrice: boolean;
+  effectiveDate: string | null;
+}) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [mrpInput, setMrpInput] = useState("");
+  const [dateInput, setDateInput] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const { mutate, isPending } = usePatchCatalogProductMrp({
+    mutation: {
+      onSuccess: () => {
+        // Invalidate all catalog product list queries so the new MRP shows up.
+        queryClient.invalidateQueries({ queryKey: ["getCatalogProducts"] });
+        setEditing(false);
+        setError(null);
+      },
+      onError: (err: unknown) => {
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : "Save failed";
+        setError(msg);
+      },
+    },
+  });
+
+  const startEdit = () => {
+    setMrpInput(currentMrp != null ? String(currentMrp) : "");
+    setDateInput(effectiveDate ?? new Date().toISOString().slice(0, 10));
+    setError(null);
+    setEditing(true);
+  };
+
+  const save = () => {
+    const val = parseFloat(mrpInput);
+    if (isNaN(val) || val <= 0) {
+      setError("Enter a positive number");
+      return;
+    }
+    mutate({ itemCode, data: { mrp: val, effectiveDate: dateInput } });
+  };
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <span className="text-muted-foreground text-xs">₹</span>
+          <Input
+            className="h-7 w-28 text-sm font-mono px-2"
+            value={mrpInput}
+            onChange={(e) => setMrpInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            autoFocus
+          />
+          <input
+            type="date"
+            className="h-7 border border-input rounded-md px-2 text-xs font-mono bg-background text-foreground"
+            value={dateInput}
+            onChange={(e) => setDateInput(e.target.value)}
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-green-600 hover:text-green-700"
+            onClick={save}
+            disabled={isPending}
+            title="Save"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground"
+            onClick={() => setEditing(false)}
+            disabled={isPending}
+            title="Cancel"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        {error && <p className="text-xs text-destructive pl-4">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1 group">
+      {hasPrice ? (
+        <span className="font-mono">₹{currentMrp?.toFixed(2)}</span>
+      ) : (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+          MRP Pending
+        </span>
+      )}
+      <button
+        onClick={startEdit}
+        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+        title="Edit MRP"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
 
 export default function CatalogPage() {
   const [search, setSearch] = useState("");
@@ -15,7 +146,6 @@ export default function CatalogPage() {
   const [priceStatus, setPriceStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
 
-  // Reset to the first page whenever a filter changes.
   useEffect(() => {
     setPage(1);
   }, [search, division, category, priceStatus]);
@@ -27,11 +157,9 @@ export default function CatalogPage() {
     category: category !== "all" ? category : undefined,
     priceStatus: priceStatus !== "all" ? priceStatus : undefined,
     page,
-    pageSize: PAGE_SIZE
+    pageSize: PAGE_SIZE,
   });
 
-  // Categories belonging to the selected division (or all when none selected),
-  // deduped by name since the same category can appear under multiple divisions.
   const visibleCategories = Array.from(
     new Set(
       (filters?.categories ?? [])
@@ -67,14 +195,14 @@ export default function CatalogPage() {
       <div className="flex gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by code or name..." 
+          <Input
+            placeholder="Search by code or name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-        
+
         <Select
           value={division}
           onValueChange={(v) => {
@@ -88,7 +216,9 @@ export default function CatalogPage() {
           <SelectContent>
             <SelectItem value="all">All Divisions</SelectItem>
             {(filters?.divisions ?? []).map((d) => (
-              <SelectItem key={d} value={d}>{d}</SelectItem>
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -100,7 +230,9 @@ export default function CatalogPage() {
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {visibleCategories.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -126,38 +258,49 @@ export default function CatalogPage() {
                 <th className="px-4 py-3 font-medium text-muted-foreground">Name</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Size</th>
-                <th className="px-4 py-3 font-medium text-muted-foreground text-right">Current MRP</th>
+                <th className="px-4 py-3 font-medium text-muted-foreground text-right">
+                  Current MRP
+                  <span className="ml-1 text-xs font-normal text-muted-foreground/60">(hover to edit)</span>
+                </th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Effective</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading catalog...</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    Loading catalog...
+                  </td>
                 </tr>
               ) : productsData?.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No products found.</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    No products found.
+                  </td>
                 </tr>
               ) : (
                 productsData?.rows.map((product) => (
-                  <tr key={product.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                  <tr
+                    key={product.id}
+                    className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                  >
                     <td className="px-4 py-3 font-medium">
                       <Link href={`/product/${product.itemCode}`}>
-                        <div className="text-primary hover:underline cursor-pointer">{product.itemCode}</div>
+                        <div className="text-primary hover:underline cursor-pointer">
+                          {product.itemCode}
+                        </div>
                       </Link>
                     </td>
                     <td className="px-4 py-3">{product.productName}</td>
                     <td className="px-4 py-3 text-muted-foreground">{product.category}</td>
                     <td className="px-4 py-3 text-muted-foreground">{product.size}</td>
-                    <td className="px-4 py-3 text-right">
-                      {product.hasPrice ? (
-                        <span className="font-mono">₹{product.currentMrp?.toFixed(2)}</span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                          MRP Pending
-                        </span>
-                      )}
+                    <td className="px-4 py-2">
+                      <MrpCell
+                        itemCode={product.itemCode}
+                        currentMrp={product.currentMrp ?? null}
+                        hasPrice={product.hasPrice}
+                        effectiveDate={product.effectiveDate ?? null}
+                      />
                     </td>
                     <td className="px-4 py-3 font-mono text-muted-foreground">
                       {product.effectiveDate || "-"}

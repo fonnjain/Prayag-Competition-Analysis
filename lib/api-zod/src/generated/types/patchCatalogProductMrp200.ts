@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ExternalGetComparisonParams = {
-competitor?: string;
-category?: string;
-page?: number;
-pageSize?: number;
+export type PatchCatalogProductMrp200 = {
+  ok: boolean;
+  itemCode: string;
+  mrp: number;
+  effectiveDate: string;
 };

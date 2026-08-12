@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { sql, eq, asc, desc } from "drizzle-orm";
+import { recomputeCurrentFlags } from "../lib/catalog";
 import {
   db,
   catalogProductsTable,
@@ -248,6 +249,72 @@ router.get("/catalog/products/:itemCode", async (req, res) => {
     },
     history,
   });
+});
+
+// PATCH /catalog/products/:itemCode/mrp — set a new current MRP inline
+// (without uploading a file). Inserts a new mrp_price_history row with
+// priceBasis="MRP", marks it current, and returns the updated row.
+router.patch("/catalog/products/:itemCode/mrp", async (req, res) => {
+  const { itemCode } = req.params;
+  const body = req.body as { mrp?: unknown; effectiveDate?: unknown; notes?: unknown };
+
+  const mrp = Number(body.mrp);
+  if (isNaN(mrp) || mrp <= 0) {
+    res.status(400).json({ error: "mrp must be a positive number" });
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const effectiveDate =
+    typeof body.effectiveDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.effectiveDate.trim())
+      ? body.effectiveDate.trim()
+      : today;
+  const notes =
+    typeof body.notes === "string" && body.notes.trim()
+      ? body.notes.trim()
+      : "Manual edit";
+
+  const product = await db
+    .select({ itemCode: catalogProductsTable.itemCode })
+    .from(catalogProductsTable)
+    .where(eq(catalogProductsTable.itemCode, itemCode))
+    .limit(1);
+  if (!product[0]) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  // Upsert: if the same (itemCode, effectiveDate) already exists, overwrite the
+  // price. This keeps the history clean when the user corrects a typo.
+  await db
+    .insert(mrpPriceHistoryTable)
+    .values({
+      itemCode,
+      mrp,
+      netPrice: null,
+      discountPct: null,
+      priceBasis: "MRP",
+      effectiveDate,
+      loadDate: today,
+      sourceFile: "manual-edit",
+      isCurrent: false,
+      notes,
+    })
+    .onConflictDoUpdate({
+      target: [mrpPriceHistoryTable.itemCode, mrpPriceHistoryTable.effectiveDate],
+      set: { mrp, priceBasis: "MRP", loadDate: today, notes },
+    });
+
+  await recomputeCurrentFlags();
+
+  const [updated] = await db
+    .select()
+    .from(mrpPriceHistoryTable)
+    .where(eq(mrpPriceHistoryTable.itemCode, itemCode))
+    .orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id))
+    .limit(1);
+
+  res.json({ ok: true, itemCode, mrp, effectiveDate, current: updated ?? null });
 });
 
 // POST /catalog/reset — restore catalog to the original clean import.
