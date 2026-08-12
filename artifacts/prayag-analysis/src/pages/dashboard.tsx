@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, LogOut } from "lucide-react";
+import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, LogOut, Home, Database } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -54,9 +54,30 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
       <header className="border-b bg-card text-card-foreground px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Competition Analysis</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1">Prayag Pricing Cockpit</p>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 pr-4 border-r border-border">
+            <a
+              href="/"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="Home"
+            >
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Home</span>
+            </a>
+            <span className="text-border">/</span>
+            <a
+              href="/product-db/"
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              title="Product Database"
+            >
+              <Database className="h-4 w-4" />
+              <span className="hidden sm:inline">Product DB</span>
+            </a>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Competition Analysis</h1>
+            <p className="text-sm text-muted-foreground font-mono mt-1">Prayag Pricing Cockpit</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <ModeToggle mode={mode} onChange={setMode} />

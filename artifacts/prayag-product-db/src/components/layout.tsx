@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key, LogOut } from "lucide-react";
+import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key, LogOut, Home, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@workspace/replit-auth-web";
 
@@ -53,6 +53,25 @@ export function Layout({ children }: LayoutProps) {
             );
           })}
         </nav>
+
+        {/* Cross-app navigation */}
+        <div className="px-4 pb-2 pt-2 border-t border-sidebar-border mt-2 space-y-1">
+          <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">Other Apps</p>
+          <a
+            href="/"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Home
+          </a>
+          <a
+            href="/analysis/"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+          >
+            <TrendingUp className="w-4 h-4" />
+            Competition Analysis
+          </a>
+        </div>
 
         {/* User / logout */}
         <div className="px-4 pb-4 pt-2 border-t border-sidebar-border mt-2">
