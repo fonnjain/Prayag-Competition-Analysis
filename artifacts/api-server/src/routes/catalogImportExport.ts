@@ -37,6 +37,8 @@ function norm(s: unknown): string {
 interface ParsedRow {
   itemCode: string;
   price: number;
+  productName: string | null;
+  category: string | null;
 }
 
 export interface SkippedRow {
@@ -50,6 +52,8 @@ interface ParseResult {
   basis: string;
   codeCol: number;
   priceCol: number;
+  nameCol: number;
+  categoryCol: number;
   codeColHeader: string;
   priceColHeader: string;
   skippedRows: SkippedRow[];
@@ -146,7 +150,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     }
   }
   if (codeCol === -1) {
-    return { rows: [], basis: "Verify", codeCol: -1, priceCol: -1, codeColHeader: "", priceColHeader: "", skippedRows: [] };
+    return { rows: [], basis: "Verify", codeCol: -1, priceCol: -1, nameCol: -1, categoryCol: -1, codeColHeader: "", priceColHeader: "", skippedRows: [] };
   }
 
   // Price column: header keyword, else first mostly-numeric column.
@@ -177,7 +181,42 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     }
   }
   if (priceCol === -1) {
-    return { rows: [], basis: "Verify", codeCol, priceCol: -1, codeColHeader: rawHeaders[codeCol] ?? String(codeCol), priceColHeader: "", skippedRows: [] };
+    return { rows: [], basis: "Verify", codeCol, priceCol: -1, nameCol: -1, categoryCol: -1, codeColHeader: rawHeaders[codeCol] ?? String(codeCol), priceColHeader: "", skippedRows: [] };
+  }
+
+  // Name column: look for description/product-name keywords.
+  const NAME_KEYWORDS = ["description", "product name", "product", "name", "item name", "particulars", "article", "details", "item description"];
+  let nameCol = -1;
+  for (let c = 0; c < maxCols; c++) {
+    if (c === codeCol || c === priceCol) continue;
+    const h = (headers[c] ?? "").toLowerCase().trim();
+    if (NAME_KEYWORDS.some((k) => h === k || h.startsWith(k))) {
+      nameCol = c;
+      break;
+    }
+  }
+  // Looser fallback: header contains "desc" or "product"
+  if (nameCol === -1) {
+    for (let c = 0; c < maxCols; c++) {
+      if (c === codeCol || c === priceCol) continue;
+      const h = headers[c] ?? "";
+      if (h.includes("desc") || h.includes("product") || h.includes("particular")) {
+        nameCol = c;
+        break;
+      }
+    }
+  }
+
+  // Category column: look for "category", "type", "group", "series" keywords.
+  const CATEGORY_KEYWORDS = ["category", "type", "group", "series", "segment", "sub-category", "subcategory"];
+  let categoryCol = -1;
+  for (let c = 0; c < maxCols; c++) {
+    if (c === codeCol || c === priceCol || c === nameCol) continue;
+    const h = (headers[c] ?? "").toLowerCase().trim();
+    if (CATEGORY_KEYWORDS.some((k) => h === k || h.includes(k))) {
+      categoryCol = c;
+      break;
+    }
   }
 
   const codeColHeader = rawHeaders[codeCol] ?? String(codeCol);
@@ -210,10 +249,12 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       skippedRows.push({ rawCode: rawCodeVal, rawPrice: rawPriceVal, reason: price <= 0 ? "Price is zero or negative" : "Price is not a number" });
       continue;
     }
-    rows.push({ itemCode: code, price });
+    const productName = nameCol !== -1 ? (norm(row[nameCol]) || null) : null;
+    const category = categoryCol !== -1 ? (norm(row[categoryCol]) || null) : null;
+    rows.push({ itemCode: code, price, productName, category });
   }
 
-  return { rows, basis, codeCol, priceCol, codeColHeader, priceColHeader, skippedRows };
+  return { rows, basis, codeCol, priceCol, nameCol, categoryCol, codeColHeader, priceColHeader, skippedRows };
 }
 
 interface LoadSummary {
@@ -245,6 +286,8 @@ function parseWorkbookBuffer(
   basis: string;
   codeColHeader: string;
   priceColHeader: string;
+  hasNameCol: boolean;
+  hasCategoryCol: boolean;
   skippedUnparseable: number;
   skippedRows: SkippedRow[];
 } {
@@ -253,6 +296,8 @@ function parseWorkbookBuffer(
   let basis = "Verify";
   let codeColHeader = "";
   let priceColHeader = "";
+  let hasNameCol = false;
+  let hasCategoryCol = false;
   let skippedUnparseable = 0;
   const skippedRows: SkippedRow[] = [];
 
@@ -266,6 +311,8 @@ function parseWorkbookBuffer(
     const parsed = parseSheet(grid, knownCodes);
     skippedUnparseable += parsed.skippedRows.length;
     skippedRows.push(...parsed.skippedRows);
+    if (parsed.nameCol !== -1) hasNameCol = true;
+    if (parsed.categoryCol !== -1) hasCategoryCol = true;
     if (parsed.rows.length > 0) {
       rows = rows.concat(parsed.rows);
       basis = parsed.basis;
@@ -278,7 +325,7 @@ function parseWorkbookBuffer(
     }
   }
 
-  return { rows, basis, codeColHeader, priceColHeader, skippedUnparseable, skippedRows };
+  return { rows, basis, codeColHeader, priceColHeader, hasNameCol, hasCategoryCol, skippedUnparseable, skippedRows };
 }
 
 // ---------------------------------------------------------------------------
@@ -287,9 +334,9 @@ function parseWorkbookBuffer(
 // ---------------------------------------------------------------------------
 const FILENAME_DIVISION_MAP: Array<{ pattern: RegExp; division: string }> = [
   { pattern: /ptmt/i,                          division: "PTMT & Plastic Fittings" },
-  { pattern: /pipe|fitting/i,                  division: "Pipe & Fittings" },
-  { pattern: /\bcp\b|chrome/i,                 division: "CP Fittings" },
-  { pattern: /sanitar/i,                       division: "Sanitaryware" },
+  { pattern: /pipe|fitting/i,                  division: "Pipes & Fittings" },
+  { pattern: /\bcp\b|chrome/i,                 division: "CP Fittings / Faucets" },
+  { pattern: /sanitar/i,                       division: "Ceramic Sanitaryware" },
   { pattern: /quaa|fern/i,                     division: "QUAA & FERN" },
 ];
 
@@ -316,9 +363,9 @@ async function persistParsedRows(
   priceColHeader: string,
   skippedUnparseable: number,
 ): Promise<LoadSummary> {
-  // De-duplicate within the uploaded file by item code (keep last).
-  const byCode = new Map<string, number>();
-  for (const r of parsedRows) byCode.set(r.itemCode, r.price);
+  // De-duplicate within the uploaded file by item code (keep last occurrence).
+  const byCode = new Map<string, { price: number; productName: string | null; category: string | null }>();
+  for (const r of parsedRows) byCode.set(r.itemCode, { price: r.price, productName: r.productName, category: r.category });
 
   if (byCode.size === 0) {
     return {
@@ -357,8 +404,6 @@ async function persistParsedRows(
 
   // Infer division once per file — same for every product in this upload.
   const inferredDivision = divisionFromFilename(filename);
-  // Collect existing products that have a null division so we can backfill.
-  const existingNullDivisionCodes: Set<string> = new Set();
 
   await db.transaction(async (tx) => {
     const existingPairs = await tx
@@ -370,29 +415,32 @@ async function persistParsedRows(
       .where(eq(mrpPriceHistoryTable.effectiveDate, effectiveDate));
     const dupSet = new Set(existingPairs.map((p) => normCode(p.itemCode)));
 
-    // Also fetch which existing products still have a null division so we can
-    // backfill them in one batch at the end of the transaction.
-    const nullDivRows = inferredDivision
-      ? await tx
-          .select({ itemCode: catalogProductsTable.itemCode })
-          .from(catalogProductsTable)
-          .where(eq(catalogProductsTable.division, null as unknown as string))
-      : [];
-    const nullDivSet = new Set(nullDivRows.map((r) => r.itemCode));
+    // Fetch existing products that are missing name or division so we can backfill.
+    const existingRows = await tx
+      .select({
+        itemCode: catalogProductsTable.itemCode,
+        productName: catalogProductsTable.productName,
+        division: catalogProductsTable.division,
+        category: catalogProductsTable.category,
+      })
+      .from(catalogProductsTable);
+    const existingMap = new Map(existingRows.map((r) => [r.itemCode, r]));
 
     const newProductValues: (typeof catalogProductsTable.$inferInsert)[] = [];
     const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
+    // Backfill updates: itemCode -> {productName?, division?, category?}
+    const backfillMap = new Map<string, Partial<typeof catalogProductsTable.$inferInsert>>();
 
-    for (const [code, price] of byCode) {
+    for (const [code, { price, productName, category }] of byCode) {
       const isKnown = knownCodes.has(code);
       const storedCode = canonical.get(code) ?? code;
 
       if (!isKnown) {
         newProductValues.push({
           itemCode: storedCode,
-          productName: null,
+          productName: productName ?? null,
           division: inferredDivision,
-          category: null,
+          category: category ?? null,
           uom: "NOS",
           isActive: true,
           sourceFiles: filename,
@@ -404,9 +452,14 @@ async function persistParsedRows(
         canonical.set(code, storedCode);
       } else {
         summary.matchedProducts++;
-        // Queue backfill for existing products still missing a division.
-        if (inferredDivision && nullDivSet.has(storedCode)) {
-          existingNullDivisionCodes.add(storedCode);
+        // Backfill any null metadata on existing products.
+        const existing = existingMap.get(storedCode);
+        if (existing) {
+          const patch: Partial<typeof catalogProductsTable.$inferInsert> = {};
+          if (!existing.productName && productName) patch.productName = productName;
+          if (!existing.division && inferredDivision) patch.division = inferredDivision;
+          if (!existing.category && category) patch.category = category;
+          if (Object.keys(patch).length > 0) backfillMap.set(storedCode, patch);
         }
       }
 
@@ -440,14 +493,26 @@ async function persistParsedRows(
       }
     }
 
-    // Backfill division on existing products that were missing it.
-    if (inferredDivision && existingNullDivisionCodes.size > 0) {
-      const codes = [...existingNullDivisionCodes];
-      for (let i = 0; i < codes.length; i += 500) {
-        await tx
-          .update(catalogProductsTable)
-          .set({ division: inferredDivision })
-          .where(inArray(catalogProductsTable.itemCode, codes.slice(i, i + 500)));
+    // Apply backfill patches for existing products with null metadata.
+    // Group by patch shape to minimize number of UPDATE statements.
+    if (backfillMap.size > 0) {
+      // Simple approach: update one at a time in batches of 500 using inArray
+      // for the common case where all patches in a batch share the same fields.
+      const byPatch = new Map<string, string[]>();
+      for (const [code, patch] of backfillMap) {
+        const key = JSON.stringify(patch);
+        const list = byPatch.get(key) ?? [];
+        list.push(code);
+        byPatch.set(key, list);
+      }
+      for (const [patchJson, codes] of byPatch) {
+        const patch = JSON.parse(patchJson) as Partial<typeof catalogProductsTable.$inferInsert>;
+        for (let i = 0; i < codes.length; i += 500) {
+          await tx
+            .update(catalogProductsTable)
+            .set(patch)
+            .where(inArray(catalogProductsTable.itemCode, codes.slice(i, i + 500)));
+        }
       }
     }
   });
