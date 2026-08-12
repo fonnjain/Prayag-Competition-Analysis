@@ -308,13 +308,29 @@ router.patch("/catalog/products/:itemCode/mrp", async (req, res) => {
 
   await recomputeCurrentFlags();
 
+  // Read back the row that recomputeCurrentFlags() just promoted to isCurrent=true.
+  // Effective-date ordering may have elected a different row than the one we just
+  // inserted, so we must use the actual current MRP rather than the request body's
+  // value when snapshotting competitor gaps.
+  const [currentRow] = await db
+    .select()
+    .from(mrpPriceHistoryTable)
+    .where(
+      and(
+        eq(mrpPriceHistoryTable.itemCode, itemCode),
+        eq(mrpPriceHistoryTable.isCurrent, true),
+      ),
+    )
+    .limit(1);
+
+  const actualCurrentMrp = currentRow?.mrp ?? mrp;
+
   // Refresh the snapshot MRP stored on every matched competitor row so the
   // Competition Analysis dashboard reflects the new price immediately.
-  const today2 = new Date().toISOString().slice(0, 10);
   const refreshed = await db
     .update(competitorPricesTable)
     .set({
-      prayagMrpAtCompare: mrp,
+      prayagMrpAtCompare: actualCurrentMrp,
       updatedAt: new Date(),
     })
     .where(
@@ -325,19 +341,12 @@ router.patch("/catalog/products/:itemCode/mrp", async (req, res) => {
     )
     .returning({ id: competitorPricesTable.id });
 
-  const [updated] = await db
-    .select()
-    .from(mrpPriceHistoryTable)
-    .where(eq(mrpPriceHistoryTable.itemCode, itemCode))
-    .orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id))
-    .limit(1);
-
   res.json({
     ok: true,
     itemCode,
-    mrp,
-    effectiveDate,
-    current: updated ?? null,
+    mrp: actualCurrentMrp,
+    effectiveDate: currentRow?.effectiveDate ?? effectiveDate,
+    current: currentRow ?? null,
     competitorRowsRefreshed: refreshed.length,
   });
 });
