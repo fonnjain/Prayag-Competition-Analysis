@@ -1,9 +1,26 @@
-import { Factory, PackageSearch, FileSpreadsheet, Hexagon, BarChart3, Scale } from "lucide-react";
+import { Factory, PackageSearch, FileSpreadsheet, Hexagon, BarChart3, Scale, LogOut } from "lucide-react";
 import React from "react";
+import { useAuth } from "@workspace/replit-auth-web";
 
 export default function Home() {
+  const { user, logout } = useAuth();
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Top-right user / logout */}
+      <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
+        {user && (
+          <span className="text-sm text-muted-foreground hidden sm:block">{user.name ?? user.username}</span>
+        )}
+        <button
+          onClick={logout}
+          className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Log out
+        </button>
+      </div>
+
       {/* Decorative background elements */}
       <div className="absolute top-0 left-0 w-full h-[400px] bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
       <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />

@@ -14,7 +14,8 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale } from "lucide-react";
+import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, LogOut } from "lucide-react";
+import { useAuth } from "@workspace/replit-auth-web";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ export type DashboardFilters = {
 };
 
 export default function Dashboard() {
+  const { user, logout } = useAuth();
   const [mode, setMode] = useState<CompareMode>("mrp");
   const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
   // Mode rides along inside the filters object so every child hook + the export
@@ -72,6 +74,15 @@ export default function Dashboard() {
                 <Settings className="h-4 w-4 mr-2" />
                 Discounts
               </Link>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 pl-2 border-l border-border">
+            {user && (
+              <span className="text-sm text-muted-foreground hidden md:block">{user.name ?? user.username}</span>
+            )}
+            <Button variant="ghost" size="sm" onClick={logout} title="Log out">
+              <LogOut className="h-4 w-4 mr-2" />
+              Log out
             </Button>
           </div>
         </div>

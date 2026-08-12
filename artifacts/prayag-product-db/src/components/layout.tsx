@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
-import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key } from "lucide-react";
+import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@workspace/replit-auth-web";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { href: "/", label: "Catalog", icon: Box },
@@ -51,6 +53,20 @@ export function Layout({ children }: LayoutProps) {
             );
           })}
         </nav>
+
+        {/* User / logout */}
+        <div className="px-4 pb-4 pt-2 border-t border-sidebar-border mt-2">
+          {user && (
+            <p className="text-xs text-sidebar-foreground/50 truncate px-3 mb-1">{user.name ?? user.username}</p>
+          )}
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Log out
+          </button>
+        </div>
       </aside>
       
       <main className="flex-1 overflow-auto bg-background">
