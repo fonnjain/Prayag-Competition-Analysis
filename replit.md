@@ -36,7 +36,8 @@ A mobile-friendly internal multi-app hub for Prayag Polymers: a master product c
 - DB schema (source of truth): `lib/db/src/schema/catalog.ts` (catalog_products, mrp_price_history, competitor_prices, code_conflicts, accept_batches, discount_settings)
 - Analysis engine: `artifacts/api-server/src/lib/analysis.ts` (live-computed per request)
 - Catalog seed: `artifacts/api-server/src/lib/catalogSeed.ts` from `artifacts/api-server/src/seed/catalog-seed.json` + `competitor-seed.json`
-- API routes: `artifacts/api-server/src/routes/` (health, catalog, catalogImportExport, comparison, analysis)
+- API routes: `artifacts/api-server/src/routes/` (health, catalog, catalogImportExport, comparison, analysis, apiKeys, externalV1)
+- External API: `/api/v1/*` (products, products/{itemCode}, comparison, analysis/overview) requires an `X-API-Key` header; keys are managed on the Product DB "API Keys" page (`/product-db/api-keys`). Secrets are shown once at creation; only SHA-256 hashes are stored (`api_keys` table). `/v1` routes are an explicit GET-only allowlist that rewrites onto internal handlers (`routes/externalV1.ts`).
 - Frontends: `artifacts/prayag-home/`, `artifacts/prayag-product-db/`, `artifacts/prayag-analysis/`
 
 ## Architecture decisions

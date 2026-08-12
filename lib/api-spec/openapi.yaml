@@ -26,6 +26,228 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /keys:
+    get:
+      operationId: getApiKeys
+      tags: [apiKeys]
+      summary: List API keys (never returns the secret; only prefix + metadata)
+      responses:
+        "200":
+          description: API key list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyList"
+    post:
+      operationId: createApiKey
+      tags: [apiKeys]
+      summary: Generate a new API key. The full secret is returned ONCE in this response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyCreate"
+      responses:
+        "201":
+          description: Key created (full secret shown once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/{id}/revoke:
+    post:
+      operationId: revokeApiKey
+      tags: [apiKeys]
+      summary: Revoke an API key (it stops working immediately; row is kept for audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /keys/{id}:
+    delete:
+      operationId: deleteApiKey
+      tags: [apiKeys]
+      summary: Permanently delete an API key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/products:
+    get:
+      operationId: externalListProducts
+      tags: [external]
+      summary: "External API: list products with current MRP (requires X-API-Key header)"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: division
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogProductList"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/products/{itemCode}:
+    get:
+      operationId: externalGetProduct
+      tags: [external]
+      summary: "External API: product detail with MRP history (requires X-API-Key header)"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product detail with history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogProductDetail"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/comparison:
+    get:
+      operationId: externalGetComparison
+      tags: [external]
+      summary: "External API: competitor comparison rows (requires X-API-Key header)"
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: competitor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comparison rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonList"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/analysis/overview:
+    get:
+      operationId: externalGetAnalysisOverview
+      tags: [external]
+      summary: "External API: market analysis overview KPIs (requires X-API-Key header)"
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Analysis overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisOverview"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/products:
     get:
       operationId: getCatalogProducts
@@ -1774,3 +1996,53 @@ components:
           type: boolean
         deleted:
           type: integer
+    ApiKey:
+      type: object
+      required: [id, name, keyPrefix, isActive, lastUsedAt, createdAt, revokedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        keyPrefix:
+          type: string
+          description: First characters of the key (e.g. "pryg_a1b2c3…") for identification. The full secret is never stored or returned after creation.
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        revokedAt:
+          type: ["string", "null"]
+    ApiKeyList:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiKey"
+    ApiKeyCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: A label describing who/what will use this key.
+    ApiKeyCreated:
+      type: object
+      required: [key, apiKey]
+      properties:
+        key:
+          type: string
+          description: The full API key secret. Shown only once — it cannot be retrieved again.
+        apiKey:
+          $ref: "#/components/schemas/ApiKey"
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key

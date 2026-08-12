@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp } from "lucide-react";
+import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -16,6 +16,7 @@ export function Layout({ children }: LayoutProps) {
     { href: "/load-mrp", label: "Load MRP", icon: FileSpreadsheet },
     { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
     { href: "/data-health", label: "Data Health", icon: Database },
+    { href: "/api-keys", label: "API Keys", icon: Key },
   ];
 
   return (

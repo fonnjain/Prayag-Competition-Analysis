@@ -3,4 +3,5 @@
 - [Prayag Product Database app](prayag-product-db.md) — append-only MRP history rules, unique-index backstop, invalidate via generated query-key helpers, dedupe category filters.
 - [Competitor import price-gap guardrail](competitor-import-guardrail.md) — auto-matched imports reject gap vs Prayag MRP outside ~-80%..+100%; verified manual reuploads bypass it.
 - [Prayag Competition Analysis dashboard](prayag-analysis-dashboard.md) — /analysis live-compute over existing tables; ex-GST×1.18 basis, comparability gate, green=Prayag-cheaper sign convention.
+- [Prayag external API keys](prayag-external-api-keys.md) — /api/v1 is a GET-only allowlist behind X-API-Key (hash-only storage); never mount internal routers under /v1.
 - [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 web apps (home/, product-db/, analysis/) behind one proxy; console app deleted; cross-app links use raw absolute <a href>, never BASE_URL/wouter.

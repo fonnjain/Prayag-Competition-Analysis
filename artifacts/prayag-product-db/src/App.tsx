@@ -11,6 +11,7 @@ import DataHealthPage from "@/pages/data-health";
 import ComparisonPage from "@/pages/comparison";
 import MappingReviewPage from "@/pages/mapping-review";
 import ImportCompetitorPage from "@/pages/import-competitor";
+import ApiKeysPage from "@/pages/api-keys";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/comparison" component={ComparisonPage} />
       <Route path="/mapping-review" component={MappingReviewPage} />
       <Route path="/import-competitor" component={ImportCompetitorPage} />
+      <Route path="/api-keys" component={ApiKeysPage} />
       <Route component={NotFound} />
     </Switch>
   );
