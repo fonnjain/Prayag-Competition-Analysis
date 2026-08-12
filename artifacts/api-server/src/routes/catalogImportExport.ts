@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import AdmZip from "adm-zip";
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc, desc, inArray } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -282,6 +282,26 @@ function parseWorkbookBuffer(
 }
 
 // ---------------------------------------------------------------------------
+// Infer a product division from the uploaded filename so that products get
+// classified automatically without needing a separate SQL update step.
+// ---------------------------------------------------------------------------
+const FILENAME_DIVISION_MAP: Array<{ pattern: RegExp; division: string }> = [
+  { pattern: /ptmt/i,                          division: "PTMT & Plastic Fittings" },
+  { pattern: /pipe|fitting/i,                  division: "Pipe & Fittings" },
+  { pattern: /\bcp\b|chrome/i,                 division: "CP Fittings" },
+  { pattern: /sanitar/i,                       division: "Sanitaryware" },
+  { pattern: /quaa|fern/i,                     division: "QUAA & FERN" },
+];
+
+function divisionFromFilename(filename: string): string | null {
+  const base = filename.replace(/\.[^.]+$/, "").toLowerCase();
+  for (const { pattern, division } of FILENAME_DIVISION_MAP) {
+    if (pattern.test(base)) return division;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: persist a set of already-parsed rows to DB inside a transaction and
 // return a filled-in LoadSummary.  Mutates knownCodes/canonical in place.
 // ---------------------------------------------------------------------------
@@ -335,6 +355,11 @@ async function persistParsedRows(
     unmatchedCodes: [],
   };
 
+  // Infer division once per file — same for every product in this upload.
+  const inferredDivision = divisionFromFilename(filename);
+  // Collect existing products that have a null division so we can backfill.
+  const existingNullDivisionCodes: Set<string> = new Set();
+
   await db.transaction(async (tx) => {
     const existingPairs = await tx
       .select({
@@ -344,6 +369,16 @@ async function persistParsedRows(
       .from(mrpPriceHistoryTable)
       .where(eq(mrpPriceHistoryTable.effectiveDate, effectiveDate));
     const dupSet = new Set(existingPairs.map((p) => normCode(p.itemCode)));
+
+    // Also fetch which existing products still have a null division so we can
+    // backfill them in one batch at the end of the transaction.
+    const nullDivRows = inferredDivision
+      ? await tx
+          .select({ itemCode: catalogProductsTable.itemCode })
+          .from(catalogProductsTable)
+          .where(eq(catalogProductsTable.division, null as unknown as string))
+      : [];
+    const nullDivSet = new Set(nullDivRows.map((r) => r.itemCode));
 
     const newProductValues: (typeof catalogProductsTable.$inferInsert)[] = [];
     const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
@@ -356,7 +391,7 @@ async function persistParsedRows(
         newProductValues.push({
           itemCode: storedCode,
           productName: null,
-          division: null,
+          division: inferredDivision,
           category: null,
           uom: "NOS",
           isActive: true,
@@ -369,6 +404,10 @@ async function persistParsedRows(
         canonical.set(code, storedCode);
       } else {
         summary.matchedProducts++;
+        // Queue backfill for existing products still missing a division.
+        if (inferredDivision && nullDivSet.has(storedCode)) {
+          existingNullDivisionCodes.add(storedCode);
+        }
       }
 
       if (dupSet.has(code)) {
@@ -398,6 +437,17 @@ async function persistParsedRows(
     if (historyValues.length > 0) {
       for (let i = 0; i < historyValues.length; i += 500) {
         await tx.insert(mrpPriceHistoryTable).values(historyValues.slice(i, i + 500));
+      }
+    }
+
+    // Backfill division on existing products that were missing it.
+    if (inferredDivision && existingNullDivisionCodes.size > 0) {
+      const codes = [...existingNullDivisionCodes];
+      for (let i = 0; i < codes.length; i += 500) {
+        await tx
+          .update(catalogProductsTable)
+          .set({ division: inferredDivision })
+          .where(inArray(catalogProductsTable.itemCode, codes.slice(i, i + 500)));
       }
     }
   });
