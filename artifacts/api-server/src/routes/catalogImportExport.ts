@@ -61,27 +61,76 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
   }
   const headers = (grid[headerRow] ?? []).map((h) => norm(h).toLowerCase());
 
-  // Code column: prefer the column with the most overlap against known codes;
-  // fall back to a header containing "code" or "item".
-  let codeCol = -1;
-  let bestOverlap = 0;
-  for (let c = 0; c < maxCols; c++) {
-    let overlap = 0;
+  // Columns whose headers signal serial numbers — never treat as item codes.
+  const SERIAL_HEADER_TOKENS = ["s.no", "sno", "sr.no", "sl.no", "sr.", "sl.", "serial"];
+  const isSerialHeader = (c: number) => {
+    const h = (headers[c] ?? "").replace(/\s+/g, "").toLowerCase();
+    if (h === "no" || h === "no." || h === "#") return true;
+    return SERIAL_HEADER_TOKENS.some((t) => h === t || h.startsWith(t));
+  };
+
+  // Returns true when most non-empty data values in column c are consecutive
+  // small integers — i.e. the column is a serial/row-number column.
+  const isSequentialIntColumn = (c: number): boolean => {
+    const nums: number[] = [];
     for (let r = 0; r < grid.length; r++) {
       if (r === headerRow) continue;
-      if (knownCodes.has(normCode(grid[r]?.[c]))) overlap++;
+      const v = grid[r]?.[c];
+      const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
+      if (!isNaN(n) && n > 0 && Number.isInteger(n)) nums.push(n);
     }
-    if (overlap > bestOverlap) {
-      bestOverlap = overlap;
+    if (nums.length < 3) return false;
+    const sorted = [...nums].sort((a, b) => a - b);
+    let consecutive = 0;
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] - sorted[i - 1] <= 1) consecutive++;
+    }
+    return consecutive / (sorted.length - 1) > 0.75;
+  };
+
+  // Columns whose headers are measurement/dimension labels — not item codes.
+  const DIMENSION_TOKENS = ["size", "length", "width", "height", "dia", "weight", "capacity"];
+  const isDimensionHeader = (c: number) => {
+    const h = (headers[c] ?? "").toLowerCase();
+    return DIMENSION_TOKENS.some((t) => h.includes(t));
+  };
+
+  // Code column: prefer keyword-identified column first, then overlap.
+  // Priority 1 — explicit code-column header ("code", "item code", "cat no.", etc.)
+  const CODE_KEYWORDS = ["item code", "itemcode", "cat no", "catno", "cat. no"];
+  let codeCol = -1;
+  for (let c = 0; c < maxCols; c++) {
+    if (isSerialHeader(c) || isDimensionHeader(c)) continue;
+    const h = (headers[c] ?? "").toLowerCase().replace(/[\s.]/g, "");
+    if (CODE_KEYWORDS.some((k) => k.replace(/[\s.]/g, "") === h || h.startsWith(k.replace(/[\s.]/g, "")))) {
       codeCol = c;
+      break;
     }
   }
+  // Priority 2 — looser keyword fallback ("code" or "item" in header)
   if (codeCol === -1) {
     for (let c = 0; c < maxCols; c++) {
+      if (isSerialHeader(c) || isDimensionHeader(c)) continue;
       const h = headers[c] ?? "";
       if (h.includes("code") || h.includes("item")) {
         codeCol = c;
         break;
+      }
+    }
+  }
+  // Priority 3 — overlap scan (excluding serial, dimension, and sequential-int columns)
+  if (codeCol === -1) {
+    let bestOverlap = 0;
+    for (let c = 0; c < maxCols; c++) {
+      if (isSerialHeader(c) || isDimensionHeader(c) || isSequentialIntColumn(c)) continue;
+      let overlap = 0;
+      for (let r = 0; r < grid.length; r++) {
+        if (r === headerRow) continue;
+        if (knownCodes.has(normCode(grid[r]?.[c]))) overlap++;
+      }
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        codeCol = c;
       }
     }
   }
