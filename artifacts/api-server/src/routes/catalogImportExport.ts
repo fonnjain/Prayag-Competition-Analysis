@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import AdmZip from "adm-zip";
 import { eq, asc, desc } from "drizzle-orm";
 import {
   db,
@@ -23,7 +24,7 @@ const GAP_MAX_PCT = 100;
 const router: IRouter = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 const NET_KEYWORDS = ["net", "rate", "dealer", "scheme", "billing", "discount"];
@@ -231,6 +232,183 @@ interface LoadSummary {
   message?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Helper: parse all sheets in a workbook buffer into rows + metadata.
+// Mutates knownCodes/canonical in place so successive files in a zip see
+// products inserted by earlier files.
+// ---------------------------------------------------------------------------
+function parseWorkbookBuffer(
+  buffer: Buffer,
+  knownCodes: Set<string>,
+): {
+  rows: ParsedRow[];
+  basis: string;
+  codeColHeader: string;
+  priceColHeader: string;
+  skippedUnparseable: number;
+  skippedRows: SkippedRow[];
+} {
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  let rows: ParsedRow[] = [];
+  let basis = "Verify";
+  let codeColHeader = "";
+  let priceColHeader = "";
+  let skippedUnparseable = 0;
+  const skippedRows: SkippedRow[] = [];
+
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) continue;
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: null,
+    });
+    const parsed = parseSheet(grid, knownCodes);
+    skippedUnparseable += parsed.skippedRows.length;
+    skippedRows.push(...parsed.skippedRows);
+    if (parsed.rows.length > 0) {
+      rows = rows.concat(parsed.rows);
+      basis = parsed.basis;
+      if (!codeColHeader) codeColHeader = parsed.codeColHeader;
+      if (!priceColHeader) priceColHeader = parsed.priceColHeader;
+    } else {
+      if (!codeColHeader && parsed.codeColHeader) codeColHeader = parsed.codeColHeader;
+      if (!priceColHeader && parsed.priceColHeader) priceColHeader = parsed.priceColHeader;
+      basis = parsed.basis;
+    }
+  }
+
+  return { rows, basis, codeColHeader, priceColHeader, skippedUnparseable, skippedRows };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: persist a set of already-parsed rows to DB inside a transaction and
+// return a filled-in LoadSummary.  Mutates knownCodes/canonical in place.
+// ---------------------------------------------------------------------------
+async function persistParsedRows(
+  parsedRows: ParsedRow[],
+  filename: string,
+  effectiveDate: string,
+  knownCodes: Set<string>,
+  canonical: Map<string, string>,
+  basis: string,
+  codeColHeader: string,
+  priceColHeader: string,
+  skippedUnparseable: number,
+): Promise<LoadSummary> {
+  // De-duplicate within the uploaded file by item code (keep last).
+  const byCode = new Map<string, number>();
+  for (const r of parsedRows) byCode.set(r.itemCode, r.price);
+
+  if (byCode.size === 0) {
+    return {
+      file: filename,
+      effectiveDate,
+      basis,
+      codeColHeader,
+      priceColHeader,
+      totalRows: 0,
+      matchedProducts: 0,
+      newProducts: 0,
+      newHistoryRows: 0,
+      skippedDuplicates: 0,
+      skippedUnparseable,
+      unmatchedCodes: [],
+      message:
+        "No valid code-and-price rows could be read from the file. Check the sheet has a recognisable item-code column and a price/MRP column.",
+    };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const summary: LoadSummary = {
+    file: filename,
+    effectiveDate,
+    basis,
+    codeColHeader,
+    priceColHeader,
+    totalRows: byCode.size,
+    matchedProducts: 0,
+    newProducts: 0,
+    newHistoryRows: 0,
+    skippedDuplicates: 0,
+    skippedUnparseable,
+    unmatchedCodes: [],
+  };
+
+  await db.transaction(async (tx) => {
+    const existingPairs = await tx
+      .select({
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+      })
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.effectiveDate, effectiveDate));
+    const dupSet = new Set(existingPairs.map((p) => normCode(p.itemCode)));
+
+    const newProductValues: (typeof catalogProductsTable.$inferInsert)[] = [];
+    const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
+
+    for (const [code, price] of byCode) {
+      const isKnown = knownCodes.has(code);
+      const storedCode = canonical.get(code) ?? code;
+
+      if (!isKnown) {
+        newProductValues.push({
+          itemCode: storedCode,
+          productName: null,
+          division: null,
+          category: null,
+          uom: "NOS",
+          isActive: true,
+          sourceFiles: filename,
+          dataFlag: "new_from_load",
+        });
+        summary.newProducts++;
+        summary.unmatchedCodes.push(storedCode);
+        knownCodes.add(code);
+        canonical.set(code, storedCode);
+      } else {
+        summary.matchedProducts++;
+      }
+
+      if (dupSet.has(code)) {
+        summary.skippedDuplicates++;
+        continue;
+      }
+
+      historyValues.push({
+        itemCode: storedCode,
+        mrp: price,
+        netPrice: basis === "Net" ? price : null,
+        priceBasis: basis,
+        effectiveDate,
+        loadDate: today,
+        sourceFile: filename,
+        isCurrent: false,
+      });
+      dupSet.add(code);
+      summary.newHistoryRows++;
+    }
+
+    if (newProductValues.length > 0) {
+      for (let i = 0; i < newProductValues.length; i += 500) {
+        await tx.insert(catalogProductsTable).values(newProductValues.slice(i, i + 500));
+      }
+    }
+    if (historyValues.length > 0) {
+      for (let i = 0; i < historyValues.length; i += 500) {
+        await tx.insert(mrpPriceHistoryTable).values(historyValues.slice(i, i + 500));
+      }
+    }
+  });
+
+  if (summary.newHistoryRows === 0 && summary.skippedDuplicates > 0) {
+    summary.message = `All ${summary.skippedDuplicates} rows already exist for effective date ${effectiveDate} — nothing added (re-load is safe).`;
+  }
+
+  return summary;
+}
+
 router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
   const file = req.file;
   if (!file) {
@@ -250,8 +428,8 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
 
   const name = file.originalname;
   const ext = name.toLowerCase().split(".").pop() ?? "";
-  if (!["xlsx", "xls", "csv"].includes(ext)) {
-    res.status(400).json({ error: "Upload an .xlsx, .xls, or .csv file" });
+  if (!["xlsx", "xls", "csv", "zip"].includes(ext)) {
+    res.status(400).json({ error: "Upload an .xlsx, .xls, .csv, or .zip file" });
     return;
   }
 
@@ -260,164 +438,93 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
       .select({ itemCode: catalogProductsTable.itemCode })
       .from(catalogProductsTable);
     const knownCodes = new Set(existingProducts.map((p) => normCode(p.itemCode)));
-    // Map normalized -> canonical itemCode as stored.
     const canonical = new Map<string, string>(
       existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
     );
 
-    const wb = XLSX.read(file.buffer, { type: "buffer" });
-    let parsedRows: ParsedRow[] = [];
-    let basis = "Verify";
-    let detectedCodeColHeader = "";
-    let detectedPriceColHeader = "";
-    let totalSkippedUnparseable = 0;
-    const allSkippedRows: SkippedRow[] = [];
-    for (const sheetName of wb.SheetNames) {
-      const sheet = wb.Sheets[sheetName];
-      if (!sheet) continue;
-      const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-        header: 1,
-        defval: null,
-      });
-      const parsed = parseSheet(grid, knownCodes);
-      // Accumulate skipped rows from every sheet
-      totalSkippedUnparseable += parsed.skippedRows.length;
-      allSkippedRows.push(...parsed.skippedRows);
-      if (parsed.rows.length > 0) {
-        parsedRows = parsedRows.concat(parsed.rows);
-        basis = parsed.basis;
-        if (!detectedCodeColHeader) detectedCodeColHeader = parsed.codeColHeader;
-        if (!detectedPriceColHeader) detectedPriceColHeader = parsed.priceColHeader;
-      } else {
-        // Even if no rows, record which columns were found (for diagnostics)
-        if (!detectedCodeColHeader && parsed.codeColHeader) detectedCodeColHeader = parsed.codeColHeader;
-        if (!detectedPriceColHeader && parsed.priceColHeader) detectedPriceColHeader = parsed.priceColHeader;
-        basis = parsed.basis;
+    // ------------------------------------------------------------------
+    // ZIP: process every xlsx/xls/csv entry inside the archive, one at a
+    // time, accumulating results.  knownCodes/canonical are mutated across
+    // iterations so later files see products created by earlier ones.
+    // ------------------------------------------------------------------
+    if (ext === "zip") {
+      const zip = new AdmZip(file.buffer);
+      const entries = zip
+        .getEntries()
+        .filter((e) => {
+          if (e.isDirectory) return false;
+          const entryExt = e.name.toLowerCase().split(".").pop() ?? "";
+          return ["xlsx", "xls", "csv"].includes(entryExt);
+        })
+        // Ignore macOS resource-fork entries (__MACOSX / ._xxx)
+        .filter((e) => !e.entryName.startsWith("__MACOSX") && !e.name.startsWith("._"))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (entries.length === 0) {
+        res.status(400).json({
+          error: "The ZIP file contains no .xlsx / .xls / .csv files.",
+        });
+        return;
       }
-    }
 
-    // De-duplicate within the uploaded file by item code (keep last).
-    const byCode = new Map<string, number>();
-    for (const r of parsedRows) byCode.set(r.itemCode, r.price);
-
-    if (byCode.size === 0) {
-      res.json({
-        results: {
-          file: name,
+      const fileSummaries: LoadSummary[] = [];
+      for (const entry of entries) {
+        const buf = entry.getData();
+        const parsed = parseWorkbookBuffer(buf, knownCodes);
+        const summary = await persistParsedRows(
+          parsed.rows,
+          entry.name,
           effectiveDate,
-          basis,
-          codeColHeader: detectedCodeColHeader,
-          priceColHeader: detectedPriceColHeader,
-          totalRows: 0,
-          matchedProducts: 0,
-          newProducts: 0,
-          newHistoryRows: 0,
-          skippedDuplicates: 0,
-          skippedUnparseable: totalSkippedUnparseable,
-          // unmatchedCodes is only meaningful when valid rows were parsed;
-          // in the zero-parse case there are no catalog-missing codes to report.
-          unmatchedCodes: [],
-          message:
-            "No valid code-and-price rows could be read from the file. Check the sheet has a recognisable item-code column and a price/MRP column.",
-        } satisfies LoadSummary,
-      });
+          knownCodes,
+          canonical,
+          parsed.basis,
+          parsed.codeColHeader,
+          parsed.priceColHeader,
+          parsed.skippedUnparseable,
+        );
+        fileSummaries.push(summary);
+      }
+
+      await recomputeCurrentFlags();
+
+      // Build aggregate totals across all files.
+      const aggregate = {
+        file: name,
+        effectiveDate,
+        basis: fileSummaries.map((s) => s.basis).join(", "),
+        codeColHeader: "",
+        priceColHeader: "",
+        totalRows: fileSummaries.reduce((s, f) => s + f.totalRows, 0),
+        matchedProducts: fileSummaries.reduce((s, f) => s + f.matchedProducts, 0),
+        newProducts: fileSummaries.reduce((s, f) => s + f.newProducts, 0),
+        newHistoryRows: fileSummaries.reduce((s, f) => s + f.newHistoryRows, 0),
+        skippedDuplicates: fileSummaries.reduce((s, f) => s + f.skippedDuplicates, 0),
+        skippedUnparseable: fileSummaries.reduce((s, f) => s + f.skippedUnparseable, 0),
+        unmatchedCodes: fileSummaries.flatMap((f) => f.unmatchedCodes),
+        files: fileSummaries,
+      };
+
+      res.json({ results: aggregate });
       return;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const summary: LoadSummary = {
-      file: name,
+    // ------------------------------------------------------------------
+    // Single spreadsheet file (existing behaviour)
+    // ------------------------------------------------------------------
+    const parsed = parseWorkbookBuffer(file.buffer, knownCodes);
+    const summary = await persistParsedRows(
+      parsed.rows,
+      name,
       effectiveDate,
-      basis,
-      codeColHeader: detectedCodeColHeader,
-      priceColHeader: detectedPriceColHeader,
-      totalRows: byCode.size,
-      matchedProducts: 0,
-      newProducts: 0,
-      newHistoryRows: 0,
-      skippedDuplicates: 0,
-      skippedUnparseable: totalSkippedUnparseable,
-      unmatchedCodes: [],
-    };
-
-    await db.transaction(async (tx) => {
-      // Existing (code, effective_date) pairs for duplicate detection.
-      const existingPairs = await tx
-        .select({
-          itemCode: mrpPriceHistoryTable.itemCode,
-          effectiveDate: mrpPriceHistoryTable.effectiveDate,
-        })
-        .from(mrpPriceHistoryTable)
-        .where(eq(mrpPriceHistoryTable.effectiveDate, effectiveDate));
-      const dupSet = new Set(
-        existingPairs.map((p) => normCode(p.itemCode)),
-      );
-
-      const newProductValues: (typeof catalogProductsTable.$inferInsert)[] = [];
-      const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
-
-      for (const [code, price] of byCode) {
-        const isKnown = knownCodes.has(code);
-        const storedCode = canonical.get(code) ?? code;
-
-        if (!isKnown) {
-          newProductValues.push({
-            itemCode: storedCode,
-            productName: null,
-            division: null,
-            category: null,
-            uom: "NOS",
-            isActive: true,
-            sourceFiles: name,
-            dataFlag: "new_from_load",
-          });
-          summary.newProducts++;
-          summary.unmatchedCodes.push(storedCode);
-          knownCodes.add(code);
-        } else {
-          summary.matchedProducts++;
-        }
-
-        if (dupSet.has(code)) {
-          summary.skippedDuplicates++;
-          continue;
-        }
-
-        historyValues.push({
-          itemCode: storedCode,
-          mrp: price,
-          netPrice: basis === "Net" ? price : null,
-          priceBasis: basis,
-          effectiveDate,
-          loadDate: today,
-          sourceFile: name,
-          isCurrent: false,
-        });
-        dupSet.add(code);
-        summary.newHistoryRows++;
-      }
-
-      if (newProductValues.length > 0) {
-        for (let i = 0; i < newProductValues.length; i += 500) {
-          await tx
-            .insert(catalogProductsTable)
-            .values(newProductValues.slice(i, i + 500));
-        }
-      }
-      if (historyValues.length > 0) {
-        for (let i = 0; i < historyValues.length; i += 500) {
-          await tx
-            .insert(mrpPriceHistoryTable)
-            .values(historyValues.slice(i, i + 500));
-        }
-      }
-    });
+      knownCodes,
+      canonical,
+      parsed.basis,
+      parsed.codeColHeader,
+      parsed.priceColHeader,
+      parsed.skippedUnparseable,
+    );
 
     await recomputeCurrentFlags();
-
-    if (summary.newHistoryRows === 0 && summary.skippedDuplicates > 0) {
-      summary.message = `All ${summary.skippedDuplicates} rows already exist for effective date ${effectiveDate} — nothing added (re-load is safe).`;
-    }
 
     res.json({ results: summary });
   } catch (err) {

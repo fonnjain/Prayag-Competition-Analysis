@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Download, FileSpreadsheet, Upload } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Upload } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetCatalogProductsQueryKey,
@@ -16,6 +16,7 @@ export default function LoadMrpPage() {
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -94,14 +95,17 @@ export default function LoadMrpPage() {
       <div className="bg-card border rounded-lg p-6">
         <form onSubmit={handleUpload} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="file">Price Sheet (Excel/CSV)</Label>
+            <Label htmlFor="file">Price Sheet (Excel / CSV / ZIP)</Label>
             <Input 
               id="file" 
               type="file" 
-              accept=".xlsx,.xls,.csv" 
+              accept=".xlsx,.xls,.csv,.zip" 
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               required
             />
+            <p className="text-xs text-muted-foreground">
+              Upload a single Excel/CSV file, or a ZIP containing multiple spreadsheets. All files in the ZIP will use the same effective date.
+            </p>
           </div>
           
           <div className="space-y-2">
@@ -133,37 +137,44 @@ export default function LoadMrpPage() {
           <h3 className="font-semibold text-lg flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-primary" />
             Import Summary
+            {result.files && (
+              <span className="text-sm font-normal text-muted-foreground">
+                — {result.files.length} file{result.files.length !== 1 ? "s" : ""} from ZIP
+              </span>
+            )}
           </h3>
 
-          {/* Detection details */}
-          <div className="text-sm grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div className="bg-muted/40 rounded px-3 py-2">
-              <span className="text-muted-foreground">Code column: </span>
-              <span className="font-medium">
-                {result.codeColHeader ? (
-                  <code className="bg-muted px-1 rounded">{result.codeColHeader}</code>
-                ) : (
-                  <span className="text-destructive">Not detected</span>
-                )}
-              </span>
+          {/* Aggregate detection details — only for single-file uploads */}
+          {!result.files && (
+            <div className="text-sm grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="bg-muted/40 rounded px-3 py-2">
+                <span className="text-muted-foreground">Code column: </span>
+                <span className="font-medium">
+                  {result.codeColHeader ? (
+                    <code className="bg-muted px-1 rounded">{result.codeColHeader}</code>
+                  ) : (
+                    <span className="text-destructive">Not detected</span>
+                  )}
+                </span>
+              </div>
+              <div className="bg-muted/40 rounded px-3 py-2">
+                <span className="text-muted-foreground">Price column: </span>
+                <span className="font-medium">
+                  {result.priceColHeader ? (
+                    <code className="bg-muted px-1 rounded">{result.priceColHeader}</code>
+                  ) : (
+                    <span className="text-destructive">Not detected</span>
+                  )}
+                </span>
+              </div>
+              <div className="bg-muted/40 rounded px-3 py-2">
+                <span className="text-muted-foreground">Basis: </span>
+                <span className="font-medium">{result.basis || "—"}</span>
+              </div>
             </div>
-            <div className="bg-muted/40 rounded px-3 py-2">
-              <span className="text-muted-foreground">Price column: </span>
-              <span className="font-medium">
-                {result.priceColHeader ? (
-                  <code className="bg-muted px-1 rounded">{result.priceColHeader}</code>
-                ) : (
-                  <span className="text-destructive">Not detected</span>
-                )}
-              </span>
-            </div>
-            <div className="bg-muted/40 rounded px-3 py-2">
-              <span className="text-muted-foreground">Basis: </span>
-              <span className="font-medium">{result.basis || "—"}</span>
-            </div>
-          </div>
+          )}
 
-          {/* Counts */}
+          {/* Aggregate counts */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="p-4 bg-muted/50 rounded-md">
               <div className="text-sm text-muted-foreground mb-1">Total Rows</div>
@@ -183,8 +194,109 @@ export default function LoadMrpPage() {
             </div>
           </div>
 
-          {/* Zero-import warning */}
-          {nothingImported && (
+          {/* Per-file breakdown for ZIP uploads */}
+          {result.files && result.files.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Per-file breakdown</p>
+              {result.files.map((f: any) => {
+                const isExpanded = expandedFiles.has(f.file);
+                const toggle = () =>
+                  setExpandedFiles((prev) => {
+                    const next = new Set(prev);
+                    isExpanded ? next.delete(f.file) : next.add(f.file);
+                    return next;
+                  });
+                const noRows = f.totalRows === 0;
+                return (
+                  <div key={f.file} className="border rounded text-sm">
+                    <button
+                      onClick={toggle}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/40 transition-colors text-left"
+                    >
+                      <span className="flex items-center gap-2 font-medium truncate">
+                        {isExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="truncate">{f.file}</span>
+                        {noRows && (
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        )}
+                      </span>
+                      <span className="shrink-0 ml-3 text-muted-foreground font-mono">
+                        {f.newHistoryRows > 0
+                          ? `+${f.newHistoryRows} prices`
+                          : noRows
+                          ? "0 rows"
+                          : `${f.skippedDuplicates} dup`}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="px-3 pb-3 pt-1 border-t space-y-2">
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-muted/30 rounded px-2 py-1">
+                            <span className="text-muted-foreground">Code: </span>
+                            {f.codeColHeader ? (
+                              <code className="font-medium">{f.codeColHeader}</code>
+                            ) : (
+                              <span className="text-destructive">—</span>
+                            )}
+                          </div>
+                          <div className="bg-muted/30 rounded px-2 py-1">
+                            <span className="text-muted-foreground">Price: </span>
+                            {f.priceColHeader ? (
+                              <code className="font-medium">{f.priceColHeader}</code>
+                            ) : (
+                              <span className="text-destructive">—</span>
+                            )}
+                          </div>
+                          <div className="bg-muted/30 rounded px-2 py-1">
+                            <span className="text-muted-foreground">Basis: </span>
+                            <span className="font-medium">{f.basis || "—"}</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 text-xs font-mono">
+                          <div className="bg-muted/30 rounded px-2 py-1 text-center">
+                            <div className="text-muted-foreground">Rows</div>
+                            <div className="font-bold">{f.totalRows}</div>
+                          </div>
+                          <div className="bg-muted/30 rounded px-2 py-1 text-center">
+                            <div className="text-muted-foreground">Matched</div>
+                            <div className="font-bold text-green-600">{f.matchedProducts}</div>
+                          </div>
+                          <div className="bg-muted/30 rounded px-2 py-1 text-center">
+                            <div className="text-muted-foreground">New</div>
+                            <div className="font-bold">{f.newProducts}</div>
+                          </div>
+                          <div className="bg-muted/30 rounded px-2 py-1 text-center">
+                            <div className="text-muted-foreground">Prices</div>
+                            <div className="font-bold text-primary">{f.newHistoryRows}</div>
+                          </div>
+                        </div>
+                        {f.skippedDuplicates > 0 && (
+                          <p className="text-amber-600 text-xs">
+                            {f.skippedDuplicates} duplicate{f.skippedDuplicates !== 1 ? "s" : ""} skipped
+                          </p>
+                        )}
+                        {f.skippedUnparseable > 0 && (
+                          <p className="text-amber-600 text-xs">
+                            {f.skippedUnparseable} row{f.skippedUnparseable !== 1 ? "s" : ""} skipped — bad code or invalid price
+                          </p>
+                        )}
+                        {f.message && (
+                          <p className="text-muted-foreground text-xs">{f.message}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Zero-import warning — single file only */}
+          {nothingImported && !result.files && (
             <div className="flex items-start gap-3 text-sm text-amber-800 bg-amber-50 border border-amber-300 p-3 rounded">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
               <div>
@@ -205,15 +317,15 @@ export default function LoadMrpPage() {
             </div>
           )}
 
-          {/* Skipped duplicates */}
-          {result.skippedDuplicates > 0 && (
+          {/* Skipped duplicates — single file only */}
+          {!result.files && result.skippedDuplicates > 0 && (
             <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
               Skipped {result.skippedDuplicates} rows that matched existing prices for this date.
             </div>
           )}
 
-          {/* Rows skipped due to bad codes / prices (non-zero-import case) */}
-          {!nothingImported && result.skippedUnparseable > 0 && (
+          {/* Rows skipped due to bad codes / prices — single file only */}
+          {!result.files && !nothingImported && result.skippedUnparseable > 0 && (
             <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
               {result.skippedUnparseable} row{result.skippedUnparseable !== 1 ? "s were" : " was"} skipped — item code could not be parsed or price was invalid.
             </div>
@@ -235,8 +347,8 @@ export default function LoadMrpPage() {
             </div>
           )}
 
-          {/* General message */}
-          {result.message && (
+          {/* General message — single file only */}
+          {!result.files && result.message && (
             <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
               {result.message}
             </div>
