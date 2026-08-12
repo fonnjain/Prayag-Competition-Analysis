@@ -82,7 +82,9 @@ router.post('/login', async (req: Request, res: Response) => {
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
 
-  res.json({ ok: true, user: sessionData.user });
+  // Return sid so the client can store it as a Bearer token (avoids
+  // cookie-forwarding issues in the Replit proxy environment).
+  res.json({ ok: true, user: sessionData.user, sid });
 });
 
 // GET /api/logout — clear session and redirect

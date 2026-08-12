@@ -15,8 +15,6 @@ import analysisRouter from "./analysis";
 // outside this allowlist is reachable with an API key.
 const router: IRouter = Router();
 
-router.use(apiKeyAuth);
-
 function forward(
   req: Request,
   res: Response,
@@ -29,10 +27,10 @@ function forward(
   handler(req, res, next);
 }
 
-router.get("/v1/products", (req, res, next) =>
+router.get("/v1/products", apiKeyAuth, (req, res, next) =>
   forward(req, res, next, "/catalog/products", catalogRouter),
 );
-router.get("/v1/products/:itemCode", (req, res, next) =>
+router.get("/v1/products/:itemCode", apiKeyAuth, (req, res, next) =>
   forward(
     req,
     res,
@@ -41,10 +39,10 @@ router.get("/v1/products/:itemCode", (req, res, next) =>
     catalogRouter,
   ),
 );
-router.get("/v1/comparison", (req, res, next) =>
+router.get("/v1/comparison", apiKeyAuth, (req, res, next) =>
   forward(req, res, next, "/catalog/comparison", comparisonRouter),
 );
-router.get("/v1/analysis/overview", (req, res, next) =>
+router.get("/v1/analysis/overview", apiKeyAuth, (req, res, next) =>
   forward(req, res, next, "/analysis/overview", analysisRouter),
 );
 
