@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { sql, eq, asc, desc } from "drizzle-orm";
+import { sql, eq, asc, desc, and } from "drizzle-orm";
 import { recomputeCurrentFlags } from "../lib/catalog";
 import {
   db,
   catalogProductsTable,
   mrpPriceHistoryTable,
   codeConflictsTable,
+  competitorPricesTable,
 } from "@workspace/db";
 import { loadCatalogSeed } from "../lib/catalogSeed";
 
@@ -307,6 +308,23 @@ router.patch("/catalog/products/:itemCode/mrp", async (req, res) => {
 
   await recomputeCurrentFlags();
 
+  // Refresh the snapshot MRP stored on every matched competitor row so the
+  // Competition Analysis dashboard reflects the new price immediately.
+  const today2 = new Date().toISOString().slice(0, 10);
+  const refreshed = await db
+    .update(competitorPricesTable)
+    .set({
+      prayagMrpAtCompare: mrp,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(competitorPricesTable.matchedPrayagCode, itemCode),
+        eq(competitorPricesTable.matchStatus, "matched"),
+      ),
+    )
+    .returning({ id: competitorPricesTable.id });
+
   const [updated] = await db
     .select()
     .from(mrpPriceHistoryTable)
@@ -314,7 +332,14 @@ router.patch("/catalog/products/:itemCode/mrp", async (req, res) => {
     .orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id))
     .limit(1);
 
-  res.json({ ok: true, itemCode, mrp, effectiveDate, current: updated ?? null });
+  res.json({
+    ok: true,
+    itemCode,
+    mrp,
+    effectiveDate,
+    current: updated ?? null,
+    competitorRowsRefreshed: refreshed.length,
+  });
 });
 
 // POST /catalog/reset — restore catalog to the original clean import.
