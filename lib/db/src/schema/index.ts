@@ -19,3 +19,4 @@
 
 export * from "./catalog";
 export * from "./apiKeys";
+export * from "./auth";
