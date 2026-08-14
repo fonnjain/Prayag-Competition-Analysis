@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import DiscountSettings from "@/pages/discount-settings";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useState } from "react";
 
 const queryClient = new QueryClient({
@@ -101,16 +101,18 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={200}>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthGate>
-            <Router />
-          </AuthGate>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider delayDuration={200}>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthGate>
+              <Router />
+            </AuthGate>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </AuthProvider>
   );
 }
 

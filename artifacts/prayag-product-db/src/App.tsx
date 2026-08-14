@@ -12,7 +12,7 @@ import ComparisonPage from "@/pages/comparison";
 import MappingReviewPage from "@/pages/mapping-review";
 import ImportCompetitorPage from "@/pages/import-competitor";
 import ApiKeysPage from "@/pages/api-keys";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useState } from "react";
 
 const queryClient = new QueryClient();
@@ -107,18 +107,20 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthGate>
-            <Layout>
-              <Router />
-            </Layout>
-          </AuthGate>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthGate>
+              <Layout>
+                <Router />
+              </Layout>
+            </AuthGate>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </AuthProvider>
   );
 }
 
