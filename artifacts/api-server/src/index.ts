@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedCatalogIfEmpty, backfillCatalogSizes } from "./lib/catalogSeed";
+import { seedAdminUser } from "./lib/adminSeed";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +24,12 @@ app.listen(port, async (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  try {
+    await seedAdminUser();
+  } catch (seedErr) {
+    logger.error({ err: seedErr }, "Failed to seed admin user");
+  }
 
   try {
     await seedCatalogIfEmpty();
