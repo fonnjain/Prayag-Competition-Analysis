@@ -186,6 +186,69 @@ describe("getPrayagCatalogMapForPeriod — direct date resolution", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Level 1b: GET /analysis/overview — snake_case mapping smoke test
+//
+// Confirms that mapCompetitorRow() correctly bridges the raw snake_case column
+// names returned by db.execute() to the camelCase properties expected by
+// buildRow(). Before the fix, matchStatus was always undefined so every row
+// was treated as unmatched, producing comparableSkus = 0 silently.
+// ---------------------------------------------------------------------------
+
+describe("GET /analysis/overview — comparableSkus non-zero after mapCompetitorRow fix", () => {
+  const overviewApp = express();
+  overviewApp.use(express.json());
+  overviewApp.use(analysisRouter);
+  const overviewRequest = supertest(overviewApp);
+
+  type OverviewBody = {
+    comparableSkus: number;
+    prayagCheaperCount: number;
+    prayagCostlierCount: number;
+  };
+
+  it("reports comparableSkus >= 1 for the seeded matched competitor row", async () => {
+    // Use AS_OF_AUG so the Apr-dated competitor row (effectiveDate <= Aug 17)
+    // is included in getCompetitorRowsForPeriod.
+    const qs = new URLSearchParams({ effectivePeriod: AS_OF_AUG });
+    const res = await overviewRequest.get(`/analysis/overview?${qs}`);
+    expect(res.status).toBe(200);
+
+    const body = res.body as OverviewBody;
+    expect(
+      body.comparableSkus,
+      "comparableSkus must be >= 1 — if it is 0, mapCompetitorRow() is broken and matchStatus is not being read",
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("prayagCheaperCount + prayagCostlierCount === comparableSkus (no null gaps)", async () => {
+    const qs = new URLSearchParams({ effectivePeriod: AS_OF_AUG });
+    const res = await overviewRequest.get(`/analysis/overview?${qs}`);
+    expect(res.status).toBe(200);
+
+    const body = res.body as OverviewBody;
+    expect(body.prayagCheaperCount + body.prayagCostlierCount).toBe(
+      body.comparableSkus,
+    );
+  });
+
+  it("the seeded competitor SKU (price=600 > prayagMrp=405.57) is counted as prayagCheaper", async () => {
+    // Competitor price 600 > Prayag MRP 405.57 → Prayag is cheaper.
+    // Filter by the test competitor so other real data doesn't interfere.
+    const qs = new URLSearchParams({
+      effectivePeriod: AS_OF_AUG,
+      competitor: COMPETITOR,
+    });
+    const res = await overviewRequest.get(`/analysis/overview?${qs}`);
+    expect(res.status).toBe(200);
+
+    const body = res.body as OverviewBody;
+    expect(body.comparableSkus).toBe(1);
+    expect(body.prayagCheaperCount).toBe(1);
+    expect(body.prayagCostlierCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Level 2: HTTP pipeline tests (upcomingPrayagMrp flows from catalog map)
 // ---------------------------------------------------------------------------
 
