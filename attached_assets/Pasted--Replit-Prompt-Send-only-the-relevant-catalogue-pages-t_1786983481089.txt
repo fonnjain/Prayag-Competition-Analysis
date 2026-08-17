@@ -1,0 +1,118 @@
+# Replit Prompt — Send only the relevant catalogue pages to Claude
+
+The full Sparsh Pearl catalogue is 108 pages / ~12 MB, which is slow and wasteful to send. Only **17 pages** carry the mapped products. This builds a small sub-PDF from those pages before calling the API — with a verification step so a changed catalogue is detected rather than silently under-extracted.
+
+> Paste everything below (from **GOAL**) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+Before sending a catalogue to Claude, extract only the pages that can contain mapped products, using the page list already in the catalogue profile (`catalogue-profiles/sparsh-pearl.json`). Verify afterwards that the expected products were actually found; if coverage is poor, widen the page range and retry, and surface a clear warning that the catalogue structure may have changed.
+
+**Assumption:** future Sparsh Pearl volumes keep the same structure and only prices change. The verification step exists because that assumption will eventually break, and it must break loudly.
+
+---
+
+## 1. Resolve the page set from the profile
+
+Union of the `pages` arrays in the profile's `seriesMap`:
+
+```
+18, 19, 24, 25, 26, 27, 34, 35, 38, 39, 64, 65, 83, 84, 96, 97, 98
+```
+
+**17 of 108 pages (~16%)** → roughly **2 MB instead of 12 MB**, and one API request instead of five.
+
+Derive this list from the profile at runtime — never hard-code it in the extractor:
+
+```ts
+export function profilePages(profile: CatalogueProfile): number[] {
+  const pages = new Set<number>();
+  for (const s of profile.seriesMap) for (const p of s.pages) pages.add(p);
+  return [...pages].sort((a, b) => a - b);
+}
+```
+
+## 2. Build the sub-PDF with pdf-lib
+
+```ts
+import { PDFDocument } from "pdf-lib";
+
+/** Copy the given 1-based pages into a new PDF. */
+export async function extractPages(
+  src: Uint8Array | ArrayBuffer,
+  pages1Based: number[],
+): Promise<{ bytes: Uint8Array; pageMap: number[] }> {
+  const srcDoc = await PDFDocument.load(src);
+  const total = srcDoc.getPageCount();
+
+  // keep only valid pages, de-duplicate, preserve order
+  const wanted = [...new Set(pages1Based)]
+    .filter((p) => Number.isInteger(p) && p >= 1 && p <= total)
+    .sort((a, b) => a - b);
+
+  if (wanted.length === 0) throw new Error("No valid pages to extract");
+
+  const out = await PDFDocument.create();
+  const copied = await out.copyPages(srcDoc, wanted.map((p) => p - 1));
+  copied.forEach((pg) => out.addPage(pg));
+
+  return { bytes: await out.save(), pageMap: wanted };
+}
+```
+
+**`pageMap` is essential.** The sub-PDF renumbers pages 1..17, but every extracted item must carry its **original** catalogue page number for verification and for the review screen:
+
+```ts
+const originalPage = pageMap[itemPageInSubPdf - 1];
+```
+
+Instruct the model to report the page number **within the PDF it was given**, then translate it through `pageMap`. Do not ask the model to guess original page numbers.
+
+## 3. Chunk only if needed
+
+17 pages fits comfortably inside one request (limits are 100 pages / 32 MB). Keep the chunker, but make it a no-op for small sets:
+
+```ts
+const MAX_PAGES_PER_REQUEST = 25;
+const MAX_BYTES_PER_REQUEST = 28 * 1024 * 1024; // headroom under the 32 MB limit
+```
+
+Split only when the sub-PDF exceeds either limit. Log the resulting size so a future volume that balloons is visible.
+
+## 4. If the sub-PDF is still too large
+
+Some volumes may have heavier images. Fall back to sending **page images** instead of the PDF: rasterise each page to JPEG at ~150 DPI, quality ~80, and send as `image` blocks. A rasterised A4 page is typically 200–500 KB and costs the same in tokens (page images are billed by area, not by source format). Do not drop below ~120 DPI — the variant qualifiers `(45 Degree)`, `(15mm)` are printed small and stop being legible.
+
+## 5. Verify coverage — this is the important part
+
+After matching, compute:
+
+```
+coverage = targets resolved to a price / total targets
+```
+
+- **coverage ≥ 0.95** → normal. Proceed to the review screen.
+- **coverage < 0.95** → the page set is probably wrong. **Retry once with a widened range:** every profile page ±2 (this catches a volume where sections shifted by a page or two), de-duplicated. For the current profile that is ~45 pages — still one or two requests.
+- **Still < 0.95 after widening** → stop widening. Present the batch with a prominent warning:
+
+  > *Catalogue structure may have changed. Only N of 150 mapped products were found. Review the page mapping in the catalogue profile before trusting these prices.*
+
+  List which **series** came back empty — that points straight at the pages that moved. Do **not** silently fall back to scanning all 108 pages; a structure change needs a human decision, and the profile should then be updated and documented.
+
+Record on the batch: `pagesSent`, `pagesWidened` (bool), `coverage`, so a degrading catalogue is visible over time.
+
+## 6. Prompt caching
+
+The target list (~150 items) is identical across every chunk and every retry. Mark it as a cached prefix in the API request so repeat sends bill at the reduced cache-read rate. With a single 17-page request this matters little, but it pays off on the widened-retry path and on future larger volumes.
+
+---
+
+## Validation
+
+- A normal run sends **17 pages / ~2 MB** in **one** request, not 108 pages in five.
+- Every extracted item's `page` is the **original** catalogue page (e.g. `ED-950` → page 64, not page 11 of the sub-PDF).
+- Ground-truth spot checks still pass: `ED-950`=467, `ED-951`=555, `ED-969`=561, `ED-964`=520, `REG-771`=273, `RS-104`=359 (hero page 24), `RPS-2279`=753 (hero page 26), `TS-101`=227, `EVA-480`=310, `RPS-2271`=267.
+- All 150 mapped products resolve → coverage 1.0, no widening triggered.
+- Simulate a shifted catalogue (e.g. point the profile at pages 60–61 instead of 64–65): coverage drops, the widened retry runs, and if it still fails the batch shows the structure-change warning naming the Quadra/Edge series.

@@ -45,7 +45,7 @@ export interface FailedChunk {
   endPage: number;
   error: string;
 }
-const CHUNK_SIZE = 25;
+const CHUNK_SIZE = 10; // Reduced from 25: smaller chunks = smaller JSON output = less chance of truncation
 
 /**
  * Split a PDF buffer into chunks of at most CHUNK_SIZE pages.
@@ -190,6 +190,13 @@ export async function extractFromPdf(
           ],
         });
 
+        // Diagnostic log for every response — helps trace model behaviour.
+        console.info(
+          `[pdfExtractor] chunk ${i + 1} response: stop_reason=${response.stop_reason}, ` +
+          `content_blocks=${response.content.length}, ` +
+          `types=${response.content.map((b) => b.type).join(",")}`,
+        );
+
         // Warn if output was still cut off — means max_tokens needs raising.
         if (response.stop_reason === "max_tokens") {
           console.warn(
@@ -197,16 +204,44 @@ export async function extractFromPdf(
           );
         }
 
-        const text =
-          response.content[0]?.type === "text"
-            ? response.content[0].text.trim()
-            : "";
+        // Find the text block — use find() so order of content blocks doesn't matter.
+        const textBlock = response.content.find((b) => b.type === "text");
+        if (!textBlock || textBlock.type !== "text") {
+          // No text block at all — model returned something unexpected (tool_use,
+          // error, or empty array). Treat as zero items on these pages, not a failure.
+          console.warn(
+            `[pdfExtractor] chunk ${i + 1}: no text content block in response. ` +
+            `Content: ${JSON.stringify(response.content).slice(0, 400)}`,
+          );
+          items = [];
+          lastErr = undefined;
+          break;
+        }
+
+        const text = textBlock.text.trim();
+
+        if (!text) {
+          // Empty text block — model returned nothing. Zero items, not a failure.
+          console.warn(`[pdfExtractor] chunk ${i + 1}: empty text response from model.`);
+          items = [];
+          lastErr = undefined;
+          break;
+        }
 
         // Strip markdown fences if Claude added them despite instructions
         const cleaned = text
           .replace(/^```(?:json)?\s*/i, "")
           .replace(/\s*```$/, "")
           .trim();
+
+        // Log first 200 chars to help diagnose non-JSON responses.
+        if (!cleaned.startsWith("[") && !cleaned.startsWith("{")) {
+          console.warn(
+            `[pdfExtractor] chunk ${i + 1}: response does not look like JSON. ` +
+            `First 200 chars: ${cleaned.slice(0, 200)}`,
+          );
+        }
+
         const parsed = JSON.parse(cleaned) as unknown[];
 
         items = parsed
