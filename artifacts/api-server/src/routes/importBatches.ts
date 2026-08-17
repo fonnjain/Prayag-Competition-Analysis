@@ -228,7 +228,7 @@ router.post(
 
       sendSse("status", { stage: "extracting", message: "Starting PDF extraction…" });
 
-      const extracted = await extractFromPdf(
+      const { items: extracted, failedChunks } = await extractFromPdf(
         file.buffer,
         targetCodes,
         SPARSH_CODE_FAMILIES,
@@ -243,6 +243,10 @@ router.post(
           });
         },
       );
+
+      if (failedChunks.length > 0) {
+        req.log.warn({ failedChunks }, "[importBatches] some PDF chunks failed extraction");
+      }
 
       sendSse("status", { stage: "matching", message: "Matching products…" });
 
@@ -289,7 +293,21 @@ router.post(
         .set({ rowCounts: JSON.stringify(counts) })
         .where(eq(importBatchesTable.id, batchId));
 
-      sendSse("done", { batchId, competitor, effectiveDate, priceBasis, gstPct, status: "pending", rowCounts: counts });
+      const failedChunksSummary = failedChunks.map((fc) => ({
+        chunkIndex: fc.chunkIndex,
+        startPage: fc.startPage,
+        endPage: fc.endPage,
+      }));
+      sendSse("done", {
+        batchId,
+        competitor,
+        effectiveDate,
+        priceBasis,
+        gstPct,
+        status: "pending",
+        rowCounts: counts,
+        failedChunks: failedChunksSummary,
+      });
       res.end();
     } catch (err) {
       req.log.error({ err }, "import-batches POST failed");

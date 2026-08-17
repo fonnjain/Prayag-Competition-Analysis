@@ -51,7 +51,7 @@ async function main() {
   console.log(`Extracting with model: ${(await import("../src/lib/pdfExtractor.js")).EXTRACTION_MODEL}`);
   console.log("This may take several minutes for a 100-page catalogue...\n");
 
-  const extracted = await extractFromPdf(
+  const { items: extracted, failedChunks } = await extractFromPdf(
     pdfBuffer,
     [], // no target-code filter — extract everything in the code families
     SPARSH_PROFILE.codeFamilies,
@@ -63,6 +63,18 @@ async function main() {
   );
 
   console.log(`\nExtraction complete — ${extracted.length} items found`);
+
+  if (failedChunks.length > 0) {
+    console.warn(
+      `\n⚠️  WARNING: ${failedChunks.length} chunk(s) failed extraction and were skipped:`,
+    );
+    for (const fc of failedChunks) {
+      console.warn(`   - Pages ${fc.startPage}–${fc.endPage}: ${fc.error}`);
+    }
+    console.warn(
+      "   Re-run the script or re-upload the PDF to recover the missing pages.\n",
+    );
+  }
 
   // Deduplicate: if the same cat_no+variant appears on multiple pages, keep
   // the first occurrence (earlier pages are usually the main listing).

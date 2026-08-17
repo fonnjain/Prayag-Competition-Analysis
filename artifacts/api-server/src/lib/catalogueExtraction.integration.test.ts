@@ -80,7 +80,7 @@ describe.skipIf(skip)(
             `${targetCodes.length} unique codes, model: ${EXTRACTION_MODEL}`,
         );
 
-        const extracted = await extractFromPdf(
+        const { items: extracted, failedChunks } = await extractFromPdf(
           pdfBuffer,
           targetCodes,
           SPARSH_PROFILE.codeFamilies,
@@ -93,6 +93,12 @@ describe.skipIf(skip)(
         );
 
         console.log(`[regression] Extraction complete — ${extracted.length} items found`);
+        if (failedChunks.length > 0) {
+          console.warn(
+            `[regression] WARNING: ${failedChunks.length} chunk(s) failed extraction: ` +
+              failedChunks.map((fc) => `pp. ${fc.startPage}–${fc.endPage}`).join(", "),
+          );
+        }
 
         // Index extracted items for fast lookup: "CAT_NO|variant" → mrp
         const extractedIndex = new Map<string, number>();

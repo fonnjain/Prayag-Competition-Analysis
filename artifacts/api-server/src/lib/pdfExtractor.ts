@@ -39,6 +39,12 @@ export interface ExtractionProgress {
   totalItemsFound: number;
 }
 
+export interface FailedChunk {
+  chunkIndex: number; // 1-based
+  startPage: number;
+  endPage: number;
+  error: string;
+}
 const CHUNK_SIZE = 25;
 
 /**
@@ -129,13 +135,14 @@ export async function extractFromPdf(
   targetCodes: string[],
   codeFamilies: string[],
   onProgress?: (p: ExtractionProgress) => void,
-): Promise<ExtractedItem[]> {
+): Promise<ExtractionResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
   const client = new Anthropic({ apiKey });
   const chunks = await splitPdf(pdfBuffer);
   const allItems: ExtractedItem[] = [];
+  const failedChunks: FailedChunk[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
@@ -209,7 +216,8 @@ export async function extractFromPdf(
           }))
           .filter((x) => x.cat_no && !isNaN(x.mrp) && x.mrp > 0);
 
-        break; // success
+        lastErr = undefined; // clear on success
+        break;
       } catch (err) {
         lastErr = err;
         if (attempt === 0) {
@@ -219,11 +227,19 @@ export async function extractFromPdf(
       }
     }
 
-    if (items.length === 0 && lastErr) {
+    if (lastErr !== undefined) {
+      const errMsg =
+        lastErr instanceof Error ? lastErr.message : String(lastErr);
       console.error(
-        `[pdfExtractor] chunk ${i + 1} failed after retry:`,
+        `[pdfExtractor] chunk ${i + 1} (pages ${chunk.startPage}–${chunk.endPage}) failed after retry:`,
         lastErr,
       );
+      failedChunks.push({
+        chunkIndex: i + 1,
+        startPage: chunk.startPage,
+        endPage: chunk.endPage,
+        error: errMsg,
+      });
     }
 
     allItems.push(...items);
@@ -239,5 +255,10 @@ export async function extractFromPdf(
     });
   }
 
-  return allItems;
+  return { items: allItems, failedChunks };
+}
+
+export interface ExtractionResult {
+  items: ExtractedItem[];
+  failedChunks: FailedChunk[];
 }
