@@ -153,6 +153,13 @@ export interface DeleteCompetitorResult {
   deleted: number;
 }
 
+export interface DeleteCompetitorPeriodResult {
+  ok: boolean;
+  competitor: string;
+  effectiveDate: string;
+  /** Number of competitor price rows removed for this period. */
+  deleted: number;
+}
 export interface ComparisonRow {
   id: number;
   competitor: string;
@@ -811,8 +818,14 @@ export interface PriceHistory {
   competitorHistory: CompetitorPriceHistory[];
 }
 
+export interface CompetitorBrandPeriod {
+  brand: string;
+  /** Sorted list of effective dates (YYYY-MM-DD) for this brand (oldest first). */
+  effectiveDates: string[];
+}
 export interface CompetitorBrands {
   brands: string[];
+  brandPeriods: CompetitorBrandPeriod[];
 }
 
 /**

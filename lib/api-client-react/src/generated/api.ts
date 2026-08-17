@@ -53,6 +53,7 @@ import type {
   ComparisonSummary,
   CompetitorBrands,
   CompetitorMappingUpdate,
+  DeleteCompetitorPeriodResult,
   DeleteCompetitorResult,
   DiscountSettings,
   DiscountSettingsUpdate,
@@ -1943,8 +1944,8 @@ export const getGetCompetitorBrandsUrl = () => {
 }
 
 /**
- * All distinct competitor brand names in competitor_prices, for use in the brand combobox on the import page.
- * @summary Distinct competitor brand names
+ * All distinct competitor brand names in competitor_prices with their effective dates, for use on the import page.
+ * @summary Distinct competitor brand names with their price periods
  */
 export const getCompetitorBrands = async ( options?: RequestInit): Promise<CompetitorBrands> => {
 
@@ -1984,7 +1985,7 @@ export type GetCompetitorBrandsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Distinct competitor brand names
+ * @summary Distinct competitor brand names with their price periods
  */
 
 export function useGetCompetitorBrands<TData = Awaited<ReturnType<typeof getCompetitorBrands>>, TError = ErrorType<unknown>>(
@@ -2003,7 +2004,7 @@ export function useGetCompetitorBrands<TData = Awaited<ReturnType<typeof getComp
 export const getDeleteCatalogCompetitorUrl = (competitor: string,) => {
 
 
-  return `/api/catalog/competitors/${competitor}`
+  return `/api/catalog/competitors/${encodeURIComponent(competitor)}`
 }
 
 /**
@@ -2060,6 +2061,12 @@ export const useDeleteCatalogCompetitor = <TError = ErrorType<unknown>,
       return useMutation(getDeleteCatalogCompetitorMutationOptions(options));
     }
 
+export const getDeleteCompetitorPeriodUrl = (competitor: string,
+    effectiveDate: string,) => {
+
+
+  return `/api/catalog/competitors/${encodeURIComponent(competitor)}/periods/${encodeURIComponent(effectiveDate)}`
+}
 export const getGetAnalysisFiltersUrl = () => {
 
 
@@ -3358,6 +3365,8 @@ export const useLogoutMobileSession = <TError = ErrorType<unknown>,
       return useMutation(getLogoutMobileSessionMutationOptions(options));
     }
 
+    export type DeleteCompetitorPeriodMutationError = ErrorType<ErrorResponse>
+
 
 export type GetMrpIncreasesQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpIncreases>>>
 
@@ -3413,3 +3422,55 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData> & { queryKey: QueryKey }
 }
+
+/**
+ * @summary Delete price rows for a single (brand, effectiveDate) period
+ */
+export const deleteCompetitorPeriod = async (competitor: string,
+    effectiveDate: string, options?: RequestInit): Promise<DeleteCompetitorPeriodResult> => {
+
+  return customFetch<DeleteCompetitorPeriodResult>(getDeleteCompetitorPeriodUrl(competitor,effectiveDate),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+    /**
+ * @summary Delete price rows for a single (brand, effectiveDate) period
+ */
+export const useDeleteCompetitorPeriod = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCompetitorPeriod>>,
+        TError,
+        {competitor: string;effectiveDate: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCompetitorPeriodMutationOptions(options));
+    }
+
+export const getDeleteCompetitorPeriodMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext> => {
+
+const mutationKey = ['deleteCompetitorPeriod'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, {competitor: string;effectiveDate: string}> = (props) => {
+          const {competitor,effectiveDate} = props ?? {};
+
+          return  deleteCompetitorPeriod(competitor,effectiveDate,requestOptions)
+        }
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCompetitorPeriodMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompetitorPeriod>>>

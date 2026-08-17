@@ -739,11 +739,15 @@ export const UpdateCompetitorMappingResponse = zod.object({
 
 
 /**
- * All distinct competitor brand names in competitor_prices, for use in the brand combobox on the import page.
- * @summary Distinct competitor brand names
+ * All distinct competitor brand names in competitor_prices with their effective dates, for use on the import page.
+ * @summary Distinct competitor brand names with their price periods
  */
 export const GetCompetitorBrandsResponse = zod.object({
-  "brands": zod.array(zod.string())
+  "brands": zod.array(zod.string()),
+  "brandPeriods": zod.array(zod.object({
+  "brand": zod.string(),
+  "effectiveDates": zod.array(zod.string()).describe('Sorted list of effective dates (YYYY-MM-DD) for this brand (oldest first).')
+}))
 })
 
 
@@ -760,7 +764,13 @@ export const DeleteCatalogCompetitorResponse = zod.object({
   "deleted": zod.number().describe('Number of competitor price rows removed.')
 })
 
-
+/**
+ * @summary Delete price rows for a single (brand, effectiveDate) period
+ */
+export const DeleteCompetitorPeriodParams = zod.object({
+  "competitor": zod.coerce.string(),
+  "effectiveDate": zod.coerce.string()
+})
 /**
  * Distinct competitors, Prayag divisions/categories, match confidences and statuses for the analysis filter bar.
  * @summary Available filter options
@@ -1167,6 +1177,13 @@ export const LogoutMobileSessionHeader = zod.object({
 
 export const LogoutMobileSessionResponse = zod.object({
   "success": zod.boolean()
+})
+
+export const DeleteCompetitorPeriodResponse = zod.object({
+  "ok": zod.boolean(),
+  "competitor": zod.string(),
+  "effectiveDate": zod.string(),
+  "deleted": zod.number().describe('Number of competitor price rows removed for this period.')
 })
 
 

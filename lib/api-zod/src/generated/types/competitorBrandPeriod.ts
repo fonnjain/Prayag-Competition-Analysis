@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetComparisonFiltersParams = {
-/**
- * When set, scopes the returned periods to rows for that competitor only.
- */
-competitor?: string;
-};
+export interface CompetitorBrandPeriod {
+  brand: string;
+  /** Sorted list of effective dates (YYYY-MM-DD) for this brand (oldest first). */
+  effectiveDates: string[];
+}

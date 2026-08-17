@@ -783,11 +783,11 @@ paths:
     get:
       operationId: getCompetitorBrands
       tags: [catalog]
-      summary: Distinct competitor brand names
-      description: All distinct competitor brand names in competitor_prices, for use in the brand combobox on the import page.
+      summary: Distinct competitor brand names with their price periods
+      description: All distinct competitor brand names in competitor_prices with their effective dates, for use on the import page.
       responses:
         "200":
-          description: Brand names
+          description: Brand names with periods
           content:
             application/json:
               schema:
@@ -810,6 +810,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteCompetitorResult"
+  /catalog/competitors/{competitor}/periods/{effectiveDate}:
+    delete:
+      operationId: deleteCompetitorPeriod
+      tags: [comparison]
+      summary: Delete price rows for a single (brand, effectiveDate) period
+      parameters:
+        - name: competitor
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: effectiveDate
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Period deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteCompetitorPeriodResult"
+        "404":
+          description: Period not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /analysis/filters:
     get:
       operationId: getAnalysisFilters
@@ -1512,6 +1541,19 @@ components:
         deleted:
           type: integer
           description: Number of competitor price rows removed.
+    DeleteCompetitorPeriodResult:
+      type: object
+      required: [ok, competitor, effectiveDate, deleted]
+      properties:
+        ok:
+          type: boolean
+        competitor:
+          type: string
+        effectiveDate:
+          type: string
+        deleted:
+          type: integer
+          description: Number of competitor price rows removed for this period.
     ComparisonRow:
       type: object
       required:
@@ -2519,14 +2561,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CompetitorPriceHistory"
+    CompetitorBrandPeriod:
+      type: object
+      required: [brand, effectiveDates]
+      properties:
+        brand:
+          type: string
+        effectiveDates:
+          type: array
+          items:
+            type: string
+          description: Sorted list of effective dates (YYYY-MM-DD) for this brand (oldest first).
     CompetitorBrands:
       type: object
-      required: [brands]
+      required: [brands, brandPeriods]
       properties:
         brands:
           type: array
           items:
             type: string
+        brandPeriods:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorBrandPeriod"
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

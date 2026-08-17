@@ -8,7 +8,7 @@ import {
   mrpPriceHistoryTable,
   acceptBatchesTable,
 } from "@workspace/db";
-import { normCode } from "../lib/catalog";
+import { normCode, recomputeCompetitorCurrentFlags } from "../lib/catalog";
 import { buildCandidate, suggestMatches, type CatalogCandidate } from "../lib/suggest";
 import { catalogVersion, topSuggestionTier } from "../lib/suggestCache";
 import {
@@ -1307,5 +1307,55 @@ router.delete("/catalog/competitors/:competitor", async (req: Request<{ competit
 
   res.json({ ok: true, competitor, deleted: deleted.length });
 });
+
+// DELETE /catalog/competitors/:competitor/periods/:effectiveDate — remove a
+// single price period for a brand without touching older or newer periods.
+// After deletion the is_current flags are recomputed so the next-most-recent
+// period becomes current.
+router.delete(
+  "/catalog/competitors/:competitor/periods/:effectiveDate",
+  async (req, res) => {
+    const competitor = strParam(req.params.competitor);
+    const effectiveDate = strParam(req.params.effectiveDate);
+
+    if (!competitor || !effectiveDate) {
+      res
+        .status(400)
+        .json({ error: "competitor and effectiveDate are required" });
+      return;
+    }
+
+    const deleted = await db
+      .delete(competitorPricesTable)
+      .where(
+        sql`competitor = ${competitor} AND effective_date = ${effectiveDate}`,
+      )
+      .returning({ id: competitorPricesTable.id });
+
+    if (deleted.length === 0) {
+      res.status(404).json({ error: "Period not found" });
+      return;
+    }
+
+    // Recompute is_current for this brand so the remaining periods are correct.
+    // Check if any rows remain for the brand; if so, recompute flags.
+    const remaining = await db
+      .select({ id: competitorPricesTable.id })
+      .from(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, competitor))
+      .limit(1);
+
+    if (remaining.length > 0) {
+      await recomputeCompetitorCurrentFlags(competitor);
+    }
+
+    res.json({
+      ok: true,
+      competitor,
+      effectiveDate,
+      deleted: deleted.length,
+    });
+  },
+);
 
 export default router;

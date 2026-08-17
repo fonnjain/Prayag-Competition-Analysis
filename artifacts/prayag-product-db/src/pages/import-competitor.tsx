@@ -11,11 +11,15 @@ import {
   Loader2,
   FileText,
   FileSpreadsheet,
+  ChevronDown,
+  ChevronRight,
+  Calendar,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetComparisonFilters,
   useDeleteCatalogCompetitor,
+  useDeleteCompetitorPeriod,
   useGetCompetitorBrands,
   getGetComparisonQueryKey,
   getGetComparisonByProductQueryKey,
@@ -43,6 +47,18 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function ImportCompetitorPage() {
@@ -54,6 +70,8 @@ export default function ImportCompetitorPage() {
   const [gstPct, setGstPct] = useState<number>(18);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  // Track which brands are expanded to show their periods
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
@@ -63,6 +81,7 @@ export default function ImportCompetitorPage() {
   const { data: brandsData } = useGetCompetitorBrands();
   const competitors = filters?.competitors ?? [];
   const existingBrands = brandsData?.brands ?? [];
+  const brandPeriods = brandsData?.brandPeriods ?? [];
 
   const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
 
@@ -94,6 +113,34 @@ export default function ImportCompetitorPage() {
       },
     },
   });
+
+  const deletePeriodMutation = useDeleteCompetitorPeriod({
+    mutation: {
+      onSuccess: (data) => {
+        toast({
+          title: "Period Removed",
+          description: `Deleted ${data.deleted} price rows for ${data.competitor} (${formatDate(data.effectiveDate)}).`,
+        });
+        invalidateComparisonQueries();
+      },
+      onError: (err: any) => {
+        toast({
+          title: "Delete Failed",
+          description: err?.message || "Could not remove price period.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  const toggleExpanded = (brand: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(brand)) next.delete(brand);
+      else next.add(brand);
+      return next;
+    });
+  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -348,9 +395,7 @@ export default function ImportCompetitorPage() {
         <div>
           <h3 className="font-semibold text-lg">Tracked Competitor Brands</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Remove a brand you no longer track. This deletes{" "}
-            <strong>all periods</strong> of its price rows and removes it from
-            the comparison filters, columns, and KPIs.
+            Expand a brand to remove individual price periods, or remove the entire brand at once.
           </p>
         </div>
 
@@ -361,55 +406,162 @@ export default function ImportCompetitorPage() {
         ) : (
           <ul className="divide-y border rounded-md">
             {competitors.map((brand) => {
-              const isDeleting =
+              const isExpanded = expanded.has(brand);
+              const periods = brandPeriods.find((bp) => bp.brand === brand)?.effectiveDates ?? [];
+              const isDeletingBrand =
                 deleteMutation.isPending &&
                 deleteMutation.variables?.competitor === brand;
+
               return (
-                <li
-                  key={brand}
-                  className="flex items-center justify-between gap-4 px-4 py-3"
-                >
-                  <span className="font-medium">{brand}</span>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        disabled={deleteMutation.isPending}
-                      >
-                        {isDeleting ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4 mr-2" />
-                        )}
-                        Remove
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove {brand}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This permanently deletes{" "}
-                          <strong>all price periods</strong> for {brand}. The
-                          brand will disappear from the comparison filters, By
-                          Product columns, and summary KPIs. You would need to
-                          re-upload its price sheets to restore it.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() =>
-                            deleteMutation.mutate({ competitor: brand })
-                          }
+                <li key={brand} className="flex flex-col">
+                  {/* Brand header row */}
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(brand)}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      )}
+                      <span className="font-medium">{brand}</span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        {periods.length} {periods.length === 1 ? "period" : "periods"}
+                      </span>
+                    </button>
+
+                    {/* Remove entire brand */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                          disabled={deleteMutation.isPending || deletePeriodMutation.isPending}
                         >
-                          Remove Brand
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          {isDeletingBrand ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 mr-2" />
+                          )}
+                          Remove All
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove {brand}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This permanently deletes{" "}
+                            <strong>
+                              all {periods.length} price{" "}
+                              {periods.length === 1 ? "period" : "periods"}
+                            </strong>{" "}
+                            for {brand}. The brand will disappear from the comparison
+                            filters, By Product columns, and summary KPIs. This cannot
+                            be undone — you would need to re-upload its price sheets to
+                            restore it.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() =>
+                              deleteMutation.mutate({ competitor: brand })
+                            }
+                          >
+                            Remove Brand
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+
+                  {/* Expanded period list */}
+                  {isExpanded && periods.length > 0 && (
+                    <ul className="border-t bg-muted/30 divide-y">
+                      {[...periods].reverse().map((date) => {
+                        const isDeletingPeriod =
+                          deletePeriodMutation.isPending &&
+                          deletePeriodMutation.variables?.competitor === brand &&
+                          deletePeriodMutation.variables?.effectiveDate === date;
+
+                        return (
+                          <li
+                            key={date}
+                            className="flex items-center justify-between gap-4 px-6 py-2"
+                          >
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="font-medium">{formatDate(date)}</span>
+                              <span className="text-xs text-muted-foreground font-mono">
+                                ({date})
+                              </span>
+                            </div>
+
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-7 text-xs flex-shrink-0"
+                                  disabled={
+                                    deleteMutation.isPending ||
+                                    deletePeriodMutation.isPending
+                                  }
+                                >
+                                  {isDeletingPeriod ? (
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3 h-3 mr-1" />
+                                  )}
+                                  Remove period
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Remove {brand} — {formatDate(date)}?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This permanently deletes all price rows for{" "}
+                                    <strong>{brand}</strong> with effective date{" "}
+                                    <strong>{date}</strong>. Other periods for this
+                                    brand are kept.
+                                    {periods.length === 1 && (
+                                      <>
+                                        {" "}Since this is the only period,{" "}
+                                        <strong>
+                                          {brand} will be removed entirely
+                                        </strong>{" "}
+                                        from the comparison.
+                                      </>
+                                    )}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() =>
+                                      deletePeriodMutation.mutate({
+                                        competitor: brand,
+                                        effectiveDate: date,
+                                      })
+                                    }
+                                  >
+                                    Remove Period
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </li>
               );
             })}

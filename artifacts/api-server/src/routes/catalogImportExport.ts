@@ -9,7 +9,7 @@ import {
   mrpPriceHistoryTable,
   competitorPricesTable,
 } from "@workspace/db";
-import { recomputeCurrentFlags, normCode } from "../lib/catalog";
+import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
 import { effectivePrice } from "../lib/analysis";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
@@ -790,34 +790,6 @@ function findCol(
   return -1;
 }
 
-// Recompute is_current on competitor_prices for a given brand after a period
-// import. Matched rows: latest effective_date per (competitor, matched_prayag_code).
-// Unmatched rows: all rows from the newest period for that competitor.
-async function recomputeCompetitorCurrentFlags(competitor: string): Promise<void> {
-  await db.execute(sql`UPDATE competitor_prices SET is_current = false WHERE competitor = ${competitor}`);
-  await db.execute(sql`
-    UPDATE competitor_prices
-    SET is_current = true
-    WHERE id IN (
-      SELECT DISTINCT ON (competitor, matched_prayag_code) id
-      FROM competitor_prices
-      WHERE competitor = ${competitor}
-        AND matched_prayag_code IS NOT NULL
-      ORDER BY competitor, matched_prayag_code, effective_date DESC NULLS LAST, id DESC
-    )
-  `);
-  await db.execute(sql`
-    UPDATE competitor_prices
-    SET is_current = true
-    WHERE competitor = ${competitor}
-      AND matched_prayag_code IS NULL
-      AND effective_date = (
-        SELECT MAX(effective_date) FROM competitor_prices
-        WHERE competitor = ${competitor} AND matched_prayag_code IS NULL
-      )
-  `);
-}
-
 function toDateStr(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (typeof v === "number") {
@@ -923,13 +895,33 @@ function parseCompetitorSheet(
   return rows;
 }
 
-// GET /catalog/competitor-brands — distinct brand names for the combobox.
+// GET /catalog/competitor-brands — distinct brand names + their price periods.
 router.get("/catalog/competitor-brands", async (_req, res) => {
   const rows = await db
-    .selectDistinct({ competitor: competitorPricesTable.competitor })
+    .selectDistinct({
+      competitor: competitorPricesTable.competitor,
+      effectiveDate: competitorPricesTable.effectiveDate,
+    })
     .from(competitorPricesTable)
-    .orderBy(competitorPricesTable.competitor);
-  res.json({ brands: rows.map((r) => r.competitor) });
+    .orderBy(
+      asc(competitorPricesTable.competitor),
+      asc(competitorPricesTable.effectiveDate),
+    );
+
+  // Group into brand → sorted effectiveDates
+  const periodMap = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!periodMap.has(row.competitor)) periodMap.set(row.competitor, []);
+    if (row.effectiveDate) periodMap.get(row.competitor)!.push(row.effectiveDate);
+  }
+
+  const brands = [...periodMap.keys()].sort();
+  const brandPeriods = brands.map((brand) => ({
+    brand,
+    effectiveDates: periodMap.get(brand) ?? [],
+  }));
+
+  res.json({ brands, brandPeriods });
 });
 
 // POST /catalog/load-competitor — upload a competitor workbook (any brand).
