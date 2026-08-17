@@ -30,7 +30,6 @@ import {
   Search,
 } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type RowStatus = "ok" | "needs_review" | "not_found" | "new_product";
 
@@ -249,7 +248,7 @@ export default function ImportReviewPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${BASE}/api/catalog/import-batches/${batchId}`);
+        const res = await fetch(`/api/catalog/import-batches/${batchId}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load batch");
         setBatch(data);
@@ -271,7 +270,7 @@ export default function ImportReviewPage() {
     if (!batch) return;
     setIsApproving(true);
     try {
-      const res = await fetch(`${BASE}/api/catalog/import-batches/${batchId}/approve`, {
+      const res = await fetch(`/api/catalog/import-batches/${batchId}/approve`, {
         method: "POST",
       });
       const data = await res.json();
@@ -292,7 +291,7 @@ export default function ImportReviewPage() {
     if (!confirm("Discard this batch? Staged prices will be deleted. The batch record is kept for audit.")) return;
     setIsDiscarding(true);
     try {
-      const res = await fetch(`${BASE}/api/catalog/import-batches/${batchId}`, {
+      const res = await fetch(`/api/catalog/import-batches/${batchId}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -308,7 +307,7 @@ export default function ImportReviewPage() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const res = await fetch(`${BASE}/api/catalog/import-batches/${batchId}/export`);
+      const res = await fetch(`/api/catalog/import-batches/${batchId}/export`);
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";

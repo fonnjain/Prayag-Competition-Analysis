@@ -60,7 +60,6 @@ function formatDate(iso: string): string {
   }
 }
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function ImportCompetitorPage() {
   const [, navigate] = useLocation();
@@ -171,7 +170,7 @@ export default function ImportCompetitorPage() {
     try {
       if (isPdf) {
         // PDF → SSE-streaming staging endpoint → navigate to review page
-        const res = await fetch(`${BASE}/api/catalog/import-batches`, {
+        const res = await fetch(`/api/catalog/import-batches`, {
           method: "POST",
           body: formData,
         });
@@ -271,7 +270,7 @@ export default function ImportCompetitorPage() {
         }
       } else {
         // Excel/CSV → existing direct-import route
-        const res = await fetch(`${BASE}/api/catalog/load-competitor`, {
+        const res = await fetch(`/api/catalog/load-competitor`, {
           method: "POST",
           body: formData,
         });
