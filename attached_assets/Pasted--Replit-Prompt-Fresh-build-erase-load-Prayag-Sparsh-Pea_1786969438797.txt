@@ -1,0 +1,89 @@
+# Replit Prompt — Fresh build (erase → load Prayag + Sparsh Pearl → period features)
+
+**Before pasting:** upload these two files to the project:
+1. `0_Prayag_Master_TwoPeriod.xlsx` — Prayag full catalog + MRP price history (2 periods).
+2. `Prayag_vs_Sparsh_Pearl_PTMT.xlsx` — the user-matched Prayag ↔ Sparsh Pearl (PTMT) mapping.
+
+> Then paste everything below (from **GOAL** onward) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+Erase the entire existing database and rebuild it fresh from two uploaded files, then make the whole app effective-date / period aware. Every price (Prayag and competitor) is tied to an effective date; competitor imports use a brand dropdown + an effective date; the comparison can be filtered by effective period; and period-to-period MRP increases are tracked for both Prayag and competitors. Do **not** run any auto-matcher — the Sparsh Pearl mapping is already user-matched and final.
+
+**Conventions:** contract-first (openapi.yaml → codegen, never hand-edit the generated client), Drizzle for DB, gaps computed **live** (never stored).
+
+## Step 1 — Erase everything
+
+Fully wipe the database. Delete all rows from every data table: `competitor_prices`, `competitor_price_history`, `catalog_products`, `mrp_price_history`, `code_conflicts`, `products`, `comparisons`, `discount_settings`. Use existing reset endpoints if present, otherwise truncate. After this, every table must be empty.
+
+## Step 2 — Load the Prayag master (two periods)
+
+From `0_Prayag_Master_TwoPeriod.xlsx`:
+
+- Sheet **`catalog_products`** → table `catalog_products` { item_code, product_name, division }.
+- Sheet **`mrp_price_history`** → table `mrp_price_history` { item_code, mrp, price_basis, effective_date, is_current, period_label, mrp_source }.
+  - Each item has 1 or 2 rows: a `Current` row (is_current = true) and, where the price changed, a `Previous` row (is_current = false). Keep both.
+
+## Step 3 — Load the Sparsh Pearl mapping (competitor side)
+
+From `Prayag_vs_Sparsh_Pearl_PTMT.xlsx`, sheet **`competitor_prices`**. Map columns by header (case-insensitive) into `competitor_price_history`:
+
+| File column | Goes to |
+|---|---|
+| competitor | competitor (always "Sparsh Pearl") |
+| category | category |
+| size | size |
+| competitor_product | description |
+| competitor_code | competitor_code (e.g. ED-950) |
+| competitor_mrp | mrp |
+| prayag_item_code | matched_prayag_code (FK → catalog_products.item_code, e.g. 123-Q) |
+| match_confidence | match_confidence (default "High") |
+
+- Set `effective_date = 2026-03-05` and `is_current = true` for all these rows (this is the period they were matched against).
+- Link every row to `catalog_products` via `matched_prayag_code`. Do **not** auto-match or guess.
+
+## Step 4 — Competitor brand = dropdown (Import Competitor page)
+
+Replace the free-text "Competitor Brand Name" input with a combobox:
+
+- Pre-populated with the **distinct competitor brands already in the database**.
+- The user can **select an existing brand**, or **add a new brand** by typing a new name.
+- On "Process Upload", use the selected or newly-entered brand. New brands appear in the dropdown next time.
+
+## Step 5 — Effective date on competitor upload
+
+Add a required **"Effective Date"** date-picker to the Import Competitor form.
+
+- Store `effective_date` on every imported competitor row in `competitor_price_history`.
+- Re-uploading the **same competitor for the same effective_date** replaces that period; a **new effective_date adds a new period** (older periods kept). Mark the newest period per competitor as `is_current = true`.
+
+## Step 6 — Effective-date filter in the comparison / dashboard
+
+Add a filter (dropdown) to choose the effective period for the comparison.
+
+- Options = the distinct effective dates across Prayag + competitor history. Default = latest.
+- For the chosen date:
+  - **Prayag price** = the `mrp_price_history` row for that item with the latest `effective_date <= chosen date`.
+  - **Competitor price** = the `competitor_price_history` row for that competitor+item with the latest `effective_date <= chosen date`.
+  - `gap% = (competitor price − Prayag price) / Prayag price × 100`.
+- Changing the filter recomputes the whole comparison and the median-gap KPIs for that period.
+
+## Step 7 — Period-to-period MRP increase (both sides)
+
+For each item (Prayag and each competitor item), order its prices by `effective_date` and compute:
+
+```
+increase% = (this_period_mrp − previous_period_mrp) / previous_period_mrp × 100
+```
+
+Surface this per product — the MRP for each period and the % change between consecutive periods — for Prayag **and** the competitor. A "Price History" panel/expandable row per product is fine, plus an overall view of the biggest MRP increases per period.
+
+## Validation
+
+- All old tables empty, then repopulated only from the two files.
+- `competitor_price_history` has 150 rows, all `competitor = "Sparsh Pearl"`; every `matched_prayag_code` exists in `catalog_products` (no orphans).
+- Median Sparsh Pearl gap ≈ **−1%** (range roughly −34% to +29%).
+- A Prayag item with two periods (e.g. `U70`: 112.5 → 128) shows increase% = (128 − 112.5) / 112.5 × 100 ≈ **+13.8%**.
+- Importing a competitor twice with two effective dates keeps both periods; the filter lists both; latest is default.
