@@ -1018,6 +1018,7 @@ router.get("/catalog/mapping-review", async (req, res) => {
     .select({
       id: competitorPricesTable.id,
       competitor: competitorPricesTable.competitor,
+      effectiveDate: competitorPricesTable.effectiveDate,
       category: competitorPricesTable.category,
       description: competitorPricesTable.description,
       size: competitorPricesTable.size,

@@ -542,6 +542,7 @@ export const GetMappingReviewResponse = zod.object({
   "rows": zod.array(zod.object({
   "id": zod.number(),
   "competitor": zod.string(),
+  "effectiveDate": zod.string().nullish().describe('Price period date (YYYY-MM-DD) this row belongs to.'),
   "category": zod.string().nullish(),
   "description": zod.string().nullish(),
   "size": zod.string().nullish(),

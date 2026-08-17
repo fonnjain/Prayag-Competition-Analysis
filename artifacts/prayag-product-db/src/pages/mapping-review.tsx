@@ -604,6 +604,7 @@ export default function MappingReviewPage() {
                   />
                 </th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Competitor</th>
+                <th className="px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Eff. Date</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Description</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Size</th>
@@ -617,11 +618,11 @@ export default function MappingReviewPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">Loading pending reviews...</td>
+                  <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">Loading pending reviews...</td>
                 </tr>
               ) : mappingData?.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">No reviews pending.</td>
+                  <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">No reviews pending.</td>
                 </tr>
               ) : (
                 mappingData?.rows.map((row) => {
@@ -644,6 +645,9 @@ export default function MappingReviewPage() {
                         />
                       </td>
                       <td className="px-4 py-3 font-medium">{row.competitor}</td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap font-mono text-xs">
+                        {row.effectiveDate ?? "—"}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{row.category || "-"}</td>
                       <td className="px-4 py-3 max-w-[250px] truncate" title={row.description || ""}>
                         {row.description || "-"}
@@ -695,7 +699,7 @@ export default function MappingReviewPage() {
                     </tr>
                     {suggestions.length > 0 && (
                       <tr className="border-b last:border-0 bg-muted/20">
-                        <td colSpan={5}></td>
+                        <td colSpan={6}></td>
                         <td colSpan={5} className="px-4 pb-3 pt-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">

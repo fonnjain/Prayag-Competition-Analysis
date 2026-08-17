@@ -1765,6 +1765,9 @@ components:
           type: integer
         competitor:
           type: string
+        effectiveDate:
+          type: ["string", "null"]
+          description: "Price period date (YYYY-MM-DD) this row belongs to."
         category:
           type: ["string", "null"]
         description:

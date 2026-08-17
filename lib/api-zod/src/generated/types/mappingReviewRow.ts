@@ -10,6 +10,11 @@ import type { MappingSuggestion } from './mappingSuggestion';
 export interface MappingReviewRow {
   id: number;
   competitor: string;
+  /**
+     * Price period date (YYYY-MM-DD) this row belongs to.
+     * @nullable
+     */
+  effectiveDate?: string | null;
   /** @nullable */
   category?: string | null;
   /** @nullable */
