@@ -1,37 +1,37 @@
 ---
-name: Period-aware pricing (effective-date feature)
-description: Architecture decisions for the multi-period MRP + competitor price history feature.
+name: Period-aware pricing
+description: How Prayag MRP and competitor prices are resolved to "current" — the source-of-truth rule and helper locations.
 ---
 
-## What was built
-Competitor prices and Prayag MRP history are now period-aware. Each period is identified by an `effective_date`. Old periods are preserved (append-only). Analysis filters to a chosen period.
+# Period-aware pricing
 
-## Key decisions
+## The rule
+**is_current is a denormalised convenience flag, never the source of truth for what price is in force.**
+All live price lookups use `DISTINCT ON (item_code) … WHERE effective_date <= :asOf ORDER BY effective_date DESC, id DESC`.
+`:asOf` defaults to `todayString()` (YYYY-MM-DD, local calendar) when no period filter is selected.
 
-**competitor_prices.is_current** — added column (boolean NOT NULL DEFAULT true). After each import, `recomputeCompetitorCurrentFlags(competitor)` sets:
-- Matched rows: is_current=true only for the latest effective_date per (competitor, matched_prayag_code)
-- Unmatched rows: is_current=true for all rows whose effective_date equals the max date for that competitor
+**Why:** is_current only updates when recomputeCurrentFlags() runs — a future-dated row loaded today would immediately become "current" under the old flag approach.
 
-**Default analysis view** — `getFilteredRows` without `effectivePeriod` uses `WHERE is_current = true` for both competitor prices and Prayag MRP (not a full table scan any more). With `effectivePeriod`, uses DISTINCT ON raw SQL.
+## Key helpers (routes/analysis.ts)
+- `todayString()` — returns today as YYYY-MM-DD
+- `getPrayagCatalogMapForPeriod(atDate?)` — resolves Prayag MRP + upcoming MRP via two parallel DISTINCT ON queries (current ≤ asOf, upcoming > asOf)
+- `getCompetitorRowsForPeriod(atDate?)` — matched rows via DISTINCT ON, unmatched via MAX(effective_date) JOIN, both ≤ resolvedDate
 
-**recomputeCurrentFlags (MRP)** — fixed to exclude future-dated rows: `WHERE effective_date <= CURRENT_DATE`. This ensures "Upcoming" (e.g., Sep 2026) rows never become is_current=true.
+## Comparison.ts helpers (also date-driven now)
+- `getPrayagMaps()` — DISTINCT ON WHERE effective_date <= today (was is_current = true)
+- `getCatalogCandidates()` — same
 
-**Load competitor route** — now requires `effectiveDate` (YYYY-MM-DD) in the POST body. Deletes only (competitor, effectiveDate) rows — NOT all competitor rows. isCurrent=false on insert; recompute sets flags after.
+## Competitor flag fix (lib/catalog.ts)
+- `recomputeCompetitorCurrentFlags()` now has `AND effective_date <= CURRENT_DATE` on both the matched DISTINCT ON and the unmatched MAX() subquery
 
-**Upcoming rows** — loaded into mrp_price_history with is_current=false. Appear in period list and history panel but NOT in default comparison. The `/analysis/periods` endpoint flags them via `isFuturePeriod` map.
+## Upcoming prices (Part 3)
+- `PrayagInfo` has `upcomingMrp` / `upcomingMrpDate` (earliest revision AFTER asOf per item)
+- `AnalysisRow` has `upcomingPrayagMrp` / `upcomingPrayagMrpDate`
+- Opportunity table shows "↑ ₹X.XX w.e.f. YYYY-MM-DD" badge when upcoming exists
+- Price history panel badges future-dated rows "Upcoming" (orange) vs past "Current" (grey)
 
-**period filter in analysis dashboard** — stored in DashboardFilters.effectivePeriod. Undefined = "Latest (auto)" = isCurrent=true path. A specific date = DISTINCT ON path.
+## mrp-increases route
+Changed from `WHERE is_current = true` to `ROW_NUMBER() OVER (…DESC) = 1` on rows pre-filtered to `effective_date <= CURRENT_DATE`.
 
-**Why:**
-Prayag needs to compare prices across historical periods (e.g., pre vs post price increase) and see upcoming prices (w.e.f. Sep 2026) without affecting current KPIs.
-
-**How to apply:**
-- Any new analysis endpoint that reads competitor/MRP data must call `getCompetitorRowsForPeriod(atDate)` and `getPrayagCatalogMapForPeriod(atDate)` (both in analysis.ts).
-- Any new competitor import must include `effectiveDate` and call `recomputeCompetitorCurrentFlags` after.
-- Never use `db.select().from(competitorPricesTable)` (all rows) in analysis — use the period-aware helpers.
-
-## Data loaded (2026-08-17)
-- 8,207 rows from `0_Prayag_Master_MultiPeriod_1786970660521.xlsx` sheet `mrp_price_history`
-- Previous/Current/Upcoming status stored in `notes` column
-- 1,989 Upcoming rows (2026-09-01) have is_current=false
-- 6,595 rows are is_current=true across all mrp_price_history
+## Remaining gap
+`/analysis/mrp-increases` always uses CURRENT_DATE — task #82 tracks wiring it to effectivePeriod.
