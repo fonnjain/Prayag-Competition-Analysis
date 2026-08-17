@@ -251,6 +251,13 @@ export default function ImportCompetitorPage() {
               }));
             } else if (eventName === "done") {
               const data = payload;
+              // Persist failedChunks so the review page can show the warning
+              if (Array.isArray(data.failedChunks) && data.failedChunks.length > 0) {
+                sessionStorage.setItem(
+                  `importBatch_${data.batchId}_failedChunks`,
+                  JSON.stringify(data.failedChunks),
+                );
+              }
               toast({
                 title: "Extraction Complete",
                 description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,

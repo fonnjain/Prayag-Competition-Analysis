@@ -226,6 +226,24 @@ export default function ImportReviewPage() {
   const [isApproving, setIsApproving] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [failedChunks, setFailedChunks] = useState<
+    Array<{ chunkIndex: number; startPage: number; endPage: number }>
+  >([]);
+
+  // Read failed chunks from sessionStorage (written by the import page after SSE completes)
+  useEffect(() => {
+    if (!batchId) return;
+    const key = `importBatch_${batchId}_failedChunks`;
+    const raw = sessionStorage.getItem(key);
+    if (raw) {
+      try {
+        setFailedChunks(JSON.parse(raw));
+      } catch {
+        // ignore malformed data
+      }
+      sessionStorage.removeItem(key);
+    }
+  }, [batchId]);
 
   // Load batch on mount
   useEffect(() => {
@@ -382,6 +400,25 @@ export default function ImportReviewPage() {
           This batch has been{" "}
           <span className="font-semibold">{batch.status}</span>.
           {batch.status === "approved" ? " Prices are live in the comparison dashboard." : ""}
+        </div>
+      )}
+
+      {/* Failed-chunks warning */}
+      {failedChunks.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 flex gap-3 items-start text-sm text-amber-900">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+          <div className="space-y-1">
+            <p className="font-semibold">
+              {failedChunks.length === 1 ? "1 page range" : `${failedChunks.length} page ranges`} could not be read from the PDF
+            </p>
+            <ul className="list-disc list-inside space-y-0.5 text-amber-800">
+              {failedChunks.map((fc) => (
+                <li key={fc.chunkIndex}>
+                  Pages {fc.startPage}–{fc.endPage} — consider re-uploading or checking those pages in the original PDF
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
