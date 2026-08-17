@@ -499,11 +499,13 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
   const body = req.body as {
     competitor?: string | null;
     confidence?: string | null;
+    period?: string | null;
     search?: string | null;
     minConfidence?: string;
   };
   const competitor = strParam(body.competitor);
   const confidence = strParam(body.confidence);
+  const period = strParam(body.period);
   const search = strParam(body.search);
   const TIERS = ["low", "medium", "high"] as const;
   const minTierRaw =
@@ -519,6 +521,7 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (confidence)
     conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
+  if (period) conditions.push(eq(competitorPricesTable.effectiveDate, period));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
     conditions.push(
@@ -574,6 +577,7 @@ router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
 router.get("/catalog/mapping-review/auto-accept-preview", async (req, res) => {
   const competitor = strParam(req.query.competitor);
   const confidence = strParam(req.query.confidence);
+  const period = strParam(req.query.period);
   const search = strParam(req.query.search);
   const TIERS = ["low", "medium", "high"] as const;
 
@@ -581,6 +585,7 @@ router.get("/catalog/mapping-review/auto-accept-preview", async (req, res) => {
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (confidence)
     conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
+  if (period) conditions.push(eq(competitorPricesTable.effectiveDate, period));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
     conditions.push(
@@ -949,8 +954,11 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
   });
 });
 
-// GET /catalog/comparison/filters — competitors, categories, match statuses.
-router.get("/catalog/comparison/filters", async (_req, res) => {
+// GET /catalog/comparison/filters — competitors, categories, match statuses, periods.
+// Optional ?competitor= scopes the returned periods to that competitor's rows only.
+router.get("/catalog/comparison/filters", async (req, res) => {
+  const competitor = strParam(req.query.competitor);
+
   const compRows = await db
     .selectDistinct({ competitor: competitorPricesTable.competitor })
     .from(competitorPricesTable)
@@ -966,6 +974,19 @@ router.get("/catalog/comparison/filters", async (_req, res) => {
   const confRows = await db
     .selectDistinct({ matchConfidence: competitorPricesTable.matchConfidence })
     .from(competitorPricesTable);
+
+  // Distinct effective dates for unmatched rows (the set the period filter applies to),
+  // scoped to the selected competitor when one is active, newest first.
+  const periodConditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  if (competitor) periodConditions.push(eq(competitorPricesTable.competitor, competitor));
+  const periodRows = await db
+    .selectDistinct({ effectiveDate: competitorPricesTable.effectiveDate })
+    .from(competitorPricesTable)
+    .where(and(...periodConditions));
+  const periods = periodRows
+    .map((r) => r.effectiveDate)
+    .filter((d): d is string => !!d)
+    .sort((a, b) => b.localeCompare(a)); // newest first
 
   // Stable, meaningful order for the confidence tiers rather than alphabetical.
   const CONF_ORDER = ["High", "Medium", "Low"];
@@ -985,6 +1006,7 @@ router.get("/catalog/comparison/filters", async (_req, res) => {
       .map((r) => r.matchStatus)
       .filter((c): c is string => !!c),
     confidences,
+    periods,
   });
 });
 
@@ -992,6 +1014,7 @@ router.get("/catalog/comparison/filters", async (_req, res) => {
 router.get("/catalog/mapping-review", async (req, res) => {
   const competitor = strParam(req.query.competitor);
   const confidence = strParam(req.query.confidence);
+  const period = strParam(req.query.period);
   const search = strParam(req.query.search);
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
@@ -1000,6 +1023,7 @@ router.get("/catalog/mapping-review", async (req, res) => {
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (confidence)
     conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
+  if (period) conditions.push(eq(competitorPricesTable.effectiveDate, period));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
     conditions.push(
@@ -1200,11 +1224,13 @@ router.patch("/catalog/competitor-prices/:id", async (req, res) => {
 // GET /catalog/mapping-review/export — full filtered review list as CSV/XLSX.
 router.get("/catalog/mapping-review/export", async (req, res) => {
   const competitor = strParam(req.query.competitor);
+  const period = strParam(req.query.period);
   const search = strParam(req.query.search);
   const format = String(req.query.format ?? "xlsx");
 
   const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (period) conditions.push(eq(competitorPricesTable.effectiveDate, period));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
     conditions.push(

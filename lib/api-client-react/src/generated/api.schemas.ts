@@ -344,6 +344,8 @@ export interface ComparisonFilters {
   categories: string[];
   matchStatuses: string[];
   confidences: string[];
+  /** Distinct effective dates present in unmatched rows, newest first. */
+  periods: string[];
 }
 
 export type MappingSuggestionConfidenceLabel = typeof MappingSuggestionConfidenceLabel[keyof typeof MappingSuggestionConfidenceLabel];
@@ -442,6 +444,8 @@ export interface AutoAcceptRequest {
   competitor?: string | null;
   /** @nullable */
   confidence?: string | null;
+  /** @nullable */
+  period?: string | null;
   /** @nullable */
   search?: string | null;
   minConfidence: AutoAcceptRequestMinConfidence;
@@ -919,6 +923,13 @@ page?: number;
 pageSize?: number;
 };
 
+export type GetComparisonFiltersParams = {
+/**
+ * When set, scopes the returned periods to rows for that competitor only.
+ */
+competitor?: string;
+};
+
 export type GetComparisonMatrixParams = {
 category?: string;
 search?: string;
@@ -936,6 +947,10 @@ competitor?: string;
  * Filter by match confidence tier (Low, etc.).
  */
 confidence?: string;
+/**
+ * Filter to a single price-period (effective date, YYYY-MM-DD).
+ */
+period?: string;
 search?: string;
 page?: number;
 pageSize?: number;
@@ -944,6 +959,10 @@ pageSize?: number;
 export type GetAutoAcceptPreviewParams = {
 competitor?: string;
 confidence?: string;
+/**
+ * Scope the preview to a single price-period (effective date, YYYY-MM-DD).
+ */
+period?: string;
 search?: string;
 };
 

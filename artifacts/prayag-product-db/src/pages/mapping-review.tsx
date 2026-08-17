@@ -80,6 +80,7 @@ export default function MappingReviewPage() {
   const [search, setSearch] = useState("");
   const [competitor, setCompetitor] = useState<string>("all");
   const [confidence, setConfidence] = useState<string>("all");
+  const [period, setPeriod] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [editingRows, setEditingRows] = useState<Record<number, { code: string, status: string }>>({});
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -89,21 +90,31 @@ export default function MappingReviewPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // When the competitor changes, clear the period selection so it doesn't
+  // carry a date that belongs to a different competitor's import history.
+  useEffect(() => {
+    setPeriod("all");
+  }, [competitor]);
+
   useEffect(() => {
     setPage(1);
-  }, [search, competitor, confidence]);
+  }, [search, competitor, confidence, period]);
 
   // Selection is scoped to the current filter/page; reset it whenever the
   // visible set changes so stale ids never get accepted.
   useEffect(() => {
     setSelected(new Set());
-  }, [search, competitor, confidence, page]);
+  }, [search, competitor, confidence, period, page]);
 
-  const { data: filters } = useGetComparisonFilters();
+  const filtersParams = competitor !== "all" ? { competitor } : undefined;
+  const { data: filters } = useGetComparisonFilters(filtersParams, {
+    query: { queryKey: getGetComparisonFiltersQueryKey(filtersParams) },
+  });
 
   const previewParams = {
     competitor: competitor !== "all" ? competitor : undefined,
     confidence: confidence !== "all" ? confidence : undefined,
+    period: period !== "all" ? period : undefined,
     search: search || undefined,
   };
   const { data: autoAcceptPreview } = useGetAutoAcceptPreview(previewParams, {
@@ -117,6 +128,7 @@ export default function MappingReviewPage() {
     search: search || undefined,
     competitor: competitor !== "all" ? competitor : undefined,
     confidence: confidence !== "all" ? confidence : undefined,
+    period: period !== "all" ? period : undefined,
     page,
     pageSize: PAGE_SIZE
   }, {
@@ -125,6 +137,7 @@ export default function MappingReviewPage() {
         search: search || undefined,
         competitor: competitor !== "all" ? competitor : undefined,
         confidence: confidence !== "all" ? confidence : undefined,
+        period: period !== "all" ? period : undefined,
         page,
         pageSize: PAGE_SIZE
       })
@@ -374,6 +387,7 @@ export default function MappingReviewPage() {
         data: {
           competitor: competitor !== "all" ? competitor : null,
           confidence: confidence !== "all" ? confidence : null,
+          period: period !== "all" ? period : null,
           search: search || null,
           minConfidence: threshold as "high" | "medium" | "low",
         },
@@ -417,6 +431,7 @@ export default function MappingReviewPage() {
     const params = new URLSearchParams({ format });
     if (search) params.set("search", search);
     if (competitor !== "all") params.set("competitor", competitor);
+    if (period !== "all") params.set("period", period);
     return `/api/catalog/mapping-review/export?${params.toString()}`;
   };
 
@@ -478,6 +493,18 @@ export default function MappingReviewPage() {
             <SelectItem value="all">All Confidence</SelectItem>
             {(filters?.confidences ?? []).map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Period" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Periods</SelectItem>
+            {(filters?.periods ?? []).map((d) => (
+              <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}
           </SelectContent>
         </Select>

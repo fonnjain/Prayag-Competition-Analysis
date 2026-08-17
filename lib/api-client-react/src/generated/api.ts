@@ -70,6 +70,7 @@ import type {
   GetAutoAcceptPreviewParams,
   GetCatalogProductsParams,
   GetComparisonByProductParams,
+  GetComparisonFiltersParams,
   GetComparisonMatrixParams,
   GetComparisonParams,
   GetComparisonSummaryParams,
@@ -1498,20 +1499,27 @@ export function useGetComparisonByProduct<TData = Awaited<ReturnType<typeof getC
 
 
 
-export const getGetComparisonFiltersUrl = () => {
+export const getGetComparisonFiltersUrl = (params?: GetComparisonFiltersParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/catalog/comparison/filters`
+  return stringifiedParams.length > 0 ? `/api/catalog/comparison/filters?${stringifiedParams}` : `/api/catalog/comparison/filters`
 }
 
 /**
- * @summary Available competitors, categories, and match statuses for filtering
+ * @summary Available competitors, categories, match statuses, and price periods for filtering
  */
-export const getComparisonFilters = async ( options?: RequestInit): Promise<ComparisonFilters> => {
+export const getComparisonFilters = async (params?: GetComparisonFiltersParams, options?: RequestInit): Promise<ComparisonFilters> => {
 
-  return customFetch<ComparisonFilters>(getGetComparisonFiltersUrl(),
+  return customFetch<ComparisonFilters>(getGetComparisonFiltersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1524,23 +1532,23 @@ export const getComparisonFilters = async ( options?: RequestInit): Promise<Comp
 
 
 
-export const getGetComparisonFiltersQueryKey = () => {
+export const getGetComparisonFiltersQueryKey = (params?: GetComparisonFiltersParams,) => {
     return [
-    `/api/catalog/comparison/filters`
+    `/api/catalog/comparison/filters`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetComparisonFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getComparisonFilters>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetComparisonFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getComparisonFilters>>, TError = ErrorType<unknown>>(params?: GetComparisonFiltersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetComparisonFiltersQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetComparisonFiltersQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonFilters>>> = ({ signal }) => getComparisonFilters({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonFilters>>> = ({ signal }) => getComparisonFilters(params, { signal, ...requestOptions });
 
 
 
@@ -1554,15 +1562,15 @@ export type GetComparisonFiltersQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Available competitors, categories, and match statuses for filtering
+ * @summary Available competitors, categories, match statuses, and price periods for filtering
  */
 
 export function useGetComparisonFilters<TData = Awaited<ReturnType<typeof getComparisonFilters>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetComparisonFiltersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetComparisonFiltersQueryOptions(options)
+  const queryOptions = getGetComparisonFiltersQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -533,7 +533,14 @@ paths:
     get:
       operationId: getComparisonFilters
       tags: [comparison]
-      summary: Available competitors, categories, and match statuses for filtering
+      summary: Available competitors, categories, match statuses, and price periods for filtering
+      parameters:
+        - name: competitor
+          in: query
+          required: false
+          description: When set, scopes the returned periods to rows for that competitor only.
+          schema:
+            type: string
       responses:
         "200":
           description: Filter options
@@ -595,6 +602,12 @@ paths:
           in: query
           required: false
           description: Filter by match confidence tier (Low, etc.).
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          description: Filter to a single price-period (effective date, YYYY-MM-DD).
           schema:
             type: string
         - name: search
@@ -669,6 +682,12 @@ paths:
         - name: confidence
           in: query
           required: false
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          description: Scope the preview to a single price-period (effective date, YYYY-MM-DD).
           schema:
             type: string
         - name: search
@@ -1720,7 +1739,7 @@ components:
           type: integer
     ComparisonFilters:
       type: object
-      required: [competitors, categories, matchStatuses, confidences]
+      required: [competitors, categories, matchStatuses, confidences, periods]
       properties:
         competitors:
           type: array
@@ -1736,6 +1755,11 @@ components:
             type: string
         confidences:
           type: array
+          items:
+            type: string
+        periods:
+          type: array
+          description: Distinct effective dates present in unmatched rows, newest first.
           items:
             type: string
     MappingSuggestion:
@@ -1849,6 +1873,8 @@ components:
         competitor:
           type: ["string", "null"]
         confidence:
+          type: ["string", "null"]
+        period:
           type: ["string", "null"]
         search:
           type: ["string", "null"]

@@ -485,13 +485,18 @@ export const GetComparisonByProductResponse = zod.object({
 
 
 /**
- * @summary Available competitors, categories, and match statuses for filtering
+ * @summary Available competitors, categories, match statuses, and price periods for filtering
  */
+export const GetComparisonFiltersQueryParams = zod.object({
+  "competitor": zod.coerce.string().optional().describe('When set, scopes the returned periods to rows for that competitor only.')
+})
+
 export const GetComparisonFiltersResponse = zod.object({
   "competitors": zod.array(zod.string()),
   "categories": zod.array(zod.string()),
   "matchStatuses": zod.array(zod.string()),
-  "confidences": zod.array(zod.string())
+  "confidences": zod.array(zod.string()),
+  "periods": zod.array(zod.string()).describe('Distinct effective dates present in unmatched rows, newest first.')
 })
 
 
@@ -533,6 +538,7 @@ export const GetComparisonMatrixResponse = zod.object({
 export const GetMappingReviewQueryParams = zod.object({
   "competitor": zod.coerce.string().optional(),
   "confidence": zod.coerce.string().optional().describe('Filter by match confidence tier (Low, etc.).'),
+  "period": zod.coerce.string().optional().describe('Filter to a single price-period (effective date, YYYY-MM-DD).'),
   "search": zod.coerce.string().optional(),
   "page": zod.coerce.number().optional(),
   "pageSize": zod.coerce.number().optional()
@@ -616,6 +622,7 @@ export const BulkUpdateCompetitorMappingsResponse = zod.object({
 export const AutoAcceptMappingsBody = zod.object({
   "competitor": zod.string().nullish(),
   "confidence": zod.string().nullish(),
+  "period": zod.string().nullish(),
   "search": zod.string().nullish(),
   "minConfidence": zod.enum(['high', 'medium', 'low'])
 })
@@ -632,6 +639,7 @@ export const AutoAcceptMappingsResponse = zod.object({
 export const GetAutoAcceptPreviewQueryParams = zod.object({
   "competitor": zod.coerce.string().optional(),
   "confidence": zod.coerce.string().optional(),
+  "period": zod.coerce.string().optional().describe('Scope the preview to a single price-period (effective date, YYYY-MM-DD).'),
   "search": zod.coerce.string().optional()
 })
 
