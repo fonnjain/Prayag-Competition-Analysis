@@ -25,8 +25,11 @@ export interface ExtractedItem {
 export interface ExtractionProgress {
   chunk: number;
   totalChunks: number;
+  startPage: number;
+  endPage: number;
   pagesInChunk: number;
   itemsFound: number;
+  totalItemsFound: number;
 }
 
 const CHUNK_SIZE = 25;
@@ -207,8 +210,11 @@ export async function extractFromPdf(
     onProgress?.({
       chunk: i + 1,
       totalChunks: chunks.length,
+      startPage: chunk.startPage,
+      endPage: chunk.endPage,
       pagesInChunk: chunk.endPage - chunk.startPage + 1,
       itemsFound: items.length,
+      totalItemsFound: allItems.length,
     });
   }
 

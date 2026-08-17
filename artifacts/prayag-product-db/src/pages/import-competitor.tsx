@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   FileUp,
@@ -70,6 +71,16 @@ export default function ImportCompetitorPage() {
   const [gstPct, setGstPct] = useState<number>(18);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  // SSE extraction progress state
+  const [extractionProgress, setExtractionProgress] = useState<{
+    stage: "preparing" | "extracting" | "matching" | null;
+    chunk: number;
+    totalChunks: number;
+    startPage: number;
+    endPage: number;
+    totalItemsFound: number;
+    statusMessage: string;
+  } | null>(null);
   // Track which brands are expanded to show their periods
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +159,7 @@ export default function ImportCompetitorPage() {
 
     setIsUploading(true);
     setResult(null);
+    setExtractionProgress(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -158,20 +170,98 @@ export default function ImportCompetitorPage() {
 
     try {
       if (isPdf) {
-        // PDF → staging endpoint → navigate to review page
+        // PDF → SSE-streaming staging endpoint → navigate to review page
         const res = await fetch(`${BASE}/api/catalog/import-batches`, {
           method: "POST",
           body: formData,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to process PDF");
 
-        toast({
-          title: "Extraction Complete",
-          description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error((data as any).error || "Failed to process PDF");
+        }
+
+        const contentType = res.headers.get("content-type") ?? "";
+        if (!contentType.includes("text/event-stream") || !res.body) {
+          // Fallback: treat as plain JSON (old behaviour)
+          const data = await res.json();
+          toast({
+            title: "Extraction Complete",
+            description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,
+          });
+          navigate(`/import-review/${data.batchId}`);
+          return;
+        }
+
+        // Read the SSE stream
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        setExtractionProgress({
+          stage: "preparing",
+          chunk: 0,
+          totalChunks: 0,
+          startPage: 0,
+          endPage: 0,
+          totalItemsFound: 0,
+          statusMessage: "Preparing extraction…",
         });
 
-        navigate(`/import-review/${data.batchId}`);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE events are separated by double newline
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() ?? "";
+
+          for (const part of parts) {
+            const eventLine = part.split("\n").find((l) => l.startsWith("event: "));
+            const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
+            if (!dataLine) continue;
+
+            const eventName = eventLine ? eventLine.slice(7).trim() : "message";
+            let payload: any;
+            try {
+              payload = JSON.parse(dataLine.slice(6));
+            } catch {
+              continue;
+            }
+
+            if (eventName === "progress") {
+              setExtractionProgress({
+                stage: "extracting",
+                chunk: payload.chunk,
+                totalChunks: payload.totalChunks,
+                startPage: payload.startPage,
+                endPage: payload.endPage,
+                totalItemsFound: payload.totalItemsFound,
+                statusMessage: `Processing pages ${payload.startPage}–${payload.endPage} of chunk ${payload.chunk}/${payload.totalChunks}…`,
+              });
+            } else if (eventName === "status") {
+              setExtractionProgress((prev) => ({
+                ...(prev ?? {
+                  chunk: 0, totalChunks: 0, startPage: 0, endPage: 0, totalItemsFound: 0,
+                }),
+                stage: payload.stage ?? prev?.stage ?? "preparing",
+                statusMessage: payload.message ?? prev?.statusMessage ?? "",
+              }));
+            } else if (eventName === "done") {
+              const data = payload;
+              toast({
+                title: "Extraction Complete",
+                description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,
+              });
+              navigate(`/import-review/${data.batchId}`);
+              return;
+            } else if (eventName === "error") {
+              throw new Error(payload.error || "Extraction failed");
+            }
+          }
+        }
       } else {
         // Excel/CSV → existing direct-import route
         const res = await fetch(`${BASE}/api/catalog/load-competitor`, {
@@ -179,7 +269,7 @@ export default function ImportCompetitorPage() {
           body: formData,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to upload competitor file");
+        if (!res.ok) throw new Error((data as any).error || "Failed to upload competitor file");
 
         setResult(data.results);
         toast({
@@ -199,6 +289,7 @@ export default function ImportCompetitorPage() {
       });
     } finally {
       setIsUploading(false);
+      setExtractionProgress(null);
     }
   };
 
@@ -326,6 +417,35 @@ export default function ImportCompetitorPage() {
             )}
           </div>
 
+          {/* PDF extraction progress bar */}
+          {isUploading && isPdf && extractionProgress && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{extractionProgress.statusMessage}</span>
+                {extractionProgress.totalChunks > 0 && (
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {extractionProgress.chunk}/{extractionProgress.totalChunks} chunks
+                  </span>
+                )}
+              </div>
+              <Progress
+                value={
+                  extractionProgress.totalChunks > 0
+                    ? Math.round((extractionProgress.chunk / extractionProgress.totalChunks) * 100)
+                    : extractionProgress.stage === "matching"
+                    ? 95
+                    : 5
+                }
+                className="h-2"
+              />
+              {extractionProgress.totalItemsFound > 0 && (
+                <p className="text-xs text-muted-foreground text-right">
+                  {extractionProgress.totalItemsFound} items found so far
+                </p>
+              )}
+            </div>
+          )}
+
           <Button
             type="submit"
             disabled={!file || !competitor.trim() || !effectiveDate || isUploading}
@@ -334,7 +454,7 @@ export default function ImportCompetitorPage() {
             {isUploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {isPdf ? "Extracting prices (this takes ~30–60 s)…" : "Uploading…"}
+                {isPdf ? "Extracting…" : "Uploading…"}
               </>
             ) : isPdf ? (
               <>

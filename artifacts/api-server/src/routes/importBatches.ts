@@ -185,8 +185,24 @@ router.post(
       return;
     }
 
+    // Helper to send SSE events
+    const sendSse = (event: string, data: unknown) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      // Flush if available (compression middleware may buffer)
+      if (typeof (res as any).flush === "function") (res as any).flush();
+    };
+
+    // Set up SSE stream before any async work
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+    res.flushHeaders();
+
     try {
       await seedAliasesIfNeeded(competitor);
+
+      sendSse("status", { stage: "preparing", message: "Preparing extraction…" });
 
       const [batchRows] = await Promise.all([
         db.insert(importBatchesTable)
@@ -194,10 +210,14 @@ router.post(
           .returning(),
       ]);
       const batch = batchRows[0];
-      if (!batch) { res.status(500).json({ error: "Failed to create batch" }); return; }
+      if (!batch) {
+        sendSse("error", { error: "Failed to create batch" });
+        res.end();
+        return;
+      }
       const batchId = batch.id;
 
-      // Extract + match (synchronous; may take 30–90 s for a 100-page catalogue)
+      // Extract + match (may take 30–90 s for a 100-page catalogue)
       const prayagMrpMap = await getCurrentPrayagMrp();
       const [targets, aliases] = await Promise.all([
         getTargets(competitor, prayagMrpMap),
@@ -206,12 +226,25 @@ router.post(
 
       const targetCodes = targets.map((t) => t.competitorCode).filter((c): c is string => !!c);
 
+      sendSse("status", { stage: "extracting", message: "Starting PDF extraction…" });
+
       const extracted = await extractFromPdf(
         file.buffer,
         targetCodes,
         SPARSH_CODE_FAMILIES,
-        (p) => req.log.info(p, "[importBatches] extraction progress"),
+        (p) => {
+          req.log.info(p, "[importBatches] extraction progress");
+          sendSse("progress", {
+            chunk: p.chunk,
+            totalChunks: p.totalChunks,
+            startPage: p.startPage,
+            endPage: p.endPage,
+            totalItemsFound: p.totalItemsFound,
+          });
+        },
       );
+
+      sendSse("status", { stage: "matching", message: "Matching products…" });
 
       const { staging, newProducts } = matchCatalogue(
         competitor, targets, extracted, aliases, priceBasis, gstPct,
@@ -256,10 +289,12 @@ router.post(
         .set({ rowCounts: JSON.stringify(counts) })
         .where(eq(importBatchesTable.id, batchId));
 
-      res.json({ batchId, competitor, effectiveDate, priceBasis, gstPct, status: "pending", rowCounts: counts });
+      sendSse("done", { batchId, competitor, effectiveDate, priceBasis, gstPct, status: "pending", rowCounts: counts });
+      res.end();
     } catch (err) {
       req.log.error({ err }, "import-batches POST failed");
-      res.status(500).json({ error: err instanceof Error ? err.message : "Failed to process file" });
+      sendSse("error", { error: err instanceof Error ? err.message : "Failed to process file" });
+      res.end();
     }
   },
 );
