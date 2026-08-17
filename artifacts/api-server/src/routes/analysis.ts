@@ -43,7 +43,9 @@ function todayString(): string {
 // resolvedDate defaults to today (CURRENT_DATE).
 // Also queries the next upcoming revision (effective_date > resolvedDate) so
 // consumers can show "Upcoming w.e.f. <date>" without a second round-trip.
-async function getPrayagCatalogMapForPeriod(atDate?: string | null): Promise<Map<string, PrayagInfo>> {
+//
+// Exported for integration testing only. Not part of the public HTTP surface.
+export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Promise<Map<string, PrayagInfo>> {
   const resolvedDate = atDate ?? todayString();
   type PriceRow = { item_code: string; mrp: number | null; effective_date: string | null };
 
@@ -102,11 +104,64 @@ async function getPrayagCatalogMapForPeriod(atDate?: string | null): Promise<Map
 // effective_date <= resolvedDate per (competitor, matched_prayag_code) for
 // matched rows, and the latest period at or before resolvedDate for unmatched
 // rows. resolvedDate defaults to today when no period filter is provided.
+//
+// NOTE: db.execute() returns raw PostgreSQL column names (snake_case), but
+// buildRow() reads camelCase properties (matchStatus, matchedPrayagCode, etc.).
+// mapCompetitorRow() bridges the gap so field lookups in buildRow always succeed.
 type CompetitorRow = typeof competitorPricesTable.$inferSelect;
+
+type RawCompetitorRow = {
+  id: number;
+  competitor: string;
+  category: string | null;
+  description: string | null;
+  size: string | null;
+  price: number | null;
+  unit: string | null;
+  competitor_code: string | null;
+  effective_date: string | null;
+  matched_prayag_code: string | null;
+  match_status: string;
+  match_confidence: string | null;
+  prayag_mrp_at_compare: number | null;
+  is_current: boolean;
+  price_basis: string | null;
+  gst_pct: number | null;
+  created_at: Date | null;
+  updated_at: Date | null;
+};
+
+function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
+  // Cast via unknown: priceBasis/gstPct exist in the source schema but the
+  // generated dist types are stale (task #61). The fields ARE present in the
+  // runtime object and are read by buildRow() via the CompInput interface.
+  return {
+    id: r.id,
+    competitor: r.competitor,
+    category: r.category ?? null,
+    description: r.description ?? null,
+    size: r.size ?? null,
+    price: r.price ?? null,
+    unit: r.unit ?? null,
+    competitorCode: r.competitor_code ?? null,
+    effectiveDate: r.effective_date ?? null,
+    matchedPrayagCode: r.matched_prayag_code ?? null,
+    matchStatus: r.match_status ?? "no match (review)",
+    matchConfidence: r.match_confidence ?? null,
+    prayagMrpAtCompare: r.prayag_mrp_at_compare ?? null,
+    isCurrent: r.is_current ?? true,
+    priceBasis: r.price_basis ?? null,
+    gstPct: r.gst_pct ?? null,
+    // created_at / updated_at are NOT NULL in the schema; cast directly.
+    createdAt: r.created_at as Date,
+    updatedAt: r.updated_at as Date,
+  } as unknown as CompetitorRow;
+}
+
 async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<CompetitorRow[]> {
   const resolvedDate = atDate ?? todayString();
   const [matched, unmatched] = await Promise.all([
-    db.execute<CompetitorRow>(sql`
+    db.execute<RawCompetitorRow>(sql`
       SELECT DISTINCT ON (competitor, matched_prayag_code) *
       FROM competitor_prices
       WHERE matched_prayag_code IS NOT NULL
@@ -114,7 +169,7 @@ async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<Compe
         AND effective_date <= ${resolvedDate}
       ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC
     `),
-    db.execute<CompetitorRow>(sql`
+    db.execute<RawCompetitorRow>(sql`
       SELECT cp.*
       FROM competitor_prices cp
       JOIN (
@@ -129,7 +184,7 @@ async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<Compe
       WHERE cp.matched_prayag_code IS NULL
     `),
   ]);
-  return [...matched.rows, ...unmatched.rows];
+  return [...matched.rows, ...unmatched.rows].map(mapCompetitorRow);
 }
 
 const PRAYAG_SCOPE = "prayag";

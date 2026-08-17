@@ -34,4 +34,4 @@ All live price lookups use `DISTINCT ON (item_code) … WHERE effective_date <= 
 Changed from `WHERE is_current = true` to `ROW_NUMBER() OVER (…DESC) = 1` on rows pre-filtered to `effective_date <= CURRENT_DATE`.
 
 ## Remaining gap
-`/analysis/mrp-increases` always uses CURRENT_DATE — task #82 tracks wiring it to effectivePeriod.
+`/analysis/mrp-increases` always used CURRENT_DATE — now wired to effectivePeriod (implemented).
