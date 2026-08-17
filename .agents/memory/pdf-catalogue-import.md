@@ -1,49 +1,46 @@
 ---
-name: PDF catalogue import — staging system
-description: Architecture decisions for the PDF catalogue import flow (task #60). Covers extraction, matching, staging, approve/discard, and price basis.
+name: PDF catalogue import
+description: How the Sparsh Pearl PDF catalogue is extracted and staged — profile-based page selection, coverage verification, retry logic, and auth.
 ---
 
-# PDF Catalogue Import Architecture
+# PDF catalogue import
 
-## Extraction
-- Claude vision only (`claude-sonnet-4-5`) with `document` blocks (base64 PDF chunks ≤ 25 pages via pdf-lib).
-- DO NOT use pdfjs text extraction for image-only catalogues — ₹ glyph is misread.
-- Retry once on JSON parse failure (2s delay).
-- Synchronous extract during POST /catalog/import-batches (no SSE/polling).
-- Extraction takes 30–90 s; user sees a spinner.
+## Auth fix
+Raw `fetch()` calls in `import-competitor.tsx` and `import-review.tsx` bypassed `@workspace/api-client-react`'s Bearer token system. Fix: `getAuthHeaders()` helper (reads `prayag_sid` from localStorage) injected into every fetch call on those pages.
 
-## Code families (Sparsh Pearl Vol 6.2)
-- Hardcoded in `artifacts/api-server/src/routes/importBatches.ts` as `SPARSH_CODE_FAMILIES`.
-- Profile JSON at `artifacts/api-server/src/lib/catalogue-profiles/sparsh-pearl.json` (metadata only; code families in the route for now).
+## Profile-based extraction (current approach — DO NOT revert to full PDF)
+The full Sparsh Pearl catalogue is 108 pages / ~12 MB. Only 16 pages carry mapped products. `catalogueProfile.ts` defines the profile type and helpers:
+- `profilePages(profile)` → sorted deduplicated page list from seriesMap
+- `extractPages(src, pages1Based)` → sub-PDF Buffer + pageMap (index → original 1-based page)
+- `widenedPages(base, margin, pageCount)` → widened set for low-coverage retry
+- `seriesWithNoItems(profile, foundPrefixes)` → series names with no items extracted
 
-**Why:** Dynamic profiles for other brands are a follow-up (task not yet created).
+`pdfExtractor.ts` uses the profile when provided:
+1. Builds a 16-page, ~2 MB sub-PDF (vs 108 pages, ~12 MB)
+2. Sends to Claude in ONE request (16 pages < MAX_PAGES_PER_REQUEST = 25)
+3. Translates page numbers: `originalPage = pageMap[chunk.startPage - 1 + reportedPage - 1]`
+   (model reports 1-based position within the chunk mini-PDF; we translate to original catalogue page)
+4. Computes coverage = resolved targets / total targets
+5. If coverage < 95%: widens by ±2, retries once; warns if still < 95% naming empty series
 
-## Matching engine (`lib/catalogueMatcher.ts`)
-- Three signals: code (exact after normCode), size/variant (HARD GATE — reject if both sides specify a size that disagrees), description (word-overlap, soft flag).
-- Alias table: `competitor_code_aliases`. Seeds 8 Sparsh Pearl aliases on first POST for that competitor.
-- Alias match → always `needs_review` (user confirms the renumbering).
-- WMP-188 case: master code WMP-188 (3 Mtr) aliased to WMP-189 in catalogue.
+## Model
+`claude-opus-5` — all chunks were failing with "Unexpected end of JSON input" before the profile fix.
+The diagnostic logging (chunk response content_blocks, types, first 200 chars) remains in place.
+If the model returns no text block, it's treated as 0 items (not a failure).
 
-## Price basis
-- New columns `price_basis` and `gst_pct` on `competitor_prices`.
-- `effectivePrice()` in `lib/analysis.ts`: explicit basis takes priority, then falls back to checking the `unit` string (legacy compatibility, no backfill needed).
-- Sparsh Pearl catalogues import as 'MRP' basis (no GST inflation).
+## Coverage in response
+`rowCounts` JSON extended with `pagesSent`, `pagesWidened`, `coverage` (0.0–1.0).
+SSE `done` event includes `coverageWarning` string (non-null when coverage < 95%).
 
-## Staging tables
-- `import_batches`: one row per upload, status: pending → approved | discarded.
-- `competitor_price_staging`: extracted+matched items; nothing touches competitor_prices until approve.
-- `competitor_code_aliases`: code renumbering aliases, unique on (competitor, old_code).
+## Staging / approve flow
+- POST /catalog/import-batches: SSE stream (stages to competitor_price_staging)
+- GET /catalog/import-batches/:id: batch + staged rows
+- POST /catalog/import-batches/:id/approve: commits to competitor_prices
+- Aliases are seeded from SPARSH_ALIASES in importBatches.ts on each upload
 
-## Approve action
-- Commits `ok` + `needs_review` rows only. `not_found` and `new_product` are skipped.
-- Deletes existing rows for (competitor, effectiveDate) before inserting new ones.
-- Writes desc+size matches back as aliases so future imports auto-detect the renumbering.
-- Calls `recomputeCurrentFlags()` after transaction.
+## Profile file
+`artifacts/api-server/src/lib/catalogue-profiles/sparsh-pearl.json`
+16 pages: 18, 19, 24, 25, 26, 27, 34, 35, 38, 39, 64, 65, 83, 84, 96, 97
 
-## Routing
-- PDF → POST /catalog/import-batches → navigate to /import-review/:batchId
-- Excel/CSV → POST /catalog/load-competitor (unchanged)
-- Review screen at /import-review/:id in prayag-product-db app.
-
-## TypeScript
-- DB package exports via source `.ts` (no build step). Pre-existing api-zod dist issue (task #61) causes type errors in api-server tsc --noEmit but does NOT affect runtime (server uses esbuild bundle).
+## Key constraint
+The production `.replit.app` URL uses the last-deployed `dist/index.mjs`. After code changes, the user must test via the Replit dev preview (not `.replit.app`) until the app is redeployed.
