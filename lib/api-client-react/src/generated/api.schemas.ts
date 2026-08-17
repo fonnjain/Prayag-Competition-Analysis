@@ -789,6 +789,20 @@ export interface CompetitorPriceHistory {
   periods: CompetitorPriceHistoryPeriod[];
 }
 
+export interface MrpIncreaseItem {
+  itemCode: string;
+  /** @nullable */
+  productName?: string | null;
+  /** @nullable */
+  division?: string | null;
+  /** @nullable */
+  category?: string | null;
+  currentMrp: number;
+  prevMrp: number;
+  currentDate: string;
+  prevDate: string;
+  changePct: number;
+}
 export interface PriceHistory {
   itemCode: string;
   /** @nullable */
@@ -1195,6 +1209,11 @@ export const ExportAnalysisFormat = {
   csv: 'csv',
 } as const;
 
+export type GetMrpIncreasesParams = {
+division?: string;
+category?: string;
+limit?: number;
+};
 export type BeginBrowserLoginParams = {
 /**
  * Relative path to redirect to after login (must start with `/`). Defaults to `/`.
@@ -1212,3 +1231,7 @@ export type LogoutBrowserSessionParams = {
 returnTo?: string;
 };
 
+
+export interface MrpIncreaseList {
+  items: MrpIncreaseItem[];
+}

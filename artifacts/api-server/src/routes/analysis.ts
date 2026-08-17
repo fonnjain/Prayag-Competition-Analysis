@@ -500,6 +500,83 @@ router.get("/analysis/periods", async (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /analysis/mrp-increases — products with the biggest current-period MRP
+// increase vs the previous period, ranked by changePct desc.
+// ---------------------------------------------------------------------------
+router.get("/analysis/mrp-increases", async (req, res) => {
+  const division = strParam(req.query.division);
+  const category = strParam(req.query.category);
+  const limitRaw = Number(req.query.limit) || 50;
+  const limit = Math.min(Math.max(1, limitRaw), 200);
+
+  // Use a window function to pair each is_current row with the one just before it
+  // per item_code (ascending by date/id), then filter to increases only.
+  type IncRow = {
+    item_code: string;
+    product_name: string | null;
+    division: string | null;
+    category: string | null;
+    current_mrp: number;
+    prev_mrp: number;
+    current_date: string;
+    prev_date: string;
+    change_pct: number;
+  };
+
+  const divisionFilter = division ? sql`AND c.division = ${division}` : sql``;
+  const categoryFilter = category ? sql`AND c.category = ${category}` : sql``;
+
+  const rows = await db.execute<IncRow>(sql`
+    WITH ranked AS (
+      SELECT
+        h.item_code,
+        h.mrp                AS current_mrp,
+        h.effective_date     AS current_date,
+        LAG(h.mrp)          OVER w AS prev_mrp,
+        LAG(h.effective_date) OVER w AS prev_date,
+        h.is_current
+      FROM mrp_price_history h
+      WINDOW w AS (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC)
+    )
+    SELECT
+      r.item_code,
+      c.product_name,
+      c.division,
+      c.category,
+      r.current_mrp,
+      r.prev_mrp,
+      r.current_date,
+      r.prev_date,
+      ROUND(((r.current_mrp - r.prev_mrp) / r.prev_mrp * 100)::numeric, 1) AS change_pct
+    FROM ranked r
+    JOIN catalog_products c ON c.item_code = r.item_code
+    WHERE r.is_current = true
+      AND r.prev_mrp IS NOT NULL
+      AND r.prev_mrp > 0
+      AND r.current_mrp IS NOT NULL
+      AND r.current_mrp > r.prev_mrp
+      ${divisionFilter}
+      ${categoryFilter}
+    ORDER BY change_pct DESC
+    LIMIT ${limit}
+  `);
+
+  res.json({
+    items: rows.rows.map((r) => ({
+      itemCode: r.item_code,
+      productName: r.product_name,
+      division: r.division,
+      category: r.category,
+      currentMrp: r.current_mrp,
+      prevMrp: r.prev_mrp,
+      currentDate: r.current_date,
+      prevDate: r.prev_date,
+      changePct: Number(r.change_pct),
+    })),
+  });
+});
+
+// ---------------------------------------------------------------------------
 // GET /analysis/price-history/:itemCode — period-to-period MRP history.
 // ---------------------------------------------------------------------------
 router.get("/analysis/price-history/:itemCode", async (req, res) => {

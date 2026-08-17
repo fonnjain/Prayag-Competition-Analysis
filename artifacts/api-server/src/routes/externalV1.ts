@@ -35,7 +35,7 @@ router.get("/v1/products/:itemCode", apiKeyAuth, (req, res, next) =>
     req,
     res,
     next,
-    `/catalog/products/${encodeURIComponent(String(req.params.itemCode))}`,
+    `/catalog/products/${encodeURIComponent(req.params.itemCode as string)}`,
     catalogRouter,
   ),
 );

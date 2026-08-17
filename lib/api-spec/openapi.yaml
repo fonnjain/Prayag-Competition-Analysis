@@ -1000,6 +1000,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnalysisPeriods"
+  /analysis/mrp-increases:
+    get:
+      operationId: getMrpIncreases
+      tags: [analysis]
+      summary: Products with the biggest MRP increase this period vs the previous
+      description: Returns products whose current-period MRP is higher than the preceding period, ranked by % increase descending.
+      parameters:
+        - name: division
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Ranked MRP increases
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpIncreaseList"
   /analysis/price-history/{itemCode}:
     get:
       operationId: getPriceHistory
@@ -2443,6 +2473,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CompetitorPriceHistoryPeriod"
+    MrpIncreaseItem:
+      type: object
+      required: [itemCode, currentMrp, prevMrp, currentDate, prevDate, changePct]
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        currentMrp:
+          type: number
+        prevMrp:
+          type: number
+        currentDate:
+          type: string
+        prevDate:
+          type: string
+        changePct:
+          type: number
+    MrpIncreaseList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpIncreaseItem"
     PriceHistory:
       type: object
       required: [itemCode, prayagHistory, competitorHistory]

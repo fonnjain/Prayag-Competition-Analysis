@@ -39,7 +39,6 @@ export const GetApiKeysResponse = zod.object({
 export const createApiKeyBodyNameMax = 100;
 
 
-
 export const CreateApiKeyBody = zod.object({
   "name": zod.string().min(1).max(createApiKeyBodyNameMax).describe('A label describing who\/what will use this key.')
 })
@@ -1017,7 +1016,11 @@ export const GetAnalysisPeriodsResponse = zod.object({
   "isFuturePeriod": zod.record(zod.string(), zod.boolean()).describe('Map of period date → true if future-dated (Upcoming).')
 })
 
-
+/**
+ * Returns products whose current-period MRP is higher than the preceding period, ranked by % increase descending.
+ * @summary Products with the biggest MRP increase this period vs the previous
+ */
+export const getMrpIncreasesQueryLimitDefault = 50;
 /**
  * Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
  * @summary Period-to-period price history for a Prayag SKU
@@ -1142,11 +1145,6 @@ export const LogoutBrowserSessionHeader = zod.object({
  */
 
 
-
-
-
-
-
 export const ExchangeMobileAuthorizationCodeBody = zod.object({
   "code": zod.string().min(1),
   "code_verifier": zod.string().min(1),
@@ -1172,3 +1170,22 @@ export const LogoutMobileSessionResponse = zod.object({
 })
 
 
+export const GetMrpIncreasesQueryParams = zod.object({
+  "division": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().default(getMrpIncreasesQueryLimitDefault)
+})
+
+export const GetMrpIncreasesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullish(),
+  "division": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "currentMrp": zod.number(),
+  "prevMrp": zod.number(),
+  "currentDate": zod.string(),
+  "prevDate": zod.string(),
+  "changePct": zod.number()
+}))
+})
