@@ -1194,6 +1194,7 @@ export const DeleteCompetitorPeriodResponse = zod.object({
 export const GetMrpIncreasesQueryParams = zod.object({
   "division": zod.coerce.string().optional(),
   "category": zod.coerce.string().optional(),
+  "effectivePeriod": zod.string().optional().describe('ISO date (YYYY-MM-DD). Show increases as of this date — the latest MRP ≤ this date is treated as the current period. Defaults to today.'),
   "limit": zod.coerce.number().default(getMrpIncreasesQueryLimitDefault)
 })
 

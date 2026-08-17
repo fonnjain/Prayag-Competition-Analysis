@@ -1229,6 +1229,8 @@ export const ExportAnalysisFormat = {
 export type GetMrpIncreasesParams = {
 division?: string;
 category?: string;
+/** ISO date (YYYY-MM-DD). Show increases as of this date — the latest MRP ≤ this date is treated as the current period. Defaults to today. */
+effectivePeriod?: string;
 limit?: number;
 };
 export type BeginBrowserLoginParams = {

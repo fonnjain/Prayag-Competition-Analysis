@@ -511,8 +511,9 @@ router.get("/analysis/mrp-increases", async (req, res) => {
   const category = strParam(req.query.category);
   const limitRaw = Number(req.query.limit) || 50;
   const limit = Math.min(Math.max(1, limitRaw), 200);
+  const atDate = strParam(req.query.effectivePeriod) ?? todayString();
 
-  // Date-driven approach: rows with effective_date <= CURRENT_DATE only.
+  // Date-driven approach: rows with effective_date <= resolvedDate only.
   // ROW_NUMBER picks the most recent row per item (rn = 1); LAG (ascending)
   // supplies the previous period's MRP for the same item.
   type IncRow = {
@@ -540,7 +541,7 @@ router.get("/analysis/mrp-increases", async (req, res) => {
         LAG(h.mrp)            OVER (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC) AS prev_mrp,
         LAG(h.effective_date) OVER (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC) AS prev_date
       FROM mrp_price_history h
-      WHERE h.effective_date <= CURRENT_DATE
+      WHERE h.effective_date <= ${atDate}
     )
     SELECT
       r.item_code,

@@ -301,10 +301,11 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
 
 // ─── Biggest MRP Increases tab ───────────────────────────────────────────────
 
-function BiggestMrpIncreasesTab({ filters }: { filters: { division?: string; category?: string } }) {
+function BiggestMrpIncreasesTab({ filters }: { filters: { division?: string; category?: string; effectivePeriod?: string } }) {
   const { data, isLoading } = useGetMrpIncreases({
     division: filters.division,
     category: filters.category,
+    effectivePeriod: filters.effectivePeriod,
     limit: 100,
   });
 
