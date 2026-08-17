@@ -33,13 +33,17 @@ export const EXTRACTION_MODEL = "claude-opus-5" as const;
 // profile path uses a single request. The chunker only kicks in for the
 // widened-retry path (~45 pages → 2 chunks) or the full-PDF fallback.
 const MAX_PAGES_PER_REQUEST = 25;
+// Coverage below this fraction triggers a widened-page retry.
+// 0.90 allows for ~10% of mapped codes that may be genuinely absent
+// (discontinued SKUs, slight naming differences) without causing an
+// expensive extra Claude call.  Adjust upward only if profiles are
+// comprehensive and you expect near-perfect match rates.
+const COVERAGE_THRESHOLD = 0.90;
 
 // Warn when the sub-PDF exceeds this; it approaches the API's 32 MB limit.
 const MAX_BYTES_PER_REQUEST = 28 * 1024 * 1024;
 
-// Coverage threshold: if fewer than this fraction of target codes are found,
-// widen the page range by ±2 and retry once.
-const COVERAGE_THRESHOLD = 0.95;
+// (COVERAGE_THRESHOLD is defined earlier with the tuning comment.)
 
 export interface ExtractedItem {
   cat_no: string;
@@ -480,9 +484,20 @@ export async function extractFromPdf(
       const wideResolved = targetCodes.filter((c) => wideFoundCodes.has(normCode(c))).length;
       coverage = wideResolved / targetCodes.length;
 
+      // If the widened run extracted fewer items than the initial run, the extra
+      // pages contained mostly non-product content (intros, accessories, etc.).
+      // Keep whichever result is richer and log the decision.
+      const bestItems = wideItems.length >= initialItems.length ? wideItems : initialItems;
+      if (wideItems.length < initialItems.length) {
+        console.warn(
+          `[pdfExtractor] widened run found fewer items (${wideItems.length} vs ${initialItems.length}) — ` +
+          `keeping initial result. Coverage reported from widened codes.`,
+        );
+      }
+
       if (coverage < COVERAGE_THRESHOLD) {
         const foundPrefixes = new Set(
-          wideItems.map((i) => {
+          bestItems.map((i) => {
             const dash = i.cat_no.indexOf("-");
             return dash > 0 ? i.cat_no.slice(0, dash + 1) : "";
           }).filter(Boolean),
@@ -496,7 +511,7 @@ export async function extractFromPdf(
         );
       }
 
-      return { items: wideItems, failedChunks, pagesSent, pagesWidened, coverage };
+      return { items: bestItems, failedChunks, pagesSent, pagesWidened, coverage };
     }
   }
 
