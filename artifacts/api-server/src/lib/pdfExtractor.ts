@@ -4,7 +4,7 @@
  * The Sparsh Pearl catalogue is image-only (no text layer), so pdf-parse /
  * pdfjs text extraction return nothing usable. Instead we:
  *   1. Split the PDF into ≤ 25-page chunks with pdf-lib.
- *   2. Send each chunk as a base64 `document` block to Claude (claude-sonnet-4-5).
+ *   2. Send each chunk as a base64 `document` block to Claude (claude-opus-4-5).
  *   3. Parse the strict-JSON response.
  *
  * DO NOT use OCR (tesseract) or pdfjs text extraction for this catalogue.
@@ -66,9 +66,14 @@ async function splitPdf(
   return chunks;
 }
 
-function buildExtractionPrompt(
+/**
+ * Builds the STATIC portion of the extraction prompt — identical across every
+ * chunk for the same import job. This is the part we cache with Anthropic's
+ * prompt-caching API (cache_control: ephemeral) so the ~150-item target list
+ * and extraction rules are only billed at full input rate on the first chunk.
+ */
+function buildStaticPrompt(
   targetCodes: string[],
-  startPage: number,
   codeFamilies: string[],
 ): string {
   const targetList =
@@ -76,10 +81,7 @@ function buildExtractionPrompt(
       ? `Target catalogue codes to find (these are the only ones we need priced):\n${targetCodes.map((c) => `  - ${c}`).join("\n")}\n`
       : "";
 
-  return `You are reading pages ${startPage}+ of the Sparsh Pearl PTMT catalogue. This is an IMAGE-ONLY PDF — there is no text layer. Extract prices visually.
-
-${targetList}
-Code families we care about: ${codeFamilies.join(", ")}
+  return `${targetList}Code families we care about: ${codeFamilies.join(", ")}
 
 EXTRACTION RULES:
 1. Grid pages: 4-column grid of product tiles. Each tile has a Cat No. and "MRP : ₹ NNN/-".
@@ -100,6 +102,11 @@ Return ONLY a JSON array. No prose, no markdown fences, no explanation. Schema:
 ]
 
 If no relevant items are found on these pages, return: []`;
+}
+
+/** Per-chunk dynamic header (page number changes each iteration). */
+function buildDynamicHeader(startPage: number): string {
+  return `You are reading pages ${startPage}+ of the Sparsh Pearl PTMT catalogue. This is an IMAGE-ONLY PDF — there is no text layer. Extract prices visually using the rules above.`;
 }
 
 /**
@@ -125,11 +132,8 @@ export async function extractFromPdf(
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
-    const prompt = buildExtractionPrompt(
-      targetCodes,
-      chunk.startPage,
-      codeFamilies,
-    );
+    const staticPrompt = buildStaticPrompt(targetCodes, codeFamilies);
+    const dynamicHeader = buildDynamicHeader(chunk.startPage);
     const base64 = chunk.buffer.toString("base64");
 
     let items: ExtractedItem[] = [];
@@ -139,12 +143,21 @@ export async function extractFromPdf(
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const response = await client.messages.create({
-          model: "claude-sonnet-4-5",
+          model: "claude-opus-4-5",
           max_tokens: 4096,
           messages: [
             {
               role: "user",
               content: [
+                // Static block: target list + rules — identical across all chunks
+                // for this import job. cache_control: ephemeral tells Claude to
+                // cache this prefix; subsequent chunks pay only the cache-read rate.
+                {
+                  type: "text",
+                  text: staticPrompt,
+                  cache_control: { type: "ephemeral" },
+                } as Anthropic.TextBlockParam,
+                // Dynamic block: the PDF chunk (changes every iteration)
                 {
                   type: "document",
                   source: {
@@ -153,7 +166,8 @@ export async function extractFromPdf(
                     data: base64,
                   },
                 } as Anthropic.DocumentBlockParam,
-                { type: "text", text: prompt },
+                // Dynamic block: page-specific instruction
+                { type: "text", text: dynamicHeader },
               ],
             },
           ],
