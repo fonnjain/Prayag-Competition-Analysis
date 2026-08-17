@@ -246,8 +246,14 @@ function parseMode(query: Record<string, unknown>): CompareMode {
 async function getFilteredRows(query: Record<string, unknown>): Promise<AnalysisRow[]> {
   const mode = parseMode(query);
   const atDate = strParam(query.effectivePeriod);
+  // Prayag MRP always resolves to the latest revision that is already in effect
+  // (effective_date <= today), regardless of which competitor period the user is
+  // viewing.  A future Prayag MRP (e.g. w.e.f. 01-Sep) surfaces as
+  // upcomingPrayagMrp / upcomingPrayagMrpDate on each row instead.
+  const today = todayString();
+  const prayagAtDate = atDate && atDate < today ? atDate : today;
   const [maps, all, discounts] = await Promise.all([
-    getPrayagCatalogMapForPeriod(atDate),
+    getPrayagCatalogMapForPeriod(prayagAtDate),
     getCompetitorRowsForPeriod(atDate),
     mode === "net"
       ? getDiscounts()

@@ -30,6 +30,15 @@ const upload = multer({
 const NET_KEYWORDS = ["net", "rate", "dealer", "scheme", "billing", "discount"];
 const MRP_KEYWORDS = ["mrp", "list", "retail", "price", "cost"];
 
+// Headers that identify packing-quantity columns — these must never be used as
+// the price column when loading Prayag MRP (they hold pcs/box, not ₹/item).
+const PACKING_EXCLUDE_KEYWORDS = ["box", " pcs", "s.box", "m.box", "packing", "carton", "pcs/", "/pcs"];
+
+// Sheet names that hold packing data — skip entirely when loading Prayag MRP.
+const PACKING_SHEET_RE = /\bpacking\b/i;
+// Sheet names that hold master pricing data — prefer these over other sheets.
+const MASTER_SHEET_RE = /\bmaster\b/i;
+
 function norm(s: unknown): string {
   return String(s ?? "").trim();
 }
@@ -154,19 +163,40 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
   }
 
   // Price column: header keyword, else first mostly-numeric column.
+  // Columns whose headers indicate packing quantities are always excluded.
+  const isPackingHeader = (h: string) =>
+    PACKING_EXCLUDE_KEYWORDS.some((k) => h.includes(k));
+
   let netCol = -1;
+  // Two-pass MRP scan: pass 1 looks for "new mrp" / "new" + mrp keyword (preferred);
+  // pass 2 accepts any mrp keyword that doesn't have "old" in it; pass 3 accepts
+  // any mrp keyword (including "old mrp") as a last resort.
   let mrpCol = -1;
+  let newMrpCol = -1;  // explicit "new mrp" column
+  let oldMrpCol = -1;  // "old mrp" fallback
+
   for (let c = 0; c < maxCols; c++) {
     if (c === codeCol) continue;
     const h = headers[c] ?? "";
-    if (NET_KEYWORDS.some((k) => h.includes(k)) && netCol === -1) netCol = c;
-    else if (MRP_KEYWORDS.some((k) => h.includes(k)) && mrpCol === -1) mrpCol = c;
+    if (isPackingHeader(h)) continue;  // never pick a packing column
+    if (NET_KEYWORDS.some((k) => h.includes(k)) && netCol === -1) {
+      netCol = c;
+    } else if (MRP_KEYWORDS.some((k) => h.includes(k))) {
+      const isNew = h.includes("new");
+      const isOld = h.includes("old");
+      if (isNew && newMrpCol === -1) newMrpCol = c;
+      else if (!isOld && !isNew && mrpCol === -1) mrpCol = c;
+      else if (isOld && oldMrpCol === -1) oldMrpCol = c;
+    }
   }
-  let priceCol = mrpCol !== -1 ? mrpCol : netCol;
-  let basis = mrpCol !== -1 ? "MRP" : netCol !== -1 ? "Net" : "Verify";
+  // Priority: explicit "new mrp" > generic mrp > "old mrp" > net
+  const bestMrpCol = newMrpCol !== -1 ? newMrpCol : mrpCol !== -1 ? mrpCol : oldMrpCol;
+  let priceCol = bestMrpCol !== -1 ? bestMrpCol : netCol;
+  let basis = bestMrpCol !== -1 ? "MRP" : netCol !== -1 ? "Net" : "Verify";
   if (priceCol === -1) {
     for (let c = 0; c < maxCols; c++) {
       if (c === codeCol) continue;
+      if (isPackingHeader(headers[c] ?? "")) continue;  // skip packing columns in fallback too
       let numericCount = 0;
       for (let r = 0; r < grid.length; r++) {
         if (r === headerRow) continue;
@@ -270,6 +300,9 @@ interface LoadSummary {
   skippedDuplicates: number;
   skippedUnparseable: number;
   unmatchedCodes: string[];
+  /** Number of rows whose MRP is below ₹50 — near zero is expected for most categories;
+   *  a high count almost certainly means a packing-quantity column was imported. */
+  lowMrpCount: number;
   message?: string;
 }
 
@@ -301,7 +334,17 @@ function parseWorkbookBuffer(
   let skippedUnparseable = 0;
   const skippedRows: SkippedRow[] = [];
 
-  for (const sheetName of wb.SheetNames) {
+  // Sheet selection strategy:
+  // 1. If any sheet is named "MASTER" (case-insensitive), use it exclusively —
+  //    PTMT / Prayag MRP workbooks typically have a MASTER sheet with the real
+  //    MRP columns alongside a PACKING sheet whose values are pcs-per-box.
+  // 2. Otherwise, skip any sheet whose name contains "packing" and process the rest.
+  const masterSheet = wb.SheetNames.find((n) => MASTER_SHEET_RE.test(n));
+  const sheetsToProcess = masterSheet
+    ? [masterSheet]
+    : wb.SheetNames.filter((n) => !PACKING_SHEET_RE.test(n));
+
+  for (const sheetName of sheetsToProcess) {
     const sheet = wb.Sheets[sheetName];
     if (!sheet) continue;
     const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
@@ -381,12 +424,16 @@ async function persistParsedRows(
       skippedDuplicates: 0,
       skippedUnparseable,
       unmatchedCodes: [],
+      lowMrpCount: 0,
       message:
         "No valid code-and-price rows could be read from the file. Check the sheet has a recognisable item-code column and a price/MRP column.",
     };
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  // Sanity-check: count prices below ₹50.  For PTMT / CP products a count above
+  // zero almost certainly means a packing-quantity column was imported by mistake.
+  const lowMrpCount = [...byCode.values()].filter((v) => v.price < 50).length;
   const summary: LoadSummary = {
     file: filename,
     effectiveDate,
@@ -400,6 +447,7 @@ async function persistParsedRows(
     skippedDuplicates: 0,
     skippedUnparseable,
     unmatchedCodes: [],
+    lowMrpCount,
   };
 
   // Infer division once per file — same for every product in this upload.
