@@ -545,3 +545,169 @@ describe("GET /analysis/mrp-increases — combined division + category filter", 
     expect(items.some((i) => i.itemCode === itemCodeE)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: price DECREASE — must never appear in MRP Increases
+// ---------------------------------------------------------------------------
+
+describe("GET /analysis/mrp-increases — price decrease is excluded", () => {
+  // Seed an independent product (separate item code / catalog row) whose MRP
+  // went DOWN: 100 → 50.  The WHERE r.mrp > r.prev_mrp clause must reject it.
+
+  let decItemCode: string;
+  let decCatalogId: number;
+  let decDivision: string;
+
+  beforeEach(async () => {
+    decItemCode = `__TEST_MRPDEC_${Date.now()}__`;
+    decDivision = `__DIV_MRPDEC_${Date.now()}__`;
+
+    const [cat] = await db
+      .insert(catalogProductsTable)
+      .values({
+        itemCode: decItemCode,
+        productName: "Test Ball Valve 25mm",
+        division: decDivision,
+        category: "Ball Valve",
+      })
+      .returning({ id: catalogProductsTable.id });
+    decCatalogId = cat!.id;
+
+    // Two rows: MRP 100 → 50 (a decrease).
+    await db.insert(mrpPriceHistoryTable).values([
+      {
+        itemCode: decItemCode,
+        mrp: 100,
+        effectiveDate: dateMid,
+        loadDate: dateMid,
+        isCurrent: false,
+        priceBasis: "MRP",
+      },
+      {
+        itemCode: decItemCode,
+        mrp: 50,
+        effectiveDate: dateNew,
+        loadDate: dateNew,
+        isCurrent: true,
+        priceBasis: "MRP",
+      },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, decItemCode));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.id, decCatalogId));
+  });
+
+  it("does not return the item when MRP went down (100 → 50)", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(decDivision)}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    const found = res.body.items.find(
+      (i: { itemCode: string }) => i.itemCode === decItemCode,
+    );
+    expect(found).toBeUndefined();
+  });
+
+  it("does not return the item even when an effectivePeriod is supplied (100 → 50)", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?effectivePeriod=${dateNew}&division=${encodeURIComponent(decDivision)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const found = res.body.items.find(
+      (i: { itemCode: string }) => i.itemCode === decItemCode,
+    );
+    expect(found).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: unchanged price — must never appear in MRP Increases
+// ---------------------------------------------------------------------------
+
+describe("GET /analysis/mrp-increases — unchanged price is excluded", () => {
+  // Seed an independent product whose MRP stayed the same: 100 → 100.
+  // The WHERE r.mrp > r.prev_mrp clause (strict greater-than) must reject it.
+
+  let flatItemCode: string;
+  let flatCatalogId: number;
+  let flatDivision: string;
+
+  beforeEach(async () => {
+    flatItemCode = `__TEST_MRPFLAT_${Date.now()}__`;
+    flatDivision = `__DIV_MRPFLAT_${Date.now()}__`;
+
+    const [cat] = await db
+      .insert(catalogProductsTable)
+      .values({
+        itemCode: flatItemCode,
+        productName: "Test Gate Valve 20mm",
+        division: flatDivision,
+        category: "Gate Valve",
+      })
+      .returning({ id: catalogProductsTable.id });
+    flatCatalogId = cat!.id;
+
+    // Two rows: MRP 100 → 100 (no change).
+    await db.insert(mrpPriceHistoryTable).values([
+      {
+        itemCode: flatItemCode,
+        mrp: 100,
+        effectiveDate: dateMid,
+        loadDate: dateMid,
+        isCurrent: false,
+        priceBasis: "MRP",
+      },
+      {
+        itemCode: flatItemCode,
+        mrp: 100,
+        effectiveDate: dateNew,
+        loadDate: dateNew,
+        isCurrent: true,
+        priceBasis: "MRP",
+      },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, flatItemCode));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.id, flatCatalogId));
+  });
+
+  it("does not return the item when MRP stayed the same (100 → 100)", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(flatDivision)}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    const found = res.body.items.find(
+      (i: { itemCode: string }) => i.itemCode === flatItemCode,
+    );
+    expect(found).toBeUndefined();
+  });
+
+  it("does not return the item even when an effectivePeriod is supplied (100 → 100)", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?effectivePeriod=${dateNew}&division=${encodeURIComponent(flatDivision)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const found = res.body.items.find(
+      (i: { itemCode: string }) => i.itemCode === flatItemCode,
+    );
+    expect(found).toBeUndefined();
+  });
+});
