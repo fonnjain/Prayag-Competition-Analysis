@@ -3,29 +3,50 @@
  *
  * The Sparsh Pearl catalogue is image-only (no text layer), so pdf-parse /
  * pdfjs text extraction return nothing usable. Instead we:
- *   1. Split the PDF into ≤ 25-page chunks with pdf-lib.
- *   2. Send each chunk as a base64 `document` block to Claude (claude-opus-5).
+ *   1. Build a sub-PDF of the pages named in the catalogue profile (e.g.
+ *      17 of 108 pages for Sparsh Pearl — ~2 MB instead of ~12 MB).
+ *   2. Send that sub-PDF to Claude (usually fits in one request).
  *   3. Parse the strict-JSON response.
+ *   4. Compute coverage; if < 95 %, widen the page range by ±2 and retry once.
  *
  * DO NOT use OCR (tesseract) or pdfjs text extraction for this catalogue.
  * The ₹ glyph is misread and adjacent tile codes are picked up as prices.
+ *
+ * DO NOT revert to sending the full 108-page PDF. The profile-page approach
+ * is intentional — sending all pages is slower, more expensive, and risks
+ * hitting token limits.
  */
 
-import { PDFDocument } from "pdf-lib";
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  type CatalogueProfile,
+  profilePages,
+  widenedPages,
+  extractPages,
+  seriesWithNoItems,
+} from "./catalogueProfile.js";
 
-/**
- * The Claude model used for PDF catalogue extraction.
- * Stored on every import_batches row so we can correlate quality/cost changes
- * when the model is upgraded.
- */
+/** The Claude model used for PDF catalogue extraction. */
 export const EXTRACTION_MODEL = "claude-opus-5" as const;
+
+// Maximum pages per API request. 17 profile pages << 25, so the normal
+// profile path uses a single request. The chunker only kicks in for the
+// widened-retry path (~45 pages → 2 chunks) or the full-PDF fallback.
+const MAX_PAGES_PER_REQUEST = 25;
+
+// Warn when the sub-PDF exceeds this; it approaches the API's 32 MB limit.
+const MAX_BYTES_PER_REQUEST = 28 * 1024 * 1024;
+
+// Coverage threshold: if fewer than this fraction of target codes are found,
+// widen the page range by ±2 and retry once.
+const COVERAGE_THRESHOLD = 0.95;
 
 export interface ExtractedItem {
   cat_no: string;
-  variant: string | null; // e.g. "45 Degree", "15mm", "1 Mtr"
+  variant: string | null;
   mrp: number;
   product_name: string;
+  /** Original 1-based catalogue page number (translated from sub-PDF position). */
   page: number;
 }
 
@@ -45,23 +66,45 @@ export interface FailedChunk {
   endPage: number;
   error: string;
 }
-const CHUNK_SIZE = 10; // Reduced from 25: smaller chunks = smaller JSON output = less chance of truncation
+
+export interface ExtractionResult {
+  items: ExtractedItem[];
+  failedChunks: FailedChunk[];
+  /** Number of pages actually sent to Claude (profile subset or full PDF). */
+  pagesSent: number;
+  /** True if the initial coverage was < threshold and a widened retry ran. */
+  pagesWidened: boolean;
+  /**
+   * Fraction of target codes resolved to a price (0.0–1.0).
+   * 1.0 when targetCodes is empty (nothing to look for = perfect coverage).
+   */
+  coverage: number;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/** Normalise a competitor code for comparison: uppercase, strip whitespace. */
+function normCode(c: string): string {
+  return c.trim().toUpperCase().replace(/\s+/g, "");
+}
 
 /**
- * Split a PDF buffer into chunks of at most CHUNK_SIZE pages.
- * Returns an array of { buffer, startPage } (startPage is 1-based).
+ * Split a PDF buffer into chunks of at most MAX_PAGES_PER_REQUEST pages.
+ * Returns array of { buffer, startPage (1-based in *this* buffer), endPage }.
  */
 async function splitPdf(
   pdfBuffer: Buffer,
-  chunkSize = CHUNK_SIZE,
 ): Promise<Array<{ buffer: Buffer; startPage: number; endPage: number }>> {
+  // Lazy import to avoid top-level require issues in ESM build
+  const { PDFDocument } = await import("pdf-lib");
   const srcDoc = await PDFDocument.load(pdfBuffer);
   const total = srcDoc.getPageCount();
-  const chunks: Array<{ buffer: Buffer; startPage: number; endPage: number }> =
-    [];
+  const chunks: Array<{ buffer: Buffer; startPage: number; endPage: number }> = [];
 
-  for (let start = 0; start < total; start += chunkSize) {
-    const end = Math.min(start + chunkSize, total);
+  for (let start = 0; start < total; start += MAX_PAGES_PER_REQUEST) {
+    const end = Math.min(start + MAX_PAGES_PER_REQUEST, total);
     const newDoc = await PDFDocument.create();
     const pages = await newDoc.copyPages(
       srcDoc,
@@ -80,19 +123,23 @@ async function splitPdf(
 }
 
 /**
- * Builds the STATIC portion of the extraction prompt — identical across every
- * chunk for the same import job. This is the part we cache with Anthropic's
- * prompt-caching API (cache_control: ephemeral) so the ~150-item target list
- * and extraction rules are only billed at full input rate on the first chunk.
+ * Build the STATIC portion of the extraction prompt — identical across every
+ * chunk for the same import job. cache_control: ephemeral makes Claude cache
+ * this prefix across calls so subsequent chunks pay only the cache-read rate.
  */
 function buildStaticPrompt(
   targetCodes: string[],
   codeFamilies: string[],
+  isSubPdf: boolean,
 ): string {
   const targetList =
     targetCodes.length > 0
       ? `Target catalogue codes to find (these are the only ones we need priced):\n${targetCodes.map((c) => `  - ${c}`).join("\n")}\n`
       : "";
+
+  const pageInstruction = isSubPdf
+    ? `For the "page" field: report the 1-based page INDEX within the PDF you are reading (1 = first page of this file, 2 = second page, etc.). Do NOT use any printed page number visible on the page — use only the position within this file.`
+    : `For the "page" field: report the catalogue page number printed on or near the page.`;
 
   return `${targetList}Code families we care about: ${codeFamilies.join(", ")}
 
@@ -107,74 +154,96 @@ EXTRACTION RULES:
 8. If a page has no prices (marketing/intro page), return nothing for it.
 9. ONLY return codes from the target list above (or the code families listed). Ignore accessories, bathroom fittings, and codes not in our families.
 
+${pageInstruction}
+
 Return ONLY a JSON array. No prose, no markdown fences, no explanation. Schema:
 [
-  { "cat_no": "ED-950", "variant": null, "mrp": 467, "product_name": "Bib Cock with Flange", "page": 64 },
-  { "cat_no": "ED-951", "variant": "45 Degree", "mrp": 555, "product_name": "Long Body Bib Cock with Flange", "page": 64 },
-  { "cat_no": "ED-969", "variant": "90 Degree", "mrp": 561, "product_name": "Long Body Bib Cock with Flange", "page": 64 }
+  { "cat_no": "ED-950", "variant": null, "mrp": 467, "product_name": "Bib Cock with Flange", "page": 3 },
+  { "cat_no": "ED-951", "variant": "45 Degree", "mrp": 555, "product_name": "Long Body Bib Cock with Flange", "page": 3 },
+  { "cat_no": "ED-969", "variant": "90 Degree", "mrp": 561, "product_name": "Long Body Bib Cock with Flange", "page": 3 }
 ]
 
 If no relevant items are found on these pages, return: []`;
 }
 
-/** Per-chunk dynamic header (page number changes each iteration). */
-function buildDynamicHeader(startPage: number): string {
+/** Per-chunk dynamic header. */
+function buildDynamicHeader(startPage: number, isSubPdf: boolean): string {
+  if (isSubPdf) {
+    return `You are reading page ${startPage}+ of a FILTERED sub-PDF containing only the relevant product pages from the Sparsh Pearl PTMT catalogue. This is an IMAGE-ONLY PDF — there is no text layer. Extract prices visually using the rules above. Remember: use the 1-based page position within THIS PDF for the "page" field, not any printed number on the page.`;
+  }
   return `You are reading pages ${startPage}+ of the Sparsh Pearl PTMT catalogue. This is an IMAGE-ONLY PDF — there is no text layer. Extract prices visually using the rules above.`;
 }
 
-/**
- * Extract priced items from a PDF buffer using Claude vision.
- *
- * @param pdfBuffer  Raw PDF bytes
- * @param targetCodes  Competitor codes we expect to find (from the existing mapping)
- * @param codeFamilies  Code-prefix families to extract (from catalogue profile)
- * @param onProgress  Optional callback for progress updates
- */
-export async function extractFromPdf(
-  pdfBuffer: Buffer,
-  targetCodes: string[],
-  codeFamilies: string[],
-  onProgress?: (p: ExtractionProgress) => void,
-): Promise<ExtractionResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+// ---------------------------------------------------------------------------
+// Core chunk runner
+// ---------------------------------------------------------------------------
 
-  const client = new Anthropic({ apiKey });
-  const chunks = await splitPdf(pdfBuffer);
+interface RunChunksOptions {
+  buf: Buffer;
+  /** pageMap[i] = original 1-based catalogue page for sub-PDF page (i+1). Null = full PDF (no translation). */
+  pageMap: number[] | null;
+  targetCodes: string[];
+  codeFamilies: string[];
+  client: Anthropic;
+  isSubPdf: boolean;
+  onProgress?: (p: ExtractionProgress) => void;
+  /** Used to offset progress chunk numbering when this is a retry pass. */
+  chunkIndexOffset?: number;
+  totalChunksOverride?: number;
+}
+
+async function runChunks(opts: RunChunksOptions): Promise<{
+  items: ExtractedItem[];
+  failedChunks: FailedChunk[];
+}> {
+  const {
+    buf,
+    pageMap,
+    targetCodes,
+    codeFamilies,
+    client,
+    isSubPdf,
+    onProgress,
+    chunkIndexOffset = 0,
+    totalChunksOverride,
+  } = opts;
+
+  const chunks = await splitPdf(buf);
+  const totalChunks = totalChunksOverride ?? chunks.length;
   const allItems: ExtractedItem[] = [];
   const failedChunks: FailedChunk[] = [];
 
+  const staticPrompt = buildStaticPrompt(targetCodes, codeFamilies, isSubPdf);
+
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
-    const staticPrompt = buildStaticPrompt(targetCodes, codeFamilies);
-    const dynamicHeader = buildDynamicHeader(chunk.startPage);
+    const dynamicHeader = buildDynamicHeader(chunk.startPage, isSubPdf);
     const base64 = chunk.buffer.toString("base64");
+
+    if (chunk.buffer.length > MAX_BYTES_PER_REQUEST) {
+      console.warn(
+        `[pdfExtractor] chunk ${i + 1} is ${(chunk.buffer.length / 1024 / 1024).toFixed(1)} MB — approaching API limit`,
+      );
+    }
 
     let items: ExtractedItem[] = [];
     let lastErr: unknown;
 
-    // Retry once on JSON parse failure
+    // Retry once on transient failures
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const response = await client.messages.create({
           model: EXTRACTION_MODEL,
-          // 4096 is too low for dense 25-page chunks — Claude can output 150+
-          // items × ~60 chars each ≈ 9 000+ chars before the JSON closes.
-          // 16 384 gives comfortable headroom; raise if stop_reason hits it.
           max_tokens: 16384,
           messages: [
             {
               role: "user",
               content: [
-                // Static block: target list + rules — identical across all chunks
-                // for this import job. cache_control: ephemeral tells Claude to
-                // cache this prefix; subsequent chunks pay only the cache-read rate.
                 {
                   type: "text",
                   text: staticPrompt,
                   cache_control: { type: "ephemeral" },
                 } as Anthropic.TextBlockParam,
-                // Dynamic block: the PDF chunk (changes every iteration)
                 {
                   type: "document",
                   source: {
@@ -183,90 +252,96 @@ export async function extractFromPdf(
                     data: base64,
                   },
                 } as Anthropic.DocumentBlockParam,
-                // Dynamic block: page-specific instruction
                 { type: "text", text: dynamicHeader },
               ],
             },
           ],
         });
 
-        // Diagnostic log for every response — helps trace model behaviour.
+        // Diagnostic log — helps trace model behaviour in production.
         console.info(
-          `[pdfExtractor] chunk ${i + 1} response: stop_reason=${response.stop_reason}, ` +
+          `[pdfExtractor] chunk ${i + 1 + chunkIndexOffset} response: stop_reason=${response.stop_reason}, ` +
           `content_blocks=${response.content.length}, ` +
           `types=${response.content.map((b) => b.type).join(",")}`,
         );
 
-        // Warn if output was still cut off — means max_tokens needs raising.
         if (response.stop_reason === "max_tokens") {
           console.warn(
-            `[pdfExtractor] chunk ${i + 1}: stop_reason=max_tokens — response truncated at ${16384} tokens. JSON will fail; raise max_tokens.`,
+            `[pdfExtractor] chunk ${i + 1 + chunkIndexOffset}: stop_reason=max_tokens — ` +
+            `response truncated at ${16384} tokens; raise max_tokens if this persists.`,
           );
         }
 
-        // Find the text block — use find() so order of content blocks doesn't matter.
+        // Find text block — order of content blocks is not guaranteed.
         const textBlock = response.content.find((b) => b.type === "text");
         if (!textBlock || textBlock.type !== "text") {
-          // No text block at all — model returned something unexpected (tool_use,
-          // error, or empty array). Treat as zero items on these pages, not a failure.
           console.warn(
-            `[pdfExtractor] chunk ${i + 1}: no text content block in response. ` +
-            `Content: ${JSON.stringify(response.content).slice(0, 400)}`,
+            `[pdfExtractor] chunk ${i + 1 + chunkIndexOffset}: no text block in response. ` +
+            `content=${JSON.stringify(response.content).slice(0, 400)}`,
           );
+          // No text block = model returned nothing usable. Treat as 0 items, not a failure.
           items = [];
           lastErr = undefined;
           break;
         }
 
         const text = textBlock.text.trim();
-
         if (!text) {
-          // Empty text block — model returned nothing. Zero items, not a failure.
-          console.warn(`[pdfExtractor] chunk ${i + 1}: empty text response from model.`);
+          console.warn(`[pdfExtractor] chunk ${i + 1 + chunkIndexOffset}: empty text block.`);
           items = [];
           lastErr = undefined;
           break;
         }
 
-        // Strip markdown fences if Claude added them despite instructions
+        // Strip markdown fences if Claude added them despite instructions.
         const cleaned = text
           .replace(/^```(?:json)?\s*/i, "")
           .replace(/\s*```$/, "")
           .trim();
 
-        // Log first 200 chars to help diagnose non-JSON responses.
         if (!cleaned.startsWith("[") && !cleaned.startsWith("{")) {
           console.warn(
-            `[pdfExtractor] chunk ${i + 1}: response does not look like JSON. ` +
+            `[pdfExtractor] chunk ${i + 1 + chunkIndexOffset}: response not JSON. ` +
             `First 200 chars: ${cleaned.slice(0, 200)}`,
           );
         }
 
         const parsed = JSON.parse(cleaned) as unknown[];
-
-        items = parsed
+        const rawItems = parsed
           .filter(
             (x): x is Record<string, unknown> =>
               typeof x === "object" && x !== null,
           )
-          .map((x) => ({
-            cat_no: String(x.cat_no ?? "").trim().toUpperCase(),
-            variant: x.variant ? String(x.variant).trim() || null : null,
-            mrp: Number(x.mrp),
-            product_name: String(x.product_name ?? "").trim(),
-            page:
-              typeof x.page === "number"
-                ? x.page
-                : chunk.startPage,
-          }))
+          .map((x) => {
+            const reportedPage =
+              typeof x.page === "number" ? x.page : chunk.startPage;
+
+            // Translate sub-PDF page position → original catalogue page.
+            // reportedPage is 1-based within the chunk's mini-PDF.
+            // chunk.startPage is 1-based within the sub-PDF.
+            // combined: 0-based index into pageMap.
+            let originalPage = reportedPage;
+            if (pageMap) {
+              const subPdfIdx = chunk.startPage - 1 + reportedPage - 1;
+              originalPage = pageMap[subPdfIdx] ?? reportedPage;
+            }
+
+            return {
+              cat_no: String(x.cat_no ?? "").trim().toUpperCase(),
+              variant: x.variant ? String(x.variant).trim() || null : null,
+              mrp: Number(x.mrp),
+              product_name: String(x.product_name ?? "").trim(),
+              page: originalPage,
+            };
+          })
           .filter((x) => x.cat_no && !isNaN(x.mrp) && x.mrp > 0);
 
-        lastErr = undefined; // clear on success
+        items = rawItems;
+        lastErr = undefined;
         break;
       } catch (err) {
         lastErr = err;
         if (attempt === 0) {
-          // wait 2s before retry
           await new Promise((r) => setTimeout(r, 2000));
         }
       }
@@ -276,11 +351,11 @@ export async function extractFromPdf(
       const errMsg =
         lastErr instanceof Error ? lastErr.message : String(lastErr);
       console.error(
-        `[pdfExtractor] chunk ${i + 1} (pages ${chunk.startPage}–${chunk.endPage}) failed after retry:`,
+        `[pdfExtractor] chunk ${i + 1 + chunkIndexOffset} (sub-PDF pages ${chunk.startPage}–${chunk.endPage}) failed after retry:`,
         lastErr,
       );
       failedChunks.push({
-        chunkIndex: i + 1,
+        chunkIndex: i + 1 + chunkIndexOffset,
         startPage: chunk.startPage,
         endPage: chunk.endPage,
         error: errMsg,
@@ -290,8 +365,8 @@ export async function extractFromPdf(
     allItems.push(...items);
 
     onProgress?.({
-      chunk: i + 1,
-      totalChunks: chunks.length,
+      chunk: i + 1 + chunkIndexOffset,
+      totalChunks,
       startPage: chunk.startPage,
       endPage: chunk.endPage,
       pagesInChunk: chunk.endPage - chunk.startPage + 1,
@@ -303,7 +378,127 @@ export async function extractFromPdf(
   return { items: allItems, failedChunks };
 }
 
-export interface ExtractionResult {
-  items: ExtractedItem[];
-  failedChunks: FailedChunk[];
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract priced items from a PDF buffer using Claude vision.
+ *
+ * When `profile` is provided (recommended), builds a sub-PDF containing only
+ * the pages listed in the profile before calling the API. This reduces the
+ * payload from ~12 MB to ~2 MB and typically completes in one request.
+ *
+ * Falls back to chunking the full PDF when no profile is provided.
+ */
+export async function extractFromPdf(
+  pdfBuffer: Buffer,
+  targetCodes: string[],
+  codeFamilies: string[],
+  onProgress?: (p: ExtractionProgress) => void,
+  profile?: CatalogueProfile,
+): Promise<ExtractionResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+
+  const client = new Anthropic({ apiKey });
+
+  // ── Phase 1: Determine the buffer and page map to use ──────────────────────
+  let sendBuffer: Buffer = pdfBuffer;
+  let pageMap: number[] | null = null;
+  let pagesSent = 0;
+  const isSubPdf = !!profile;
+
+  if (profile) {
+    const pages = profilePages(profile);
+    const { bytes, pageMap: map } = await extractPages(pdfBuffer, pages);
+    sendBuffer = bytes;
+    pageMap = map;
+    pagesSent = pages.length;
+    console.info(
+      `[pdfExtractor] profile sub-PDF: ${pages.length}/${profile.pageCount} pages, ` +
+      `${(bytes.length / 1024 / 1024).toFixed(1)} MB (full PDF was ${(pdfBuffer.length / 1024 / 1024).toFixed(1)} MB)`,
+    );
+  } else {
+    // No profile — fall back to full PDF. Count pages without splitting.
+    const { PDFDocument } = await import("pdf-lib");
+    const srcDoc = await PDFDocument.load(pdfBuffer);
+    pagesSent = srcDoc.getPageCount();
+  }
+
+  // ── Phase 2: Initial extraction ────────────────────────────────────────────
+  const { items: initialItems, failedChunks } = await runChunks({
+    buf: sendBuffer,
+    pageMap,
+    targetCodes,
+    codeFamilies,
+    client,
+    isSubPdf,
+    onProgress,
+  });
+
+  // ── Phase 3: Coverage check + optional widened retry ──────────────────────
+  let coverage = 1.0;
+  let pagesWidened = false;
+
+  if (profile && targetCodes.length > 0) {
+    const foundCodes = new Set(initialItems.map((i) => normCode(i.cat_no)));
+    const resolved = targetCodes.filter((c) => foundCodes.has(normCode(c))).length;
+    coverage = resolved / targetCodes.length;
+
+    if (coverage < COVERAGE_THRESHOLD) {
+      const basePages = profilePages(profile);
+      const wide = widenedPages(basePages, 2, profile.pageCount);
+      console.warn(
+        `[pdfExtractor] coverage ${(coverage * 100).toFixed(0)}% < ${COVERAGE_THRESHOLD * 100}% — ` +
+        `widening page range: ${basePages.length} → ${wide.length} pages (±2)`,
+      );
+
+      const { bytes: wideBytes, pageMap: wideMap } = await extractPages(pdfBuffer, wide);
+      console.info(
+        `[pdfExtractor] widened sub-PDF: ${wide.length} pages, ${(wideBytes.length / 1024 / 1024).toFixed(1)} MB`,
+      );
+      pagesSent = wide.length;
+      pagesWidened = true;
+
+      // Run widened extraction (progress events continue from where initial left off).
+      const { items: wideItems, failedChunks: wideFailedChunks } = await runChunks({
+        buf: wideBytes,
+        pageMap: wideMap,
+        targetCodes,
+        codeFamilies,
+        client,
+        isSubPdf: true,
+        onProgress,
+        chunkIndexOffset: 1, // offset by 1 so progress shows chunk 2, 3, ...
+      });
+
+      failedChunks.push(...wideFailedChunks);
+
+      // Recompute coverage from the widened result.
+      const wideFoundCodes = new Set(wideItems.map((i) => normCode(i.cat_no)));
+      const wideResolved = targetCodes.filter((c) => wideFoundCodes.has(normCode(c))).length;
+      coverage = wideResolved / targetCodes.length;
+
+      if (coverage < COVERAGE_THRESHOLD) {
+        const foundPrefixes = new Set(
+          wideItems.map((i) => {
+            const dash = i.cat_no.indexOf("-");
+            return dash > 0 ? i.cat_no.slice(0, dash + 1) : "";
+          }).filter(Boolean),
+        );
+        const emptySeries = seriesWithNoItems(profile, foundPrefixes);
+        console.warn(
+          `[pdfExtractor] still ${(coverage * 100).toFixed(0)}% after widening. ` +
+          `Empty series: ${emptySeries.join(", ") || "none identified"}. ` +
+          `Catalogue structure may have changed — do not auto-widen further; ` +
+          `update the catalogue profile manually.`,
+        );
+      }
+
+      return { items: wideItems, failedChunks, pagesSent, pagesWidened, coverage };
+    }
+  }
+
+  return { items: initialItems, failedChunks, pagesSent, pagesWidened, coverage };
 }

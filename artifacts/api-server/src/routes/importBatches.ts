@@ -32,21 +32,16 @@ import {
   type MatchTarget,
   type CodeAlias,
 } from "../lib/catalogueMatcher.js";
+import type { CatalogueProfile } from "../lib/catalogueProfile.js";
+import sparshPearlProfileJson from "../lib/catalogue-profiles/sparsh-pearl.json" assert { type: "json" };
+
+const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
 
 const router: IRouter = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 150 * 1024 * 1024 }, // 150 MB for PDFs
 });
-
-// Code families from the Sparsh Pearl catalogue profile
-const SPARSH_CODE_FAMILIES = [
-  "ED-", "RS-", "RPS-", "EVA-", "REG-", "TS-",
-  "WC-", "UWC-", "BCC-", "BCB-", "AP-",
-  "CPS-", "CPH-", "NCP-", "PSJ-", "PMJ-", "UJS-",
-  "FV-", "FVE-", "WIH-", "WOH-", "WMP-", "BT-", "BTEP-", "TFT-",
-  "TR-", "BA-",
-];
 
 // Known Sparsh Pearl code aliases (Vol 6.2 verified)
 const SPARSH_ALIASES: Array<{ oldCode: string; newCode: string; note: string }> = [
@@ -226,12 +221,31 @@ router.post(
 
       const targetCodes = targets.map((t) => t.competitorCode).filter((c): c is string => !!c);
 
-      sendSse("status", { stage: "extracting", message: "Starting PDF extraction…" });
+      // Resolve profile for this competitor (Sparsh Pearl → sparshPearlProfile).
+      // Add more profiles here as new competitors are onboarded.
+      const catalogueProfile =
+        competitor === "Sparsh Pearl" ? sparshPearlProfile : undefined;
 
-      const { items: extracted, failedChunks } = await extractFromPdf(
+      const profileCodeFamilies =
+        catalogueProfile?.codeFamilies ?? sparshPearlProfile.codeFamilies;
+
+      sendSse("status", {
+        stage: "extracting",
+        message: catalogueProfile
+          ? `Extracting ${catalogueProfile.codeFamilies.length > 0 ? "profile" : ""} pages from PDF…`
+          : "Starting PDF extraction…",
+      });
+
+      const {
+        items: extracted,
+        failedChunks,
+        pagesSent,
+        pagesWidened,
+        coverage,
+      } = await extractFromPdf(
         file.buffer,
         targetCodes,
-        SPARSH_CODE_FAMILIES,
+        profileCodeFamilies,
         (p) => {
           req.log.info(p, "[importBatches] extraction progress");
           sendSse("progress", {
@@ -242,10 +256,18 @@ router.post(
             totalItemsFound: p.totalItemsFound,
           });
         },
+        catalogueProfile,
       );
 
       if (failedChunks.length > 0) {
         req.log.warn({ failedChunks }, "[importBatches] some PDF chunks failed extraction");
+      }
+
+      if (coverage < 0.95) {
+        req.log.warn(
+          { coverage, pagesWidened },
+          "[importBatches] low coverage after extraction — catalogue structure may have changed",
+        );
       }
 
       sendSse("status", { stage: "matching", message: "Matching products…" });
@@ -288,6 +310,10 @@ router.post(
         needs_review: staging.filter((s) => s.status === "needs_review").length,
         not_found: staging.filter((s) => s.status === "not_found").length,
         new_products: newProducts.length,
+        // Extraction quality metadata
+        pagesSent,
+        pagesWidened,
+        coverage: Math.round(coverage * 1000) / 1000, // 3 decimal places
       };
       await db.update(importBatchesTable)
         .set({ rowCounts: JSON.stringify(counts) })
@@ -298,6 +324,14 @@ router.post(
         startPage: fc.startPage,
         endPage: fc.endPage,
       }));
+
+      const coverageWarning =
+        coverage < 0.95
+          ? `Only ${Math.round(coverage * 100)}% of mapped products were found. ` +
+            `${pagesWidened ? "Page range was widened automatically but coverage is still low. " : ""}` +
+            `The catalogue structure may have changed — verify the page mapping before approving.`
+          : null;
+
       sendSse("done", {
         batchId,
         competitor,
@@ -307,6 +341,7 @@ router.post(
         status: "pending",
         rowCounts: counts,
         failedChunks: failedChunksSummary,
+        coverageWarning,
       });
       res.end();
     } catch (err) {
