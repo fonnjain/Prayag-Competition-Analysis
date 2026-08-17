@@ -46,7 +46,7 @@ vi.mock("pdf-lib", () => {
 // Import the module under test AFTER mocks are registered
 // ---------------------------------------------------------------------------
 
-import { extractFromPdf } from "./pdfExtractor.js";
+import { extractFromPdf, EXTRACTION_MODEL } from "./pdfExtractor.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -358,6 +358,22 @@ describe("retry on transient failure", () => {
     const results = await extractFromPdf(FAKE_PDF, [], []);
     expect(results).toHaveLength(1);
     expect(results[0]!.cat_no).toBe("ED-950");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Model name consistency
+// ---------------------------------------------------------------------------
+
+describe("model name", () => {
+  it("passes EXTRACTION_MODEL to the Claude API, not a hardcoded string", async () => {
+    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse("[]"));
+
+    await extractFromPdf(FAKE_PDF, [], []);
+
+    expect(mockMessagesCreate).toHaveBeenCalledOnce();
+    const callArg = mockMessagesCreate.mock.calls[0]![0] as { model: string };
+    expect(callArg.model).toBe(EXTRACTION_MODEL);
   });
 });
 

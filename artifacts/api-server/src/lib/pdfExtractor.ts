@@ -150,7 +150,7 @@ export async function extractFromPdf(
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const response = await client.messages.create({
-          model: "claude-opus-4-5",
+          model: EXTRACTION_MODEL,
           max_tokens: 4096,
           messages: [
             {
