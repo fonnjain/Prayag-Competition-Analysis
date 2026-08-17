@@ -158,7 +158,10 @@ export async function extractFromPdf(
       try {
         const response = await client.messages.create({
           model: EXTRACTION_MODEL,
-          max_tokens: 4096,
+          // 4096 is too low for dense 25-page chunks — Claude can output 150+
+          // items × ~60 chars each ≈ 9 000+ chars before the JSON closes.
+          // 16 384 gives comfortable headroom; raise if stop_reason hits it.
+          max_tokens: 16384,
           messages: [
             {
               role: "user",
@@ -186,6 +189,13 @@ export async function extractFromPdf(
             },
           ],
         });
+
+        // Warn if output was still cut off — means max_tokens needs raising.
+        if (response.stop_reason === "max_tokens") {
+          console.warn(
+            `[pdfExtractor] chunk ${i + 1}: stop_reason=max_tokens — response truncated at ${16384} tokens. JSON will fail; raise max_tokens.`,
+          );
+        }
 
         const text =
           response.content[0]?.type === "text"
