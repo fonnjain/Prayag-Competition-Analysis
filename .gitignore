@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Catalogue PDF fixtures (binary, do not commit)
+artifacts/api-server/src/lib/fixtures/*.pdf

@@ -14,6 +14,13 @@
 import { PDFDocument } from "pdf-lib";
 import Anthropic from "@anthropic-ai/sdk";
 
+/**
+ * The Claude model used for PDF catalogue extraction.
+ * Stored on every import_batches row so we can correlate quality/cost changes
+ * when the model is upgraded.
+ */
+export const EXTRACTION_MODEL = "claude-opus-4-5" as const;
+
 export interface ExtractedItem {
   cat_no: string;
   variant: string | null; // e.g. "45 Degree", "15mm", "1 Mtr"

@@ -204,6 +204,8 @@ export const importBatchesTable = pgTable(
     status: text("status").notNull().default("pending"),
     // JSON summary: { ok, needs_review, not_found, new_products }
     rowCounts: text("row_counts"),
+    // Claude model used for PDF extraction. Null for Excel/CSV imports.
+    extractionModel: text("extraction_model"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

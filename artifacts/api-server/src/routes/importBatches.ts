@@ -26,7 +26,7 @@ import {
   mrpPriceHistoryTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog.js";
-import { extractFromPdf } from "../lib/pdfExtractor.js";
+import { extractFromPdf, EXTRACTION_MODEL } from "../lib/pdfExtractor.js";
 import {
   matchCatalogue,
   type MatchTarget,
@@ -206,7 +206,7 @@ router.post(
 
       const [batchRows] = await Promise.all([
         db.insert(importBatchesTable)
-          .values({ competitor, effectiveDate, sourceFileName: file.originalname, priceBasis, gstPct, status: "pending" })
+          .values({ competitor, effectiveDate, sourceFileName: file.originalname, priceBasis, gstPct, status: "pending", extractionModel: EXTRACTION_MODEL })
           .returning(),
       ]);
       const batch = batchRows[0];
