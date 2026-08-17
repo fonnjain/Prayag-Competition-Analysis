@@ -269,3 +269,279 @@ describe("GET /analysis/mrp-increases — only one qualifying row (no previous)"
     expect(findItem(res.body)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: ?division= filter — excludes items from other divisions
+//
+// The outer beforeEach seeds itemA in sentinelDivision. Each test here seeds a
+// second item (itemB) in an independent sentinelDivisionB and verifies that
+// querying by one sentinel yields only that division's item.
+// ---------------------------------------------------------------------------
+
+describe("GET /analysis/mrp-increases — division filter narrows results", () => {
+  let itemCodeB: string;
+  let catalogIdB: number;
+  let sentinelDivisionB: string;
+
+  beforeEach(async () => {
+    // sentinelDivisionB is guaranteed to be different from sentinelDivision set
+    // up in the outer beforeEach because it embeds a distinct suffix.
+    sentinelDivisionB = `__DIV_B_MRPINC_${Date.now()}_${testSeq}__`;
+    itemCodeB = `__TEST_MRPINC_B_${Date.now()}_${testSeq}__`;
+
+    const [cat] = await db
+      .insert(catalogProductsTable)
+      .values({
+        itemCode: itemCodeB,
+        productName: "Other Division Product 15mm",
+        division: sentinelDivisionB,
+        category: "Ball Valve",
+      })
+      .returning({ id: catalogProductsTable.id });
+    catalogIdB = cat!.id;
+
+    // Same MRP pattern (1 → 1000) so itemB also qualifies as an "increase" row.
+    await db.insert(mrpPriceHistoryTable).values([
+      {
+        itemCode: itemCodeB,
+        mrp: 1,
+        effectiveDate: dateOld,
+        loadDate: dateOld,
+        isCurrent: false,
+        priceBasis: "MRP",
+      },
+      {
+        itemCode: itemCodeB,
+        mrp: 1000,
+        effectiveDate: dateNew,
+        loadDate: dateNew,
+        isCurrent: true,
+        priceBasis: "MRP",
+      },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, itemCodeB));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.id, catalogIdB));
+  });
+
+  it("returns only the item from the requested division", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(sentinelDivision)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const items: Array<{ itemCode: string }> = res.body.items;
+
+    // Our primary (sentinelDivision) item must appear.
+    expect(items.some((i) => i.itemCode === itemCode)).toBe(true);
+    // The other-division item must NOT appear.
+    expect(items.some((i) => i.itemCode === itemCodeB)).toBe(false);
+  });
+
+  it("returns only itemB when filtering by the other division", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(sentinelDivisionB)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const items: Array<{ itemCode: string }> = res.body.items;
+
+    expect(items.some((i) => i.itemCode === itemCodeB)).toBe(true);
+    expect(items.some((i) => i.itemCode === itemCode)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: ?category= filter — excludes items from other categories
+//
+// The outer beforeEach seeds itemA (category="Bib Cock") inside sentinelDivision.
+// Each test here seeds itemB (category="Gate Valve") in the SAME sentinelDivision
+// so both would appear without a category filter — then verifies that adding
+// ?category= trims the result to just the matching category.
+// ---------------------------------------------------------------------------
+
+describe("GET /analysis/mrp-increases — category filter narrows results", () => {
+  let itemCodeC: string;
+  let catalogIdC: number;
+  const altCategory = "Gate Valve";
+
+  beforeEach(async () => {
+    itemCodeC = `__TEST_MRPINC_C_${Date.now()}_${testSeq}__`;
+
+    // Same sentinelDivision as itemA so both appear without a category filter.
+    const [cat] = await db
+      .insert(catalogProductsTable)
+      .values({
+        itemCode: itemCodeC,
+        productName: "Gate Valve 20mm",
+        division: sentinelDivision,
+        category: altCategory,
+      })
+      .returning({ id: catalogProductsTable.id });
+    catalogIdC = cat!.id;
+
+    await db.insert(mrpPriceHistoryTable).values([
+      {
+        itemCode: itemCodeC,
+        mrp: 1,
+        effectiveDate: dateOld,
+        loadDate: dateOld,
+        isCurrent: false,
+        priceBasis: "MRP",
+      },
+      {
+        itemCode: itemCodeC,
+        mrp: 1000,
+        effectiveDate: dateNew,
+        loadDate: dateNew,
+        isCurrent: true,
+        priceBasis: "MRP",
+      },
+    ]);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, itemCodeC));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.id, catalogIdC));
+  });
+
+  it("without category filter: both items appear under the shared sentinel division", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(sentinelDivision)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const items: Array<{ itemCode: string }> = res.body.items;
+    expect(items.some((i) => i.itemCode === itemCode)).toBe(true);
+    expect(items.some((i) => i.itemCode === itemCodeC)).toBe(true);
+  });
+
+  it("?category=Bib Cock returns only itemA, not the Gate Valve item", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(sentinelDivision)}&category=${encodeURIComponent("Bib Cock")}`,
+    );
+
+    expect(res.status).toBe(200);
+    const items: Array<{ itemCode: string }> = res.body.items;
+    expect(items.some((i) => i.itemCode === itemCode)).toBe(true);
+    expect(items.some((i) => i.itemCode === itemCodeC)).toBe(false);
+  });
+
+  it("?category=Gate Valve returns only itemC, not the Bib Cock item", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(sentinelDivision)}&category=${encodeURIComponent(altCategory)}`,
+    );
+
+    expect(res.status).toBe(200);
+    const items: Array<{ itemCode: string }> = res.body.items;
+    expect(items.some((i) => i.itemCode === itemCodeC)).toBe(true);
+    expect(items.some((i) => i.itemCode === itemCode)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: division + category combined — must satisfy both predicates
+// ---------------------------------------------------------------------------
+
+describe("GET /analysis/mrp-increases — combined division + category filter", () => {
+  let itemCodeD: string; // same division as itemA, different category
+  let catalogIdD: number;
+  let itemCodeE: string; // different division, same category as itemA
+  let catalogIdE: number;
+  let sentinelDivisionE: string;
+
+  beforeEach(async () => {
+    sentinelDivisionE = `__DIV_E_MRPINC_${Date.now()}_${testSeq}__`;
+    itemCodeD = `__TEST_MRPINC_D_${Date.now()}_${testSeq}__`;
+    itemCodeE = `__TEST_MRPINC_E_${Date.now()}_${testSeq}__`;
+
+    // itemD: same division as itemA (sentinelDivision), different category.
+    const [catD] = await db
+      .insert(catalogProductsTable)
+      .values({
+        itemCode: itemCodeD,
+        productName: "Stop Cock 15mm",
+        division: sentinelDivision,
+        category: "Stop Cock",
+      })
+      .returning({ id: catalogProductsTable.id });
+    catalogIdD = catD!.id;
+
+    // itemE: different division, same category as itemA ("Bib Cock").
+    const [catE] = await db
+      .insert(catalogProductsTable)
+      .values({
+        itemCode: itemCodeE,
+        productName: "Bib Cock 15mm",
+        division: sentinelDivisionE,
+        category: "Bib Cock",
+      })
+      .returning({ id: catalogProductsTable.id });
+    catalogIdE = catE!.id;
+
+    const priceRows = (code: string) => [
+      {
+        itemCode: code,
+        mrp: 1,
+        effectiveDate: dateOld,
+        loadDate: dateOld,
+        isCurrent: false,
+        priceBasis: "MRP" as const,
+      },
+      {
+        itemCode: code,
+        mrp: 1000,
+        effectiveDate: dateNew,
+        loadDate: dateNew,
+        isCurrent: true,
+        priceBasis: "MRP" as const,
+      },
+    ];
+
+    await db.insert(mrpPriceHistoryTable).values([
+      ...priceRows(itemCodeD),
+      ...priceRows(itemCodeE),
+    ]);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, itemCodeD));
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, itemCodeE));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.id, catalogIdD));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.id, catalogIdE));
+  });
+
+  it("?division=A&category=Bib Cock returns only itemA — not same-div/diff-cat or same-cat/diff-div", async () => {
+    const res = await request.get(
+      `/analysis/mrp-increases?division=${encodeURIComponent(sentinelDivision)}&category=${encodeURIComponent("Bib Cock")}`,
+    );
+
+    expect(res.status).toBe(200);
+    const items: Array<{ itemCode: string }> = res.body.items;
+
+    // itemA (sentinelDivision + Bib Cock) must appear.
+    expect(items.some((i) => i.itemCode === itemCode)).toBe(true);
+    // itemD (sentinelDivision + Stop Cock) must NOT appear — wrong category.
+    expect(items.some((i) => i.itemCode === itemCodeD)).toBe(false);
+    // itemE (sentinelDivisionE + Bib Cock) must NOT appear — wrong division.
+    expect(items.some((i) => i.itemCode === itemCodeE)).toBe(false);
+  });
+});
