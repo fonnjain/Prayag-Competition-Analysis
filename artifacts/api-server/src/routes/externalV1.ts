@@ -30,12 +30,12 @@ function forward(
 router.get("/v1/products", apiKeyAuth, (req, res, next) =>
   forward(req, res, next, "/catalog/products", catalogRouter),
 );
-router.get("/v1/products/:itemCode", apiKeyAuth, (req, res, next) =>
+router.get("/v1/products/:itemCode", apiKeyAuth, (req: Request<{ itemCode: string }>, res, next) =>
   forward(
     req,
     res,
     next,
-    `/catalog/products/${encodeURIComponent(req.params.itemCode as string)}`,
+    `/catalog/products/${encodeURIComponent(req.params.itemCode)}`,
     catalogRouter,
   ),
 );

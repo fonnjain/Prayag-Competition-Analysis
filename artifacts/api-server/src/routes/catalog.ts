@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { sql, eq, asc, desc, and } from "drizzle-orm";
 import { recomputeCurrentFlags } from "../lib/catalog";
 import {
@@ -211,7 +211,7 @@ router.get("/catalog/data-health", async (_req, res) => {
 });
 
 // GET /catalog/products/:itemCode — product + full price history (newest first).
-router.get("/catalog/products/:itemCode", async (req, res) => {
+router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string }>, res) => {
   const itemCode = req.params.itemCode;
   const products = await db
     .select()
@@ -255,7 +255,7 @@ router.get("/catalog/products/:itemCode", async (req, res) => {
 // PATCH /catalog/products/:itemCode/mrp — set a new current MRP inline
 // (without uploading a file). Inserts a new mrp_price_history row with
 // priceBasis="MRP", marks it current, and returns the updated row.
-router.patch("/catalog/products/:itemCode/mrp", async (req, res) => {
+router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: string }>, res) => {
   const { itemCode } = req.params;
   const body = req.body as { mrp?: unknown; effectiveDate?: unknown; notes?: unknown };
 

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { desc, eq } from "drizzle-orm";
 import { CreateApiKeyBody } from "@workspace/api-zod";
 import { db, apiKeysTable, type ApiKeyRow } from "@workspace/db";
@@ -48,7 +48,7 @@ router.post("/keys", async (req, res) => {
 });
 
 // POST /keys/:id/revoke — deactivate immediately, keep for audit.
-router.post("/keys/:id/revoke", async (req, res) => {
+router.post("/keys/:id/revoke", async (req: Request<{ id: string }>, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(404).json({ error: "Key not found." });
@@ -67,7 +67,7 @@ router.post("/keys/:id/revoke", async (req, res) => {
 });
 
 // DELETE /keys/:id — permanent removal.
-router.delete("/keys/:id", async (req, res) => {
+router.delete("/keys/:id", async (req: Request<{ id: string }>, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(404).json({ error: "Key not found." });

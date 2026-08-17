@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { sql, eq, ne, asc, desc, and } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
@@ -682,7 +682,7 @@ router.post("/catalog/mapping-review/accept-batches", async (req, res) => {
 
 // DELETE /catalog/mapping-review/accept-batches/:id — forget a recorded batch
 // (after it was reverted, or to dismiss it from the recent list).
-router.delete("/catalog/mapping-review/accept-batches/:id", async (req, res) => {
+router.delete("/catalog/mapping-review/accept-batches/:id", async (req: Request<{ id: string }>, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "invalid batch id" });
@@ -1186,7 +1186,7 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
 });
 
 // PATCH /catalog/competitor-prices/:id — assign/correct a row's mapping.
-router.patch("/catalog/competitor-prices/:id", async (req, res) => {
+router.patch("/catalog/competitor-prices/:id", async (req: Request<{ id: string }>, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -1288,7 +1288,7 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
 // DELETE /catalog/competitors/:competitor — remove all price rows for a brand
 // the team no longer tracks. The brand then disappears from comparison filters,
 // By Product columns, and summary KPIs (all computed live from these rows).
-router.delete("/catalog/competitors/:competitor", async (req, res) => {
+router.delete("/catalog/competitors/:competitor", async (req: Request<{ competitor: string }>, res) => {
   const competitor = strParam(req.params.competitor);
   if (!competitor) {
     res.status(400).json({ error: "competitor name is required" });

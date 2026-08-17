@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
@@ -579,7 +579,7 @@ router.get("/analysis/mrp-increases", async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /analysis/price-history/:itemCode — period-to-period MRP history.
 // ---------------------------------------------------------------------------
-router.get("/analysis/price-history/:itemCode", async (req, res) => {
+router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: string }>, res) => {
   const { itemCode } = req.params;
   if (!itemCode) { res.status(400).json({ error: "itemCode required" }); return; }
 
