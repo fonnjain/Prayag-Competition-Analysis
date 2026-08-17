@@ -797,7 +797,7 @@ export const GetAnalysisOverviewQueryParams = zod.object({
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
   "mode": zod.enum(['mrp', 'net']).default(getAnalysisOverviewQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).')
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).')
 })
 
 export const GetAnalysisOverviewResponse = zod.object({
@@ -834,7 +834,7 @@ export const GetAnalysisByBrandQueryParams = zod.object({
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
   "mode": zod.enum(['mrp', 'net']).default(getAnalysisByBrandQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).')
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).')
 })
 
 export const GetAnalysisByBrandResponseItem = zod.object({
@@ -865,7 +865,7 @@ export const GetAnalysisByCategoryQueryParams = zod.object({
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
   "mode": zod.enum(['mrp', 'net']).default(getAnalysisByCategoryQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).')
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).')
 })
 
 export const GetAnalysisByCategoryResponseItem = zod.object({
@@ -894,7 +894,7 @@ export const GetAnalysisPositioningQueryParams = zod.object({
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
   "mode": zod.enum(['mrp', 'net']).default(getAnalysisPositioningQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).')
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).')
 })
 
 export const GetAnalysisPositioningResponse = zod.object({
@@ -919,7 +919,7 @@ export const GetAnalysisCoverageMatrixQueryParams = zod.object({
   "category": zod.coerce.string().optional().describe('Filter by Prayag category (matched SKUs only).'),
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).')
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).')
 })
 
 export const GetAnalysisCoverageMatrixResponse = zod.object({
@@ -961,7 +961,7 @@ export const GetAnalysisOpportunitiesQueryParams = zod.object({
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
   "mode": zod.enum(['mrp', 'net']).default(getAnalysisOpportunitiesQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).'),
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).'),
   "thresholdPct": zod.coerce.number().optional().describe('Minimum absolute price_diff_pct to qualify. Defaults to 10.')
 })
 
@@ -979,7 +979,9 @@ export const GetAnalysisOpportunitiesResponse = zod.object({
   "competitorEffectivePrice": zod.number(),
   "unit": zod.string().nullable(),
   "priceDiff": zod.number(),
-  "priceDiffPct": zod.number()
+  "priceDiffPct": zod.number(),
+  "upcomingPrayagMrp": zod.number().nullable().optional(),
+  "upcomingPrayagMrpDate": zod.string().nullable().optional()
 })),
   "priceThreats": zod.array(zod.object({
   "id": zod.number(),
@@ -993,7 +995,9 @@ export const GetAnalysisOpportunitiesResponse = zod.object({
   "competitorEffectivePrice": zod.number(),
   "unit": zod.string().nullable(),
   "priceDiff": zod.number(),
-  "priceDiffPct": zod.number()
+  "priceDiffPct": zod.number(),
+  "upcomingPrayagMrp": zod.number().nullable().optional(),
+  "upcomingPrayagMrpDate": zod.string().nullable().optional()
 }))
 })
 
@@ -1011,7 +1015,7 @@ export const ExportAnalysisQueryParams = zod.object({
   "matchConfidence": zod.coerce.string().optional().describe('Filter by mapping confidence tier (High\/Medium\/Low).'),
   "matchStatus": zod.coerce.string().optional().describe('Filter by match status.'),
   "mode": zod.enum(['mrp', 'net']).default(exportAnalysisQueryModeDefault).describe('Comparison basis. \"mrp\" (default) compares Prayag MRP vs the basis-normalized competitor MRP. \"net\" applies each side\'s configured discount first (Net-to-Net).'),
-  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).'),
+  "effectivePeriod": zod.date().optional().describe('ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to today (CURRENT_DATE).'),
   "format": zod.enum(['xlsx', 'csv']).optional().describe('File format, \"xlsx\" (default) or \"csv\".')
 })
 

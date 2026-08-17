@@ -31,86 +31,90 @@ import {
 
 const router: IRouter = Router();
 
-// Current MRP + catalog attributes keyed by normalized item code.
-// When atDate is provided, uses the latest effective_date <= atDate (period-aware).
-// Otherwise uses the is_current = true rows (default behavior).
-async function getPrayagCatalogMapForPeriod(atDate?: string | null): Promise<Map<string, PrayagInfo>> {
-  const products = await db
-    .select({
-      itemCode: catalogProductsTable.itemCode,
-      productName: catalogProductsTable.productName,
-      division: catalogProductsTable.division,
-      category: catalogProductsTable.category,
-    })
-    .from(catalogProductsTable);
+/** Returns today's date as YYYY-MM-DD (local calendar). */
+function todayString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
+// Current MRP + catalog attributes keyed by normalized item code.
+// Always uses DISTINCT ON (item_code) WHERE effective_date <= resolvedDate —
+// never falls back to the is_current flag. When no period filter is given,
+// resolvedDate defaults to today (CURRENT_DATE).
+// Also queries the next upcoming revision (effective_date > resolvedDate) so
+// consumers can show "Upcoming w.e.f. <date>" without a second round-trip.
+async function getPrayagCatalogMapForPeriod(atDate?: string | null): Promise<Map<string, PrayagInfo>> {
+  const resolvedDate = atDate ?? todayString();
   type PriceRow = { item_code: string; mrp: number | null; effective_date: string | null };
-  let current: PriceRow[];
-  if (atDate) {
-    const result = await db.execute<PriceRow>(sql`
+
+  const [products, currentResult, upcomingResult] = await Promise.all([
+    db
+      .select({
+        itemCode: catalogProductsTable.itemCode,
+        productName: catalogProductsTable.productName,
+        division: catalogProductsTable.division,
+        category: catalogProductsTable.category,
+      })
+      .from(catalogProductsTable),
+    db.execute<PriceRow>(sql`
       SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
       FROM mrp_price_history
-      WHERE effective_date <= ${atDate}
+      WHERE effective_date <= ${resolvedDate}
       ORDER BY item_code, effective_date DESC, id DESC
-    `);
-    current = result.rows;
-  } else {
-    const rows = await db
-      .select({
-        itemCode: mrpPriceHistoryTable.itemCode,
-        mrp: mrpPriceHistoryTable.mrp,
-        effectiveDate: mrpPriceHistoryTable.effectiveDate,
-      })
-      .from(mrpPriceHistoryTable)
-      .where(eq(mrpPriceHistoryTable.isCurrent, true));
-    current = rows.map((r) => ({
-      item_code: r.itemCode,
-      mrp: r.mrp,
-      effective_date: r.effectiveDate,
-    }));
-  }
+    `),
+    db.execute<PriceRow>(sql`
+      SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
+      FROM mrp_price_history
+      WHERE effective_date > ${resolvedDate}
+      ORDER BY item_code, effective_date ASC, id ASC
+    `),
+  ]);
 
   const priceMap = new Map<string, { mrp: number | null; effectiveDate: string | null }>();
-  for (const c of current) {
-    priceMap.set(normCode(c.item_code), {
-      mrp: c.mrp,
-      effectiveDate: c.effective_date,
-    });
+  for (const c of currentResult.rows) {
+    priceMap.set(normCode(c.item_code), { mrp: c.mrp, effectiveDate: c.effective_date });
+  }
+
+  const upcomingMap = new Map<string, { mrp: number | null; effectiveDate: string | null }>();
+  for (const c of upcomingResult.rows) {
+    upcomingMap.set(normCode(c.item_code), { mrp: c.mrp, effectiveDate: c.effective_date });
   }
 
   const map = new Map<string, PrayagInfo>();
   for (const p of products) {
     const key = normCode(p.itemCode);
     const price = priceMap.get(key);
+    const upcoming = upcomingMap.get(key);
     map.set(key, {
       mrp: price?.mrp ?? null,
       division: p.division,
       category: p.category,
       productName: p.productName,
       effectiveDate: price?.effectiveDate ?? null,
+      upcomingMrp: upcoming?.mrp ?? null,
+      upcomingMrpDate: upcoming?.effectiveDate ?? null,
     });
   }
   return map;
 }
 
-// Competitor rows for analysis. When atDate is provided, returns the latest
-// effective_date <= atDate per (competitor, matched_prayag_code); unmatched rows
-// come from the latest period for that competitor at or before atDate.
-// Default (no date): is_current = true rows.
+// Competitor rows for analysis. Always date-driven — returns the latest
+// effective_date <= resolvedDate per (competitor, matched_prayag_code) for
+// matched rows, and the latest period at or before resolvedDate for unmatched
+// rows. resolvedDate defaults to today when no period filter is provided.
 type CompetitorRow = typeof competitorPricesTable.$inferSelect;
 async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<CompetitorRow[]> {
-  if (atDate) {
-    // Matched: latest per (competitor, matched_prayag_code) where effective_date <= atDate
-    const matched = await db.execute<CompetitorRow>(sql`
+  const resolvedDate = atDate ?? todayString();
+  const [matched, unmatched] = await Promise.all([
+    db.execute<CompetitorRow>(sql`
       SELECT DISTINCT ON (competitor, matched_prayag_code) *
       FROM competitor_prices
       WHERE matched_prayag_code IS NOT NULL
         AND effective_date IS NOT NULL
-        AND effective_date <= ${atDate}
+        AND effective_date <= ${resolvedDate}
       ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC
-    `);
-    // Unmatched: all rows from the latest period for each competitor <= atDate
-    const unmatched = await db.execute<CompetitorRow>(sql`
+    `),
+    db.execute<CompetitorRow>(sql`
       SELECT cp.*
       FROM competitor_prices cp
       JOIN (
@@ -118,15 +122,14 @@ async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<Compe
         FROM competitor_prices
         WHERE matched_prayag_code IS NULL
           AND effective_date IS NOT NULL
-          AND effective_date <= ${atDate}
+          AND effective_date <= ${resolvedDate}
         GROUP BY competitor
       ) latest ON cp.competitor = latest.competitor
         AND cp.effective_date = latest.max_date
       WHERE cp.matched_prayag_code IS NULL
-    `);
-    return [...matched.rows, ...unmatched.rows];
-  }
-  return db.select().from(competitorPricesTable).where(eq(competitorPricesTable.isCurrent, true));
+    `),
+  ]);
+  return [...matched.rows, ...unmatched.rows];
 }
 
 const PRAYAG_SCOPE = "prayag";
@@ -509,8 +512,9 @@ router.get("/analysis/mrp-increases", async (req, res) => {
   const limitRaw = Number(req.query.limit) || 50;
   const limit = Math.min(Math.max(1, limitRaw), 200);
 
-  // Use a window function to pair each is_current row with the one just before it
-  // per item_code (ascending by date/id), then filter to increases only.
+  // Date-driven approach: rows with effective_date <= CURRENT_DATE only.
+  // ROW_NUMBER picks the most recent row per item (rn = 1); LAG (ascending)
+  // supplies the previous period's MRP for the same item.
   type IncRow = {
     item_code: string;
     product_name: string | null;
@@ -527,34 +531,34 @@ router.get("/analysis/mrp-increases", async (req, res) => {
   const categoryFilter = category ? sql`AND c.category = ${category}` : sql``;
 
   const rows = await db.execute<IncRow>(sql`
-    WITH ranked AS (
+    WITH all_rows AS (
       SELECT
         h.item_code,
-        h.mrp                AS current_mrp,
-        h.effective_date     AS current_date,
-        LAG(h.mrp)          OVER w AS prev_mrp,
-        LAG(h.effective_date) OVER w AS prev_date,
-        h.is_current
+        h.mrp,
+        h.effective_date,
+        ROW_NUMBER() OVER (PARTITION BY h.item_code ORDER BY h.effective_date DESC, h.id DESC) AS rn,
+        LAG(h.mrp)            OVER (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC) AS prev_mrp,
+        LAG(h.effective_date) OVER (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC) AS prev_date
       FROM mrp_price_history h
-      WINDOW w AS (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC)
+      WHERE h.effective_date <= CURRENT_DATE
     )
     SELECT
       r.item_code,
       c.product_name,
       c.division,
       c.category,
-      r.current_mrp,
+      r.mrp            AS current_mrp,
       r.prev_mrp,
-      r.current_date,
+      r.effective_date AS current_date,
       r.prev_date,
-      ROUND(((r.current_mrp - r.prev_mrp) / r.prev_mrp * 100)::numeric, 1) AS change_pct
-    FROM ranked r
+      ROUND(((r.mrp - r.prev_mrp) / r.prev_mrp * 100)::numeric, 1) AS change_pct
+    FROM all_rows r
     JOIN catalog_products c ON c.item_code = r.item_code
-    WHERE r.is_current = true
+    WHERE r.rn = 1
       AND r.prev_mrp IS NOT NULL
       AND r.prev_mrp > 0
-      AND r.current_mrp IS NOT NULL
-      AND r.current_mrp > r.prev_mrp
+      AND r.mrp IS NOT NULL
+      AND r.mrp > r.prev_mrp
       ${divisionFilter}
       ${categoryFilter}
     ORDER BY change_pct DESC

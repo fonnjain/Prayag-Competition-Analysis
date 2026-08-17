@@ -36,6 +36,7 @@ export async function recomputeCompetitorCurrentFlags(
       FROM competitor_prices
       WHERE competitor = ${competitor}
         AND matched_prayag_code IS NOT NULL
+        AND effective_date <= CURRENT_DATE
       ORDER BY competitor, matched_prayag_code, effective_date DESC NULLS LAST, id DESC
     )
   `);
@@ -46,7 +47,9 @@ export async function recomputeCompetitorCurrentFlags(
       AND matched_prayag_code IS NULL
       AND effective_date = (
         SELECT MAX(effective_date) FROM competitor_prices
-        WHERE competitor = ${competitor} AND matched_prayag_code IS NULL
+        WHERE competitor = ${competitor}
+          AND matched_prayag_code IS NULL
+          AND effective_date <= CURRENT_DATE
       )
   `);
 }

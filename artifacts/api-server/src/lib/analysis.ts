@@ -34,6 +34,9 @@ export interface PrayagInfo {
   category: string | null;
   productName: string | null;
   effectiveDate: string | null;
+  /** Next revision after the resolved asOf date, if any already exists in the DB. */
+  upcomingMrp: number | null;
+  upcomingMrpDate: string | null;
 }
 
 // Minimal shape of a competitor_prices row needed for analysis.
@@ -74,6 +77,9 @@ export interface AnalysisRow {
   priceDiff: number | null;
   priceDiffPct: number | null;
   prayagCheaper: boolean | null;
+  /** First Prayag MRP revision dated after the resolved asOf date, or null if none. */
+  upcomingPrayagMrp: number | null;
+  upcomingPrayagMrpDate: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +176,10 @@ export function buildRow(
     priceDiff,
     priceDiffPct,
     prayagCheaper,
+    // Pass through upcoming revision from the catalog map (informational only —
+    // never affects comparison math which uses prayagMrpAtCompare).
+    upcomingPrayagMrp: matched ? (prayag?.upcomingMrp ?? null) : null,
+    upcomingPrayagMrpDate: matched ? (prayag?.upcomingMrpDate ?? null) : null,
   };
 }
 
@@ -339,5 +349,7 @@ export function toOpportunityItem(r: AnalysisRow) {
     unit: r.unit,
     priceDiff: round1(r.priceDiff!),
     priceDiffPct: round1(r.priceDiffPct!),
+    upcomingPrayagMrp: r.upcomingPrayagMrp,
+    upcomingPrayagMrpDate: r.upcomingPrayagMrpDate,
   };
 }

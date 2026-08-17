@@ -2290,6 +2290,12 @@ components:
           type: number
         priceDiffPct:
           type: number
+        upcomingPrayagMrp:
+          type: ["number", "null"]
+          description: Next Prayag MRP revision after the resolved asOf date, or null if none.
+        upcomingPrayagMrpDate:
+          type: ["string", "null"]
+          description: Effective date (YYYY-MM-DD) of the upcoming revision, or null.
     AnalysisOpportunities:
       type: object
       required: [thresholdPct, marginHeadroom, priceThreats]

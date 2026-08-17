@@ -126,7 +126,14 @@ function OpportunityTable({ items, isThreat }: { items: AnalysisOpportunityItem[
                   <TableCell>
                     <Badge variant="outline" className="font-normal">{item.competitor}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">₹{item.prayagMrp?.toFixed(2) ?? '-'}</TableCell>
+                  <TableCell className="text-right">
+                    <div>₹{item.prayagMrp?.toFixed(2) ?? '-'}</div>
+                    {item.upcomingPrayagMrp != null && item.upcomingPrayagMrpDate && (
+                      <div className="text-[10px] text-orange-600 font-normal mt-0.5 whitespace-nowrap">
+                        ↑ ₹{item.upcomingPrayagMrp.toFixed(2)} w.e.f. {item.upcomingPrayagMrpDate}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     ₹{item.competitorEffectivePrice?.toFixed(2) ?? '-'}
                     {item.unit && <span className="text-xs text-muted-foreground ml-1">/{item.unit}</span>}
@@ -155,6 +162,7 @@ function OpportunityTable({ items, isThreat }: { items: AnalysisOpportunityItem[
 
 function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
   const { data, isLoading } = useGetPriceHistory(itemCode);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   if (isLoading || !data) {
     return (
@@ -214,9 +222,11 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
                       ) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="py-1.5">
-                      {p.isCurrent && (
+                      {p.effectiveDate > todayStr ? (
+                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-orange-400 text-orange-600">Upcoming</Badge>
+                      ) : p.isCurrent ? (
                         <Badge variant="secondary" className="text-[10px] h-4 px-1">Current</Badge>
-                      )}
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

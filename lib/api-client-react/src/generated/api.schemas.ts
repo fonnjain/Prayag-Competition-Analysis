@@ -637,6 +637,10 @@ export interface AnalysisOpportunityItem {
   unit: string | null;
   priceDiff: number;
   priceDiffPct: number;
+  /** Next Prayag MRP revision after the resolved asOf date, null if none. @nullable */
+  upcomingPrayagMrp?: number | null;
+  /** Effective date (YYYY-MM-DD) of the upcoming revision. @nullable */
+  upcomingPrayagMrpDate?: string | null;
 }
 
 export interface AnalysisOpportunities {

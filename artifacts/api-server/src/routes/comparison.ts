@@ -60,35 +60,39 @@ interface PrayagInfo {
 }
 
 // Current MRP + product name, keyed by normalized item code, for live joins.
+// Date-driven: DISTINCT ON (item_code) WHERE effective_date <= today, never
+// relies on the is_current flag which can go stale between recompute runs.
 async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
-  const current = await db
-    .select({
-      itemCode: mrpPriceHistoryTable.itemCode,
-      mrp: mrpPriceHistoryTable.mrp,
-      effectiveDate: mrpPriceHistoryTable.effectiveDate,
-    })
-    .from(mrpPriceHistoryTable)
-    .where(eq(mrpPriceHistoryTable.isCurrent, true));
-  const products = await db
-    .select({
+  const d = new Date();
+  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  type PriceRow = { item_code: string; mrp: number | null; effective_date: string | null };
+
+  const [currentResult, products] = await Promise.all([
+    db.execute<PriceRow>(sql`
+      SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
+      FROM mrp_price_history
+      WHERE effective_date <= ${todayStr}
+      ORDER BY item_code, effective_date DESC, id DESC
+    `),
+    db.select({
       itemCode: catalogProductsTable.itemCode,
       productName: catalogProductsTable.productName,
-    })
-    .from(catalogProductsTable);
+    }).from(catalogProductsTable),
+  ]);
 
   const nameMap = new Map<string, string | null>();
   for (const p of products) nameMap.set(normCode(p.itemCode), p.productName);
 
   const map = new Map<string, PrayagInfo>();
-  for (const c of current) {
-    const key = normCode(c.itemCode);
+  for (const c of currentResult.rows) {
+    const key = normCode(c.item_code);
     map.set(key, {
       mrp: c.mrp,
-      effectiveDate: c.effectiveDate,
+      effectiveDate: c.effective_date,
       productName: nameMap.get(key) ?? null,
     });
   }
-  // Include matched products that have a name but no current price.
+  // Include catalog products that have a name but no in-force price.
   for (const p of products) {
     const key = normCode(p.itemCode);
     if (!map.has(key)) {
@@ -114,16 +118,18 @@ async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
       size: catalogProductsTable.size,
     })
     .from(catalogProductsTable);
-  const current = await db
-    .select({
-      itemCode: mrpPriceHistoryTable.itemCode,
-      mrp: mrpPriceHistoryTable.mrp,
-    })
-    .from(mrpPriceHistoryTable)
-    .where(eq(mrpPriceHistoryTable.isCurrent, true));
+  const _cd = new Date();
+  const todayForCandidates = `${_cd.getFullYear()}-${String(_cd.getMonth() + 1).padStart(2, "0")}-${String(_cd.getDate()).padStart(2, "0")}`;
+  type MrpPriceRow = { item_code: string; mrp: number | null };
+  const currentMrps = await db.execute<MrpPriceRow>(sql`
+    SELECT DISTINCT ON (item_code) item_code, mrp
+    FROM mrp_price_history
+    WHERE effective_date <= ${todayForCandidates}
+    ORDER BY item_code, effective_date DESC, id DESC
+  `);
 
   const mrpByCode = new Map<string, number | null>();
-  for (const c of current) mrpByCode.set(normCode(c.itemCode), c.mrp);
+  for (const c of currentMrps.rows) mrpByCode.set(normCode(c.item_code), c.mrp);
 
   return products.map((p) =>
     buildCandidate({
