@@ -1,0 +1,232 @@
+# Replit Prompt — Competitor PDF catalogue import (staged → review → approve)
+
+Adds PDF catalogue upload to the Import Competitor page. Prices are read from the catalogue, matched against the Competitor Master mapping, and staged in a **temporary area**. The user reviews on screen, downloads a revised Competitor Master Excel, then **Approves** (commit) or **Deletes** the temp batch. Nothing enters the live database without approval.
+
+> Paste everything below (from **GOAL**) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+On the Import Competitor page, allow uploading a competitor's **PDF catalogue** alongside the existing Excel/CSV. The app reads prices **only for products already mapped for that competitor**, stages them, and shows them for approval. Prayag's own current MRP must be shown and refreshed wherever the comparison appears.
+
+**No automatic price-plausibility checks.** The user reviews every row and approves. The only checks the app performs are **match-correctness** checks (below) — those prevent the wrong product's price being written under the right code, which the user cannot catch by eye.
+
+## Follow the existing project conventions
+
+- **Contract-first:** edit `lib/api-spec/openapi.yaml`, then `pnpm --filter @workspace/api-spec run codegen`. Never hand-edit `lib/api-hooks` or `lib/api-zod`.
+- **DB schema source of truth:** `lib/db/src/schema/catalog.ts`; then `pnpm --filter @workspace/db run push`.
+- **Analysis is live-computed** in `artifacts/api-server/src/lib/analysis.ts`. Gaps are never stored.
+- `mrp_price_history` is append-only with `is_current`; diff% positive = Prayag cheaper; never store price = 0.
+- Import UI in `artifacts/prayag-product-db/`; `ANTHROPIC_API_KEY` from Replit Secrets.
+
+---
+
+## 1. Import form changes
+
+- **File input accepts PDF** as well as Excel/CSV (`.pdf,.xlsx,.xls,.csv`).
+- **Competitor brand** — dropdown of existing competitors, with the option to type a new one.
+- **Price basis** (required toggle):
+  - `MRP` — prices are already final MRP. Use as-is, **no GST added**.
+  - `Ex-GST` — show a **GST %** input (default `18`); effective price = `price × (1 + gst/100)`.
+- **Effective date** — defaults to **the upload date**, editable before submitting.
+
+For Sparsh Pearl catalogues: basis = **`MRP`** (printed prices are MRP; adding GST would inflate every gap by 18%).
+
+---
+
+## 2. Catalogue structure map — Sparsh Pearl PTMT
+
+This structure is **verified against Vol 6.2 and assumed stable for future volumes**. Store it as configuration (a `catalogue_profiles` table or a JSON config keyed by competitor), not hard-coded in the extractor, so a future volume can be adjusted without a rewrite. If a new catalogue does not match this profile, the app should **stop and report the mismatch** rather than guess.
+
+### Document facts
+- ~108 A4 pages, **image-only — there is no text layer**.
+- Every priced item shows a **Cat No.** and an **MRP** printed as `MRP : ₹ 1584/-`.
+- Legend on priced pages: `S. Box = Small Box | M. Box = Master Box`.
+- The series name is printed large at the **top-left** of each series page; the Sparsh Pearl logo sits top-right.
+
+### Page types
+1. **Grid pages** — the main source. A 4-column grid of product tiles. Each tile:
+   ```
+   ED-950   | MRP : ₹ 467/-
+   Bib Cock with Flange
+   (45 Degree)
+   S. Box : 12 Pcs. | M. Box : 144 Pcs.
+   ```
+2. **Hero pages** — one large product photo with a single small price block overlaid (e.g. `RS-104 | MRP : ₹ 359/-`). Easy to miss — these must be read too.
+3. **Table pages** — accessories and allied items use real tables with columns `Cat No. | Sizes | MRP in ₹ | S.Box (Pcs) | M.Box (Pcs)`. Pages 83, 84, 96, 97 are of this type.
+4. **Marketing pages** — no prices at all. Return nothing for these.
+
+### Tile patterns that must be handled
+- **Two codes in one tile.** A tile often carries two variants stacked, sharing one product name:
+  ```
+  ED-951 (45 Degree) | MRP : ₹ 555/-
+  ED-969 (90 Degree) | MRP : ₹ 561/-
+  Long Body Bib Cock with Flange
+  ```
+  Each code must take **its own** price. Never carry one line's price onto the other code.
+- **Variant qualifier in small text** immediately after the code — `(45 Degree)`, `(90 Degree)`, `(15mm)`, `(20mm)`, `(1 Mtr)`, `(1.5 Mtr)`, `(Full Turn)`, `(Quarter Turn)`. This qualifier is part of the product identity and must be captured; it is what distinguishes otherwise identical descriptions.
+- **Adjacent tiles are close together.** A code number from the next tile can easily be mistaken for this tile's price — bind the price to the `MRP :` label inside the same tile, never to the nearest number.
+
+### Series → pages → code family
+
+| Prayag series | Sparsh series | Code prefix | Pages (Vol 6.2) |
+|---|---|---|---|
+| Quadra | Edge | `ED-` | 64–65 |
+| Diamond | Royal | `RS-` | 24–25 |
+| Vitro | Royal Plus | `RPS-` | 26–27 |
+| Cobra | Eva | `EVA-` | 38–39 |
+| Black Pearl | Regal | `REG-` | 34–35 |
+| STANDARD | Standard (Quarter Turn) | `TS-` | 18–19 |
+| Roman / allied | Waste couplings, ball cocks | `WC-`, `UWC-`, `BCC-`, `BCB-`, `AP-` | 83 |
+| Roman / allied | Connection pipes, jet sprays | `CPS-`, `CPH-`, `NCP-`, `PSJ-`, `PMJ-`, `UJS-` | 84 |
+| Roman / allied | Cistern accessories, foot valves | `AP-`, `FV-`, `FVE-` | 96 |
+| Roman / allied | Clamps, hoses, bottle traps | `AP-`, `WIH-`, `WOH-`, `WMP-`, `BT-`, `BTEP-`, `TFT-` | 97 |
+| — | Bathroom accessories | `TR-`, `BA-` | 98 |
+
+Not currently mapped to Prayag (ignore unless the user maps them later): `FTS-` (Standard **Full Turn**, pages 20–21) — a separate series, not a renumbering of `TS-`; also `EDE-`, `EDP-`, `LUR-`, `SHP-`, `HF-`, `AF-`, `SC-`, `CCQF-`, `LFT-`, `SHN-`, `ET-`, `PC-`, `FWP-`, `WP-`, `SL-`, `FV-`.
+
+**Use this map to narrow the work:** locate the relevant pages first (by code family / series header), then read only those pages at high quality. For the current mapping that is roughly **15 pages instead of 108**.
+
+---
+
+## 3. Extraction — vision, not text parsing
+
+The catalogue has **no text layer**, so `pdf-parse`, `pdfjs` text extraction, and any regex-over-text approach return nothing usable. Extract with **Claude vision** via the Anthropic API: send pages as a base64 `document` block (model `claude-sonnet-4-6`).
+
+- **Chunk the file** — max 100 pages / 32 MB per request. Split with `pdf-lib` into batches of **≤ 25 pages**; show per-chunk progress.
+- Ask for **strict JSON only** (no prose, no markdown fences). Retry a chunk if parsing fails.
+- Per item return: `cat_no`, `variant` (the small-text qualifier, if any), `mrp` (number only — strip `₹` and `/-`), `product_name`, `page`.
+- Pass the **target list** (below) with every chunk and instruct the model to find *those* products, rather than dumping every tile.
+
+**Do not use OCR (tesseract or similar).** It was tested on this exact catalogue and failed: the `₹` glyph is read as a leading digit (₹273 → 2273), and adjacent tiles' code numbers get picked up as prices (ED-964's real price ₹520 came back as ₹2225, which is ED-960's price). Vision reads the tile as a unit and does not make these errors.
+
+---
+
+## 4. The Competitor Master is the basis
+
+Build the **target list** from the Competitor Master mapping (`Competitor Master - PTMT.xlsx`, sheet `Sheet`), which is also what seeded `competitor_prices`. Allow re-uploading that file on the Import page to refresh the mapping.
+
+Its layout: row 1 is a brand band (`Prayag`, `Sparsh Pearl`, `Vectus`), row 2 the headers. Per row: Prayag `Name`, Prayag `Cat No.`, Prayag MRP (date-headed), then per competitor a `Cat No.` and an MRP column. Rows are grouped under Prayag series headers.
+
+For the selected competitor the target list is every mapped row:
+
+```
+{ competitor_code, expected_description, size/variant, prayag_series, matched_prayag_code, expected_pages }
+```
+
+`expected_description` comes from the master's `Name` column — Prayag's product name. The master has **no separate competitor description**, so matching descriptions is a **cross-brand semantic** comparison, not a string diff.
+
+---
+
+## 5. Matching — code, description, and size together
+
+For each target, score the candidates found in the catalogue:
+
+1. **Code** — exact match after normalising (uppercase, strip spaces and punctuation).
+2. **Description** — catalogue product name vs `expected_description`, compared **semantically** by the model: "Bib Cock Fancy 15mm Foam Flow with Flange" (Prayag) must match "Bib Cock with Foam Flow" (Sparsh). Plain fuzzy string ratio is too weak here.
+3. **Size / variant** — a **hard gate**. If both sides state a size or variant (15mm/20mm, 45°/90°, 1 Mtr/1.5 Mtr) and they disagree, the pair is **rejected** no matter how well the code matches.
+
+Resolution:
+
+- **Code + description + size agree** → `matchMethod = 'code+desc'`, accept.
+- **Code matches but description or size disagrees** → **do not accept**; put in *Needs review* with the reason. This is a real and dangerous case — see the alias table below.
+- **Description + size match, code differs** → `matchMethod = 'desc+size'`, accept into *Needs review* so the user confirms the renumbering; on approval, record the new code as an alias.
+- **Nothing matches** → target goes to *Not found in catalogue*; its existing price is left untouched.
+
+### Code aliases — seed these
+
+Verified against Vol 6.2. Store in a `competitor_code_aliases` table `{ competitor, oldCode, newCode, note }` and apply automatically; extend it whenever the user approves a `desc+size` match.
+
+| Master code | Catalogue code | Product |
+|---|---|---|
+| `WC-100` | `WC-180` | Waste Coupling Half Thread 31/32mm (H/T) |
+| `PJS-255` | `PSJ-255` | Jet Spray 1 Mtr — letters transposed |
+| `PJS-256` | `PSJ-256` | Jet Spray 1.5 Mtr — letters transposed |
+| `WMH-2331` | `WIH-2331` | Washing Machine Inlet Hose 1.5 Mtr |
+| `WMH-2332` | `WIH-2332` | Washing Machine Inlet Hose 3 Mtr |
+| `RPS-2285` | `RPS-2265` | Sink Mixer |
+| `WMP-186` | `WMP-188` | Washing Machine Pipe **2 Mtr** |
+| `WMP-188` | `WMP-189` | Washing Machine Pipe **3 Mtr** |
+
+**Why the size gate is not optional:** the master's `WMP-188` is the **3 Mtr** pipe, but Vol 6.2's `WMP-188` is the **2 Mtr** pipe. The codes match exactly while the products differ. Without the size gate the app would silently write the 2 Mtr price onto the 3 Mtr product, and the number would look plausible on review.
+
+Two read-only lists are shown but **never imported**: **New products found** (catalogue items matching no target) and **Not found in catalogue** (targets the catalogue didn't mention).
+
+---
+
+## 6. Staging (temp) area
+
+Two new tables in `lib/db/src/schema/catalog.ts`:
+
+**`import_batches`** — `{ id, competitor, effectiveDate, sourceFileName, priceBasis, gstPct, status ('pending' | 'approved' | 'discarded'), rowCounts (json), createdAt }`
+
+**`competitor_price_staging`** — `{ id, batchId (FK), competitor, competitorCodeMaster, competitorCodeCatalogue, matchedPrayagCode, description, catalogueDescription, variant, oldMrp, newMrp, increasePct, prayagMrpCurrent, gapPct, page, matchMethod ('code+desc' | 'desc+size'), status ('ok' | 'needs_review' | 'not_found'), reviewReason, createdAt }`
+
+`increasePct` is stored **for display only** — the app does not judge it. Nothing touches `competitor_prices` until approval. Multiple pending batches may coexist and are approved or discarded independently.
+
+---
+
+## 7. Review screen
+
+- **Header:** competitor, effective date, price basis (+ GST% if applicable), source file, and counts — matched / needs review / not found / new products.
+- **Table**, one row per staged item: master code, catalogue code, **catalogue description and expected description side by side**, variant, **old price → new price**, **increase %**, **Prayag current MRP**, **recomputed gap %**, match method, page number.
+- Prayag MRP here must be the **live current value** from `mrp_price_history` (latest `effective_date <= today`, `is_current`) — never a stale copy.
+- *Needs review* rows sort to the top with their reason visible; the user accepts or rejects each.
+- Collapsible: "New products found" and "Not found in catalogue".
+- **Actions:** *Download revised Competitor Master (Excel)* · *Approve* · *Delete temp data*.
+
+---
+
+## 8. Revised Competitor Master Excel (download)
+
+Generate with `exceljs`, matching the existing Competitor Master shape:
+
+- Row 1 — brand band: `Prayag`, then one band per competitor.
+- Row 2 — headers: Prayag `Name`, `Cat No.`, MRP column **headed with Prayag's current effective date**; then per competitor `Cat No.` and an MRP column **headed with that competitor's effective date**.
+- Rows grouped by Prayag series, as in the current file.
+- **Prayag prices refreshed to current MRP** — not the values from the previous file.
+- Competitor prices come from the staged batch for the competitor under review, and from live `competitor_prices` for the others.
+- Extra columns for the reviewed competitor: `Increase %`, `Match method`, `Page`.
+
+This download must work **before** approval — it is the offline check.
+
+---
+
+## 9. Approve → commit
+
+- Insert staged rows into `competitor_prices` with the batch's `effectiveDate`, `priceBasis`, `gstPct`, `isCurrent = true`.
+- Set `isCurrent = false` on the previous rows for the same (competitor, product) — **append-only; never overwrite or delete history**.
+- Any approved `desc+size` match writes its code alias into `competitor_code_aliases`.
+- Mark the batch `approved`; keep the batch record for audit.
+- **Delete temp data** removes only that batch's staging rows and nothing else.
+
+---
+
+## 10. Price basis must flow into the analysis
+
+`analysis.ts` currently assumes every competitor price is ex-GST and multiplies by 1.18. Change it to use each row's own basis:
+
+```
+effectivePrice = priceBasis === 'MRP' ? price : price × (1 + gstPct / 100)
+```
+
+Backfill existing rows with the basis they were imported under so current numbers don't shift unexpectedly.
+
+---
+
+## Validation
+
+Use the verified Vol 6.2 baseline as the acceptance test — all **150** mapped Sparsh Pearl products were read from the catalogue by hand, so extraction can be checked against known-correct values:
+
+- Spot checks: `ED-950` = **467**, `ED-951` = **555**, `ED-969` = **561**, `ED-964` = **520**, `REG-771` = **273**, `RS-104` = **359**, `TS-101` = **227**, `EVA-480` = **310**, `RPS-2271` = **267**.
+- The two-code tile on page 64 yields `ED-951` = 555 **and** `ED-969` = 561 — not the same price twice.
+- `WMP-188` (master, 3 Mtr) does **not** take Vol 6.2's `WMP-188` (2 Mtr) price; the size gate routes it to `WMP-189`.
+- All 150 targets resolve to a price (via code or alias); none silently disappear.
+- `competitor_prices` is unchanged until Approve; Delete removes only the staging batch.
+- The downloaded Excel opens with Prayag's **current** MRP and the competitor's new prices under date-labelled headers.
+- With basis = `MRP`, no GST is added anywhere.
+
+## When a new catalogue arrives
+
+The structure above is assumed stable. If a new volume changes page ranges, tile layout, or code families, the profile in step 2 is what gets updated — the extractor itself should not need changing. Have the app report any target that cannot be located, so a structure change shows up as a batch of "not found" rather than as silently wrong prices.
