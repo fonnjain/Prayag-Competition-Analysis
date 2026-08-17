@@ -4,7 +4,7 @@
  * The Sparsh Pearl catalogue is image-only (no text layer), so pdf-parse /
  * pdfjs text extraction return nothing usable. Instead we:
  *   1. Split the PDF into ≤ 25-page chunks with pdf-lib.
- *   2. Send each chunk as a base64 `document` block to Claude (claude-opus-4-5).
+ *   2. Send each chunk as a base64 `document` block to Claude (claude-opus-5).
  *   3. Parse the strict-JSON response.
  *
  * DO NOT use OCR (tesseract) or pdfjs text extraction for this catalogue.
@@ -19,7 +19,7 @@ import Anthropic from "@anthropic-ai/sdk";
  * Stored on every import_batches row so we can correlate quality/cost changes
  * when the model is upgraded.
  */
-export const EXTRACTION_MODEL = "claude-opus-4-5" as const;
+export const EXTRACTION_MODEL = "claude-opus-5" as const;
 
 export interface ExtractedItem {
   cat_no: string;
