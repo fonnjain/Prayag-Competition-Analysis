@@ -7,6 +7,7 @@ import comparisonRouter from "./comparison";
 import analysisRouter from "./analysis";
 import apiKeysRouter from "./apiKeys";
 import externalV1Router from "./externalV1";
+import importBatchesRouter from "./importBatches";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,7 @@ router.use(requireAuth);
 router.use(apiKeysRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
+router.use(importBatchesRouter);
 router.use(comparisonRouter);
 router.use(analysisRouter);
 

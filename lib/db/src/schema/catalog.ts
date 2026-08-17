@@ -120,6 +120,12 @@ export const competitorPricesTable = pgTable(
     // (competitor, matchedPrayagCode) pair. Recomputed after every import.
     // Mirrors the same concept as mrp_price_history.isCurrent.
     isCurrent: boolean("is_current").notNull().default(true),
+    // Price basis: 'MRP' = price is already MRP (use as-is);
+    // 'Ex-GST' = price is ex-GST, multiply by (1 + gstPct/100) before comparing.
+    // Null = legacy rows; fall back to checking the unit string.
+    priceBasis: text("price_basis"),
+    // GST percentage to apply when priceBasis = 'Ex-GST'. Default 18 when null.
+    gstPct: doublePrecision("gst_pct"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -173,9 +179,120 @@ export const discountSettingsTable = pgTable(
   (t) => [uniqueIndex("discount_settings_scope_idx").on(t.scope)],
 );
 
+// ---------------------------------------------------------------------------
+// PDF Catalogue Import — Staging System
+// ---------------------------------------------------------------------------
+
+// One row per import attempt. Covers both PDF and Excel/CSV uploads.
+// Status lifecycle: 'pending' → 'approved' | 'discarded'.
+// Multiple pending batches may coexist (one per upload); they are approved or
+// discarded independently.
+export const importBatchesTable = pgTable(
+  "import_batches",
+  {
+    id: serial("id").primaryKey(),
+    competitor: text("competitor").notNull(),
+    effectiveDate: date("effective_date").notNull(),
+    sourceFileName: text("source_file_name").notNull(),
+    // 'MRP' = prices are final MRP, use as-is.
+    // 'Ex-GST' = prices are ex-GST; apply gstPct before comparing to Prayag MRP.
+    priceBasis: text("price_basis").notNull().default("MRP"),
+    gstPct: doublePrecision("gst_pct"),
+    // 'pending' = staged, awaiting user review.
+    // 'approved' = committed to competitor_prices.
+    // 'discarded' = staging rows deleted, batch kept for audit.
+    status: text("status").notNull().default("pending"),
+    // JSON summary: { ok, needs_review, not_found, new_products }
+    rowCounts: text("row_counts"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("import_batches_status_idx").on(t.status),
+    index("import_batches_competitor_idx").on(t.competitor),
+  ],
+);
+
+// One row per extracted+matched item in a batch. Nothing touches
+// competitor_prices until the batch is approved.
+export const competitorPriceStagingTable = pgTable(
+  "competitor_price_staging",
+  {
+    id: serial("id").primaryKey(),
+    batchId: integer("batch_id").notNull(),
+    competitor: text("competitor").notNull(),
+    // The code as it appears in the existing competitor_prices mapping (master).
+    competitorCodeMaster: text("competitor_code_master"),
+    // The code as it appears in the uploaded catalogue (may differ via alias).
+    competitorCodeCatalogue: text("competitor_code_catalogue"),
+    matchedPrayagCode: text("matched_prayag_code"),
+    // Expected product description from the existing Prayag mapping.
+    description: text("description"),
+    // Product description extracted from the PDF.
+    catalogueDescription: text("catalogue_description"),
+    // Size / variant qualifier extracted from the PDF (e.g. "15mm", "1 Mtr").
+    variant: text("variant"),
+    // Price currently stored in competitor_prices for this product.
+    oldMrp: doublePrecision("old_mrp"),
+    // Price extracted from the catalogue.
+    newMrp: doublePrecision("new_mrp"),
+    // (newMrp - oldMrp) / oldMrp * 100 — stored for display only.
+    increasePct: doublePrecision("increase_pct"),
+    // Live Prayag MRP at staging time (from mrp_price_history is_current = true).
+    prayagMrpCurrent: doublePrecision("prayag_mrp_current"),
+    // (effectiveCompetitorPrice - prayagMrp) / prayagMrp * 100.
+    gapPct: doublePrecision("gap_pct"),
+    // Page number in the source PDF where this item was found.
+    page: integer("page"),
+    // 'code+desc' = matched by code (and description/size agreed).
+    // 'desc+size' = matched by description + size (code differed — renumbering).
+    matchMethod: text("match_method"),
+    // 'ok' = ready to approve.
+    // 'needs_review' = code matched but description/size disagreed, or desc+size match.
+    // 'not_found' = target not found in the catalogue at all.
+    // 'new_product' = found in catalogue but not in the mapping.
+    status: text("status").notNull().default("ok"),
+    reviewReason: text("review_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("cps_batch_idx").on(t.batchId),
+    index("cps_status_idx").on(t.status),
+    index("cps_competitor_idx").on(t.competitor),
+  ],
+);
+
+// Code aliases: when a competitor renumbers a product between catalogue
+// versions, record the mapping here so future imports apply it automatically.
+// Seeded with known Sparsh Pearl aliases from Vol 6.2.
+export const competitorCodeAliasesTable = pgTable(
+  "competitor_code_aliases",
+  {
+    id: serial("id").primaryKey(),
+    competitor: text("competitor").notNull(),
+    // Code used in the existing competitor_prices master mapping.
+    oldCode: text("old_code").notNull(),
+    // Code that appears in the catalogue (current/new code).
+    newCode: text("new_code").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("cca_competitor_old_idx").on(t.competitor, t.oldCode),
+  ],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 export type CodeConflict = typeof codeConflictsTable.$inferSelect;
 export type CompetitorPrice = typeof competitorPricesTable.$inferSelect;
 export type AcceptBatch = typeof acceptBatchesTable.$inferSelect;
 export type DiscountSetting = typeof discountSettingsTable.$inferSelect;
+export type ImportBatch = typeof importBatchesTable.$inferSelect;
+export type CompetitorPriceStaging = typeof competitorPriceStagingTable.$inferSelect;
+export type CompetitorCodeAlias = typeof competitorCodeAliasesTable.$inferSelect;

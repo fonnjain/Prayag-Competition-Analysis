@@ -6,3 +6,4 @@
 - [Prayag external API keys](prayag-external-api-keys.md) — /api/v1 is a GET-only allowlist behind X-API-Key (hash-only storage); never mount internal routers under /v1.
 - [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 web apps (home/, product-db/, analysis/) behind one proxy; console app deleted; cross-app links use raw absolute <a href>, never BASE_URL/wouter.
 - [Period-aware pricing](period-aware-pricing.md) — is_current flags on both tables; recomputeCurrentFlags excludes future dates; load-competitor requires effectiveDate; analysis uses period-aware helpers not raw table scans.
+- [PDF catalogue import](pdf-catalogue-import.md) — Claude vision extraction, staging tables, alias-based matching, price_basis/gst_pct per row, approve wires to competitor_prices.

@@ -1,9 +1,17 @@
 import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, Upload, Trash2, Loader2 } from "lucide-react";
+import {
+  FileUp,
+  Upload,
+  Trash2,
+  Loader2,
+  FileText,
+  FileSpreadsheet,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetComparisonFilters,
@@ -35,10 +43,15 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export default function ImportCompetitorPage() {
+  const [, navigate] = useLocation();
   const [file, setFile] = useState<File | null>(null);
   const [competitor, setCompetitor] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(todayIso());
+  const [priceBasis, setPriceBasis] = useState<"MRP" | "Ex-GST">("MRP");
+  const [gstPct, setGstPct] = useState<number>(18);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +63,8 @@ export default function ImportCompetitorPage() {
   const { data: brandsData } = useGetCompetitorBrands();
   const competitors = filters?.competitors ?? [];
   const existingBrands = brandsData?.brands ?? [];
+
+  const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
 
   const invalidateComparisonQueries = () => {
     queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
@@ -91,30 +106,44 @@ export default function ImportCompetitorPage() {
     formData.append("file", file);
     formData.append("competitor", competitor.trim());
     formData.append("effectiveDate", effectiveDate);
+    formData.append("priceBasis", priceBasis);
+    if (priceBasis === "Ex-GST") formData.append("gstPct", String(gstPct));
 
     try {
-      const res = await fetch("/api/catalog/load-competitor", {
-        method: "POST",
-        body: formData,
-      });
+      if (isPdf) {
+        // PDF → staging endpoint → navigate to review page
+        const res = await fetch(`${BASE}/api/catalog/import-batches`, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to process PDF");
 
-      const data = await res.json();
+        toast({
+          title: "Extraction Complete",
+          description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,
+        });
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to upload competitor file");
+        navigate(`/import-review/${data.batchId}`);
+      } else {
+        // Excel/CSV → existing direct-import route
+        const res = await fetch(`${BASE}/api/catalog/load-competitor`, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to upload competitor file");
+
+        setResult(data.results);
+        toast({
+          title: "Upload Successful",
+          description: `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${effectiveDate}).`,
+        });
+        invalidateComparisonQueries();
+
+        setFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
-
-      setResult(data.results);
-      toast({
-        title: "Upload Successful",
-        description: `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${effectiveDate}).`,
-      });
-
-      invalidateComparisonQueries();
-
-      // Reset file input
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
       toast({
         title: "Upload Failed",
@@ -131,22 +160,22 @@ export default function ImportCompetitorPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Import Competitor Data</h1>
         <p className="text-muted-foreground mt-2">
-          Upload a competitor price list. Each upload is stored as a separate period —
-          old data is preserved so you can compare prices across time.
+          Upload an Excel/CSV price sheet for instant import, or a PDF catalogue for
+          AI-powered extraction with a review step before committing.
         </p>
       </div>
 
       <div className="bg-card border rounded-lg p-6">
         <form onSubmit={handleUpload} className="space-y-6">
+          {/* Brand + Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="competitor">Competitor Brand Name</Label>
-              {/* HTML datalist gives browser-native autocomplete for existing brands */}
               <Input
                 id="competitor"
                 list="brand-suggestions"
                 type="text"
-                placeholder="e.g. Prince, Astral, Ashirvad"
+                placeholder="e.g. Sparsh Pearl, Astral"
                 value={competitor}
                 onChange={(e) => setCompetitor(e.target.value)}
                 required
@@ -158,7 +187,7 @@ export default function ImportCompetitorPage() {
               </datalist>
               {existingBrands.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Existing brands: {existingBrands.join(", ")}
+                  Existing: {existingBrands.join(", ")}
                 </p>
               )}
             </div>
@@ -173,21 +202,81 @@ export default function ImportCompetitorPage() {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                The date from which these prices are in effect (w.e.f.).
+                The date from which these prices apply (w.e.f.).
               </p>
             </div>
           </div>
 
+          {/* Price Basis */}
+          <div className="space-y-3">
+            <Label>Price Basis</Label>
+            <div className="flex gap-3">
+              {(["MRP", "Ex-GST"] as const).map((basis) => (
+                <button
+                  key={basis}
+                  type="button"
+                  onClick={() => setPriceBasis(basis)}
+                  className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-colors ${
+                    priceBasis === basis
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {basis === "MRP" ? "MRP (final retail price)" : "Ex-GST (add GST to compare)"}
+                </button>
+              ))}
+            </div>
+            {priceBasis === "Ex-GST" && (
+              <div className="flex items-center gap-3">
+                <Label htmlFor="gstPct" className="whitespace-nowrap">GST %</Label>
+                <Input
+                  id="gstPct"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={gstPct}
+                  onChange={(e) => setGstPct(Number(e.target.value))}
+                  className="w-24"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Prices will be multiplied by {(1 + gstPct / 100).toFixed(2)} before comparing to Prayag MRP.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* File input */}
           <div className="space-y-2">
-            <Label htmlFor="file">Price Sheet (Excel/CSV)</Label>
+            <Label htmlFor="file">Price File</Label>
             <Input
               ref={fileInputRef}
               id="file"
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls,.csv,.pdf"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               required
             />
+            {file && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {isPdf ? (
+                  <FileText className="w-4 h-4 text-red-500" />
+                ) : (
+                  <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                )}
+                <span className="font-medium">{file.name}</span>
+                {isPdf ? (
+                  <span className="text-amber-600">
+                    — PDF detected. Claude will extract prices; you'll review before committing.
+                    {file.size > 50 * 1024 * 1024
+                      ? " Large file — extraction may take 60–90 seconds."
+                      : " Extraction takes ~30 seconds."}
+                  </span>
+                ) : (
+                  <span>— will import directly</span>
+                )}
+              </div>
+            )}
           </div>
 
           <Button
@@ -198,18 +287,24 @@ export default function ImportCompetitorPage() {
             {isUploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Uploading…
+                {isPdf ? "Extracting prices (this takes ~30–60 s)…" : "Uploading…"}
+              </>
+            ) : isPdf ? (
+              <>
+                <FileText className="w-4 h-4 mr-2" />
+                Extract &amp; Stage for Review
               </>
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                Process Upload
+                Import Prices
               </>
             )}
           </Button>
         </form>
       </div>
 
+      {/* Excel import result summary */}
       {result && (
         <div className="bg-card border rounded-lg p-6 space-y-4">
           <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -217,7 +312,8 @@ export default function ImportCompetitorPage() {
             Import Summary: {result.competitor}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Effective date: <span className="font-mono font-medium">{effectiveDate}</span>
+            Effective date:{" "}
+            <span className="font-mono font-medium">{effectiveDate}</span>
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -241,12 +337,13 @@ export default function ImportCompetitorPage() {
 
           {result.unmatched > 0 && (
             <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
-              {result.unmatched} rows need human review. Visit the Mapping Review page to match them.
+              {result.unmatched} rows need mapping. Visit the Mapping Review page.
             </div>
           )}
         </div>
       )}
 
+      {/* Tracked Brands */}
       <div className="bg-card border rounded-lg p-6 space-y-4">
         <div>
           <h3 className="font-semibold text-lg">Tracked Competitor Brands</h3>
@@ -293,11 +390,11 @@ export default function ImportCompetitorPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Remove {brand}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This permanently deletes <strong>all price periods</strong> for {brand}.
-                          The brand will disappear from the comparison filters,
-                          By Product columns, and summary KPIs. This cannot be
-                          undone — you would need to re-upload its price sheets to
-                          restore it.
+                          This permanently deletes{" "}
+                          <strong>all price periods</strong> for {brand}. The
+                          brand will disappear from the comparison filters, By
+                          Product columns, and summary KPIs. You would need to
+                          re-upload its price sheets to restore it.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

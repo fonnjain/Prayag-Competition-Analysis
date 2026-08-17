@@ -11,6 +11,7 @@ import DataHealthPage from "@/pages/data-health";
 import ComparisonPage from "@/pages/comparison";
 import MappingReviewPage from "@/pages/mapping-review";
 import ImportCompetitorPage from "@/pages/import-competitor";
+import ImportReviewPage from "@/pages/import-review";
 import ApiKeysPage from "@/pages/api-keys";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useState } from "react";
@@ -99,6 +100,7 @@ function Router() {
       <Route path="/comparison" component={ComparisonPage} />
       <Route path="/mapping-review" component={MappingReviewPage} />
       <Route path="/import-competitor" component={ImportCompetitorPage} />
+      <Route path="/import-review/:id" component={ImportReviewPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
       <Route component={NotFound} />
     </Switch>

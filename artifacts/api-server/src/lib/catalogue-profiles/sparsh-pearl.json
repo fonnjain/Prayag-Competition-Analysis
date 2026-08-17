@@ -1,0 +1,21 @@
+{
+  "competitor": "Sparsh Pearl",
+  "catalogueName": "PTMT Vol 6.2",
+  "pageCount": 108,
+  "codeFamilies": ["ED-", "RS-", "RPS-", "EVA-", "REG-", "TS-", "WC-", "UWC-", "BCC-", "BCB-", "AP-", "CPS-", "CPH-", "NCP-", "PSJ-", "PMJ-", "UJS-", "FV-", "FVE-", "WIH-", "WOH-", "WMP-", "BT-", "BTEP-", "TFT-", "TR-", "BA-"],
+  "ignoredFamilies": ["FTS-", "EDE-", "EDP-", "LUR-", "SHP-", "HF-", "AF-", "SC-", "CCQF-", "LFT-", "SHN-", "ET-", "PC-", "FWP-", "WP-", "SL-"],
+  "seriesMap": [
+    { "prayagSeries": "Quadra",   "sparshSeries": "Edge",                     "codePrefix": "ED-",  "pages": [64, 65] },
+    { "prayagSeries": "Diamond",  "sparshSeries": "Royal",                    "codePrefix": "RS-",  "pages": [24, 25] },
+    { "prayagSeries": "Vitro",    "sparshSeries": "Royal Plus",               "codePrefix": "RPS-", "pages": [26, 27] },
+    { "prayagSeries": "Cobra",    "sparshSeries": "Eva",                      "codePrefix": "EVA-", "pages": [38, 39] },
+    { "prayagSeries": "Black Pearl","sparshSeries": "Regal",                  "codePrefix": "REG-", "pages": [34, 35] },
+    { "prayagSeries": "STANDARD", "sparshSeries": "Standard (Quarter Turn)",  "codePrefix": "TS-",  "pages": [18, 19] },
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Waste & accessories",  "codePrefix": "WC-",  "pages": [83] },
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Connection pipes",     "codePrefix": "CPS-", "pages": [84] },
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Cistern accessories",  "codePrefix": "AP-",  "pages": [96] },
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Hoses & bottle traps", "codePrefix": "WIH-", "pages": [97] }
+  ],
+  "tablePages": [83, 84, 96, 97],
+  "notes": "Image-only PDF; no text layer. Use Claude vision only. Table pages use column format Cat No. | Sizes | MRP in ₹ | S.Box | M.Box."
+}

@@ -3,16 +3,25 @@ import { normCode } from "./catalog.js";
 // ---------------------------------------------------------------------------
 // Basis normalization
 //
-// competitor_prices.unit is the competitor's price basis:
-//   - null / empty            -> already an MRP-comparable figure (use as-is)
-//   - "Rate (ex-GST)"         -> ex-GST rate; gross up by 18% GST before
-//                                comparing to Prayag MRP
-//   - anything else           -> treated as-is (MRP basis)
+// Per-row price basis is now stored explicitly in competitor_prices.priceBasis:
+//   - 'MRP'      -> price is already MRP-comparable; use as-is
+//   - 'Ex-GST'   -> ex-GST; gross up by gstPct% (default 18) before comparing
+//   - null/other -> legacy rows; fall back to checking the unit string
+//                   ("Rate (ex-GST)" → multiply by GST_MULTIPLIER)
 // All comparisons are against Prayag's current MRP.
 // ---------------------------------------------------------------------------
 export const GST_MULTIPLIER = 1.18;
 
-export function effectivePrice(unit: string | null, price: number): number {
+export function effectivePrice(
+  unit: string | null,
+  price: number,
+  priceBasis?: string | null,
+  gstPct?: number | null,
+): number {
+  // Explicit per-row basis takes priority
+  if (priceBasis === "MRP") return price;
+  if (priceBasis === "Ex-GST") return price * (1 + (gstPct ?? 18) / 100);
+  // Legacy fallback: check unit string for rows imported before price_basis column
   if (unit != null && unit.trim() === "Rate (ex-GST)") {
     return price * GST_MULTIPLIER;
   }
@@ -41,6 +50,10 @@ export interface CompInput {
   // Period-matched Prayag MRP persisted on the row. This — NOT a catalog
   // lookup — is the basis for the competitor gap and the displayed Prayag MRP.
   prayagMrpAtCompare: number | null;
+  // Per-row price basis (new columns). Optional for backward compatibility with
+  // legacy rows that only have unit.
+  priceBasis?: string | null;
+  gstPct?: number | null;
 }
 
 export interface AnalysisRow {
@@ -104,7 +117,11 @@ export function buildRow(
   // The catalog map supplies only descriptive attributes (division/category/
   // name) for grouping and filtering — never the MRP used for the gap.
   const prayagMrp = matched ? c.prayagMrpAtCompare ?? null : null;
-  const effPrice = c.price != null ? effectivePrice(c.unit, c.price) : null;
+  // Use per-row priceBasis/gstPct if available, otherwise fall back to unit string.
+  const effPrice =
+    c.price != null
+      ? effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct)
+      : null;
 
   // Resolve the two prices that drive the comparison. In MRP mode these are the
   // raw MRP / effective figures; in Net mode they are discounted nets.

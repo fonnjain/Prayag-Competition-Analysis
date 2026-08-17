@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^3.0.0",
     "@workspace/api-zod": "workspace:*",
@@ -23,6 +24,7 @@
     "express": "^5.2.1",
     "multer": "^2.2.0",
     "openid-client": "^6.8.4",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.0.227",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
