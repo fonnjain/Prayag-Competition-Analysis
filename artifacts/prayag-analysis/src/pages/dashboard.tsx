@@ -100,7 +100,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2 pl-2 border-l border-border">
             {user && (
-              <span className="text-sm text-muted-foreground hidden md:block">{user.name ?? user.username}</span>
+              <span className="text-sm text-muted-foreground hidden md:block">{[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email}</span>
             )}
             <Button variant="ghost" size="sm" onClick={logout} title="Log out">
               <LogOut className="h-4 w-4 mr-2" />

@@ -76,7 +76,7 @@ export function Layout({ children }: LayoutProps) {
         {/* User / logout */}
         <div className="px-4 pb-4 pt-2 border-t border-sidebar-border mt-2">
           {user && (
-            <p className="text-xs text-sidebar-foreground/50 truncate px-3 mb-1">{user.name ?? user.username}</p>
+            <p className="text-xs text-sidebar-foreground/50 truncate px-3 mb-1">{[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email}</p>
           )}
           <button
             onClick={logout}

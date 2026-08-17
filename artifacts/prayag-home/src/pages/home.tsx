@@ -10,7 +10,7 @@ export default function Home() {
       {/* Top-right user / logout */}
       <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
         {user && (
-          <span className="text-sm text-muted-foreground hidden sm:block">{user.name ?? user.username}</span>
+          <span className="text-sm text-muted-foreground hidden sm:block">{[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email}</span>
         )}
         <button
           onClick={logout}
