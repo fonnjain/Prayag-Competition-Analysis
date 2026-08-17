@@ -158,7 +158,7 @@ function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
   } as unknown as CompetitorRow;
 }
 
-async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<CompetitorRow[]> {
+export async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<CompetitorRow[]> {
   const resolvedDate = atDate ?? todayString();
   const [matched, unmatched] = await Promise.all([
     db.execute<RawCompetitorRow>(sql`

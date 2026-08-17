@@ -34,7 +34,10 @@ import {
   mrpPriceHistoryTable,
   competitorPricesTable,
 } from "@workspace/db";
-import analysisRouter, { getPrayagCatalogMapForPeriod } from "./analysis.js";
+import analysisRouter, {
+  getPrayagCatalogMapForPeriod,
+  getCompetitorRowsForPeriod,
+} from "./analysis.js";
 import { normCode } from "../lib/catalog.js";
 
 // ---------------------------------------------------------------------------
@@ -309,5 +312,106 @@ describe("GET /analysis/opportunities — upcomingPrayagMrp reflects period-reso
     expect(info!.mrp).toBe(MAR_MRP);
     expect(info!.upcomingMrp).toBe(APR_MRP);
     expect(info!.upcomingMrpDate).toBe(APR_DATE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Level 3: getCompetitorRowsForPeriod — DISTINCT ON picks the right batch
+// ---------------------------------------------------------------------------
+//
+// Scenario: two competitor_prices rows for the same (competitor,
+// matched_prayag_code) pair across two effective dates:
+//   2026-01-15 → price 500   (earlier batch)
+//   2026-06-01 → price 550   (later batch)
+//
+// Expected resolution:
+//   asOf 2026-03-01  (between the two dates)  → earlier row (500)
+//   asOf 2026-08-01  (after both dates)        → later row   (550)
+//   asOf 2025-12-01  (before both dates)       → no row for this product
+//
+// The test uses a dedicated item code and competitor name so it cannot
+// interact with the fixtures defined at the top of this file.
+
+describe("getCompetitorRowsForPeriod — DISTINCT ON selects latest batch on-or-before date", () => {
+  const CP_ITEM = `__TEST_COMP_PERIOD_${Date.now()}__`;
+  const CP_COMP = `__test_comp_period_${Date.now()}__`;
+
+  const JAN_DATE = "2026-01-15";
+  const JAN_PRICE = 500;
+
+  const JUN_DATE = "2026-06-01";
+  const JUN_PRICE = 550;
+
+  beforeAll(async () => {
+    // No catalog product needed — matched_prayag_code is plain text with no FK.
+    // Insert two competitor rows: same competitor + matched code, different dates.
+    await db.insert(competitorPricesTable).values([
+      {
+        competitor: CP_COMP,
+        description: "Test Comp Period SKU — Jan batch",
+        price: JAN_PRICE,
+        unit: null,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: 480,
+        effectiveDate: JAN_DATE,
+        isCurrent: false,
+      },
+      {
+        competitor: CP_COMP,
+        description: "Test Comp Period SKU — Jun batch",
+        price: JUN_PRICE,
+        unit: null,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: 520,
+        effectiveDate: JUN_DATE,
+        isCurrent: true,
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, CP_COMP));
+  });
+
+  /** Pull out our test row from the result set (returns undefined if absent). */
+  async function findRow(atDate: string) {
+    const rows = await getCompetitorRowsForPeriod(atDate);
+    return rows.find(
+      (r) => r.competitor === CP_COMP && r.matchedPrayagCode === CP_ITEM,
+    );
+  }
+
+  it("asOf 2026-03-01 (between batches) → returns Jan batch (price=500)", async () => {
+    const row = await findRow("2026-03-01");
+    expect(
+      row,
+      "Expected Jan batch row to be present for 2026-03-01",
+    ).toBeDefined();
+    expect(row!.price).toBe(JAN_PRICE);
+    expect(row!.effectiveDate).toBe(JAN_DATE);
+  });
+
+  it("asOf 2026-08-01 (after both batches) → returns Jun batch (price=550)", async () => {
+    const row = await findRow("2026-08-01");
+    expect(
+      row,
+      "Expected Jun batch row to be present for 2026-08-01",
+    ).toBeDefined();
+    expect(row!.price).toBe(JUN_PRICE);
+    expect(row!.effectiveDate).toBe(JUN_DATE);
+  });
+
+  it("asOf 2025-12-01 (before both batches) → returns no row for this product", async () => {
+    const row = await findRow("2025-12-01");
+    expect(
+      row,
+      "Expected no row for this product before earliest batch date",
+    ).toBeUndefined();
   });
 });
