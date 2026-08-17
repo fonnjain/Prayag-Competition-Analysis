@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useGetAnalysisFilters, getExportAnalysisUrl } from "@workspace/api-client-react";
+import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { 
   Card,
 } from "@/components/ui/card";
@@ -35,6 +35,7 @@ export type DashboardFilters = {
   matchConfidence?: string;
   matchStatus?: string;
   mode?: CompareMode;
+  effectivePeriod?: string;
 };
 
 export default function Dashboard() {
@@ -175,6 +176,7 @@ function ModeToggle({ mode, onChange }: { mode: CompareMode; onChange: (m: Compa
 
 function FilterBar({ filters, onChange }: { filters: DashboardFilters, onChange: (f: DashboardFilters) => void }) {
   const { data, isLoading } = useGetAnalysisFilters();
+  const { data: periodsData } = useGetAnalysisPeriods();
 
   if (isLoading || !data) {
     return <Skeleton className="h-16 w-full" />;
@@ -290,8 +292,33 @@ function FilterBar({ filters, onChange }: { filters: DashboardFilters, onChange:
           </Select>
         </div>
 
+        {periodsData && periodsData.periods.length > 1 && (
+          <div className="space-y-1">
+            <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Period</label>
+            <Select
+              value={filters.effectivePeriod || "__latest__"}
+              onValueChange={(v) =>
+                onChange({ ...filters, effectivePeriod: v === "__latest__" ? undefined : v })
+              }
+            >
+              <SelectTrigger className="w-[160px] h-8 text-sm bg-background">
+                <SelectValue placeholder="Latest" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__latest__">Latest (auto)</SelectItem>
+                {periodsData.periods.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                    {periodsData.isFuturePeriod[p] ? " ⏳" : p === periodsData.defaultPeriod ? " ✓" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="flex-1" />
-        
+
         {Object.keys(filters).some(k => (filters as any)[k] !== undefined) && (
           <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-muted-foreground">
             <RefreshCw className="h-3 w-3 mr-2" />

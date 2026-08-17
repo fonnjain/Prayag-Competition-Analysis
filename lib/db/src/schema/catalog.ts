@@ -116,6 +116,10 @@ export const competitorPricesTable = pgTable(
     // catalog_products / mrp_price_history lookup — so a row's comparison stays
     // stable even as the master catalog MRP changes over time.
     prayagMrpAtCompare: doublePrecision("prayag_mrp_at_compare"),
+    // Append-only period flag. True for the newest effectiveDate per
+    // (competitor, matchedPrayagCode) pair. Recomputed after every import.
+    // Mirrors the same concept as mrp_price_history.isCurrent.
+    isCurrent: boolean("is_current").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -127,6 +131,7 @@ export const competitorPricesTable = pgTable(
     index("competitor_prices_matched_code_idx").on(t.matchedPrayagCode),
     index("competitor_prices_competitor_idx").on(t.competitor),
     index("competitor_prices_category_idx").on(t.category),
+    index("competitor_prices_current_idx").on(t.competitor, t.isCurrent),
   ],
 );
 

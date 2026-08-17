@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import AdmZip from "adm-zip";
-import { eq, asc, desc, inArray } from "drizzle-orm";
+import { eq, asc, desc, inArray, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -790,6 +790,34 @@ function findCol(
   return -1;
 }
 
+// Recompute is_current on competitor_prices for a given brand after a period
+// import. Matched rows: latest effective_date per (competitor, matched_prayag_code).
+// Unmatched rows: all rows from the newest period for that competitor.
+async function recomputeCompetitorCurrentFlags(competitor: string): Promise<void> {
+  await db.execute(sql`UPDATE competitor_prices SET is_current = false WHERE competitor = ${competitor}`);
+  await db.execute(sql`
+    UPDATE competitor_prices
+    SET is_current = true
+    WHERE id IN (
+      SELECT DISTINCT ON (competitor, matched_prayag_code) id
+      FROM competitor_prices
+      WHERE competitor = ${competitor}
+        AND matched_prayag_code IS NOT NULL
+      ORDER BY competitor, matched_prayag_code, effective_date DESC NULLS LAST, id DESC
+    )
+  `);
+  await db.execute(sql`
+    UPDATE competitor_prices
+    SET is_current = true
+    WHERE competitor = ${competitor}
+      AND matched_prayag_code IS NULL
+      AND effective_date = (
+        SELECT MAX(effective_date) FROM competitor_prices
+        WHERE competitor = ${competitor} AND matched_prayag_code IS NULL
+      )
+  `);
+}
+
 function toDateStr(v: unknown): string | null {
   if (v == null || v === "") return null;
   if (typeof v === "number") {
@@ -895,6 +923,15 @@ function parseCompetitorSheet(
   return rows;
 }
 
+// GET /catalog/competitor-brands — distinct brand names for the combobox.
+router.get("/catalog/competitor-brands", async (_req, res) => {
+  const rows = await db
+    .selectDistinct({ competitor: competitorPricesTable.competitor })
+    .from(competitorPricesTable)
+    .orderBy(competitorPricesTable.competitor);
+  res.json({ brands: rows.map((r) => r.competitor) });
+});
+
 // POST /catalog/load-competitor — upload a competitor workbook (any brand).
 router.post(
   "/catalog/load-competitor",
@@ -913,6 +950,16 @@ router.post(
       res.status(400).json({ error: "competitor name is required" });
       return;
     }
+
+    const effectiveDateBody =
+      typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
+        ? req.body.effectiveDate.trim()
+        : null;
+    if (!effectiveDateBody || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDateBody)) {
+      res.status(400).json({ error: "effectiveDate (YYYY-MM-DD) is required" });
+      return;
+    }
+    const effectiveDate = effectiveDateBody;
 
     const name = file.originalname;
     const ext = name.toLowerCase().split(".").pop() ?? "";
@@ -1007,23 +1054,31 @@ router.post(
           size: r.size,
           price: r.price,
           unit: r.unit,
-          effectiveDate: r.effectiveDate,
+          // Use the form's effectiveDate — more reliable than parsing from the sheet
+          effectiveDate,
           matchedPrayagCode: isMatched ? (canonical.get(norm!) ?? norm) : null,
           matchStatus: isMatched ? "matched" : "no match (review)",
           matchConfidence: isMatched ? "High" : null,
           prayagMrpAtCompare: prayagMrpSnapshot,
+          // All new rows start as not current; recompute below sets the flag.
+          isCurrent: false,
         };
       });
 
-      // Re-uploading a competitor replaces that competitor's existing rows so
-      // repeated uploads stay idempotent instead of duplicating data.
+      // Period-aware: delete only the rows for this (competitor, effectiveDate)
+      // so older periods are preserved. A different effectiveDate adds a new period.
       await db
         .delete(competitorPricesTable)
-        .where(eq(competitorPricesTable.competitor, competitor));
+        .where(
+          sql`competitor = ${competitor} AND effective_date = ${effectiveDate}`,
+        );
 
       for (let i = 0; i < values.length; i += 500) {
         await db.insert(competitorPricesTable).values(values.slice(i, i + 500));
       }
+
+      // Recompute is_current across all periods for this competitor.
+      await recomputeCompetitorCurrentFlags(competitor);
 
       res.json({
         results: {

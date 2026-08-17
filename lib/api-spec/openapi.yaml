@@ -760,6 +760,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /catalog/competitor-brands:
+    get:
+      operationId: getCompetitorBrands
+      tags: [catalog]
+      summary: Distinct competitor brand names
+      description: All distinct competitor brand names in competitor_prices, for use in the brand combobox on the import page.
+      responses:
+        "200":
+          description: Brand names
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetitorBrands"
   /catalog/competitors/{competitor}:
     delete:
       operationId: deleteCatalogCompetitor
@@ -804,6 +817,7 @@ paths:
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
         - $ref: "#/components/parameters/CompareModeFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
       responses:
         "200":
           description: Overview KPIs
@@ -824,6 +838,7 @@ paths:
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
         - $ref: "#/components/parameters/CompareModeFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
       responses:
         "200":
           description: Per-brand stats
@@ -846,6 +861,7 @@ paths:
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
         - $ref: "#/components/parameters/CompareModeFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
       responses:
         "200":
           description: Per-category stats
@@ -868,6 +884,7 @@ paths:
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
         - $ref: "#/components/parameters/CompareModeFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
       responses:
         "200":
           description: Positioning distribution
@@ -887,6 +904,7 @@ paths:
         - $ref: "#/components/parameters/CategoryFilter"
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
       responses:
         "200":
           description: Coverage matrix
@@ -907,6 +925,7 @@ paths:
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
         - $ref: "#/components/parameters/CompareModeFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
         - name: thresholdPct
           in: query
           required: false
@@ -933,6 +952,7 @@ paths:
         - $ref: "#/components/parameters/MatchConfidenceFilter"
         - $ref: "#/components/parameters/MatchStatusFilter"
         - $ref: "#/components/parameters/CompareModeFilter"
+        - $ref: "#/components/parameters/EffectivePeriodFilter"
         - name: format
           in: query
           required: false
@@ -948,6 +968,38 @@ paths:
               schema:
                 type: string
                 format: binary
+  /analysis/periods:
+    get:
+      operationId: getAnalysisPeriods
+      tags: [analysis]
+      summary: Available price periods
+      description: Distinct effective dates across Prayag MRP history and competitor prices, newest first, plus the default (latest non-future) period.
+      responses:
+        "200":
+          description: Period list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisPeriods"
+  /analysis/price-history/{itemCode}:
+    get:
+      operationId: getPriceHistory
+      tags: [analysis]
+      summary: Period-to-period price history for a Prayag SKU
+      description: Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceHistory"
   /analysis/discount-settings:
     get:
       operationId: getDiscountSettings
@@ -1174,6 +1226,14 @@ components:
         type: string
         enum: [mrp, net]
         default: mrp
+    EffectivePeriodFilter:
+      name: effectivePeriod
+      in: query
+      required: false
+      description: ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).
+      schema:
+        type: string
+        format: date
   schemas:
     ErrorResponse:
       type: object
@@ -2297,6 +2357,87 @@ components:
       properties:
         error:
           type: string
+    AnalysisPeriods:
+      type: object
+      required: [periods, defaultPeriod, isFuturePeriod]
+      properties:
+        periods:
+          type: array
+          items:
+            type: string
+        defaultPeriod:
+          type: ["string", "null"]
+        isFuturePeriod:
+          type: object
+          description: Map of period date → true if future-dated (Upcoming).
+          additionalProperties:
+            type: boolean
+    PriceHistoryPeriod:
+      type: object
+      required: [effectiveDate, isCurrent]
+      properties:
+        effectiveDate:
+          type: string
+        mrp:
+          type: ["number", "null"]
+        priceBasis:
+          type: string
+        isCurrent:
+          type: boolean
+        notes:
+          type: ["string", "null"]
+        changePct:
+          type: ["number", "null"]
+    CompetitorPriceHistoryPeriod:
+      type: object
+      required: [effectiveDate, effectivePrice, isCurrent]
+      properties:
+        effectiveDate:
+          type: string
+        price:
+          type: ["number", "null"]
+        unit:
+          type: ["string", "null"]
+        effectivePrice:
+          type: number
+        isCurrent:
+          type: boolean
+        changePct:
+          type: ["number", "null"]
+    CompetitorPriceHistory:
+      type: object
+      required: [competitor, periods]
+      properties:
+        competitor:
+          type: string
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorPriceHistoryPeriod"
+    PriceHistory:
+      type: object
+      required: [itemCode, prayagHistory, competitorHistory]
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        prayagHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceHistoryPeriod"
+        competitorHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorPriceHistory"
+    CompetitorBrands:
+      type: object
+      required: [brands]
+      properties:
+        brands:
+          type: array
+          items:
+            type: string
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

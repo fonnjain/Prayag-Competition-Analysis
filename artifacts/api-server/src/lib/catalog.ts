@@ -12,6 +12,7 @@ export async function recomputeCurrentFlags(): Promise<void> {
     FROM (
       SELECT DISTINCT ON (item_code) id
       FROM mrp_price_history
+      WHERE effective_date <= CURRENT_DATE
       ORDER BY item_code, effective_date DESC, id DESC
     ) latest
     WHERE m.id = latest.id

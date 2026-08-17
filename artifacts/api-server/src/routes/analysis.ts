@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -17,6 +17,7 @@ import {
   confidenceCounts,
   bucketize,
   toOpportunityItem,
+  effectivePrice,
   pct,
   round1,
   strParam,
@@ -31,7 +32,9 @@ import {
 const router: IRouter = Router();
 
 // Current MRP + catalog attributes keyed by normalized item code.
-async function getPrayagCatalogMap(): Promise<Map<string, PrayagInfo>> {
+// When atDate is provided, uses the latest effective_date <= atDate (period-aware).
+// Otherwise uses the is_current = true rows (default behavior).
+async function getPrayagCatalogMapForPeriod(atDate?: string | null): Promise<Map<string, PrayagInfo>> {
   const products = await db
     .select({
       itemCode: catalogProductsTable.itemCode,
@@ -40,20 +43,38 @@ async function getPrayagCatalogMap(): Promise<Map<string, PrayagInfo>> {
       category: catalogProductsTable.category,
     })
     .from(catalogProductsTable);
-  const current = await db
-    .select({
-      itemCode: mrpPriceHistoryTable.itemCode,
-      mrp: mrpPriceHistoryTable.mrp,
-      effectiveDate: mrpPriceHistoryTable.effectiveDate,
-    })
-    .from(mrpPriceHistoryTable)
-    .where(eq(mrpPriceHistoryTable.isCurrent, true));
+
+  type PriceRow = { item_code: string; mrp: number | null; effective_date: string | null };
+  let current: PriceRow[];
+  if (atDate) {
+    const result = await db.execute<PriceRow>(sql`
+      SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
+      FROM mrp_price_history
+      WHERE effective_date <= ${atDate}
+      ORDER BY item_code, effective_date DESC, id DESC
+    `);
+    current = result.rows;
+  } else {
+    const rows = await db
+      .select({
+        itemCode: mrpPriceHistoryTable.itemCode,
+        mrp: mrpPriceHistoryTable.mrp,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+      })
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.isCurrent, true));
+    current = rows.map((r) => ({
+      item_code: r.itemCode,
+      mrp: r.mrp,
+      effective_date: r.effectiveDate,
+    }));
+  }
 
   const priceMap = new Map<string, { mrp: number | null; effectiveDate: string | null }>();
   for (const c of current) {
-    priceMap.set(normCode(c.itemCode), {
+    priceMap.set(normCode(c.item_code), {
       mrp: c.mrp,
-      effectiveDate: c.effectiveDate,
+      effectiveDate: c.effective_date,
     });
   }
 
@@ -70,6 +91,42 @@ async function getPrayagCatalogMap(): Promise<Map<string, PrayagInfo>> {
     });
   }
   return map;
+}
+
+// Competitor rows for analysis. When atDate is provided, returns the latest
+// effective_date <= atDate per (competitor, matched_prayag_code); unmatched rows
+// come from the latest period for that competitor at or before atDate.
+// Default (no date): is_current = true rows.
+type CompetitorRow = typeof competitorPricesTable.$inferSelect;
+async function getCompetitorRowsForPeriod(atDate?: string | null): Promise<CompetitorRow[]> {
+  if (atDate) {
+    // Matched: latest per (competitor, matched_prayag_code) where effective_date <= atDate
+    const matched = await db.execute<CompetitorRow>(sql`
+      SELECT DISTINCT ON (competitor, matched_prayag_code) *
+      FROM competitor_prices
+      WHERE matched_prayag_code IS NOT NULL
+        AND effective_date IS NOT NULL
+        AND effective_date <= ${atDate}
+      ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC
+    `);
+    // Unmatched: all rows from the latest period for each competitor <= atDate
+    const unmatched = await db.execute<CompetitorRow>(sql`
+      SELECT cp.*
+      FROM competitor_prices cp
+      JOIN (
+        SELECT competitor, MAX(effective_date) AS max_date
+        FROM competitor_prices
+        WHERE matched_prayag_code IS NULL
+          AND effective_date IS NOT NULL
+          AND effective_date <= ${atDate}
+        GROUP BY competitor
+      ) latest ON cp.competitor = latest.competitor
+        AND cp.effective_date = latest.max_date
+      WHERE cp.matched_prayag_code IS NULL
+    `);
+    return [...matched.rows, ...unmatched.rows];
+  }
+  return db.select().from(competitorPricesTable).where(eq(competitorPricesTable.isCurrent, true));
 }
 
 const PRAYAG_SCOPE = "prayag";
@@ -130,9 +187,10 @@ function parseMode(query: Record<string, unknown>): CompareMode {
 
 async function getFilteredRows(query: Record<string, unknown>): Promise<AnalysisRow[]> {
   const mode = parseMode(query);
+  const atDate = strParam(query.effectivePeriod);
   const [maps, all, discounts] = await Promise.all([
-    getPrayagCatalogMap(),
-    db.select().from(competitorPricesTable),
+    getPrayagCatalogMapForPeriod(atDate),
+    getCompetitorRowsForPeriod(atDate),
     mode === "net"
       ? getDiscounts()
       : Promise.resolve<ResolvedDiscounts>({
@@ -412,6 +470,100 @@ router.get("/analysis/export", async (req, res) => {
   ]);
 
   sendSheet(res, [header, ...body], "Analysis", "prayag-competition-analysis", format);
+});
+
+// ---------------------------------------------------------------------------
+// GET /analysis/periods — distinct effective dates across both price tables.
+// ---------------------------------------------------------------------------
+router.get("/analysis/periods", async (_req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  type DateRow = { effective_date: string };
+  const [mrpDates, compDates] = await Promise.all([
+    db.execute<DateRow>(sql`SELECT DISTINCT effective_date FROM mrp_price_history ORDER BY effective_date DESC`),
+    db.execute<DateRow>(sql`SELECT DISTINCT effective_date FROM competitor_prices WHERE effective_date IS NOT NULL ORDER BY effective_date DESC`),
+  ]);
+
+  const allDates = new Set<string>();
+  for (const r of mrpDates.rows) if (r.effective_date) allDates.add(r.effective_date);
+  for (const r of compDates.rows) if (r.effective_date) allDates.add(r.effective_date);
+
+  const periods = [...allDates].sort((a, b) => b.localeCompare(a));
+  // Default = latest period that is not a future date
+  const defaultPeriod = periods.find((d) => d <= today) ?? periods[0] ?? null;
+
+  // Flag which periods are future-dated (Upcoming)
+  const isFuturePeriod: Record<string, boolean> = {};
+  for (const p of periods) isFuturePeriod[p] = p > today;
+
+  res.json({ periods, defaultPeriod, isFuturePeriod });
+});
+
+// ---------------------------------------------------------------------------
+// GET /analysis/price-history/:itemCode — period-to-period MRP history.
+// ---------------------------------------------------------------------------
+router.get("/analysis/price-history/:itemCode", async (req, res) => {
+  const { itemCode } = req.params;
+  if (!itemCode) { res.status(400).json({ error: "itemCode required" }); return; }
+
+  type MrpRow = { effective_date: string; mrp: number | null; price_basis: string; is_current: boolean; notes: string | null };
+  type CompRow = { competitor: string; price: number | null; unit: string | null; effective_date: string; is_current: boolean };
+
+  const [productRows, mrpRows, compRows] = await Promise.all([
+    db
+      .select({ itemCode: catalogProductsTable.itemCode, productName: catalogProductsTable.productName })
+      .from(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, itemCode)),
+    db.execute<MrpRow>(sql`
+      SELECT effective_date, mrp, price_basis, is_current, notes
+      FROM mrp_price_history
+      WHERE item_code = ${itemCode}
+      ORDER BY effective_date ASC, id ASC
+    `),
+    db.execute<CompRow>(sql`
+      SELECT competitor, price, unit, effective_date, is_current
+      FROM competitor_prices
+      WHERE matched_prayag_code = ${itemCode}
+        AND price IS NOT NULL
+      ORDER BY competitor ASC, effective_date ASC, id ASC
+    `),
+  ]);
+
+  // Compute period-to-period % change for Prayag
+  const prayagHistory = mrpRows.rows.map((r, i) => {
+    const prev = mrpRows.rows[i - 1];
+    const changePct =
+      prev?.mrp != null && prev.mrp > 0 && r.mrp != null
+        ? round1(((r.mrp - prev.mrp) / prev.mrp) * 100)
+        : null;
+    return { effectiveDate: r.effective_date, mrp: r.mrp, priceBasis: r.price_basis, isCurrent: r.is_current, notes: r.notes, changePct };
+  });
+
+  // Group competitor rows by brand and compute period-to-period % change
+  const byCompetitor = new Map<string, CompRow[]>();
+  for (const r of compRows.rows) {
+    const list = byCompetitor.get(r.competitor) ?? [];
+    list.push(r);
+    byCompetitor.set(r.competitor, list);
+  }
+  const competitorHistory = [...byCompetitor.entries()].map(([competitor, rows]) => ({
+    competitor,
+    periods: rows.map((r, i) => {
+      const effPrice = round1(effectivePrice(r.unit, r.price!));
+      const prev = rows[i - 1];
+      const prevEff = prev?.price != null ? effectivePrice(prev.unit, prev.price) : null;
+      const changePct =
+        prevEff != null && prevEff > 0 ? round1(((effPrice - prevEff) / prevEff) * 100) : null;
+      return { effectiveDate: r.effective_date, price: r.price, unit: r.unit, effectivePrice: effPrice, isCurrent: r.is_current, changePct };
+    }),
+  }));
+
+  res.json({
+    itemCode,
+    productName: productRows[0]?.productName ?? null,
+    prayagHistory,
+    competitorHistory,
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,12 +8,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetComparisonFilters,
   useDeleteCatalogCompetitor,
+  useGetCompetitorBrands,
   getGetComparisonQueryKey,
   getGetComparisonByProductQueryKey,
   getGetComparisonSummaryQueryKey,
   getGetComparisonFiltersQueryKey,
   getGetComparisonMatrixQueryKey,
   getGetMappingReviewQueryKey,
+  getGetCompetitorBrandsQueryKey,
 } from "@workspace/api-client-react";
 import {
   AlertDialog,
@@ -27,17 +29,27 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Today's date in YYYY-MM-DD (local timezone)
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function ImportCompetitorPage() {
   const [file, setFile] = useState<File | null>(null);
   const [competitor, setCompetitor] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(todayIso());
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: filters } = useGetComparisonFilters();
+  const { data: brandsData } = useGetCompetitorBrands();
   const competitors = filters?.competitors ?? [];
+  const existingBrands = brandsData?.brands ?? [];
 
   const invalidateComparisonQueries = () => {
     queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
@@ -46,6 +58,7 @@ export default function ImportCompetitorPage() {
     queryClient.invalidateQueries({ queryKey: getGetComparisonFiltersQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetComparisonMatrixQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetCompetitorBrandsQueryKey() });
   };
 
   const deleteMutation = useDeleteCatalogCompetitor({
@@ -69,7 +82,7 @@ export default function ImportCompetitorPage() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !competitor.trim()) return;
+    if (!file || !competitor.trim() || !effectiveDate) return;
 
     setIsUploading(true);
     setResult(null);
@@ -77,6 +90,7 @@ export default function ImportCompetitorPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("competitor", competitor.trim());
+    formData.append("effectiveDate", effectiveDate);
 
     try {
       const res = await fetch("/api/catalog/load-competitor", {
@@ -93,16 +107,14 @@ export default function ImportCompetitorPage() {
       setResult(data.results);
       toast({
         title: "Upload Successful",
-        description: `Imported ${data.results.inserted} rows for ${data.results.competitor}.`,
+        description: `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${effectiveDate}).`,
       });
 
       invalidateComparisonQueries();
 
       // Reset file input
       setFile(null);
-      const fileInput = document.getElementById('file') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err: any) {
       toast({
         title: "Upload Failed",
@@ -119,38 +131,75 @@ export default function ImportCompetitorPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Import Competitor Data</h1>
         <p className="text-muted-foreground mt-2">
-          Upload a competitor price list to compare against Prayag's catalog.
+          Upload a competitor price list. Each upload is stored as a separate period —
+          old data is preserved so you can compare prices across time.
         </p>
       </div>
 
       <div className="bg-card border rounded-lg p-6">
         <form onSubmit={handleUpload} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="competitor">Competitor Brand Name</Label>
-            <Input 
-              id="competitor" 
-              type="text" 
-              placeholder="e.g. Prince, Astral, Ashirvad"
-              value={competitor}
-              onChange={(e) => setCompetitor(e.target.value)}
-              required
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="competitor">Competitor Brand Name</Label>
+              {/* HTML datalist gives browser-native autocomplete for existing brands */}
+              <Input
+                id="competitor"
+                list="brand-suggestions"
+                type="text"
+                placeholder="e.g. Prince, Astral, Ashirvad"
+                value={competitor}
+                onChange={(e) => setCompetitor(e.target.value)}
+                required
+              />
+              <datalist id="brand-suggestions">
+                {existingBrands.map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
+              {existingBrands.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Existing brands: {existingBrands.join(", ")}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="effectiveDate">Price Effective Date</Label>
+              <Input
+                id="effectiveDate"
+                type="date"
+                value={effectiveDate}
+                onChange={(e) => setEffectiveDate(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                The date from which these prices are in effect (w.e.f.).
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="file">Price Sheet (Excel/CSV)</Label>
-            <Input 
-              id="file" 
-              type="file" 
-              accept=".xlsx,.xls,.csv" 
+            <Input
+              ref={fileInputRef}
+              id="file"
+              type="file"
+              accept=".xlsx,.xls,.csv"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               required
             />
           </div>
 
-          <Button type="submit" disabled={!file || !competitor.trim() || isUploading} className="w-full">
+          <Button
+            type="submit"
+            disabled={!file || !competitor.trim() || !effectiveDate || isUploading}
+            className="w-full"
+          >
             {isUploading ? (
-              "Uploading..."
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Uploading…
+              </>
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
@@ -167,7 +216,10 @@ export default function ImportCompetitorPage() {
             <FileUp className="w-5 h-5 text-primary" />
             Import Summary: {result.competitor}
           </h3>
-          
+          <p className="text-sm text-muted-foreground">
+            Effective date: <span className="font-mono font-medium">{effectiveDate}</span>
+          </p>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="p-4 bg-muted/50 rounded-md">
               <div className="text-sm text-muted-foreground mb-1">Total Rows</div>
@@ -186,10 +238,10 @@ export default function ImportCompetitorPage() {
               <div className="text-2xl font-mono font-bold text-amber-600">{result.unmatched}</div>
             </div>
           </div>
-          
+
           {result.unmatched > 0 && (
             <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
-              {result.unmatched} rows need human review. Please visit the Mapping Review page to match them.
+              {result.unmatched} rows need human review. Visit the Mapping Review page to match them.
             </div>
           )}
         </div>
@@ -199,8 +251,9 @@ export default function ImportCompetitorPage() {
         <div>
           <h3 className="font-semibold text-lg">Tracked Competitor Brands</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Remove a brand you no longer track. This deletes all of its price rows
-            and removes it from the comparison filters, columns, and KPIs.
+            Remove a brand you no longer track. This deletes{" "}
+            <strong>all periods</strong> of its price rows and removes it from
+            the comparison filters, columns, and KPIs.
           </p>
         </div>
 
@@ -240,10 +293,10 @@ export default function ImportCompetitorPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Remove {brand}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This permanently deletes all of {brand}'s price rows.
+                          This permanently deletes <strong>all price periods</strong> for {brand}.
                           The brand will disappear from the comparison filters,
                           By Product columns, and summary KPIs. This cannot be
-                          undone — you would need to re-upload its price sheet to
+                          undone — you would need to re-upload its price sheets to
                           restore it.
                         </AlertDialogDescription>
                       </AlertDialogHeader>

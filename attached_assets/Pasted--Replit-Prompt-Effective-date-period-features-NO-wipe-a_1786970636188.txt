@@ -1,0 +1,86 @@
+# Replit Prompt — Effective-date / period features (NO wipe, additive)
+
+Makes prices effective-date/period aware and adds the competitor brand dropdown, effective date on import, an effective-date filter in the analysis dashboard, and period-to-period MRP increase for Prayag + competitors. **Nothing is deleted** — the existing Sparsh Pearl data stays.
+
+> Paste everything below (from **GOAL**) into the Replit AI Agent. Optional: first upload `0_Prayag_Master_MultiPeriod.xlsx` if you want the full Prayag price history (up to 5 periods per item) loaded (Step 6).
+
+---
+
+## GOAL
+
+Do **not** wipe or reseed anything. Keep the existing `catalog_products`, `mrp_price_history`, and `competitor_prices` (Sparsh Pearl) data. Additively make the whole app effective-date / period aware:
+1. Competitor brand becomes a dropdown (+ add new).
+2. Competitor import captures an effective date.
+3. The analysis dashboard can be filtered by effective period.
+4. Period-to-period MRP increase is shown for both Prayag and competitors.
+
+## Follow the existing project conventions (do not deviate)
+
+- **Contract-first:** edit `lib/api-spec/openapi.yaml`, then regenerate with `pnpm --filter @workspace/api-spec run codegen`. Never hand-edit generated hooks (`lib/api-hooks`) or zod (`lib/api-zod`).
+- **DB schema source of truth:** `lib/db/src/schema/catalog.ts`. After changes run `pnpm --filter @workspace/db run push`.
+- **Analysis is live-computed** in `artifacts/api-server/src/lib/analysis.ts` (recompute per request).
+- Keep the existing rules: competitor prices are **ex-GST**, comparison uses **ex-GST × 1.18 vs Prayag MRP**; **diff% positive = Prayag cheaper**; `mrp_price_history` is **append-only** with `is_current`; never store price = 0.
+- Frontends: import lives in `artifacts/prayag-product-db/`, the dashboard in `artifacts/prayag-analysis/`.
+
+## Step 1 — Schema (append-only, additive)
+
+In `lib/db/src/schema/catalog.ts`:
+
+- `competitor_prices`: add `effectiveDate` (date) and `isCurrent` (boolean, default true).
+  - Treat competitor prices as **append-only per (competitor, matchedPrayagCode, effectiveDate)** — mirror how `mrp_price_history` already works. The newest `effectiveDate` per (competitor, matchedPrayagCode) is `isCurrent = true`; older ones stay with `isCurrent = false`.
+- `mrp_price_history` already has `effectiveDate` + `isCurrent` — reuse it as-is; no change needed.
+
+Run the DB push. Do not drop or truncate any table.
+
+## Step 2 — Backfill the existing Sparsh Pearl rows
+
+Set `effectiveDate = 2026-03-05` and `isCurrent = true` on the current Sparsh Pearl rows in `competitor_prices` (the period they were matched against). This is an UPDATE, not a delete.
+
+## Step 3 — Competitor brand dropdown (Import Competitor page)
+
+On the `prayag-product-db` Import Competitor page, replace the free-text "Competitor Brand Name" input with a combobox:
+- Options = the **distinct `competitor` values already in `competitor_prices`**.
+- Allow selecting an existing brand **or** typing a new brand name (first-time competitor).
+- New brands appear automatically next time.
+
+## Step 4 — Effective date on competitor import
+
+Add a required **"Effective Date"** date-picker to the Import Competitor form.
+- Store `effectiveDate` on every imported row.
+- Re-uploading the **same competitor for the same effectiveDate** replaces that period's rows; a **new effectiveDate adds a new period** (older periods kept); newest per (competitor, product) becomes `isCurrent = true`.
+- Keep the existing auto-match guardrail (reject gaps outside ~−80%..+100%) for auto-matched imports; verified manual re-uploads bypass it.
+
+## Step 5 — Effective-date filter in the analysis dashboard
+
+In `prayag-analysis` + `analysis.ts`, add a period filter (dropdown):
+- Options = distinct effective dates across `mrp_price_history` + `competitor_prices`. Default = latest.
+- For the chosen date, per product:
+  - **Prayag MRP** = the `mrp_price_history` row with the latest `effectiveDate <= chosen`.
+  - **Competitor price** = the `competitor_prices` row (that competitor + product) with the latest `effectiveDate <= chosen`.
+  - Recompute diff% live using the existing rule (competitor ex-GST × 1.18 vs Prayag MRP; positive = Prayag cheaper).
+- Changing the filter recomputes coverage/positioning/opportunity KPIs for that period.
+
+## Step 6 — Period-to-period MRP increase (Prayag + competitor)
+
+For each item, order its prices by `effectiveDate` and compute:
+
+```
+increase% = (this_period_mrp − previous_period_mrp) / previous_period_mrp × 100
+```
+
+Show per product (a Price History panel / expandable row) the MRP by period and the % change between consecutive periods — for **Prayag** (`mrp_price_history`) and for the **competitor** (`competitor_prices` history) — plus an overall "biggest MRP increases this period" view.
+
+*(Optional data:)* if `0_Prayag_Master_MultiPeriod.xlsx` is uploaded, append its `mrp_price_history` sheet so Prayag has full price history from day one. Append only (match on `item_code` + `effective_date`; skip rows that already exist) — do not modify existing rows.
+
+That sheet has a `status` column with three values:
+- `Previous` — an older period, `is_current = false`.
+- `Current` — the price effective **today**, `is_current = true`.
+- `Upcoming` — a **future-dated** price (e.g. PTMT w.e.f. 01 Sep 2026) that is not yet in force. Load these rows with `is_current = false` and **exclude them from the default comparison**, so today's numbers never use a future price. They should still appear in the price-history panel and be selectable in the period filter.
+
+## Validation
+
+- No table was truncated; existing Sparsh Pearl rows still present, now with `effectiveDate = 2026-03-05`.
+- Import Competitor shows a brand dropdown listing "Sparsh Pearl" and lets a new brand be added.
+- Importing a competitor twice with two effective dates keeps both periods; the dashboard filter lists both; latest is default; older still viewable.
+- Selecting an older period changes the Prayag + competitor prices used and the resulting diff%.
+- A Prayag item with two periods shows increase% = (new − old) / old × 100.
