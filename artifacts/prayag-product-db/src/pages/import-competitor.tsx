@@ -60,6 +60,15 @@ function formatDate(iso: string): string {
   }
 }
 
+/** Bearer token stored by the auth layer — needed for raw fetch() calls that
+ *  bypass the generated API client (which injects Authorization automatically). */
+function getAuthHeaders(): Record<string, string> {
+  try {
+    const sid = localStorage.getItem("prayag_sid");
+    if (sid) return { Authorization: `Bearer ${sid}` };
+  } catch { /* ignore */ }
+  return {};
+}
 
 export default function ImportCompetitorPage() {
   const [, navigate] = useLocation();
@@ -173,6 +182,7 @@ export default function ImportCompetitorPage() {
         const res = await fetch(`/api/catalog/import-batches`, {
           method: "POST",
           body: formData,
+          headers: getAuthHeaders(),
         });
 
         if (!res.ok) {
@@ -273,6 +283,7 @@ export default function ImportCompetitorPage() {
         const res = await fetch(`/api/catalog/load-competitor`, {
           method: "POST",
           body: formData,
+          headers: getAuthHeaders(),
         });
         const data = await res.json();
         if (!res.ok) throw new Error((data as any).error || "Failed to upload competitor file");

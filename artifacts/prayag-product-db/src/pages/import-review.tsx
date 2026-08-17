@@ -64,6 +64,16 @@ interface BatchData {
   rows: StagingRow[];
 }
 
+/** Bearer token stored by the auth layer — needed for raw fetch() calls that
+ *  bypass the generated API client (which injects Authorization automatically). */
+function getAuthHeaders(): Record<string, string> {
+  try {
+    const sid = localStorage.getItem("prayag_sid");
+    if (sid) return { Authorization: `Bearer ${sid}` };
+  } catch { /* ignore */ }
+  return {};
+}
+
 function fmt(v: number | null, decimals = 0): string {
   if (v == null) return "—";
   return v.toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -248,7 +258,9 @@ export default function ImportReviewPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/catalog/import-batches/${batchId}`);
+        const res = await fetch(`/api/catalog/import-batches/${batchId}`, {
+          headers: getAuthHeaders(),
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load batch");
         setBatch(data);
@@ -272,6 +284,7 @@ export default function ImportReviewPage() {
     try {
       const res = await fetch(`/api/catalog/import-batches/${batchId}/approve`, {
         method: "POST",
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Approve failed");
@@ -293,6 +306,7 @@ export default function ImportReviewPage() {
     try {
       const res = await fetch(`/api/catalog/import-batches/${batchId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Discard failed");
@@ -307,7 +321,9 @@ export default function ImportReviewPage() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const res = await fetch(`/api/catalog/import-batches/${batchId}/export`);
+      const res = await fetch(`/api/catalog/import-batches/${batchId}/export`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
