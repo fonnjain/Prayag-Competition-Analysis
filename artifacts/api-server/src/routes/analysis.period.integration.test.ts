@@ -415,3 +415,104 @@ describe("getCompetitorRowsForPeriod — DISTINCT ON selects latest batch on-or-
     ).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Level 4: prayagMrpDate resolution — future vs past effectivePeriod
+// ---------------------------------------------------------------------------
+//
+// getFilteredRows() caps prayagMrpDate at today:
+//   future effectivePeriod → prayagMrpDate === today
+//   past   effectivePeriod → prayagMrpDate === effectivePeriod
+//
+// Dates are computed dynamically at test runtime so the assertions stay
+// correct regardless of when the suite is run.
+//
+// Verified via two observable surfaces:
+//   1. GET /analysis/opportunities  — prayagMrpDate field in the JSON body
+//   2. GET /analysis/export?format=csv — column header "Prayag MRP (as of <date>)"
+
+/** Matches todayString() in analysis.ts — local-calendar YYYY-MM-DD. */
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** A date that is safely in the future (1 year from today). */
+function futureDateStr(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** A date that is safely in the past (30 days ago). */
+function pastDateStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+describe("prayagMrpDate resolution — future vs past effectivePeriod", () => {
+  const mrpApp = express();
+  mrpApp.use(express.json());
+  mrpApp.use(analysisRouter);
+  const mrpRequest = supertest(mrpApp);
+
+  // ── /analysis/opportunities ──────────────────────────────────────────────
+
+  it(
+    "future effectivePeriod → prayagMrpDate === today in /analysis/opportunities",
+    async () => {
+      // A date one year from today is always in the future.
+      // getFilteredRows() must clamp it down to today.
+      const qs = new URLSearchParams({ effectivePeriod: futureDateStr() });
+      const res = await mrpRequest.get(`/analysis/opportunities?${qs}`);
+      expect(res.status).toBe(200);
+      expect(res.body.prayagMrpDate).toBe(todayStr());
+    },
+  );
+
+  it(
+    "past effectivePeriod → prayagMrpDate === that past date in /analysis/opportunities",
+    async () => {
+      // A date 30 days ago is always in the past.
+      const past = pastDateStr();
+      const qs = new URLSearchParams({ effectivePeriod: past });
+      const res = await mrpRequest.get(`/analysis/opportunities?${qs}`);
+      expect(res.status).toBe(200);
+      expect(res.body.prayagMrpDate).toBe(past);
+    },
+  );
+
+  // ── /analysis/export column header ──────────────────────────────────────
+
+  it(
+    'future effectivePeriod → export CSV column header contains "Prayag MRP (as of <today>)"',
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: futureDateStr(),
+        format: "csv",
+      });
+      const res = await mrpRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const firstLine = (res.text as string).split("\n")[0];
+      expect(firstLine).toContain(`Prayag MRP (as of ${todayStr()})`);
+    },
+  );
+
+  it(
+    'past effectivePeriod → export CSV column header contains "Prayag MRP (as of <past date>)"',
+    async () => {
+      const past = pastDateStr();
+      const qs = new URLSearchParams({
+        effectivePeriod: past,
+        format: "csv",
+      });
+      const res = await mrpRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const firstLine = (res.text as string).split("\n")[0];
+      expect(firstLine).toContain(`Prayag MRP (as of ${past})`);
+    },
+  );
+});
