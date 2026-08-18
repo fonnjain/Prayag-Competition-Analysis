@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useGetAnalysisOverview } from "@workspace/api-client-react";
 import type { DashboardFilters } from "@/pages/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +8,18 @@ import {
   Target, Layers, PackageSearch 
 } from "lucide-react";
 
-export function OverviewCards({ filters }: { filters: DashboardFilters }) {
+export function OverviewCards({
+  filters,
+  onPrayagMrpDate,
+}: {
+  filters: DashboardFilters;
+  onPrayagMrpDate?: (date: string | null) => void;
+}) {
   const { data, isLoading } = useGetAnalysisOverview(filters as any);
+
+  useEffect(() => {
+    onPrayagMrpDate?.(data?.prayagMrpDate ?? null);
+  }, [data?.prayagMrpDate, onPrayagMrpDate]);
 
   if (isLoading || !data) {
     return (

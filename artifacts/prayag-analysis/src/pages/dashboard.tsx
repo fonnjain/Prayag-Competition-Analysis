@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { 
@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, LogOut, Home, Database } from "lucide-react";
+import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, LogOut, Home, Database, CalendarDays } from "lucide-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [mode, setMode] = useState<CompareMode>("mrp");
   const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
+  const [prayagMrpDate, setPrayagMrpDate] = useState<string | null>(null);
   // Mode rides along inside the filters object so every child hook + the export
   // URL pick it up automatically. "mrp" is the default and is omitted.
   const filters: DashboardFilters =
@@ -51,6 +52,10 @@ export default function Dashboard() {
     const url = getExportAnalysisUrl({ ...filters, format });
     window.open(url, "_blank");
   };
+
+  const handlePrayagMrpDate = useCallback((date: string | null) => {
+    setPrayagMrpDate(date);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/20">
@@ -111,9 +116,9 @@ export default function Dashboard() {
       </header>
       
       <main className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        <FilterBar filters={baseFilters} onChange={setBaseFilters} />
+        <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} />
         
-        <OverviewCards filters={filters} />
+        <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} />
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="h-[400px]">
@@ -174,7 +179,15 @@ function ModeToggle({ mode, onChange }: { mode: CompareMode; onChange: (m: Compa
   );
 }
 
-function FilterBar({ filters, onChange }: { filters: DashboardFilters, onChange: (f: DashboardFilters) => void }) {
+function FilterBar({
+  filters,
+  onChange,
+  prayagMrpDate,
+}: {
+  filters: DashboardFilters;
+  onChange: (f: DashboardFilters) => void;
+  prayagMrpDate?: string | null;
+}) {
   const { data, isLoading } = useGetAnalysisFilters();
   const { data: periodsData } = useGetAnalysisPeriods();
 
@@ -318,6 +331,13 @@ function FilterBar({ filters, onChange }: { filters: DashboardFilters, onChange:
         )}
 
         <div className="flex-1" />
+
+        {prayagMrpDate && (
+          <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Prayag MRP revision used for this comparison">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            Prayag MRP as of {prayagMrpDate}
+          </div>
+        )}
 
         {Object.keys(filters).some(k => (filters as any)[k] !== undefined) && (
           <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-muted-foreground">

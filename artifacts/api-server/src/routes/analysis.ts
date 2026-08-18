@@ -329,7 +329,7 @@ router.get("/analysis/filters", async (_req, res) => {
 
 // GET /analysis/overview — headline KPIs.
 router.get("/analysis/overview", async (req, res) => {
-  const { rows } = await getFilteredRows(req.query);
+  const { rows, prayagMrpDate } = await getFilteredRows(req.query);
   const matched = rows.filter((r) => r.matched).length;
   const gap = gapStats(rows);
   res.json({
@@ -345,6 +345,7 @@ router.get("/analysis/overview", async (req, res) => {
     medianPriceDiffPct: gap.medianPriceDiffPct,
     competitorCount: new Set(rows.map((r) => r.competitor)).size,
     matchQuality: confidenceCounts(rows),
+    prayagMrpDate,
   });
 });
 

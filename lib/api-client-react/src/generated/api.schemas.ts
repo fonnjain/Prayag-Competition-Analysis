@@ -551,6 +551,8 @@ export interface AnalysisOverview {
   medianPriceDiffPct: number | null;
   competitorCount: number;
   matchQuality: ConfidenceCounts;
+  /** Resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison — always ≤ today. */
+  prayagMrpDate: string;
 }
 
 export interface AnalysisBrandStat {
