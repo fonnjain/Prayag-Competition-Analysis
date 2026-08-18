@@ -194,19 +194,35 @@ export function matchCatalogue(
       continue;
     }
 
-    // Apply alias: if masterCode has a known alias, look for newCode in catalogue
-    const lookupCode = aliasOldToNew.get(masterCode) ?? masterCode;
+    // Apply alias: if masterCode has a known alias, look for newCode ONLY.
+    // Never fall back to a similar code when an alias exists.
+    const isAliased = aliasOldToNew.has(masterCode);
+    const lookupCode = isAliased ? aliasOldToNew.get(masterCode)! : masterCode;
     const candidates = extractedByCode.get(lookupCode) ?? [];
 
     if (candidates.length === 0) {
-      // Not found in extracted items
+      // Not found in extracted items (alias target absent → not_found, no fallback)
       staging.push(makeRow(target, null, "not_found", null, null, null));
       continue;
     }
 
-    // Take the best candidate (first unclaimed; if all claimed, use first)
-    const candidate =
-      candidates.find((c) => !claimed.has(c)) ?? candidates[0]!;
+    // One-catalogue-code-to-one-master-code constraint.
+    // If every extraction for this code is already claimed, two master codes
+    // have resolved to the same catalogue code — flag both as needs_review.
+    const candidate = candidates.find((c) => !claimed.has(c));
+    if (!candidate) {
+      staging.push(
+        makeRow(
+          target,
+          candidates[0]!,
+          "needs_review",
+          "code+desc",
+          `Catalogue code ${candidates[0]!.cat_no} already claimed by another master code`,
+          candidates[0]!.cat_no,
+        ),
+      );
+      continue;
+    }
     claimed.add(candidate);
 
     // Size gate: only fires when BOTH sides have an explicit size/variant field
