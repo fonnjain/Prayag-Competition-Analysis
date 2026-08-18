@@ -817,7 +817,9 @@ export const GetAnalysisOverviewResponse = zod.object({
   "medium": zod.number(),
   "low": zod.number(),
   "none": zod.number()
-})
+}),
+  "prayagMrpDate": zod.string(),
+  "competitorPeriodDate": zod.string().nullable()
 })
 
 

@@ -11,15 +11,21 @@ import {
 export function OverviewCards({
   filters,
   onPrayagMrpDate,
+  onCompetitorPeriodDate,
 }: {
   filters: DashboardFilters;
   onPrayagMrpDate?: (date: string | null) => void;
+  onCompetitorPeriodDate?: (date: string | null) => void;
 }) {
   const { data, isLoading } = useGetAnalysisOverview(filters as any);
 
   useEffect(() => {
     onPrayagMrpDate?.(data?.prayagMrpDate ?? null);
   }, [data?.prayagMrpDate, onPrayagMrpDate]);
+
+  useEffect(() => {
+    onCompetitorPeriodDate?.((data as any)?.competitorPeriodDate ?? null);
+  }, [(data as any)?.competitorPeriodDate, onCompetitorPeriodDate]);
 
   if (isLoading || !data) {
     return (

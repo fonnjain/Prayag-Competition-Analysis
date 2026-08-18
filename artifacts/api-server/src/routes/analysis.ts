@@ -247,6 +247,12 @@ interface FilteredRowsResult {
   rows: AnalysisRow[];
   /** The resolved Prayag MRP date (YYYY-MM-DD) used for comparison — always ≤ today. */
   prayagMrpDate: string;
+  /**
+   * The latest competitor effective_date that is ≤ the requested period
+   * (YYYY-MM-DD), or null when no competitor rows with a known effective date
+   * exist for that period.
+   */
+  competitorPeriodDate: string | null;
 }
 
 async function getFilteredRows(query: Record<string, unknown>): Promise<FilteredRowsResult> {
@@ -275,7 +281,17 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Filtered
     discountFor: (c) => discounts.byCompetitor.get(c) ?? DEFAULT_COMPETITOR_DISCOUNT,
   };
   const rows = all.map((c) => buildRow(c, maps, opts));
-  return { rows: applyFilters(rows, parseFilters(query)), prayagMrpDate };
+
+  // Resolve the latest competitor effective_date that contributed to this view.
+  let competitorPeriodDate: string | null = null;
+  for (const r of all) {
+    const d = r.effectiveDate ?? null;
+    if (d && (!competitorPeriodDate || d > competitorPeriodDate)) {
+      competitorPeriodDate = d;
+    }
+  }
+
+  return { rows: applyFilters(rows, parseFilters(query)), prayagMrpDate, competitorPeriodDate };
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +345,7 @@ router.get("/analysis/filters", async (_req, res) => {
 
 // GET /analysis/overview — headline KPIs.
 router.get("/analysis/overview", async (req, res) => {
-  const { rows, prayagMrpDate } = await getFilteredRows(req.query);
+  const { rows, prayagMrpDate, competitorPeriodDate } = await getFilteredRows(req.query);
   const matched = rows.filter((r) => r.matched).length;
   const gap = gapStats(rows);
   res.json({
@@ -346,6 +362,7 @@ router.get("/analysis/overview", async (req, res) => {
     competitorCount: new Set(rows.map((r) => r.competitor)).size,
     matchQuality: confidenceCounts(rows),
     prayagMrpDate,
+    competitorPeriodDate,
   });
 });
 

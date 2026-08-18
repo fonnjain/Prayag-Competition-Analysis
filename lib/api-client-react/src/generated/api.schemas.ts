@@ -553,6 +553,12 @@ export interface AnalysisOverview {
   matchQuality: ConfidenceCounts;
   /** Resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison — always ≤ today. */
   prayagMrpDate: string;
+  /**
+   * The latest competitor effective_date (YYYY-MM-DD) that contributed to this
+   * view, or null when no competitor rows with a known date exist.
+   * @nullable
+   */
+  competitorPeriodDate: string | null;
 }
 
 export interface AnalysisBrandStat {

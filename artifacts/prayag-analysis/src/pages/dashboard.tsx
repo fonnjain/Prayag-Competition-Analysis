@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [mode, setMode] = useState<CompareMode>("mrp");
   const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
   const [prayagMrpDate, setPrayagMrpDate] = useState<string | null>(null);
+  const [competitorPeriodDate, setCompetitorPeriodDate] = useState<string | null>(null);
   // Mode rides along inside the filters object so every child hook + the export
   // URL pick it up automatically. "mrp" is the default and is omitted.
   const filters: DashboardFilters =
@@ -55,6 +56,10 @@ export default function Dashboard() {
 
   const handlePrayagMrpDate = useCallback((date: string | null) => {
     setPrayagMrpDate(date);
+  }, []);
+
+  const handleCompetitorPeriodDate = useCallback((date: string | null) => {
+    setCompetitorPeriodDate(date);
   }, []);
 
   return (
@@ -116,9 +121,9 @@ export default function Dashboard() {
       </header>
       
       <main className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} />
+        <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} competitorPeriodDate={competitorPeriodDate} />
         
-        <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} />
+        <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} onCompetitorPeriodDate={handleCompetitorPeriodDate} />
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="h-[400px]">
@@ -183,10 +188,12 @@ function FilterBar({
   filters,
   onChange,
   prayagMrpDate,
+  competitorPeriodDate,
 }: {
   filters: DashboardFilters;
   onChange: (f: DashboardFilters) => void;
   prayagMrpDate?: string | null;
+  competitorPeriodDate?: string | null;
 }) {
   const { data, isLoading } = useGetAnalysisFilters();
   const { data: periodsData } = useGetAnalysisPeriods();
@@ -336,6 +343,13 @@ function FilterBar({
           <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Prayag MRP revision used for this comparison">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
             Prayag MRP as of {prayagMrpDate}
+          </div>
+        )}
+
+        {competitorPeriodDate && (
+          <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Latest competitor price date used for this comparison">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            Competitor prices as of {competitorPeriodDate}
           </div>
         )}
 
