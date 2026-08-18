@@ -416,4 +416,20 @@ describe("resolveCompetitorPeriodDate", () => {
     const rows = [{} as { effectiveDate?: string | null }, { effectiveDate: "2024-05-10" }];
     expect(resolveCompetitorPeriodDate(rows)).toBe("2024-05-10");
   });
+
+  it("returns null when selected period predates all competitor imports — triggers the no-data chip", () => {
+    // Scenario: all competitor imports happened in 2024, but the user selects a
+    // period of "2023-12-31".  The SQL WHERE effective_date <= '2023-12-31'
+    // returns zero rows.  resolveCompetitorPeriodDate([]) must return null so
+    // the UI can display "No competitor data for this period" instead of going blank.
+    expect(resolveCompetitorPeriodDate([])).toBeNull();
+
+    // Also cover the edge case where the period filter returns rows but every
+    // row pre-dates any named effective_date (legacy import with no date column).
+    const legacyRows = [
+      { effectiveDate: undefined as string | undefined },
+      { effectiveDate: null },
+    ];
+    expect(resolveCompetitorPeriodDate(legacyRows)).toBeNull();
+  });
 });

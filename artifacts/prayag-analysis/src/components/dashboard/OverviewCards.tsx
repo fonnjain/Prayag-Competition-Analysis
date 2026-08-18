@@ -15,7 +15,8 @@ export function OverviewCards({
 }: {
   filters: DashboardFilters;
   onPrayagMrpDate?: (date: string | null) => void;
-  onCompetitorPeriodDate?: (date: string | null) => void;
+  // undefined = data not yet loaded; null = loaded but no competitor data; string = date
+  onCompetitorPeriodDate?: (date: string | null | undefined) => void;
 }) {
   const { data, isLoading } = useGetAnalysisOverview(filters as any);
 
@@ -24,8 +25,15 @@ export function OverviewCards({
   }, [data?.prayagMrpDate, onPrayagMrpDate]);
 
   useEffect(() => {
-    onCompetitorPeriodDate?.((data as any)?.competitorPeriodDate ?? null);
-  }, [(data as any)?.competitorPeriodDate, onCompetitorPeriodDate]);
+    // Only publish null (triggering the "no data" chip) once we have a confirmed
+    // successful response.  While data is undefined (loading or error), pass
+    // undefined so the chip stays hidden — not "No competitor data".
+    onCompetitorPeriodDate?.(
+      data === undefined
+        ? undefined
+        : ((data as any).competitorPeriodDate ?? null),
+    );
+  }, [data, onCompetitorPeriodDate]);
 
   if (isLoading || !data) {
     return (

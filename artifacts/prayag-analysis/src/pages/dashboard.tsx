@@ -43,7 +43,9 @@ export default function Dashboard() {
   const [mode, setMode] = useState<CompareMode>("mrp");
   const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
   const [prayagMrpDate, setPrayagMrpDate] = useState<string | null>(null);
-  const [competitorPeriodDate, setCompetitorPeriodDate] = useState<string | null>(null);
+  // undefined = overview data not yet received; null = loaded but no competitor
+  // rows exist for this period; string = the resolved period date.
+  const [competitorPeriodDate, setCompetitorPeriodDate] = useState<string | null | undefined>(undefined);
   // Mode rides along inside the filters object so every child hook + the export
   // URL pick it up automatically. "mrp" is the default and is omitted.
   const filters: DashboardFilters =
@@ -58,7 +60,8 @@ export default function Dashboard() {
     setPrayagMrpDate(date);
   }, []);
 
-  const handleCompetitorPeriodDate = useCallback((date: string | null) => {
+  const handleCompetitorPeriodDate = useCallback((date: string | null | undefined) => {
+    // undefined = still loading, null = loaded but no data, string = resolved date
     setCompetitorPeriodDate(date);
   }, []);
 
@@ -193,7 +196,9 @@ function FilterBar({
   filters: DashboardFilters;
   onChange: (f: DashboardFilters) => void;
   prayagMrpDate?: string | null;
-  competitorPeriodDate?: string | null;
+  // undefined = overview not yet loaded; null = loaded but no competitor data;
+  // string = the resolved competitor period date.
+  competitorPeriodDate?: string | null | undefined;
 }) {
   const { data, isLoading } = useGetAnalysisFilters();
   const { data: periodsData } = useGetAnalysisPeriods();
@@ -346,11 +351,28 @@ function FilterBar({
           </div>
         )}
 
-        {competitorPeriodDate && (
-          <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Latest competitor price date used for this comparison">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-            Competitor prices as of {competitorPeriodDate}
-          </div>
+        {/* competitorPeriodDate === undefined means overview data is still loading;
+            null means data loaded but no competitor rows exist for this period. */}
+        {competitorPeriodDate !== undefined && (
+          competitorPeriodDate === null ? (
+            <div
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-amber-200 bg-amber-50 text-xs text-amber-700 font-medium whitespace-nowrap dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
+              title="No competitor prices have been imported for this period"
+              data-testid="competitor-period-no-data"
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+              No competitor data for this period
+            </div>
+          ) : (
+            <div
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap"
+              title="Latest competitor price date used for this comparison"
+              data-testid="competitor-period-date"
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+              Competitor prices as of {competitorPeriodDate}
+            </div>
+          )
         )}
 
         {Object.keys(filters).some(k => (filters as any)[k] !== undefined) && (
