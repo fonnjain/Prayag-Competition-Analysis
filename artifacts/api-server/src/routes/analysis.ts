@@ -243,7 +243,13 @@ function parseMode(query: Record<string, unknown>): CompareMode {
   return strParam(query.mode) === "net" ? "net" : "mrp";
 }
 
-async function getFilteredRows(query: Record<string, unknown>): Promise<AnalysisRow[]> {
+interface FilteredRowsResult {
+  rows: AnalysisRow[];
+  /** The resolved Prayag MRP date (YYYY-MM-DD) used for comparison — always ≤ today. */
+  prayagMrpDate: string;
+}
+
+async function getFilteredRows(query: Record<string, unknown>): Promise<FilteredRowsResult> {
   const mode = parseMode(query);
   const atDate = strParam(query.effectivePeriod);
   // Prayag MRP always resolves to the latest revision that is already in effect
@@ -251,9 +257,9 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Analysis
   // viewing.  A future Prayag MRP (e.g. w.e.f. 01-Sep) surfaces as
   // upcomingPrayagMrp / upcomingPrayagMrpDate on each row instead.
   const today = todayString();
-  const prayagAtDate = atDate && atDate < today ? atDate : today;
+  const prayagMrpDate = atDate && atDate < today ? atDate : today;
   const [maps, all, discounts] = await Promise.all([
-    getPrayagCatalogMapForPeriod(prayagAtDate),
+    getPrayagCatalogMapForPeriod(prayagMrpDate),
     getCompetitorRowsForPeriod(atDate),
     mode === "net"
       ? getDiscounts()
@@ -269,7 +275,7 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Analysis
     discountFor: (c) => discounts.byCompetitor.get(c) ?? DEFAULT_COMPETITOR_DISCOUNT,
   };
   const rows = all.map((c) => buildRow(c, maps, opts));
-  return applyFilters(rows, parseFilters(query));
+  return { rows: applyFilters(rows, parseFilters(query)), prayagMrpDate };
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +329,7 @@ router.get("/analysis/filters", async (_req, res) => {
 
 // GET /analysis/overview — headline KPIs.
 router.get("/analysis/overview", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows } = await getFilteredRows(req.query);
   const matched = rows.filter((r) => r.matched).length;
   const gap = gapStats(rows);
   res.json({
@@ -344,7 +350,7 @@ router.get("/analysis/overview", async (req, res) => {
 
 // GET /analysis/by-brand — per-competitor breakdown.
 router.get("/analysis/by-brand", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows } = await getFilteredRows(req.query);
   const byComp = new Map<string, AnalysisRow[]>();
   for (const r of rows) {
     const list = byComp.get(r.competitor);
@@ -374,7 +380,7 @@ router.get("/analysis/by-brand", async (req, res) => {
 
 // GET /analysis/by-category — per Prayag category breakdown (matched rows).
 router.get("/analysis/by-category", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows } = await getFilteredRows(req.query);
   const byCat = new Map<string, AnalysisRow[]>();
   for (const r of rows) {
     if (!r.category) continue;
@@ -402,7 +408,7 @@ router.get("/analysis/by-category", async (req, res) => {
 
 // GET /analysis/positioning — histogram of price_diff_pct across comparable SKUs.
 router.get("/analysis/positioning", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows } = await getFilteredRows(req.query);
   const diffs = rows
     .filter((r) => r.comparable && r.priceDiffPct != null)
     .map((r) => r.priceDiffPct!);
@@ -411,7 +417,7 @@ router.get("/analysis/positioning", async (req, res) => {
 
 // GET /analysis/coverage-matrix — per-competitor coverage and match quality.
 router.get("/analysis/coverage-matrix", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows } = await getFilteredRows(req.query);
   const byComp = new Map<string, AnalysisRow[]>();
   for (const r of rows) {
     const list = byComp.get(r.competitor);
@@ -445,7 +451,7 @@ router.get("/analysis/coverage-matrix", async (req, res) => {
 
 // GET /analysis/opportunities — biggest margin headroom and pricing threats.
 router.get("/analysis/opportunities", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows, prayagMrpDate } = await getFilteredRows(req.query);
   const rawThreshold = Number(req.query.thresholdPct);
   const thresholdPct =
     Number.isFinite(rawThreshold) && rawThreshold >= 0 ? rawThreshold : 10;
@@ -465,7 +471,7 @@ router.get("/analysis/opportunities", async (req, res) => {
     .slice(0, LIMIT)
     .map(toOpportunityItem);
 
-  res.json({ thresholdPct, marginHeadroom, priceThreats });
+  res.json({ thresholdPct, marginHeadroom, priceThreats, prayagMrpDate });
 });
 
 // GET /analysis/export — filtered comparison rows as CSV/XLSX.
@@ -496,7 +502,7 @@ function sendSheet(
 }
 
 router.get("/analysis/export", async (req, res) => {
-  const rows = await getFilteredRows(req.query);
+  const { rows, prayagMrpDate } = await getFilteredRows(req.query);
   const format = String(req.query.format ?? "xlsx") === "csv" ? "csv" : "xlsx";
 
   const header = [
@@ -507,7 +513,7 @@ router.get("/analysis/export", async (req, res) => {
     "Category",
     "Match Status",
     "Match Confidence",
-    "Prayag MRP",
+    `Prayag MRP (as of ${prayagMrpDate})`,
     "Competitor Price",
     "Unit / Basis",
     "Competitor Effective Price",

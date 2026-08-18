@@ -647,6 +647,8 @@ export interface AnalysisOpportunities {
   thresholdPct: number;
   marginHeadroom: AnalysisOpportunityItem[];
   priceThreats: AnalysisOpportunityItem[];
+  /** Resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison — always ≤ today. */
+  prayagMrpDate: string;
 }
 
 export interface AcceptBatch {

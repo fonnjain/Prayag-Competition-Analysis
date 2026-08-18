@@ -60,11 +60,11 @@ export function OpportunitiesThreats({ filters }: { filters: DashboardFilters })
             </TabsList>
 
             <TabsContent value="opportunities" className="border rounded-md">
-              <OpportunityTable items={data.marginHeadroom} isThreat={false} />
+              <OpportunityTable items={data.marginHeadroom} isThreat={false} prayagMrpDate={data.prayagMrpDate} />
             </TabsContent>
 
             <TabsContent value="threats" className="border rounded-md">
-              <OpportunityTable items={data.priceThreats} isThreat={true} />
+              <OpportunityTable items={data.priceThreats} isThreat={true} prayagMrpDate={data.prayagMrpDate} />
             </TabsContent>
 
             <TabsContent value="mrp-increases" className="border rounded-md">
@@ -79,7 +79,7 @@ export function OpportunitiesThreats({ filters }: { filters: DashboardFilters })
 
 // ─── Expandable opportunity/threat table ────────────────────────────────────
 
-function OpportunityTable({ items, isThreat }: { items: AnalysisOpportunityItem[]; isThreat: boolean }) {
+function OpportunityTable({ items, isThreat, prayagMrpDate }: { items: AnalysisOpportunityItem[]; isThreat: boolean; prayagMrpDate?: string }) {
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
 
   if (items.length === 0) {
@@ -95,7 +95,9 @@ function OpportunityTable({ items, isThreat }: { items: AnalysisOpportunityItem[
             <TableHead>SKU Code</TableHead>
             <TableHead>Product Name</TableHead>
             <TableHead>Competitor</TableHead>
-            <TableHead className="text-right">Prayag MRP</TableHead>
+            <TableHead className="text-right">
+              Prayag MRP{prayagMrpDate ? <span className="font-normal text-muted-foreground ml-1">(as of {prayagMrpDate})</span> : null}
+            </TableHead>
             <TableHead className="text-right">Comp. Price</TableHead>
             <TableHead className="text-right">Gap %</TableHead>
           </TableRow>

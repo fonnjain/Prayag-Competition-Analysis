@@ -998,7 +998,8 @@ export const GetAnalysisOpportunitiesResponse = zod.object({
   "priceDiffPct": zod.number(),
   "upcomingPrayagMrp": zod.number().nullable().optional(),
   "upcomingPrayagMrpDate": zod.string().nullable().optional()
-}))
+})),
+  "prayagMrpDate": zod.string()
 })
 
 

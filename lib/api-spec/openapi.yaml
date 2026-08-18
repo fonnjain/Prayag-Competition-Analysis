@@ -2305,7 +2305,7 @@ components:
           description: Effective date (YYYY-MM-DD) of the upcoming revision, or null.
     AnalysisOpportunities:
       type: object
-      required: [thresholdPct, marginHeadroom, priceThreats]
+      required: [thresholdPct, marginHeadroom, priceThreats, prayagMrpDate]
       properties:
         thresholdPct:
           type: number
@@ -2317,6 +2317,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AnalysisOpportunityItem"
+        prayagMrpDate:
+          type: string
+          description: >
+            The resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison.
+            Always ≤ today — future-dated competitor periods still use the most
+            recent in-effect Prayag MRP.
     AcceptBatch:
       type: object
       required: [id, kind, competitorPriceIds, count, createdAt]
