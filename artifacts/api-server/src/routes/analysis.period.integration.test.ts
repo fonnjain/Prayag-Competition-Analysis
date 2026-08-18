@@ -28,6 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import { eq } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import {
   db,
   catalogProductsTable,
@@ -513,6 +514,259 @@ describe("prayagMrpDate resolution — future vs past effectivePeriod", () => {
 
       const firstLine = (res.text as string).split("\n")[0];
       expect(firstLine).toContain(`Prayag MRP (as of ${past})`);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Level 5: GET /analysis/export — period-filtered row data (CSV + XLSX)
+// ---------------------------------------------------------------------------
+//
+// Scenario: two competitor_prices rows for the same (competitor,
+// matched_prayag_code) pair at two different effective dates:
+//   2026-01-15 → price 450   (earlier batch)
+//   2026-06-15 → price 510   (later batch)
+//
+// When effectivePeriod targets a date between the two batches the export must
+// include the Jan price (450); when it targets a date after both batches it
+// must include the Jun price (510). Both CSV and XLSX formats are verified.
+//
+// The export header row layout (0-indexed):
+//   0  Competitor
+//   1  Prayag Code
+//   2  Prayag Product
+//   3  Division
+//   4  Category
+//   5  Match Status
+//   6  Match Confidence
+//   7  Prayag MRP (as of <date>)
+//   8  Competitor Price         ← asserted below
+//   9  Unit / Basis
+//  10  Competitor Effective Price
+//  11  Price Diff
+//  12  Price Diff %
+//  13  Prayag Cheaper
+
+describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () => {
+  const EX_ITEM = `__TEST_EXP_PERIOD_${Date.now()}__`;
+  const EX_COMP = `__test_exp_period_${Date.now()}__`;
+
+  const EX_MRP = 400;
+  const EX_MRP_DATE = "2026-01-01";
+
+  const EX_JAN_DATE = "2026-01-15";
+  const EX_JAN_PRICE = 450;
+
+  const EX_JUN_DATE = "2026-06-15";
+  const EX_JUN_PRICE = 510;
+
+  // Date between the two batches — resolves to Jan
+  const AS_OF_BETWEEN = "2026-03-01";
+  // Date after both batches — resolves to Jun
+  const AS_OF_AFTER = "2026-08-01";
+
+  const exportApp = express();
+  exportApp.use(express.json());
+  exportApp.use(analysisRouter);
+  const exportRequest = supertest(exportApp);
+
+  beforeAll(async () => {
+    // Catalog product so buildRow can populate prayagCode / prayagProductName
+    await db.insert(catalogProductsTable).values({
+      itemCode: EX_ITEM,
+      productName: "Test Export Period Product",
+      division: "Test Division",
+      category: "Test Category",
+    });
+
+    // One MRP revision so the row is comparable in the export
+    await db.insert(mrpPriceHistoryTable).values({
+      itemCode: EX_ITEM,
+      mrp: EX_MRP,
+      priceBasis: "MRP",
+      effectiveDate: EX_MRP_DATE,
+      loadDate: EX_MRP_DATE,
+      isCurrent: false,
+    });
+
+    // Two competitor rows — same competitor + matched code, different dates
+    await db.insert(competitorPricesTable).values([
+      {
+        competitor: EX_COMP,
+        description: "Test Export Period SKU — Jan batch",
+        price: EX_JAN_PRICE,
+        unit: null,
+        matchedPrayagCode: EX_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: EX_MRP,
+        effectiveDate: EX_JAN_DATE,
+        isCurrent: false,
+      },
+      {
+        competitor: EX_COMP,
+        description: "Test Export Period SKU — Jun batch",
+        price: EX_JUN_PRICE,
+        unit: null,
+        matchedPrayagCode: EX_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: EX_MRP,
+        effectiveDate: EX_JUN_DATE,
+        isCurrent: true,
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, EX_COMP));
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, EX_ITEM));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, EX_ITEM));
+  });
+
+  // ── CSV helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Parse a CSV string into a 2-D array of cells.
+   * Handles double-quoted fields (strips surrounding quotes; does not unescape
+   * embedded quotes — sufficient for our test data which has no commas or
+   * quotes inside values).
+   */
+  function parseCSV(text: string): string[][] {
+    return text
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) =>
+        line.split(",").map((cell) => cell.replace(/^"|"$/g, "").trim()),
+      );
+  }
+
+  /** Return the first data row whose Competitor column (index 0) matches. */
+  function findCSVRow(rows: string[][], competitor: string): string[] | undefined {
+    return rows.slice(1).find((r) => r[0] === competitor);
+  }
+
+  // ── XLSX helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Fetch the export as an XLSX buffer via supertest's binary parse hook and
+   * return the first worksheet as a 2-D array of cells.
+   */
+  async function fetchXLSX(qs: URLSearchParams): Promise<(string | number | null)[][]> {
+    const res = await exportRequest
+      .get(`/analysis/export?${qs}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(res.status, `XLSX export returned ${res.status}`).toBe(200);
+    expect(res.headers["content-type"]).toContain("spreadsheetml");
+
+    const wb = XLSX.read(res.body as Buffer, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, {
+      header: 1,
+    });
+  }
+
+  /** Return the first data row whose Competitor column (index 0) matches. */
+  function findXLSXRow(
+    aoa: (string | number | null)[][],
+    competitor: string,
+  ): (string | number | null)[] | undefined {
+    return aoa.slice(1).find((r) => r[0] === competitor);
+  }
+
+  // ── CSV tests ────────────────────────────────────────────────────────────
+
+  it(
+    "CSV — effectivePeriod before Jun batch → Competitor Price column shows Jan price (450)",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: AS_OF_BETWEEN,
+        format: "csv",
+        competitor: EX_COMP,
+      });
+      const res = await exportRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/csv");
+
+      const rows = parseCSV(res.text as string);
+      const dataRow = findCSVRow(rows, EX_COMP);
+      expect(
+        dataRow,
+        `Row for ${EX_COMP} not found in CSV (effectivePeriod=${AS_OF_BETWEEN})`,
+      ).toBeDefined();
+      // Column 8 = "Competitor Price"
+      expect(Number(dataRow![8])).toBe(EX_JAN_PRICE);
+    },
+  );
+
+  it(
+    "CSV — effectivePeriod after both batches → Competitor Price column shows Jun price (510)",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: AS_OF_AFTER,
+        format: "csv",
+        competitor: EX_COMP,
+      });
+      const res = await exportRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/csv");
+
+      const rows = parseCSV(res.text as string);
+      const dataRow = findCSVRow(rows, EX_COMP);
+      expect(
+        dataRow,
+        `Row for ${EX_COMP} not found in CSV (effectivePeriod=${AS_OF_AFTER})`,
+      ).toBeDefined();
+      expect(Number(dataRow![8])).toBe(EX_JUN_PRICE);
+    },
+  );
+
+  // ── XLSX tests ───────────────────────────────────────────────────────────
+
+  it(
+    "XLSX — effectivePeriod before Jun batch → Competitor Price column shows Jan price (450)",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: AS_OF_BETWEEN,
+        format: "xlsx",
+        competitor: EX_COMP,
+      });
+      const aoa = await fetchXLSX(qs);
+      const dataRow = findXLSXRow(aoa, EX_COMP);
+      expect(
+        dataRow,
+        `Row for ${EX_COMP} not found in XLSX (effectivePeriod=${AS_OF_BETWEEN})`,
+      ).toBeDefined();
+      expect(Number(dataRow![8])).toBe(EX_JAN_PRICE);
+    },
+  );
+
+  it(
+    "XLSX — effectivePeriod after both batches → Competitor Price column shows Jun price (510)",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: AS_OF_AFTER,
+        format: "xlsx",
+        competitor: EX_COMP,
+      });
+      const aoa = await fetchXLSX(qs);
+      const dataRow = findXLSXRow(aoa, EX_COMP);
+      expect(
+        dataRow,
+        `Row for ${EX_COMP} not found in XLSX (effectivePeriod=${AS_OF_AFTER})`,
+      ).toBeDefined();
+      expect(Number(dataRow![8])).toBe(EX_JUN_PRICE);
     },
   );
 });
