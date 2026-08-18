@@ -77,6 +77,8 @@ export interface AnalysisRow {
   priceDiff: number | null;
   priceDiffPct: number | null;
   prayagCheaper: boolean | null;
+  /** Effective date of the Prayag MRP used for this row's comparison (YYYY-MM-DD), or null. */
+  prayagEffectiveDate: string | null;
   /** First Prayag MRP revision dated after the resolved asOf date, or null if none. */
   upcomingPrayagMrp: number | null;
   upcomingPrayagMrpDate: string | null;
@@ -178,6 +180,7 @@ export function buildRow(
     prayagCheaper,
     // Pass through upcoming revision from the catalog map (informational only —
     // never affects comparison math which uses prayagMrpAtCompare).
+    prayagEffectiveDate: matched ? (prayag?.effectiveDate ?? null) : null,
     upcomingPrayagMrp: matched ? (prayag?.upcomingMrp ?? null) : null,
     upcomingPrayagMrpDate: matched ? (prayag?.upcomingMrpDate ?? null) : null,
   };

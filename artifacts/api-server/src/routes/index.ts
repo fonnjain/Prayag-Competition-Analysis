@@ -8,8 +8,12 @@ import analysisRouter from "./analysis";
 import apiKeysRouter from "./apiKeys";
 import externalV1Router from "./externalV1";
 import importBatchesRouter from "./importBatches";
+import adminSeedAliasesRouter from "./adminSeedAliases";
 
 const router: IRouter = Router();
+
+// TEMPORARY: one-time production alias seed — remove after use
+router.use(adminSeedAliasesRouter);
 
 // Unauthenticated routes
 router.use(healthRouter);

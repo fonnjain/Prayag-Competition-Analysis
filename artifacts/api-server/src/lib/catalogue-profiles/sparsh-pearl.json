@@ -13,9 +13,10 @@
     { "prayagSeries": "STANDARD", "sparshSeries": "Standard (Quarter Turn)",  "codePrefix": "TS-",  "pages": [18, 19] },
     { "prayagSeries": "Roman/allied", "sparshSeries": "Waste & accessories",  "codePrefix": "WC-",  "pages": [83] },
     { "prayagSeries": "Roman/allied", "sparshSeries": "Connection pipes",     "codePrefix": "CPS-", "pages": [84] },
-    { "prayagSeries": "Roman/allied", "sparshSeries": "Cistern accessories",  "codePrefix": "AP-",  "pages": [96] },
-    { "prayagSeries": "Roman/allied", "sparshSeries": "Hoses & bottle traps", "codePrefix": "WIH-", "pages": [97] }
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Cistern accessories",     "codePrefix": "AP-",  "pages": [96] },
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Hoses & bottle traps",    "codePrefix": "WIH-", "pages": [97] },
+    { "prayagSeries": "Roman/allied", "sparshSeries": "Tank rod & accessories",  "codePrefix": "TR-",  "pages": [98] }
   ],
-  "tablePages": [83, 84, 96, 97],
+  "tablePages": [83, 84, 96, 97, 98],
   "notes": "Image-only PDF; no text layer. Use Claude vision only. Table pages use column format Cat No. | Sizes | MRP in ₹ | S.Box | M.Box."
 }

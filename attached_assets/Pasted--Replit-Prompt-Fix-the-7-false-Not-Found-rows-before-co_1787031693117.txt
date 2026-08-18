@@ -1,0 +1,78 @@
+# Replit Prompt — Fix the 7 false "Not Found" rows before committing batch 8
+
+The Sparsh Pearl import (batch 8) is otherwise verified correct: all 150 rows match the hand-verified Vol 6.2 baseline, both on Sparsh prices and on Prayag MRP. Two issues remain. **Do not commit the batch until both are fixed and the batch is re-run.**
+
+> Paste everything below (from **GOAL**) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+Seven rows are marked `not_found` even though all seven products exist in the catalogue. Fix the two root causes, re-run the match for batch 8, and confirm all 150 rows resolve. Also correct a misleading date label in the review export.
+
+---
+
+## Issue 1 — `competitor_code_aliases` is empty, so aliases never applied
+
+The alias table has **0 rows**. The eight seeded aliases exist in code but were never inserted, so renumbered codes fall through to `not_found`.
+
+Seed the table now (competitor = `Sparsh Pearl`):
+
+| oldCode | newCode | note |
+|---|---|---|
+| `WC-100` | `WC-180` | Waste Coupling Half Thread 31/32mm (H/T) |
+| `PJS-255` | `PSJ-255` | Jet Spray 1 Mtr — letters transposed |
+| `PJS-256` | `PSJ-256` | Jet Spray 1.5 Mtr — letters transposed |
+| `WMH-2331` | `WIH-2331` | Washing Machine Inlet Hose 1.5 Mtr |
+| `WMH-2332` | `WIH-2332` | Washing Machine Inlet Hose 3 Mtr |
+| `RPS-2285` | `RPS-2265` | Sink Mixer |
+| `WMP-186` | `WMP-188` | Washing Machine Pipe **2 Mtr** |
+| `WMP-188` | `WMP-189` | Washing Machine Pipe **3 Mtr** |
+
+Use `onConflictDoNothing` so re-seeding is safe. Then verify the table holds 8 rows.
+
+After seeding, these three must resolve:
+
+| Master code | Catalogue code | Correct MRP |
+|---|---|---|
+| `WC-100` | `WC-180` | **127** |
+| `RPS-2285` | `RPS-2265` | **1388** |
+| `WMP-188` | `WMP-189` | **592** |
+
+**Note on `WMP-188`:** the catalogue also contains a code literally called `WMP-188`, but that is the **2 Mtr** pipe, while the master's `WMP-188` is the **3 Mtr** pipe. The alias must win over the identical-looking code match — otherwise the size gate correctly rejects it and the row stays `not_found`. Apply aliases **before** direct code matching.
+
+## Issue 2 — page 98 was not extracted
+
+Four bathroom-accessory items are marked `not_found` but are all present on **page 98** of the catalogue:
+
+| Code | Product | Correct MRP |
+|---|---|---|
+| `TR-532` | Towel Rail 18" | **538** |
+| `TR-533` | Towel Rail 24" | **620** |
+| `TR-534` | Shelf 18" | **799** |
+| `TR-535` | Tooth Brush Holder | **336** |
+
+The catalogue profile maps the `TR-` / `BA-` family to page 98, so the page list should already include it. Check:
+
+1. Does `profilePages()` actually return **98** for this profile? Print the resolved page list.
+2. Was page 98 included in the sub-PDF sent to the extractor? Log `pageMap` for the batch.
+3. If page 98 was sent but produced nothing, the page is a **bathroom-accessories grid** with two sections (`TRANSPARENT` with `TR-` codes, `P.T.M.T` with `BA-` codes) — verify the extractor isn't stopping at the first section.
+
+## Issue 3 — misleading date label in the export
+
+The export header reads a single `Prayag MRP (2026-08-01)` for every row, but each item resolves to its **own** effective date — these PTMT items are on the **2026-04-20** period (e.g. `ED-950` = 405.57 w.e.f. 2026-04-20). The values are correct; only the label is wrong.
+
+Fix by adding a per-row **`Prayag Effective Date`** column and removing the date from the header. A single date in the header will always be wrong for a multi-division batch.
+
+---
+
+## Validation — all must pass before committing
+
+- `competitor_code_aliases` holds **8** rows for Sparsh Pearl.
+- Batch 8 re-run gives: **Not Found = 0**, and 150 rows total.
+- The seven previously-missing rows resolve to: `WC-100`→127, `RPS-2285`→1388, `WMP-188`→**592** (not 462), `TR-532`→538, `TR-533`→620, `TR-534`→799, `TR-535`→336.
+- Existing correct rows are unchanged — spot check `WC-182` (Prayag 144, Sparsh 151, gap +4.9%), `ED-950` (405.57 / 467), `ED-951` (508 / 555), `REG-771` (244.08 / 273), `RS-104` (342 / 359).
+- Every row carries its own `Prayag Effective Date`; PTMT rows show **2026-04-20**.
+- Median gap stays near **+2.7%**.
+
+Only once all of the above pass, the batch is ready for **Approve & Commit** — a single clean commit of all 150 rows.
