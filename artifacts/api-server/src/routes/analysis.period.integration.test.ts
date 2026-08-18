@@ -971,3 +971,419 @@ describe("GET /analysis/export — zero-row guard for pre-data effectivePeriod",
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// Level 7: GET /analysis/export — filter combinations scope rows correctly
+// ---------------------------------------------------------------------------
+//
+// Confirms that the export file only contains rows matching the active filter.
+// Fixture:
+//   FILT_ITEM_A: division "Filter Div A", category "Filter Cat A"
+//   FILT_ITEM_B: division "Filter Div B", category "Filter Cat B"
+//   FILT_COMP_A: matched row for ITEM_A, matched row for ITEM_B  (2 rows total)
+//   FILT_COMP_B: matched row for ITEM_A, unmatched row           (2 rows total)
+//
+// All competitor rows carry effectiveDate "2026-01-01", which is before today,
+// so they always appear regardless of which effectivePeriod is in use.
+//
+// Filter combinations tested (CSV and XLSX):
+//   competitor=A            → only A rows; no B rows
+//   competitor=B            → only B rows; no A rows
+//   competitor=A + division → intersection: 1 row
+//   competitor=A + category → intersection: 1 row
+//   competitor=B + matchStatus=matched          → 1 matched row
+//   competitor=B + matchStatus=no match (review)→ 1 unmatched row
+//
+// Export column layout (0-indexed):
+//   0 Competitor  1 Prayag Code  2 Prayag Product  3 Division  4 Category
+//   5 Match Status  6 Match Confidence  7 Prayag MRP (as of …)
+//   8 Competitor Price  …  13 Prayag Cheaper
+
+describe("GET /analysis/export — filter combinations scope rows correctly", () => {
+  const ts = Date.now();
+  const FILT_ITEM_A = `__TEST_FILT_ITEM_A_${ts}__`;
+  const FILT_ITEM_B = `__TEST_FILT_ITEM_B_${ts}__`;
+  const FILT_COMP_A = `__test_filt_comp_a_${ts}__`;
+  const FILT_COMP_B = `__test_filt_comp_b_${ts}__`;
+
+  const FILT_DIV_A = `Filter Div A ${ts}`;
+  const FILT_DIV_B = `Filter Div B ${ts}`;
+  const FILT_CAT_A = `Filter Cat A ${ts}`;
+  const FILT_CAT_B = `Filter Cat B ${ts}`;
+  const FILT_MRP = 400;
+  const FILT_DATE = "2026-01-01";
+
+  const filtApp = express();
+  filtApp.use(express.json());
+  filtApp.use(analysisRouter);
+  const filtRequest = supertest(filtApp);
+
+  beforeAll(async () => {
+    // Catalog products
+    await db.insert(catalogProductsTable).values([
+      {
+        itemCode: FILT_ITEM_A,
+        productName: "Filter Test Product A",
+        division: FILT_DIV_A,
+        category: FILT_CAT_A,
+      },
+      {
+        itemCode: FILT_ITEM_B,
+        productName: "Filter Test Product B",
+        division: FILT_DIV_B,
+        category: FILT_CAT_B,
+      },
+    ]);
+
+    // MRP revisions for comparability
+    await db.insert(mrpPriceHistoryTable).values([
+      {
+        itemCode: FILT_ITEM_A,
+        mrp: FILT_MRP,
+        priceBasis: "MRP",
+        effectiveDate: FILT_DATE,
+        loadDate: FILT_DATE,
+        isCurrent: false,
+      },
+      {
+        itemCode: FILT_ITEM_B,
+        mrp: FILT_MRP,
+        priceBasis: "MRP",
+        effectiveDate: FILT_DATE,
+        loadDate: FILT_DATE,
+        isCurrent: false,
+      },
+    ]);
+
+    // FILT_COMP_A: two matched rows (one per catalog item)
+    // FILT_COMP_B: one matched row (ITEM_A) + one unmatched row (no prayag code)
+    await db.insert(competitorPricesTable).values([
+      {
+        competitor: FILT_COMP_A,
+        description: "Filter Comp A — SKU A",
+        price: 450,
+        unit: null,
+        matchedPrayagCode: FILT_ITEM_A,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: FILT_MRP,
+        effectiveDate: FILT_DATE,
+        isCurrent: false,
+      },
+      {
+        competitor: FILT_COMP_A,
+        description: "Filter Comp A — SKU B",
+        price: 480,
+        unit: null,
+        matchedPrayagCode: FILT_ITEM_B,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: FILT_MRP,
+        effectiveDate: FILT_DATE,
+        isCurrent: true,
+      },
+      {
+        competitor: FILT_COMP_B,
+        description: "Filter Comp B — SKU A (matched)",
+        price: 420,
+        unit: null,
+        matchedPrayagCode: FILT_ITEM_A,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        prayagMrpAtCompare: FILT_MRP,
+        effectiveDate: FILT_DATE,
+        isCurrent: false,
+      },
+      {
+        competitor: FILT_COMP_B,
+        description: "Filter Comp B — SKU unmatched",
+        price: 300,
+        unit: null,
+        matchedPrayagCode: null,
+        matchStatus: "no match (review)",
+        matchConfidence: null,
+        prayagMrpAtCompare: null,
+        effectiveDate: FILT_DATE,
+        isCurrent: true,
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, FILT_COMP_A));
+    await db
+      .delete(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, FILT_COMP_B));
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, FILT_ITEM_A));
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, FILT_ITEM_B));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, FILT_ITEM_A));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, FILT_ITEM_B));
+  });
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+
+  /** Parse CSV text into a 2-D array (strips surrounding double-quotes). */
+  function parseCSVRows(text: string): string[][] {
+    return text
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) =>
+        line.split(",").map((cell) => cell.replace(/^"|"$/g, "").trim()),
+      );
+  }
+
+  /** Return data rows (skip header) from a CSV 2-D array. */
+  function csvDataRows(rows: string[][]): string[][] {
+    return rows.slice(1);
+  }
+
+  /** Fetch the export as a 2-D array of cells from the first XLSX worksheet. */
+  async function fetchXLSXRows(
+    qs: URLSearchParams,
+  ): Promise<(string | number | null)[][]> {
+    const res = await filtRequest
+      .get(`/analysis/export?${qs}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(res.status, `XLSX export returned ${res.status}`).toBe(200);
+    const wb = XLSX.read(res.body as Buffer, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, {
+      header: 1,
+    });
+  }
+
+  /** Return data rows (skip header) from an XLSX 2-D array. */
+  function xlsxDataRows(
+    aoa: (string | number | null)[][],
+  ): (string | number | null)[][] {
+    return aoa.slice(1);
+  }
+
+  // ── competitor filter — CSV ───────────────────────────────────────────────
+
+  it("CSV — competitor=FILT_COMP_A → only FILT_COMP_A rows, no FILT_COMP_B rows", async () => {
+    const qs = new URLSearchParams({ format: "csv", competitor: FILT_COMP_A });
+    const res = await filtRequest.get(`/analysis/export?${qs}`);
+    expect(res.status).toBe(200);
+
+    const data = csvDataRows(parseCSVRows(res.text as string));
+    const compARows = data.filter((r) => r[0] === FILT_COMP_A);
+    const compBRows = data.filter((r) => r[0] === FILT_COMP_B);
+
+    expect(compARows.length, "Expected 2 rows for FILT_COMP_A").toBe(2);
+    expect(compBRows.length, "Expected 0 rows for FILT_COMP_B").toBe(0);
+    // Every returned row belongs to the filtered competitor
+    expect(data.every((r) => r[0] === FILT_COMP_A)).toBe(true);
+  });
+
+  it("CSV — competitor=FILT_COMP_B → only FILT_COMP_B rows, no FILT_COMP_A rows", async () => {
+    const qs = new URLSearchParams({ format: "csv", competitor: FILT_COMP_B });
+    const res = await filtRequest.get(`/analysis/export?${qs}`);
+    expect(res.status).toBe(200);
+
+    const data = csvDataRows(parseCSVRows(res.text as string));
+    const compARows = data.filter((r) => r[0] === FILT_COMP_A);
+    const compBRows = data.filter((r) => r[0] === FILT_COMP_B);
+
+    expect(compBRows.length, "Expected 2 rows for FILT_COMP_B").toBe(2);
+    expect(compARows.length, "Expected 0 rows for FILT_COMP_A").toBe(0);
+    expect(data.every((r) => r[0] === FILT_COMP_B)).toBe(true);
+  });
+
+  // ── competitor filter — XLSX ──────────────────────────────────────────────
+
+  it("XLSX — competitor=FILT_COMP_A → only FILT_COMP_A rows, no FILT_COMP_B rows", async () => {
+    const qs = new URLSearchParams({ format: "xlsx", competitor: FILT_COMP_A });
+    const aoa = await fetchXLSXRows(qs);
+    const data = xlsxDataRows(aoa);
+
+    const compARows = data.filter((r) => r[0] === FILT_COMP_A);
+    const compBRows = data.filter((r) => r[0] === FILT_COMP_B);
+
+    expect(compARows.length, "Expected 2 rows for FILT_COMP_A").toBe(2);
+    expect(compBRows.length, "Expected 0 rows for FILT_COMP_B").toBe(0);
+    expect(data.every((r) => r[0] === FILT_COMP_A)).toBe(true);
+  });
+
+  it("XLSX — competitor=FILT_COMP_B → only FILT_COMP_B rows, no FILT_COMP_A rows", async () => {
+    const qs = new URLSearchParams({ format: "xlsx", competitor: FILT_COMP_B });
+    const aoa = await fetchXLSXRows(qs);
+    const data = xlsxDataRows(aoa);
+
+    const compARows = data.filter((r) => r[0] === FILT_COMP_A);
+    const compBRows = data.filter((r) => r[0] === FILT_COMP_B);
+
+    expect(compBRows.length, "Expected 2 rows for FILT_COMP_B").toBe(2);
+    expect(compARows.length, "Expected 0 rows for FILT_COMP_A").toBe(0);
+    expect(data.every((r) => r[0] === FILT_COMP_B)).toBe(true);
+  });
+
+  // ── division filter — CSV ─────────────────────────────────────────────────
+
+  it(
+    "CSV — competitor=A + division=FILT_DIV_A → only the ITEM_A row (1 row, correct division)",
+    async () => {
+      const qs = new URLSearchParams({
+        format: "csv",
+        competitor: FILT_COMP_A,
+        division: FILT_DIV_A,
+      });
+      const res = await filtRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const data = csvDataRows(parseCSVRows(res.text as string));
+      expect(data.length, "Expected exactly 1 row for FILT_COMP_A + FILT_DIV_A").toBe(1);
+      // Column 3 = Division
+      expect(data[0]![3]).toBe(FILT_DIV_A);
+      // Column 4 = Category — should be FILT_CAT_A (ITEM_A)
+      expect(data[0]![4]).toBe(FILT_CAT_A);
+    },
+  );
+
+  // ── division filter — XLSX ────────────────────────────────────────────────
+
+  it(
+    "XLSX — competitor=A + division=FILT_DIV_A → only the ITEM_A row (1 row, correct division)",
+    async () => {
+      const qs = new URLSearchParams({
+        format: "xlsx",
+        competitor: FILT_COMP_A,
+        division: FILT_DIV_A,
+      });
+      const aoa = await fetchXLSXRows(qs);
+      const data = xlsxDataRows(aoa);
+
+      expect(data.length, "Expected exactly 1 row for FILT_COMP_A + FILT_DIV_A").toBe(1);
+      expect(data[0]![3]).toBe(FILT_DIV_A);
+      expect(data[0]![4]).toBe(FILT_CAT_A);
+    },
+  );
+
+  // ── category filter — CSV ─────────────────────────────────────────────────
+
+  it(
+    "CSV — competitor=A + category=FILT_CAT_B → only the ITEM_B row (1 row, correct category)",
+    async () => {
+      const qs = new URLSearchParams({
+        format: "csv",
+        competitor: FILT_COMP_A,
+        category: FILT_CAT_B,
+      });
+      const res = await filtRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const data = csvDataRows(parseCSVRows(res.text as string));
+      expect(data.length, "Expected exactly 1 row for FILT_COMP_A + FILT_CAT_B").toBe(1);
+      // Column 4 = Category
+      expect(data[0]![4]).toBe(FILT_CAT_B);
+      // Column 3 = Division — should be FILT_DIV_B (ITEM_B)
+      expect(data[0]![3]).toBe(FILT_DIV_B);
+    },
+  );
+
+  // ── category filter — XLSX ────────────────────────────────────────────────
+
+  it(
+    "XLSX — competitor=A + category=FILT_CAT_B → only the ITEM_B row (1 row, correct category)",
+    async () => {
+      const qs = new URLSearchParams({
+        format: "xlsx",
+        competitor: FILT_COMP_A,
+        category: FILT_CAT_B,
+      });
+      const aoa = await fetchXLSXRows(qs);
+      const data = xlsxDataRows(aoa);
+
+      expect(data.length, "Expected exactly 1 row for FILT_COMP_A + FILT_CAT_B").toBe(1);
+      expect(data[0]![4]).toBe(FILT_CAT_B);
+      expect(data[0]![3]).toBe(FILT_DIV_B);
+    },
+  );
+
+  // ── matchStatus filter — CSV ──────────────────────────────────────────────
+
+  it(
+    "CSV — competitor=B + matchStatus=matched → only the matched row (1 row)",
+    async () => {
+      const qs = new URLSearchParams({
+        format: "csv",
+        competitor: FILT_COMP_B,
+        matchStatus: "matched",
+      });
+      const res = await filtRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const data = csvDataRows(parseCSVRows(res.text as string));
+      expect(data.length, "Expected exactly 1 matched row for FILT_COMP_B").toBe(1);
+      // Column 5 = Match Status
+      expect(data[0]![5]).toBe("matched");
+    },
+  );
+
+  it(
+    'CSV — competitor=B + matchStatus="no match (review)" → only the unmatched row (1 row)',
+    async () => {
+      const qs = new URLSearchParams({
+        format: "csv",
+        competitor: FILT_COMP_B,
+        matchStatus: "no match (review)",
+      });
+      const res = await filtRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const data = csvDataRows(parseCSVRows(res.text as string));
+      expect(data.length, "Expected exactly 1 unmatched row for FILT_COMP_B").toBe(1);
+      // Column 5 = Match Status
+      expect(data[0]![5]).toBe("no match (review)");
+    },
+  );
+
+  // ── matchStatus filter — XLSX ─────────────────────────────────────────────
+
+  it(
+    "XLSX — competitor=B + matchStatus=matched → only the matched row (1 row)",
+    async () => {
+      const qs = new URLSearchParams({
+        format: "xlsx",
+        competitor: FILT_COMP_B,
+        matchStatus: "matched",
+      });
+      const aoa = await fetchXLSXRows(qs);
+      const data = xlsxDataRows(aoa);
+
+      expect(data.length, "Expected exactly 1 matched row for FILT_COMP_B").toBe(1);
+      expect(data[0]![5]).toBe("matched");
+    },
+  );
+
+  it(
+    'XLSX — competitor=B + matchStatus="no match (review)" → only the unmatched row (1 row)',
+    async () => {
+      const qs = new URLSearchParams({
+        format: "xlsx",
+        competitor: FILT_COMP_B,
+        matchStatus: "no match (review)",
+      });
+      const aoa = await fetchXLSXRows(qs);
+      const data = xlsxDataRows(aoa);
+
+      expect(data.length, "Expected exactly 1 unmatched row for FILT_COMP_B").toBe(1);
+      expect(data[0]![5]).toBe("no match (review)");
+    },
+  );
+});
