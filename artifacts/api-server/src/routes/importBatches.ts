@@ -43,16 +43,20 @@ const upload = multer({
   limits: { fileSize: 150 * 1024 * 1024 }, // 150 MB for PDFs
 });
 
-// Known Sparsh Pearl code aliases (Vol 6.2 verified)
+// Known Sparsh Pearl code aliases (Vol 6.2 verified).
+// After import diagnostics confirmed which codes are actually in the PDF extraction:
+//   - RPS-2285 exists as-is in Vol 6.2 (no alias needed; RPS-2265 is not in the catalogue)
+//   - WMP pipe renumbering: WMP-186→WMP-188 (2 Mtr), WMP-188→WMP-187 (3 Mtr)
+//   - WC-100→WC-181 (WC-180 absent; WC-181 confirmed as Half Thread Waste Coupling — verify ₹127)
+// seedAliasesIfNeeded() does a full delete+insert so any correction here takes effect on next import.
 const SPARSH_ALIASES: Array<{ oldCode: string; newCode: string; note: string }> = [
-  { oldCode: "WC-100",   newCode: "WC-180",   note: "Waste Coupling Half Thread 31/32mm (H/T)" },
+  { oldCode: "WC-100",   newCode: "WC-181",   note: "Waste Coupling Half Thread — WC-180 absent in Vol 6.2; verify ₹127" },
   { oldCode: "PJS-255",  newCode: "PSJ-255",  note: "Jet Spray 1 Mtr — letters transposed" },
   { oldCode: "PJS-256",  newCode: "PSJ-256",  note: "Jet Spray 1.5 Mtr — letters transposed" },
   { oldCode: "WMH-2331", newCode: "WIH-2331", note: "Washing Machine Inlet Hose 1.5 Mtr" },
   { oldCode: "WMH-2332", newCode: "WIH-2332", note: "Washing Machine Inlet Hose 3 Mtr" },
-  { oldCode: "RPS-2285", newCode: "RPS-2265", note: "Sink Mixer" },
   { oldCode: "WMP-186",  newCode: "WMP-188",  note: "Washing Machine Pipe 2 Mtr" },
-  { oldCode: "WMP-188",  newCode: "WMP-189",  note: "Washing Machine Pipe 3 Mtr" },
+  { oldCode: "WMP-188",  newCode: "WMP-187",  note: "Washing Machine Pipe 3 Mtr — WMP-189 absent in Vol 6.2" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -61,11 +65,21 @@ const SPARSH_ALIASES: Array<{ oldCode: string; newCode: string; note: string }> 
 
 async function seedAliasesIfNeeded(competitor: string): Promise<void> {
   if (competitor !== "Sparsh Pearl") return;
-  for (const a of SPARSH_ALIASES) {
-    await db
-      .insert(competitorCodeAliasesTable)
-      .values({ competitor, oldCode: a.oldCode, newCode: a.newCode, note: a.note })
-      .onConflictDoNothing();
+  // Full re-seed: delete existing rows then insert the current canonical list.
+  // This ensures any correction to SPARSH_ALIASES (wrong target, removed entry)
+  // propagates automatically on the next import without a separate DB migration.
+  await db
+    .delete(competitorCodeAliasesTable)
+    .where(eq(competitorCodeAliasesTable.competitor, competitor));
+  if (SPARSH_ALIASES.length > 0) {
+    await db.insert(competitorCodeAliasesTable).values(
+      SPARSH_ALIASES.map((a) => ({
+        competitor,
+        oldCode: a.oldCode,
+        newCode: a.newCode,
+        note: a.note,
+      })),
+    );
   }
 }
 

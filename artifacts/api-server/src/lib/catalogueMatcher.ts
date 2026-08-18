@@ -198,12 +198,6 @@ export function matchCatalogue(
     const lookupCode = aliasOldToNew.get(masterCode) ?? masterCode;
     const candidates = extractedByCode.get(lookupCode) ?? [];
 
-    // TEMP diagnostic — remove after alias debugging resolved
-    const DEBUG_CODES = new Set(["WC100", "RPS2285", "WMP188"]);
-    if (DEBUG_CODES.has(masterCode)) {
-      console.log(`[aliasDiag] masterCode=${masterCode} aliasHit=${aliasOldToNew.has(masterCode)} lookupCode=${lookupCode} inExtracted=${extractedByCode.has(lookupCode)} extractedKeys=[${[...extractedByCode.keys()].filter(k => k.startsWith(masterCode.slice(0,3))).join(",")}]`);
-    }
-
     if (candidates.length === 0) {
       // Not found in extracted items
       staging.push(makeRow(target, null, "not_found", null, null, null));
