@@ -1138,4 +1138,96 @@ router.post(
   },
 );
 
+// GET /catalog/mrp-periods — list all MRP effective dates with row counts.
+router.get("/catalog/mrp-periods", async (_req, res) => {
+  const rows = await db
+    .select({
+      effectiveDate: mrpPriceHistoryTable.effectiveDate,
+      count: sql<number>`cast(count(*) as integer)`,
+    })
+    .from(mrpPriceHistoryTable)
+    .groupBy(mrpPriceHistoryTable.effectiveDate)
+    .orderBy(desc(mrpPriceHistoryTable.effectiveDate));
+
+  res.json({ periods: rows.map((r) => ({ effectiveDate: r.effectiveDate, count: r.count })) });
+});
+
+// DELETE /catalog/mrp-period/:date — remove all mrp_price_history rows for a
+// specific effective date and re-run the current-flag computation atomically.
+// Rejects if this is the only remaining period (catalog must always have at
+// least one price period so products have a current MRP).
+//
+// All reads, the guard check, the delete, and the flag recomputation run
+// inside a single serializable transaction with an exclusive table lock so
+// that concurrent deletions or uploads cannot race past the single-period
+// guard and leave zero periods behind.
+router.delete("/catalog/mrp-period/:date", async (req, res) => {
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400).json({ error: "date param must be YYYY-MM-DD" });
+    return;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      // Lock the table exclusively for the duration of this transaction so
+      // concurrent deletes or inserts cannot race past the period-count guard.
+      await tx.execute(
+        sql`LOCK TABLE mrp_price_history IN SHARE ROW EXCLUSIVE MODE`,
+      );
+
+      // Re-read the period list inside the lock.
+      const allPeriods = await tx
+        .selectDistinct({ effectiveDate: mrpPriceHistoryTable.effectiveDate })
+        .from(mrpPriceHistoryTable);
+
+      // Check target existence first so we always return 404 for an absent
+      // date, regardless of how many periods remain.
+      const target = allPeriods.find((p) => p.effectiveDate === date);
+      if (!target) {
+        throw Object.assign(
+          new Error(`No MRP period found for date ${date}`),
+          { httpStatus: 404 },
+        );
+      }
+
+      if (allPeriods.length <= 1) {
+        throw Object.assign(
+          new Error("Cannot delete the only remaining MRP period. At least one price period must exist."),
+          { httpStatus: 409 },
+        );
+      }
+
+      await tx
+        .delete(mrpPriceHistoryTable)
+        .where(eq(mrpPriceHistoryTable.effectiveDate, date));
+
+      // Inline recomputeCurrentFlags so it runs inside the same transaction.
+      await tx.execute(sql`UPDATE mrp_price_history SET is_current = false`);
+      await tx.execute(sql`
+        UPDATE mrp_price_history m
+        SET is_current = true
+        FROM (
+          SELECT DISTINCT ON (item_code) id
+          FROM mrp_price_history
+          WHERE effective_date <= CURRENT_DATE
+          ORDER BY item_code, effective_date DESC, id DESC
+        ) latest
+        WHERE m.id = latest.id
+      `);
+    });
+  } catch (err: any) {
+    const status: number = err.httpStatus ?? 500;
+    if (status < 500) {
+      res.status(status).json({ error: err.message });
+    } else {
+      req.log.error({ err, date }, "mrp-period delete failed");
+      res.status(500).json({ error: "Failed to delete MRP period" });
+    }
+    return;
+  }
+
+  res.json({ deleted: date });
+});
+
 export default router;

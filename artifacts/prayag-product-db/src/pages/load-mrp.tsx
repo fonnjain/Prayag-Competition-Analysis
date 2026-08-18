@@ -3,13 +3,43 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, ChevronDown, ChevronRight, Download, FileSpreadsheet, Upload } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle, Calendar, ChevronDown, ChevronRight, Download, FileSpreadsheet, Trash2, Upload } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getGetCatalogProductsQueryKey,
   getGetCatalogDataHealthQueryKey,
   getGetCatalogFiltersQueryKey,
+  getGetComparisonQueryKey,
+  getGetComparisonSummaryQueryKey,
+  getGetComparisonByProductQueryKey,
 } from "@workspace/api-client-react";
+
+interface MrpPeriod {
+  effectiveDate: string;
+  count: number;
+}
+
+function useMrpPeriods() {
+  return useQuery<MrpPeriod[]>({
+    queryKey: ["catalog", "mrp-periods"],
+    queryFn: async () => {
+      const res = await fetch("/api/catalog/mrp-periods");
+      if (!res.ok) throw new Error("Failed to load MRP periods");
+      const data = await res.json();
+      return data.periods as MrpPeriod[];
+    },
+  });
+}
 
 export default function LoadMrpPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -20,8 +50,12 @@ export default function LoadMrpPage() {
   // Tracks which low-MRP warnings the user has dismissed. "__single__" is the
   // sentinel key for single-file uploads; ZIP entries use their filename.
   const [dismissedLowMrp, setDismissedLowMrp] = useState<Set<string>>(new Set());
+  const [pendingDelete, setPendingDelete] = useState<MrpPeriod | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: periods, isLoading: periodsLoading } = useMrpPeriods();
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,10 +87,14 @@ export default function LoadMrpPage() {
         description: `Imported ${data.results.totalRows} rows successfully.`,
       });
       
-      // Invalidate catalog queries so new prices/products show immediately.
+      // Invalidate catalog and comparison queries so new prices show immediately.
       queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetCatalogFiltersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonByProductQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["catalog", "mrp-periods"] });
 
     } catch (err: any) {
       toast({
@@ -66,6 +104,40 @@ export default function LoadMrpPage() {
       });
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/catalog/mrp-period/${pendingDelete.effectiveDate}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete period");
+      }
+      toast({
+        title: "Period Deleted",
+        description: `Removed all MRP prices for ${pendingDelete.effectiveDate}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["catalog", "mrp-periods"] });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogFiltersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonByProductQueryKey() });
+    } catch (err: any) {
+      toast({
+        title: "Delete Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setPendingDelete(null);
     }
   };
 
@@ -96,6 +168,55 @@ export default function LoadMrpPage() {
         </p>
       </div>
 
+      {/* Existing MRP Periods */}
+      <div className="bg-card border rounded-lg p-6 space-y-4">
+        <h2 className="font-semibold text-base flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
+          Existing MRP Periods
+        </h2>
+        {periodsLoading ? (
+          <p className="text-sm text-muted-foreground">Loading periods…</p>
+        ) : !periods || periods.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No MRP periods loaded yet.</p>
+        ) : (
+          <div className="divide-y rounded-md border overflow-hidden">
+            {periods.map((period) => (
+              <div
+                key={period.effectiveDate}
+                className="flex items-center justify-between px-3 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-sm font-medium">{period.effectiveDate}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {period.count.toLocaleString()} item{period.count !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={periods.length <= 1}
+                  title={
+                    periods.length <= 1
+                      ? "Cannot delete the only remaining period"
+                      : `Delete all prices for ${period.effectiveDate}`
+                  }
+                  onClick={() => setPendingDelete(period)}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        {periods && periods.length === 1 && (
+          <p className="text-xs text-muted-foreground">
+            At least one period must remain — upload a replacement before deleting this one.
+          </p>
+        )}
+      </div>
+
+      {/* Upload Form */}
       <div className="bg-card border rounded-lg p-6">
         <form onSubmit={handleUpload} className="space-y-6">
           <div className="space-y-2">
@@ -440,6 +561,32 @@ export default function LoadMrpPage() {
           )}
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete MRP period {pendingDelete?.effectiveDate}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove all{" "}
+              <strong>{pendingDelete?.count.toLocaleString()} price rows</strong> for effective date{" "}
+              <strong>{pendingDelete?.effectiveDate}</strong>. Current prices for each product are
+              determined by the latest period on or before today — deleting this period may change
+              which prices are active. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting…" : "Delete period"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
