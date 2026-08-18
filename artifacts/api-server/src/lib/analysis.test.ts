@@ -10,6 +10,7 @@ import {
   median,
   mean,
   pct,
+  resolveCompetitorPeriodDate,
   type PrayagInfo,
   type CompInput,
   type AnalysisRow,
@@ -331,5 +332,88 @@ describe("positioning bucketize", () => {
     const firstCheaper = buckets.find((b) => b.label === "2-10% cheaper")!;
     expect(parity.count).toBe(1);
     expect(firstCheaper.count).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveCompetitorPeriodDate
+//
+// These tests cover the date-chip logic end-to-end without needing a database:
+// the SQL in getCompetitorRowsForPeriod pre-filters to effective_date ≤ the
+// requested period; resolveCompetitorPeriodDate then picks the MAX of whatever
+// rows come back.  To simulate a period switch, the test simply varies which
+// rows are passed in — exactly as the SQL would return different subsets for
+// different period arguments.
+// ---------------------------------------------------------------------------
+describe("resolveCompetitorPeriodDate", () => {
+  it("returns null when the row list is empty (no competitor data at all)", () => {
+    expect(resolveCompetitorPeriodDate([])).toBeNull();
+  });
+
+  it("returns null when all rows have null effective dates", () => {
+    expect(
+      resolveCompetitorPeriodDate([
+        { effectiveDate: null },
+        { effectiveDate: null },
+      ]),
+    ).toBeNull();
+  });
+
+  it("returns the single date when only one row is present", () => {
+    expect(resolveCompetitorPeriodDate([{ effectiveDate: "2024-06-01" }])).toBe(
+      "2024-06-01",
+    );
+  });
+
+  it('returns the most recent date — simulates "Latest (auto)" where all rows are returned', () => {
+    // Scenario: no period filter → SQL returns rows from all uploads.
+    // The chip should reflect the very latest competitor upload date.
+    const rows = [
+      { effectiveDate: "2024-01-15" },
+      { effectiveDate: "2024-06-01" }, // latest
+      { effectiveDate: "2024-03-20" },
+    ];
+    expect(resolveCompetitorPeriodDate(rows)).toBe("2024-06-01");
+  });
+
+  it("returns an older date when the SQL has pre-filtered to a past period", () => {
+    // Scenario: user selects period "2024-03-31".
+    // The SQL (effective_date <= '2024-03-31') excludes the Jun upload.
+    // Only the Jan and Mar rows are passed in; chip must show "2024-03-20".
+    const rowsForPastPeriod = [
+      { effectiveDate: "2024-01-15" },
+      { effectiveDate: "2024-03-20" }, // latest within the past period
+    ];
+    expect(resolveCompetitorPeriodDate(rowsForPastPeriod)).toBe("2024-03-20");
+  });
+
+  it("switching from a past period to an earlier past period returns the correct older date", () => {
+    // Simulates two consecutive period selections:
+    //   Period A → "2024-03-31" → chip = "2024-03-20"
+    //   Period B → "2024-01-31" → chip = "2024-01-15"
+    const rowsForPeriodA = [
+      { effectiveDate: "2024-01-15" },
+      { effectiveDate: "2024-03-20" },
+    ];
+    const rowsForPeriodB = [
+      { effectiveDate: "2024-01-15" }, // only Jan survives this filter
+    ];
+    expect(resolveCompetitorPeriodDate(rowsForPeriodA)).toBe("2024-03-20");
+    expect(resolveCompetitorPeriodDate(rowsForPeriodB)).toBe("2024-01-15");
+  });
+
+  it("ignores rows with null effective dates when dated rows are also present", () => {
+    const rows = [
+      { effectiveDate: null },
+      { effectiveDate: "2024-04-01" },
+      { effectiveDate: null },
+    ];
+    expect(resolveCompetitorPeriodDate(rows)).toBe("2024-04-01");
+  });
+
+  it("handles rows that only carry effectiveDate as undefined (legacy shape)", () => {
+    // Some callers pass plain objects without the property at all.
+    const rows = [{} as { effectiveDate?: string | null }, { effectiveDate: "2024-05-10" }];
+    expect(resolveCompetitorPeriodDate(rows)).toBe("2024-05-10");
   });
 });

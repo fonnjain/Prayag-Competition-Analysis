@@ -334,6 +334,29 @@ export function bucketize(diffs: number[]) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Competitor period date resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Given a set of competitor rows (already pre-filtered to effective_date ≤ the
+ * requested period by the SQL query), returns the latest effective_date present
+ * in those rows — i.e. the "most recent competitor upload that contributed to
+ * this view".  Returns null when no row carries a dated effective_date.
+ *
+ * Exported for unit testing; not part of the public HTTP surface.
+ */
+export function resolveCompetitorPeriodDate(
+  rows: Array<{ effectiveDate?: string | null }>,
+): string | null {
+  let result: string | null = null;
+  for (const r of rows) {
+    const d = r.effectiveDate ?? null;
+    if (d && (!result || d > result)) result = d;
+  }
+  return result;
+}
+
 export function toOpportunityItem(r: AnalysisRow) {
   return {
     id: r.id,

@@ -21,6 +21,7 @@ import {
   pct,
   round1,
   strParam,
+  resolveCompetitorPeriodDate,
   DEFAULT_PRAYAG_DISCOUNT,
   DEFAULT_COMPETITOR_DISCOUNT,
   type PrayagInfo,
@@ -281,16 +282,7 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Filtered
     discountFor: (c) => discounts.byCompetitor.get(c) ?? DEFAULT_COMPETITOR_DISCOUNT,
   };
   const rows = all.map((c) => buildRow(c, maps, opts));
-
-  // Resolve the latest competitor effective_date that contributed to this view.
-  let competitorPeriodDate: string | null = null;
-  for (const r of all) {
-    const d = r.effectiveDate ?? null;
-    if (d && (!competitorPeriodDate || d > competitorPeriodDate)) {
-      competitorPeriodDate = d;
-    }
-  }
-
+  const competitorPeriodDate = resolveCompetitorPeriodDate(all);
   return { rows: applyFilters(rows, parseFilters(query)), prayagMrpDate, competitorPeriodDate };
 }
 
