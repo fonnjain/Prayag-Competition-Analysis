@@ -17,6 +17,6 @@
     { "prayagSeries": "Roman/allied", "sparshSeries": "Hoses & bottle traps",    "codePrefix": "WIH-", "pages": [97] },
     { "prayagSeries": "Roman/allied", "sparshSeries": "Tank rod & accessories",  "codePrefix": "TR-",  "pages": [98] }
   ],
-  "tablePages": [83, 84, 96, 97, 98],
+  "tablePages": [83, 84, 96, 97],
   "notes": "Image-only PDF; no text layer. Use Claude vision only. Table pages use column format Cat No. | Sizes | MRP in ₹ | S.Box | M.Box."
 }

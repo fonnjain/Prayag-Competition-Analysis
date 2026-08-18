@@ -1,0 +1,59 @@
+# Replit Prompt — Revised: one correction before publishing
+
+Two of the three staged fixes are correct as described. One needs a change before publish.
+
+> Paste everything below (from **CORRECTION**) into the Replit AI Agent.
+
+---
+
+## CORRECTION — page 98 must NOT be added to `tablePages`
+
+The staged change adds the `TR-` entry to **both** `seriesMap` and `tablePages` in `sparsh-pearl.json`. Adding page 98 to `seriesMap` is correct. Adding it to `tablePages` is **wrong and will break the fix it is meant to deliver.**
+
+Page 98 is a **grid page**, not a table page. Its items are printed as tiles:
+
+```
+TR-531   | MRP : ₹ 319/-
+Soap Dish (Oval)
+S. Box : 24 Pcs. | M. Box : 96 Pcs.
+```
+
+This is the same tile format used on the ED-/REG-/TS- series pages. The genuine table pages (83, 84, 96, 97) have real column headers — `Cat No. | Sizes | MRP in ₹ | S.Box (Pcs) | M.Box (Pcs)` — with one row per size. Page 98 has none of that.
+
+If page 98 is treated as a table page, the extractor will look for column headers that do not exist and the four `TR-` items will be missed again.
+
+**Change required:**
+- **Keep** the `TR-` entry in `seriesMap` with `pages: [98]`.
+- **Remove** `98` from `tablePages`. It must stay `[83, 84, 96, 97]`.
+
+Page 98 also has **two sections** on the same page — `TRANSPARENT` (the `TR-` codes) and `P.T.M.T` (`BA-` codes). The extractor must read the whole page, not stop at the first section. The `BA-` codes are not mapped to Prayag and will correctly appear under "New products found".
+
+---
+
+## Confirmed correct — no change needed
+
+**Alias precedence.** `catalogueMatcher.ts` already resolves the alias before looking up candidates:
+
+```ts
+const lookupCode = aliasOldToNew.get(masterCode) ?? masterCode;
+const candidates = extractedByCode.get(lookupCode) ?? [];
+```
+
+This is exactly right for `WMP-188`. The catalogue contains a code literally named `WMP-188` (the **2 Mtr** pipe), while the master's `WMP-188` is the **3 Mtr** pipe. Because the alias is applied first, the lookup goes to `WMP-189` and the correct 3 Mtr price is used. No change required.
+
+**Export header.** Splitting `Prayag MRP (as of YYYY-MM-DD)` into `Prayag MRP` + a per-row `Prayag Effective Date` column is the right fix.
+
+---
+
+## Validation — after publish, seed, and re-import
+
+- `sparsh-pearl.json`: `tablePages` is `[83, 84, 96, 97]` — **98 is not in it**; the `TR-` seriesMap entry has `pages: [98]`.
+- `competitor_code_aliases` holds **8** rows for Sparsh Pearl.
+- Batch re-run: **Not Found = 0**, 150 rows total.
+- The seven previously-missing rows resolve to: `WC-100`→**127**, `RPS-2285`→**1388**, `WMP-188`→**592** (not 462 — that is the 2 Mtr pipe), `TR-532`→**538**, `TR-533`→**620**, `TR-534`→**799**, `TR-535`→**336**.
+- Previously correct rows unchanged: `WC-182` (Prayag 144 / Sparsh 151 / gap +4.9%), `ED-950` (405.57 / 467), `ED-951` (508 / 555), `REG-771` (244.08 / 273), `RS-104` (342 / 359).
+- Every row carries its own `Prayag Effective Date`; PTMT rows show **2026-04-20**.
+- Median gap stays near **+2.7%**.
+- `BA-` codes from page 98 appear under "New products found", not as errors.
+
+Only once all of the above pass, commit the batch — a single clean commit of all 150 rows.
