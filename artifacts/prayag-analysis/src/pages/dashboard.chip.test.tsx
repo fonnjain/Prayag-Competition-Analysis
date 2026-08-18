@@ -183,4 +183,68 @@ describe("Dashboard — competitor period date chip", () => {
     );
     expect(screen.queryByText(/2026-03-10/i)).not.toBeInTheDocument();
   });
+
+  it("Clear button reverts the chip to the Latest date, resets the period select, and re-calls child hooks without effectivePeriod", async () => {
+    const user = userEvent.setup();
+
+    // Helper: return the last args passed to a mocked hook.
+    const lastCallArg = (mock: Mock) => mock.mock.calls[mock.mock.calls.length - 1]?.[0];
+
+    // Start in Latest (auto) mode — July competitor data.
+    (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
+    render(<Dashboard />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Competitor prices as of 2026-07-31/i)).toBeInTheDocument(),
+    );
+
+    // ── Switch to the March period ──
+    (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-03-10"));
+    await user.click(screen.getByTestId("period-select-trigger"));
+    await user.click(await screen.findByRole("option", { name: /2026-03-31/i }));
+
+    // Chip reflects the March competitor date.
+    await waitFor(() =>
+      expect(screen.getByText(/Competitor prices as of 2026-03-10/i)).toBeInTheDocument(),
+    );
+
+    // All five child panel hooks must have been re-called with effectivePeriod set to the March period.
+    await waitFor(() => {
+      expect(lastCallArg(useGetAnalysisByBrand as Mock)).toMatchObject({ effectivePeriod: "2026-03-31" });
+      expect(lastCallArg(useGetAnalysisByCategory as Mock)).toMatchObject({ effectivePeriod: "2026-03-31" });
+      expect(lastCallArg(useGetAnalysisCoverageMatrix as Mock)).toMatchObject({ effectivePeriod: "2026-03-31" });
+      expect(lastCallArg(useGetAnalysisPositioning as Mock)).toMatchObject({ effectivePeriod: "2026-03-31" });
+      expect(lastCallArg(useGetAnalysisOpportunities as Mock)).toMatchObject({ effectivePeriod: "2026-03-31" });
+    });
+
+    // ── Click the Clear button ──
+    // After clearing, the overview hook is called without effectivePeriod, returning July data.
+    (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
+    const clearButton = screen.getByRole("button", { name: /clear/i });
+    await user.click(clearButton);
+
+    // Chip should revert to the latest date.
+    await waitFor(() =>
+      expect(screen.getByText(/Competitor prices as of 2026-07-31/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/2026-03-10/i)).not.toBeInTheDocument();
+
+    // Period select should show "Latest (auto)" again.
+    const periodTrigger = screen.getByTestId("period-select-trigger");
+    expect(periodTrigger).toHaveTextContent(/latest \(auto\)/i);
+
+    // All five child panel hooks must have been re-called WITHOUT effectivePeriod after Clear.
+    await waitFor(() => {
+      const brandArg = lastCallArg(useGetAnalysisByBrand as Mock);
+      const categoryArg = lastCallArg(useGetAnalysisByCategory as Mock);
+      const coverageArg = lastCallArg(useGetAnalysisCoverageMatrix as Mock);
+      const positioningArg = lastCallArg(useGetAnalysisPositioning as Mock);
+      const opportunitiesArg = lastCallArg(useGetAnalysisOpportunities as Mock);
+      expect(brandArg?.effectivePeriod).toBeUndefined();
+      expect(categoryArg?.effectivePeriod).toBeUndefined();
+      expect(coverageArg?.effectivePeriod).toBeUndefined();
+      expect(positioningArg?.effectivePeriod).toBeUndefined();
+      expect(opportunitiesArg?.effectivePeriod).toBeUndefined();
+    });
+  });
 });
