@@ -8,12 +8,8 @@ import analysisRouter from "./analysis";
 import apiKeysRouter from "./apiKeys";
 import externalV1Router from "./externalV1";
 import importBatchesRouter from "./importBatches";
-import adminRepairMrpRouter from "./adminRepairMrp";
 
 const router: IRouter = Router();
-
-// TEMPORARY: one-time production MRP repair — remove after use
-router.use(adminRepairMrpRouter);
 
 // Unauthenticated routes
 router.use(healthRouter);
