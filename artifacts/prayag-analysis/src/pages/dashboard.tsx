@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Card,
 } from "@/components/ui/card";
@@ -40,9 +41,11 @@ export type DashboardFilters = {
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const [mode, setMode] = useState<CompareMode>("mrp");
   const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
   const [prayagMrpDate, setPrayagMrpDate] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
   // undefined = overview data not yet received; null = loaded but no competitor
   // rows exist for this period; string = the resolved period date.
   const [competitorPeriodDate, setCompetitorPeriodDate] = useState<string | null | undefined>(undefined);
@@ -51,9 +54,43 @@ export default function Dashboard() {
   const filters: DashboardFilters =
     mode === "net" ? { ...baseFilters, mode } : baseFilters;
 
-  const handleExport = (format: "xlsx" | "csv") => {
+  const handleExport = async (format: "xlsx" | "csv") => {
     const url = getExportAnalysisUrl({ ...filters, format });
-    window.open(url, "_blank");
+    setExportLoading(true);
+    try {
+      const res = await fetch(url);
+      const rowCount = res.headers.get("x-export-row-count");
+      if (rowCount === "0") {
+        const warning = res.headers.get("x-export-warning");
+        toast({
+          title: "Export has no data",
+          description:
+            warning ??
+            "No rows matched the selected period or filters. The file contains a header row only.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Non-zero rows: trigger a real file download via a temporary anchor.
+      const blob = await res.blob();
+      const ext = format === "csv" ? "csv" : "xlsx";
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = `prayag-competition-analysis.${ext}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      toast({
+        title: "Export failed",
+        description: "Could not download the export. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const handlePrayagMrpDate = useCallback((date: string | null) => {
@@ -96,11 +133,11 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <ModeToggle mode={mode} onChange={setMode} />
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
+            <Button variant="outline" size="sm" onClick={() => handleExport("csv")} disabled={exportLoading}>
               <Download className="h-4 w-4 mr-2" />
               CSV
             </Button>
-            <Button size="sm" onClick={() => handleExport("xlsx")}>
+            <Button size="sm" onClick={() => handleExport("xlsx")} disabled={exportLoading}>
               <Download className="h-4 w-4 mr-2" />
               Excel Export
             </Button>

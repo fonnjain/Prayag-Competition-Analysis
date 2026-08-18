@@ -7,10 +7,14 @@
  *
  * All network hooks are mocked so no real HTTP calls are made.
  */
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Dashboard from "./dashboard";
+
+// Hoist mockToastFn so it is in scope inside the vi.mock factory (which is
+// also hoisted before imports by Vitest).
+const { mockToastFn } = vi.hoisted(() => ({ mockToastFn: vi.fn() }));
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -18,6 +22,10 @@ import Dashboard from "./dashboard";
 
 vi.mock("@workspace/replit-auth-web", () => ({
   useAuth: vi.fn(() => ({ user: { firstName: "Test" }, logout: vi.fn() })),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: mockToastFn }),
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -246,5 +254,93 @@ describe("Dashboard — competitor period date chip", () => {
       expect(positioningArg?.effectivePeriod).toBeUndefined();
       expect(opportunitiesArg?.effectivePeriod).toBeUndefined();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dashboard — export button: zero-row warning and blob download
+// ---------------------------------------------------------------------------
+//
+// Confirms that handleExport():
+//   • Shows a destructive toast titled "Export has no data" when the API
+//     returns X-Export-Row-Count: 0 — and does NOT initiate a download.
+//   • Calls URL.createObjectURL (initiating a blob download) when the API
+//     returns a non-zero row count — and does NOT show a warning toast.
+
+describe("Dashboard — export button: zero-row warning and download", () => {
+  const origCreateObjectURL = URL.createObjectURL;
+  const origRevokeObjectURL = URL.revokeObjectURL;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupSideHooks();
+    (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
+    mockToastFn.mockReset();
+    URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    URL.createObjectURL = origCreateObjectURL;
+    URL.revokeObjectURL = origRevokeObjectURL;
+    vi.restoreAllMocks();
+  });
+
+  it("shows a 'Export has no data' toast and skips download when X-Export-Row-Count is 0", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        headers: {
+          get: (h: string) => {
+            if (h === "x-export-row-count") return "0";
+            if (h === "x-export-warning")
+              return "No rows matched the requested period or filters; the file contains a header row only.";
+            return null;
+          },
+        },
+        blob: vi.fn(),
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    await waitFor(() => screen.getByRole("button", { name: /csv/i }));
+    await user.click(screen.getByRole("button", { name: /csv/i }));
+
+    await waitFor(() =>
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Export has no data" }),
+      ),
+    );
+    // Blob download must NOT have been triggered.
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("triggers a blob download and does not show a warning toast when rows are present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        headers: {
+          get: (h: string) => {
+            if (h === "x-export-row-count") return "12";
+            return null;
+          },
+        },
+        blob: vi.fn().mockResolvedValue(new Blob(["Competitor,Price"], { type: "text/csv" })),
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    await waitFor(() => screen.getByRole("button", { name: /csv/i }));
+    await user.click(screen.getByRole("button", { name: /csv/i }));
+
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+    // No warning toast should have been shown.
+    expect(mockToastFn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Export has no data" }),
+    );
   });
 });

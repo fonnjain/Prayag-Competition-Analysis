@@ -770,3 +770,204 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// Level 6: GET /analysis/export — zero-row guard when period pre-dates all data
+// ---------------------------------------------------------------------------
+//
+// When effectivePeriod is set to a date that pre-dates every row in both price
+// tables (e.g. "2000-01-01"), the export must:
+//   • Return HTTP 200 — not a 500 or 404.
+//   • Return a file that contains only the header row (no data rows).
+//   • Set X-Export-Row-Count: 0 so the UI can detect the empty result.
+//   • Set X-Export-Warning so the UI can surface a human-readable message.
+//
+// The "data pre-dates all rows" scenario is trivially guaranteed by using a
+// date far in the past ("2000-01-01"). No fixture data is inserted because
+// the test relies on the absence of rows for that date.
+
+describe("GET /analysis/export — zero-row guard for pre-data effectivePeriod", () => {
+  const zeroRowApp = express();
+  zeroRowApp.use(express.json());
+  zeroRowApp.use(analysisRouter);
+  const zeroRowRequest = supertest(zeroRowApp);
+
+  // A date guaranteed to pre-date every row in any environment.
+  const PRE_DATA_DATE = "2000-01-01";
+
+  // Self-contained fixture for the non-zero ("warning absent") test so it
+  // does not depend on data inserted by the Level 5 describe block.
+  const ZR_ITEM = `__TEST_ZR_NOZERO_${Date.now()}__`;
+  const ZR_COMP = `__test_zr_nozero_${Date.now()}__`;
+  const ZR_DATE = "2026-05-01";
+  const ZR_MRP = 300;
+  const ZR_PRICE = 350;
+
+  beforeAll(async () => {
+    await db.insert(catalogProductsTable).values({
+      itemCode: ZR_ITEM,
+      productName: "Zero-Row Guard Non-Zero Fixture",
+      division: "Test Division",
+      category: "Test Category",
+    });
+    await db.insert(mrpPriceHistoryTable).values({
+      itemCode: ZR_ITEM,
+      mrp: ZR_MRP,
+      priceBasis: "MRP",
+      effectiveDate: ZR_DATE,
+      loadDate: ZR_DATE,
+      isCurrent: false,
+    });
+    await db.insert(competitorPricesTable).values({
+      competitor: ZR_COMP,
+      description: "Zero-Row Guard Non-Zero Fixture SKU",
+      price: ZR_PRICE,
+      unit: null,
+      matchedPrayagCode: ZR_ITEM,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      prayagMrpAtCompare: ZR_MRP,
+      effectiveDate: ZR_DATE,
+      isCurrent: true,
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, ZR_COMP));
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, ZR_ITEM));
+    await db
+      .delete(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, ZR_ITEM));
+  });
+
+  it(
+    "CSV — returns HTTP 200 with header row only (no data rows) when effectivePeriod pre-dates all data",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: PRE_DATA_DATE,
+        format: "csv",
+      });
+      const res = await zeroRowRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/csv");
+
+      // Only the header line should be present (filter out trailing blank lines)
+      const lines = (res.text as string)
+        .split("\n")
+        .filter((l) => l.trim() !== "");
+      expect(
+        lines.length,
+        "CSV must contain exactly 1 line (header only) when no rows match",
+      ).toBe(1);
+    },
+  );
+
+  it(
+    "CSV — X-Export-Row-Count header is 0 when effectivePeriod pre-dates all data",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: PRE_DATA_DATE,
+        format: "csv",
+      });
+      const res = await zeroRowRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["x-export-row-count"]).toBe("0");
+    },
+  );
+
+  it(
+    "CSV — X-Export-Warning header is present when effectivePeriod pre-dates all data",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: PRE_DATA_DATE,
+        format: "csv",
+      });
+      const res = await zeroRowRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+      expect(
+        res.headers["x-export-warning"],
+        "X-Export-Warning must be set when the export has zero data rows",
+      ).toBeTruthy();
+    },
+  );
+
+  it(
+    "XLSX — returns HTTP 200 with header row only (no data rows) when effectivePeriod pre-dates all data",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: PRE_DATA_DATE,
+        format: "xlsx",
+      });
+      const res = await zeroRowRequest
+        .get(`/analysis/export?${qs}`)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("end", () => callback(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("spreadsheetml");
+
+      const wb = XLSX.read(res.body as Buffer, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, {
+        header: 1,
+      });
+      // Sheet must have exactly 1 row (the header)
+      expect(
+        aoa.length,
+        "XLSX must contain exactly 1 row (header only) when no rows match",
+      ).toBe(1);
+    },
+  );
+
+  it(
+    "XLSX — X-Export-Row-Count: 0 and X-Export-Warning present when effectivePeriod pre-dates all data",
+    async () => {
+      const qs = new URLSearchParams({
+        effectivePeriod: PRE_DATA_DATE,
+        format: "xlsx",
+      });
+      const res = await zeroRowRequest
+        .get(`/analysis/export?${qs}`)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("end", () => callback(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      expect(res.headers["x-export-row-count"]).toBe("0");
+      expect(res.headers["x-export-warning"]).toBeTruthy();
+    },
+  );
+
+  it(
+    "non-zero rows — X-Export-Row-Count > 0 and X-Export-Warning absent when data rows are present",
+    async () => {
+      // Use the self-contained fixture seeded in beforeAll above.
+      // ZR_DATE = "2026-05-01"; querying on "2026-06-01" (after ZR_DATE) must
+      // return at least the one seeded row for ZR_COMP, giving a non-zero count.
+      const qs = new URLSearchParams({
+        effectivePeriod: "2026-06-01",
+        format: "csv",
+        competitor: ZR_COMP,
+      });
+      const res = await zeroRowRequest.get(`/analysis/export?${qs}`);
+      expect(res.status).toBe(200);
+
+      const rowCount = Number(res.headers["x-export-row-count"]);
+      expect(rowCount, "X-Export-Row-Count must be >= 1 for the seeded fixture row").toBeGreaterThanOrEqual(1);
+
+      expect(
+        res.headers["x-export-warning"],
+        "X-Export-Warning must be absent when data rows are present",
+      ).toBeUndefined();
+    },
+  );
+});

@@ -549,6 +549,18 @@ router.get("/analysis/export", async (req, res) => {
     r.prayagCheaper == null ? "" : r.prayagCheaper ? "Yes" : "No",
   ]);
 
+  // Surface row-count metadata so clients can show a warning without parsing
+  // the file. When zero data rows are found (e.g. effectivePeriod pre-dates
+  // all data) the file still returns HTTP 200 with a header-only sheet, but
+  // the X-Export-Warning header tells the UI something went wrong.
+  res.setHeader("X-Export-Row-Count", String(body.length));
+  if (body.length === 0) {
+    res.setHeader(
+      "X-Export-Warning",
+      "No rows matched the requested period or filters; the file contains a header row only.",
+    );
+  }
+
   sendSheet(res, [header, ...body], "Analysis", "prayag-competition-analysis", format);
 });
 
