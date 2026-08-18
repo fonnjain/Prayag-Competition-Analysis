@@ -17,6 +17,9 @@ export default function LoadMrpPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+  // Tracks which low-MRP warnings the user has dismissed. "__single__" is the
+  // sentinel key for single-file uploads; ZIP entries use their filename.
+  const [dismissedLowMrp, setDismissedLowMrp] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -26,6 +29,7 @@ export default function LoadMrpPage() {
 
     setIsUploading(true);
     setResult(null);
+    setDismissedLowMrp(new Set());
 
     const formData = new FormData();
     formData.append("file", file);
@@ -198,6 +202,36 @@ export default function LoadMrpPage() {
           {result.files && result.files.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Per-file breakdown</p>
+
+              {/* Aggregate low-MRP warning for ZIP — visible without expanding any file */}
+              {(() => {
+                const affected = (result.files as any[]).filter(
+                  (f) => f.lowMrpCount > 0 && !dismissedLowMrp.has("__zip__")
+                );
+                if (affected.length === 0) return null;
+                const totalLow = affected.reduce((s: number, f: any) => s + f.lowMrpCount, 0);
+                return (
+                  <div className="flex items-start gap-3 text-sm text-amber-800 bg-amber-50 border border-amber-300 p-3 rounded">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                    <div className="flex-1">
+                      <p className="font-semibold">
+                        ⚠ {totalLow} item{totalLow !== 1 ? "s" : ""} across {affected.length} file{affected.length !== 1 ? "s" : ""} have MRP below ₹50 — verify the correct price column was picked.
+                      </p>
+                      <p className="mt-1 text-xs">
+                        Affected: {affected.map((f: any) => f.file).join(", ")}. Expand each file for details.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setDismissedLowMrp((prev) => new Set([...prev, "__zip__"]))}
+                      className="shrink-0 text-amber-600 hover:text-amber-800 text-lg leading-none font-bold"
+                      aria-label="Dismiss warning"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })()}
+
               {result.files.map((f: any) => {
                 const isExpanded = expandedFiles.has(f.file);
                 const toggle = () =>
@@ -207,6 +241,7 @@ export default function LoadMrpPage() {
                     return next;
                   });
                 const noRows = f.totalRows === 0;
+                const hasLowMrp = f.lowMrpCount > 0 && !dismissedLowMrp.has(f.file);
                 return (
                   <div key={f.file} className="border rounded text-sm">
                     <button
@@ -222,6 +257,12 @@ export default function LoadMrpPage() {
                         <span className="truncate">{f.file}</span>
                         {noRows && (
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        )}
+                        {hasLowMrp && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 shrink-0">
+                            <AlertTriangle className="w-3 h-3" />
+                            {f.lowMrpCount} low MRP
+                          </span>
                         )}
                       </span>
                       <span className="shrink-0 ml-3 text-muted-foreground font-mono">
@@ -287,6 +328,26 @@ export default function LoadMrpPage() {
                         {f.message && (
                           <p className="text-muted-foreground text-xs">{f.message}</p>
                         )}
+                        {f.lowMrpCount > 0 && !dismissedLowMrp.has(f.file) && (
+                          <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-300 p-2 rounded">
+                            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
+                            <div className="flex-1">
+                              <span className="font-semibold">
+                                {f.lowMrpCount} item{f.lowMrpCount !== 1 ? "s" : ""} have MRP below ₹50 — verify the correct column was picked.
+                              </span>
+                              {f.priceColHeader && (
+                                <span> Expected column: <code className="bg-amber-100 px-0.5 rounded">{f.priceColHeader}</code>.</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => setDismissedLowMrp((prev) => new Set([...prev, f.file]))}
+                              className="shrink-0 text-amber-600 hover:text-amber-800 text-base leading-none font-bold"
+                              aria-label="Dismiss warning"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -328,6 +389,30 @@ export default function LoadMrpPage() {
           {!result.files && !nothingImported && result.skippedUnparseable > 0 && (
             <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
               {result.skippedUnparseable} row{result.skippedUnparseable !== 1 ? "s were" : " was"} skipped — item code could not be parsed or price was invalid.
+            </div>
+          )}
+
+          {/* Low-MRP warning — single file only */}
+          {!result.files && result.lowMrpCount > 0 && !dismissedLowMrp.has("__single__") && (
+            <div className="flex items-start gap-3 text-sm text-amber-800 bg-amber-50 border border-amber-300 p-3 rounded">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+              <div className="flex-1">
+                <p className="font-semibold">
+                  ⚠ {result.lowMrpCount} item{result.lowMrpCount !== 1 ? "s" : ""} have MRP below ₹50 — verify the correct column was picked.
+                </p>
+                {result.priceColHeader && (
+                  <p className="mt-1">
+                    Expected column: <code className="bg-amber-100 px-1 rounded">{result.priceColHeader}</code>. If this is a packing-quantity column (e.g. pcs/box), re-upload with the correct MRP column.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setDismissedLowMrp((prev) => new Set([...prev, "__single__"]))}
+                className="shrink-0 text-amber-600 hover:text-amber-800 text-lg leading-none font-bold"
+                aria-label="Dismiss warning"
+              >
+                ×
+              </button>
             </div>
           )}
 
