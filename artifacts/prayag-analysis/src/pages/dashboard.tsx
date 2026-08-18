@@ -326,7 +326,7 @@ function FilterBar({
                 onChange({ ...filters, effectivePeriod: v === "__latest__" ? undefined : v })
               }
             >
-              <SelectTrigger className="w-[160px] h-8 text-sm bg-background">
+              <SelectTrigger className="w-[160px] h-8 text-sm bg-background" data-testid="period-select-trigger">
                 <SelectValue placeholder="Latest" />
               </SelectTrigger>
               <SelectContent>
