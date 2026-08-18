@@ -512,7 +512,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
 
   const header = [
     "Prayag Code", "Prayag Product", "Division", "Category",
-    `Prayag MRP (${prayagDate})`,
+    "Prayag MRP", "Prayag Effective Date",
     `${batch.competitor} Code (Master)`, `${batch.competitor} Code (Catalogue)`,
     `${batch.competitor} MRP (${batch.effectiveDate})`,
     "Old MRP", "Increase %", "Gap % vs Prayag",
@@ -526,7 +526,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
     const mrpRow = mrpMap.get(p.itemCode);
     body.push([
       p.itemCode, p.productName ?? "", p.division ?? "", p.category ?? "",
-      mrpRow?.mrp ?? null,
+      mrpRow?.mrp ?? null, mrpRow?.effectiveDate ?? null,
       s.competitorCodeMaster ?? "", s.competitorCodeCatalogue ?? "",
       s.newMrp ?? null, s.oldMrp ?? null,
       s.increasePct != null ? Math.round(s.increasePct * 10) / 10 : null,
@@ -537,7 +537,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
   // Append not_found rows
   for (const r of stagingRows.filter((r) => r.status === "not_found")) {
     body.push([
-      r.matchedPrayagCode ?? "", r.description ?? "", "", "", "",
+      r.matchedPrayagCode ?? "", r.description ?? "", "", "", "", "",
       r.competitorCodeMaster ?? "", "", null, r.oldMrp ?? null, null, null,
       "", "not_found", r.reviewReason ?? "", null,
     ]);

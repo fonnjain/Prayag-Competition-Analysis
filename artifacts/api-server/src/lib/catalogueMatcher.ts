@@ -198,6 +198,12 @@ export function matchCatalogue(
     const lookupCode = aliasOldToNew.get(masterCode) ?? masterCode;
     const candidates = extractedByCode.get(lookupCode) ?? [];
 
+    // TEMP diagnostic — remove after alias debugging resolved
+    const DEBUG_CODES = new Set(["WC100", "RPS2285", "WMP188"]);
+    if (DEBUG_CODES.has(masterCode)) {
+      console.log(`[aliasDiag] masterCode=${masterCode} aliasHit=${aliasOldToNew.has(masterCode)} lookupCode=${lookupCode} inExtracted=${extractedByCode.has(lookupCode)} extractedKeys=[${[...extractedByCode.keys()].filter(k => k.startsWith(masterCode.slice(0,3))).join(",")}]`);
+    }
+
     if (candidates.length === 0) {
       // Not found in extracted items
       staging.push(makeRow(target, null, "not_found", null, null, null));
@@ -209,12 +215,14 @@ export function matchCatalogue(
       candidates.find((c) => !claimed.has(c)) ?? candidates[0]!;
     claimed.add(candidate);
 
-    // Size gate: if the target has a size and the catalogue item has a variant
-    // that disagrees → flag as needs_review
+    // Size gate: only fires when BOTH sides have an explicit size/variant field
+    // and they disagree. If either is absent, skip — descriptions alone can
+    // carry numeric tokens (part numbers, box counts) that would cause false
+    // positives (e.g. "expected (none), found (none)").
     const targetSizeStr = [target.size, target.description].join(" ");
     const catSizeStr = [candidate.variant, candidate.product_name].join(" ");
 
-    if (sizesConflict(targetSizeStr, catSizeStr)) {
+    if (target.size && candidate.variant && sizesConflict(targetSizeStr, catSizeStr)) {
       staging.push(
         makeRow(
           target,
