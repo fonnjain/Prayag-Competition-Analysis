@@ -9,10 +9,17 @@ import {
   catalogProductsTable,
   mrpPriceHistoryTable,
   competitorPricesTable,
+  mrpSourcesTable,
+  mrpLoadBatchesTable,
 } from "@workspace/db";
 import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
+import {
+  ensureOfficialMrpSources,
+  isIsoDate,
+  sha256ForBuffer,
+} from "../lib/mrpProvenance";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -390,6 +397,13 @@ interface LoadSummary {
   flaggedMrpCount: number;
   flaggedRows: MrpReviewFinding[];
   reviewBatchId: string | null;
+  provenance?: {
+    sourceDivision: string;
+    sourceUrl: string;
+    downloadedAt: string;
+    fileSha256: string;
+    loadBatchId: number;
+  };
   message?: string;
 }
 
@@ -522,6 +536,7 @@ async function persistParsedRows(
   priceColHeader: string,
   skippedUnparseable: number,
   reviewBatchId: string,
+  loadBatchId: number,
 ): Promise<LoadSummary> {
   // De-duplicate within the uploaded file by item code (keep last occurrence).
   const byCode = new Map<string, { price: number; productName: string | null; category: string | null }>();
@@ -671,6 +686,7 @@ async function persistParsedRows(
         reviewStatus: reasons.length > 0 ? "pending" : "approved",
         reviewReasons: reasons.length > 0 ? JSON.stringify(reasons) : null,
         importBatchId: reviewBatchId,
+        loadBatchId,
         reviewedAt: reasons.length > 0 ? null : new Date(),
       });
       if (reasons.length > 0) {
@@ -773,6 +789,85 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
         return;
       }
     }
+    const sourceId = Number(req.body.sourceId);
+    const downloadedAt = req.body.downloadedAt;
+    if (!Number.isInteger(sourceId) || sourceId <= 0) {
+      res.status(400).json({
+        error: "Choose the official MRP source before loading a price sheet.",
+      });
+      return;
+    }
+    if (!isIsoDate(downloadedAt)) {
+      res.status(400).json({
+        error: "Enter the date this file was downloaded (YYYY-MM-DD).",
+      });
+      return;
+    }
+
+    await ensureOfficialMrpSources();
+    const sourceRows = await db
+      .select()
+      .from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.id, sourceId))
+      .limit(1);
+    const source = sourceRows[0];
+    if (!source) {
+      res.status(400).json({
+        error: "The selected MRP source no longer exists. Refresh and choose a source again.",
+      });
+      return;
+    }
+
+    const fileSha256 = sha256ForBuffer(file.buffer);
+    const latestBatches = await db
+      .select()
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.sourceId, source.id))
+      .orderBy(desc(mrpLoadBatchesTable.loadedAt))
+      .limit(1);
+    const latestBatch = latestBatches[0];
+    const confirmDuplicate = req.body.confirmDuplicate === "true";
+    if (
+      latestBatch &&
+      latestBatch.fileSha256 === fileSha256 &&
+      !confirmDuplicate
+    ) {
+      res.status(409).json({
+        error: `This is byte-for-byte the file loaded on ${latestBatch.loadedAt.toISOString().slice(0, 10)}. Load anyway?`,
+        duplicate: {
+          sourceDivision: source.division,
+          loadedAt: latestBatch.loadedAt,
+          downloadedAt: latestBatch.downloadedAt,
+          fileSha256,
+          loadBatchId: latestBatch.id,
+        },
+      });
+      return;
+    }
+
+    const createdBatch = await db
+      .insert(mrpLoadBatchesTable)
+      .values({
+        sourceId: source.id,
+        fileName: name,
+        fileSha256,
+        fileSizeBytes: file.size,
+        downloadedAt,
+        loadedBy: req.user?.email ?? req.user?.id ?? null,
+        notes: confirmDuplicate
+          ? "Identical snapshot load explicitly confirmed by the user."
+          : null,
+      })
+      .returning({ id: mrpLoadBatchesTable.id });
+    const loadBatchId = createdBatch[0]!.id;
+    const provenance = {
+      sourceDivision: source.division,
+      sourceUrl: source.sheetUrl,
+      downloadedAt,
+      fileSha256,
+      loadBatchId,
+    };
+
     const existingProducts = await db
       .select({ itemCode: catalogProductsTable.itemCode })
       .from(catalogProductsTable);
@@ -821,6 +916,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
           parsed.priceColHeader,
           parsed.skippedUnparseable,
           reviewBatchId,
+          loadBatchId,
         );
         fileSummaries.push(summary);
       }
@@ -846,8 +942,13 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
         flaggedRows: fileSummaries.flatMap((f) => f.flaggedRows),
         reviewBatchId:
           fileSummaries.some((f) => f.flaggedMrpCount > 0) ? reviewBatchId : null,
+        provenance,
         files: fileSummaries,
       };
+      await db
+        .update(mrpLoadBatchesTable)
+        .set({ rowCount: aggregate.newHistoryRows })
+        .where(eq(mrpLoadBatchesTable.id, loadBatchId));
 
       res.json({ results: aggregate });
       return;
@@ -868,11 +969,16 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
       parsed.priceColHeader,
       parsed.skippedUnparseable,
       reviewBatchId,
+      loadBatchId,
     );
 
     await recomputeCurrentFlags();
+    await db
+      .update(mrpLoadBatchesTable)
+      .set({ rowCount: summary.newHistoryRows })
+      .where(eq(mrpLoadBatchesTable.id, loadBatchId));
 
-    res.json({ results: summary });
+    res.json({ results: { ...summary, provenance } });
   } catch (err) {
     req.log.error({ err, file: name }, "load-mrp failed");
     res.status(500).json({ error: "Failed to parse and load file" });

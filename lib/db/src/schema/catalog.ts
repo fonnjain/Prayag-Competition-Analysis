@@ -46,6 +46,53 @@ export const catalogProductsTable = pgTable(
   ],
 );
 
+// Canonical official Prayag MRP workbooks. sheetId remains separate from the
+// display URL so the app can move from manually downloaded files to a direct
+// Google Sheets reader without re-identifying each source.
+export const mrpSourcesTable = pgTable(
+  "mrp_sources",
+  {
+    id: serial("id").primaryKey(),
+    division: text("division").notNull(),
+    sheetId: text("sheet_id").notNull(),
+    sheetUrl: text("sheet_url").notNull(),
+    expectedFileName: text("expected_file_name"),
+    notes: text("notes"),
+  },
+  (t) => [
+    uniqueIndex("mrp_sources_division_idx").on(t.division),
+    uniqueIndex("mrp_sources_sheet_id_idx").on(t.sheetId),
+  ],
+);
+
+// One auditable event per uploaded source snapshot. The checksum, rather than
+// the filename, is the durable identity of a downloaded workbook.
+export const mrpLoadBatchesTable = pgTable(
+  "mrp_load_batches",
+  {
+    id: serial("id").primaryKey(),
+    sourceId: integer("source_id")
+      .notNull()
+      .references(() => mrpSourcesTable.id),
+    fileName: text("file_name").notNull(),
+    fileSha256: text("file_sha256").notNull(),
+    fileSizeBytes: integer("file_size_bytes").notNull(),
+    // This comes from the person who exported the sheet; it is never inferred
+    // from filesystem metadata.
+    downloadedAt: date("downloaded_at", { mode: "string" }).notNull(),
+    loadedAt: timestamp("loaded_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    loadedBy: text("loaded_by"),
+    rowCount: integer("row_count").notNull().default(0),
+    notes: text("notes"),
+  },
+  (t) => [
+    index("mrp_load_batches_source_loaded_idx").on(t.sourceId, t.loadedAt),
+    index("mrp_load_batches_source_hash_idx").on(t.sourceId, t.fileSha256),
+  ],
+);
+
 // Append-only MRP price history. Every load INSERTs new rows; old rows are
 // never updated or deleted. is_current is recomputed per item_code (latest
 // effective_date) after each load.
@@ -68,6 +115,9 @@ export const mrpPriceHistoryTable = pgTable(
     reviewStatus: text("review_status").notNull().default("approved"),
     reviewReasons: text("review_reasons"),
     importBatchId: text("import_batch_id"),
+    // Non-null for MRP-sheet loads. Legacy/manual rows are backfilled or
+    // surfaced by Data Health until a traceable source batch is recorded.
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   },
   (t) => [

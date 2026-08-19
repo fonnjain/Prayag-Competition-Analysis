@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { 
   useGetComparison, 
   useGetComparisonByProduct,
@@ -20,6 +21,14 @@ import { cn } from "@/lib/utils";
 import { PriceWindowDetails } from "@/components/price-window";
 
 const PAGE_SIZE = 50;
+
+function formatSnapshotDate(value: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 type ViewMode = "byProduct" | "byCompetitor";
 
@@ -113,6 +122,27 @@ export default function ComparisonPage() {
   }, [view, ambiguousOnly]);
 
   const { data: filters } = useGetComparisonFilters();
+  const { data: provenance } = useQuery<{
+    snapshotDate: string | null;
+    sources: { downloadedAt: string | null }[];
+  }>({
+    queryKey: ["catalog", "mrp-provenance"],
+    queryFn: async () => {
+      const res = await fetch("/api/catalog/mrp-provenance");
+      if (!res.ok) throw new Error("Failed to load MRP provenance");
+      return res.json();
+    },
+  });
+  const sourceDates = [...new Set(
+    (provenance?.sources ?? [])
+      .map((source) => source.downloadedAt)
+      .filter((date): date is string => !!date),
+  )].sort();
+  const snapshotLabel = provenance?.snapshotDate
+    ? `Prayag MRP as of ${formatSnapshotDate(provenance.snapshotDate)}`
+    : sourceDates.length > 1
+      ? `Prayag MRP snapshots span ${formatSnapshotDate(sourceDates[0]!)}–${formatSnapshotDate(sourceDates.at(-1)!)}`
+      : null;
   
   const { data: summaryData, isLoading: summaryLoading } = useGetComparisonSummary({
     competitor: competitor !== "all" ? competitor : undefined,
@@ -185,6 +215,11 @@ export default function ComparisonPage() {
           <p className="text-muted-foreground mt-1">
             Analyze Prayag prices against competitor brands.
           </p>
+          {snapshotLabel && (
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              {snapshotLabel}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-md border bg-card p-1">

@@ -1,0 +1,136 @@
+# Replit Prompt — Source Provenance for MRP Loads
+
+## 1. The problem this solves
+
+The six Google Sheets are the source of truth for Prayag MRP. A downloaded workbook is a photograph of one of them, taken at a moment. The app currently loads photographs and keeps no record of when they were taken.
+
+That gap became concrete today. The 600-series sinks (`616-D` through `625-D`) were withdrawn with effect from 01 Sep 2026. In the workbook downloaded on 19 August they carry `Removed` **and** a September price of 2,690 / 2,860 / 3,040. In the live sheet, viewed the same afternoon, the September price cells are **empty** — only `Removed` remains.
+
+Same file name, same columns, different contents. Hours of analysis went into deciding which of two contradictory signals should win, and the contradiction did not exist in the source. It was an artefact of a stale copy.
+
+The rebuild is still a correct reading of the file it was given, and nothing about those nine cells changes any outcome. But right now, if someone asks *"was the rebuild built from the current price list?"*, the only honest answer is *"it was built from a file downloaded on 19 August, and the sheet has changed since."* The app cannot do better than that because it does not record what it loaded.
+
+**A price without provenance cannot be defended.** That is the thing to fix.
+
+---
+
+## 2. What already exists, and why it is not enough
+
+`mrp_price_history` has `source_file` (free text) and `load_date`. Neither answers the question that matters.
+
+`load_date` records **when we imported**. What determines staleness is **when the file was downloaded**, which can be days or weeks earlier. And `source_file` is a filename — the least reliable identifier in this whole process, because all six files keep their names across every revision. Today's drift is invisible by filename: the workbook that has the September prices and the workbook that does not are both called `NEW PTMT MRP w.e.f. List as on 01st Sep, 2026.xlsx`.
+
+---
+
+## 3. Build
+
+### 3.1 A register of the six sources
+
+New table `mrp_sources`, one row per official workbook. These are the canonical links; seed them exactly:
+
+| Division | Google Sheets ID |
+|---|---|
+| Pipes & Fittings | `1Xyb8skpqAMIm5PF5d2HgKp8vRc0y4UHxWFfItD3ZcJk` |
+| PTMT & Plastic Fittings | `1PnzjXxDfnG-9asuvQ9nR_Vho26q-ulWeOwEL7hyBAFU` |
+| CP Fittings / Faucets | `1-3boSoPGeSRIM-ruFX-FgHqaBBI3DBCuWoOWLl0RRAM` |
+| Ceramic Sanitaryware | `1TJ5Xg2GYMBHQzsrk0kKtM-iRI3tvG1eTmon5HZGU9F0` |
+| Hardware | `1YxBT9NUfLD0mK0d1T2DbLRTkYwXZct5frrJkZnCXhIA` |
+| CP (QUAA / FERN) | `1ViubLx1zOjUvFXJWDQUHAMBgqty8py8vHmEawYMe4qg` |
+
+Columns: `id`, `division`, `sheet_id`, `sheet_url`, `expected_file_name`, `notes`. Full URLs are `https://docs.google.com/spreadsheets/d/{sheet_id}/edit`.
+
+### 3.2 A load record
+
+New table `mrp_load_batches`:
+
+| Column | Purpose |
+|---|---|
+| `id` | primary key |
+| `source_id` | FK to `mrp_sources` |
+| `file_name` | as uploaded |
+| `file_sha256` | **the identifier that actually works** |
+| `file_size_bytes` | secondary check |
+| `downloaded_at` | date the person exported the sheet — supplied by them, not inferred |
+| `loaded_at` | timestamp of the import |
+| `loaded_by` | who ran it |
+| `row_count` | price rows written |
+| `notes` | free text |
+
+Add `load_batch_id` to `mrp_price_history` as a FK. Every price row must trace to a batch, and every batch to a file hash and a download date.
+
+**Why the hash carries the weight.** It is the only field that distinguishes two files with the same name. Re-uploading an identical file becomes a detectable no-op; uploading a changed one is provably different, whatever it is called. Had this existed, today's drift would have surfaced the moment a fresh copy was uploaded.
+
+Schema changes go in `lib/db/src/schema/catalog.ts`, then `pnpm --filter @workspace/db run push`.
+
+### 3.3 Ask for the download date
+
+On **Load MRP**, before accepting a file:
+
+- Ask which of the six sources it is — a picker from `mrp_sources`, not free text.
+- Ask when it was downloaded, defaulting to today but editable, because people load files they exported last week.
+- Compute and show the SHA-256. If it matches the most recent batch for that source, say so plainly: *"This is byte-for-byte the file loaded on 19 Aug. Load anyway?"*
+- Show the source link so the person can open the sheet and re-export if the copy looks old.
+
+Do not infer the download date from file modification time. It survives copying, zipping and re-saving unpredictably, and a wrong date here is worse than an absent one — it looks authoritative.
+
+### 3.4 Surface freshness
+
+On **Data Health**, a panel: one row per division showing source, file hash (first 12 characters), downloaded date, loaded date, snapshot age in days, and price-row count. Sort oldest first.
+
+Flag any division whose snapshot is more than 30 days old. Wording should state the fact, not raise an alarm: *"PTMT prices are from a snapshot taken 34 days ago. The sheet may have changed since."* A stale snapshot is not an error; it is a fact the reader needs when deciding how much weight to put on a number.
+
+Add the same line, compactly, to the Comparison and Competition Analysis pages: **"Prayag MRP as of <download date>"**. The gap figures on those pages are only as current as that date, and anyone acting on them should see it without navigating elsewhere.
+
+### 3.5 Record the current rebuild retrospectively
+
+The existing 12,768 rows came from files downloaded on **19 August 2026**. Backfill one batch per division so history is not left as the only unprovenanced load. Verified hashes:
+
+```
+03afec64dd7fa66d…  2,168,993 B   MRP w.e.f. 01st Feb, 2026 Pipe & Fitting.xlsx
+5da96e39cac40ede…    918,578 B   NEW PTMT MRP w.e.f. List as on 01st Sep, 2026.xlsx
+82f7f52c5a83ca9f…    872,767 B   New CP MRP w.e.f. 01st Aug, 2026.xlsx
+ca729a94d1714c66…    202,052 B   SANITARYWARE NEW MRP w.e.f. 01st May, 2026.xlsx
+d5a80e00f732af17…    114,001 B   NEW HARDWARE Price List as on 01st Mar, 2026.xlsx
+b867beecfce9f079…    152,291 B   MRP w.e.f. 15th Feb, 2024 QUAA & FERN.xlsx
+```
+
+Mark these batches `notes = 'Backfilled provenance for the 19 Aug 2026 rebuild'`, and record that the PTMT file is **known to differ from the live sheet** in the 600-series September price cells.
+
+---
+
+## 4. What this does not solve
+
+Provenance records staleness; it does not remove it. The team still exports by hand, and a snapshot is stale the moment the sheet is edited.
+
+The eventual fix is for the app to read the six sheets directly through the Google Sheets API with a service account, so "download date" collapses into "read at". That needs a decision on credentials and sharing, so it is out of scope here — but build `mrp_sources` with that in mind. The `sheet_id` column is what a direct reader would use, which is why it is stored separately from the URL rather than parsed out of it later.
+
+---
+
+## 5. Acceptance tests
+
+```
+1. Loading a file without choosing a source, or without a download date, is rejected
+   with a clear message.
+2. Loading the same file twice produces the same SHA-256 and the UI warns before the
+   second load proceeds.
+3. Changing one cell in a workbook changes the hash, and the UI treats it as a new file.
+4. Every mrp_price_history row has a non-null load_batch_id after the backfill.
+5. Data Health shows six divisions with a snapshot age, and flags any over 30 days.
+6. Comparison and Competition Analysis both display the Prayag MRP download date.
+7. Backfilled batches carry downloaded_at = 2026-08-19 and the six hashes above.
+```
+
+Test 3 is the one that matters. It is exactly the case that went undetected today.
+
+---
+
+## 6. Report back
+
+Read from the database, not from this prompt:
+
+- The six `mrp_sources` rows.
+- The backfilled batches with hash, download date and row count.
+- Any `mrp_price_history` rows left without a `load_batch_id`. Expected: zero.
+- The Data Health freshness panel contents.
+
+One clean commit.

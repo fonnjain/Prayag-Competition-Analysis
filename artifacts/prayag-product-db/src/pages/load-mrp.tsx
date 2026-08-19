@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -29,6 +30,22 @@ interface MrpPeriod {
   count: number;
 }
 
+interface MrpSource {
+  id: number;
+  division: string;
+  sheetUrl: string;
+  expectedFileName: string | null;
+  notes: string | null;
+}
+
+interface DuplicateSnapshot {
+  sourceDivision: string;
+  loadedAt: string;
+  downloadedAt: string;
+  fileSha256: string;
+  loadBatchId: number;
+}
+
 function useMrpPeriods() {
   return useQuery<MrpPeriod[]>({
     queryKey: ["catalog", "mrp-periods"],
@@ -41,9 +58,23 @@ function useMrpPeriods() {
   });
 }
 
+function useMrpSources() {
+  return useQuery<MrpSource[]>({
+    queryKey: ["catalog", "mrp-sources"],
+    queryFn: async () => {
+      const res = await fetch("/api/catalog/mrp-sources");
+      if (!res.ok) throw new Error("Failed to load official MRP sources");
+      const data = await res.json();
+      return data.sources as MrpSource[];
+    },
+  });
+}
+
 export default function LoadMrpPage() {
   const [file, setFile] = useState<File | null>(null);
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sourceId, setSourceId] = useState("");
+  const [downloadedAt, setDownloadedAt] = useState(new Date().toISOString().split("T")[0]);
   const [isUploading, setIsUploading] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -54,14 +85,16 @@ export default function LoadMrpPage() {
   const [dismissedLowMrp, setDismissedLowMrp] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<MrpPeriod | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [duplicateSnapshot, setDuplicateSnapshot] = useState<DuplicateSnapshot | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: periods, isLoading: periodsLoading } = useMrpPeriods();
+  const { data: sources, isLoading: sourcesLoading } = useMrpSources();
+  const selectedSource = sources?.find((source) => String(source.id) === sourceId) ?? null;
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file || !effectiveDate) return;
+  const submitUpload = async (confirmDuplicate = false) => {
+    if (!file || !effectiveDate || !sourceId || !downloadedAt) return;
 
     setIsUploading(true);
     setResult(null);
@@ -71,6 +104,9 @@ export default function LoadMrpPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("effectiveDate", effectiveDate);
+    formData.append("sourceId", sourceId);
+    formData.append("downloadedAt", downloadedAt);
+    if (confirmDuplicate) formData.append("confirmDuplicate", "true");
 
     try {
       const res = await fetch("/api/catalog/load-mrp", {
@@ -80,6 +116,10 @@ export default function LoadMrpPage() {
 
       const data = await res.json();
 
+      if (res.status === 409 && data.duplicate) {
+        setDuplicateSnapshot(data.duplicate as DuplicateSnapshot);
+        return;
+      }
       if (!res.ok) {
         throw new Error(data.error || "Failed to upload file");
       }
@@ -87,11 +127,15 @@ export default function LoadMrpPage() {
       setResult(data.results);
       toast({
         title:
-          data.results.flaggedMrpCount > 0
+          data.results.kind === "discontinuation-correction"
+            ? "Correction applied"
+            : data.results.flaggedMrpCount > 0
             ? "Review required"
             : "Upload successful",
         description:
-          data.results.flaggedMrpCount > 0
+          data.results.kind === "discontinuation-correction"
+            ? data.results.message
+            : data.results.flaggedMrpCount > 0
             ? `${data.results.flaggedMrpCount} suspicious price row(s) are blocked until you confirm them.`
             : `Imported ${data.results.totalRows} rows successfully.`,
       });
@@ -113,6 +157,11 @@ export default function LoadMrpPage() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitUpload();
   };
 
   const handleReview = async (decision: "approve" | "cancel") => {
@@ -284,6 +333,51 @@ export default function LoadMrpPage() {
               Upload a single Excel/CSV file, or a ZIP containing multiple spreadsheets. All files in the ZIP will use the same effective date.
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="source">Official source</Label>
+            <Select value={sourceId} onValueChange={setSourceId} disabled={sourcesLoading}>
+              <SelectTrigger id="source">
+                <SelectValue placeholder={sourcesLoading ? "Loading sources…" : "Choose the Google Sheet this file came from"} />
+              </SelectTrigger>
+              <SelectContent>
+                {(sources ?? []).map((source) => (
+                  <SelectItem key={source.id} value={String(source.id)}>
+                    {source.division}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedSource && (
+              <p className="text-xs text-muted-foreground">
+                <a
+                  href={selectedSource.sheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Open source sheet
+                </a>
+                {selectedSource.expectedFileName
+                  ? ` · Expected file: ${selectedSource.expectedFileName}`
+                  : ""}
+              </p>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="downloadedAt">File Downloaded On</Label>
+            <Input
+              id="downloadedAt"
+              type="date"
+              value={downloadedAt}
+              onChange={(e) => setDownloadedAt(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter when this copy was exported from the source sheet. This is not inferred from the file’s modified date.
+            </p>
+          </div>
           
           <div className="space-y-2">
             <Label htmlFor="effectiveDate">Effective Date</Label>
@@ -296,7 +390,7 @@ export default function LoadMrpPage() {
             />
           </div>
 
-          <Button type="submit" disabled={!file || !effectiveDate || isUploading} className="w-full">
+          <Button type="submit" disabled={!file || !effectiveDate || !sourceId || !downloadedAt || isUploading} className="w-full">
             {isUploading ? (
               "Uploading..."
             ) : (
@@ -330,6 +424,15 @@ export default function LoadMrpPage() {
               </span>
             )}
           </h3>
+            {result.provenance && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <div className="font-medium">{result.provenance.sourceDivision}</div>
+                <div className="mt-1 text-muted-foreground">
+                  Snapshot downloaded {result.provenance.downloadedAt} · SHA-256{" "}
+                  <code className="font-mono text-xs">{result.provenance.fileSha256}</code>
+                </div>
+              </div>
+            )}
 
           {/* Aggregate detection details — only for single-file uploads */}
           {!result.files && (
@@ -702,6 +805,37 @@ export default function LoadMrpPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? "Deleting…" : "Delete period"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!duplicateSnapshot}
+        onOpenChange={(open) => {
+          if (!open) setDuplicateSnapshot(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Load the same snapshot again?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This is byte-for-byte the file loaded on{" "}
+              <strong>{duplicateSnapshot?.loadedAt?.slice(0, 10)}</strong> for{" "}
+              <strong>{duplicateSnapshot?.sourceDivision}</strong>. It has SHA-256{" "}
+              <code>{duplicateSnapshot?.fileSha256}</code>. Loading it again will be
+              recorded, but duplicate price rows will not be added.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setDuplicateSnapshot(null);
+                void submitUpload(true);
+              }}
+            >
+              Load anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

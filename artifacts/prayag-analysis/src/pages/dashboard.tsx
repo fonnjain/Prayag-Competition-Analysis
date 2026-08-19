@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -47,6 +48,27 @@ export default function Dashboard() {
   // undefined = overview data not yet received; null = loaded but no competitor
   // rows exist for this period; string = the resolved period date.
   const [competitorPeriodDate, setCompetitorPeriodDate] = useState<string | null | undefined>(undefined);
+  const { data: provenance } = useQuery<{
+    snapshotDate: string | null;
+    sources: { downloadedAt: string | null }[];
+  }>({
+    queryKey: ["catalog", "mrp-provenance"],
+    queryFn: async () => {
+      const res = await fetch("/api/catalog/mrp-provenance");
+      if (!res.ok) throw new Error("Failed to load MRP provenance");
+      return res.json();
+    },
+  });
+  const sourceDates = [...new Set(
+    (provenance?.sources ?? [])
+      .map((source) => source.downloadedAt)
+      .filter((date): date is string => !!date),
+  )].sort();
+  const snapshotLabel = provenance?.snapshotDate
+    ? `Prayag MRP as of ${new Date(`${provenance.snapshotDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+    : sourceDates.length > 1
+      ? `Prayag MRP snapshots span ${new Date(`${sourceDates[0]}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}–${new Date(`${sourceDates.at(-1)}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+      : null;
   // Mode rides along inside the filters object so every child hook + the export
   // URL pick it up automatically. "mrp" is the default and is omitted.
   const filters: DashboardFilters =
@@ -125,7 +147,7 @@ export default function Dashboard() {
       </div>
 
       <div className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} competitorPeriodDate={competitorPeriodDate} />
+        <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} competitorPeriodDate={competitorPeriodDate} snapshotLabel={snapshotLabel} />
         
         <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} onCompetitorPeriodDate={handleCompetitorPeriodDate} />
         
@@ -193,6 +215,7 @@ function FilterBar({
   onChange,
   prayagMrpDate,
   competitorPeriodDate,
+  snapshotLabel,
 }: {
   filters: DashboardFilters;
   onChange: (f: DashboardFilters) => void;
@@ -200,6 +223,7 @@ function FilterBar({
   // undefined = overview not yet loaded; null = loaded but no competitor data;
   // string = the resolved competitor period date.
   competitorPeriodDate?: string | null | undefined;
+  snapshotLabel?: string | null;
 }) {
   const { data, isLoading } = useGetAnalysisFilters();
   const { data: periodsData } = useGetAnalysisPeriods();
@@ -348,7 +372,13 @@ function FilterBar({
         {prayagMrpDate && (
           <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Prayag MRP revision used for this comparison">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-            Prayag MRP as of {prayagMrpDate}
+            MRP revision as of {prayagMrpDate}
+          </div>
+        )}
+        {snapshotLabel && (
+          <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Downloaded source snapshot used for Prayag MRP">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            {snapshotLabel}
           </div>
         )}
 

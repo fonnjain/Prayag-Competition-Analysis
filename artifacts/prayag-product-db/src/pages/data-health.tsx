@@ -6,7 +6,7 @@ import {
   getGetCatalogFiltersQueryKey,
 } from "@workspace/api-client-react";
 import { AlertTriangle, CheckCircle2, Database, RotateCcw } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +21,40 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+interface MrpSourceHealth {
+  id: number;
+  division: string;
+  sheetUrl: string;
+  expectedFileName: string | null;
+  notes: string | null;
+  fileHashPrefix: string | null;
+  downloadedAt: string | null;
+  loadedAt: string | null;
+  rowCount: number | null;
+  snapshotAgeDays: number | null;
+  isStale: boolean;
+  freshnessMessage: string;
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return "Not loaded";
+  return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function DataHealthPage() {
   const { data, isLoading } = useGetCatalogDataHealth();
+  const { data: provenance } = useQuery<{ sources: MrpSourceHealth[] }>({
+    queryKey: ["catalog", "mrp-provenance"],
+    queryFn: async () => {
+      const res = await fetch("/api/catalog/mrp-provenance");
+      if (!res.ok) throw new Error("Failed to load MRP source provenance");
+      return res.json();
+    },
+  });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const resetMutation = useResetCatalog({
@@ -104,6 +136,73 @@ export default function DataHealthPage() {
           >
             {data.flaggedMrpCount}
           </span>
+        </div>
+      </div>
+
+      <div className="bg-card border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b bg-muted/20">
+          <h2 className="font-semibold">MRP source snapshots</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            These are the downloaded copies used for price history. A snapshot can be correct and still become stale after its source sheet changes.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead className="bg-muted/40 text-left">
+              <tr>
+                <th className="px-4 py-2.5 font-medium">Source</th>
+                <th className="px-4 py-2.5 font-medium">File hash</th>
+                <th className="px-4 py-2.5 font-medium">Downloaded</th>
+                <th className="px-4 py-2.5 font-medium">Loaded</th>
+                <th className="px-4 py-2.5 font-medium">Snapshot age</th>
+                <th className="px-4 py-2.5 font-medium text-right">Price rows</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(provenance?.sources ?? []).map((source) => (
+                <tr
+                  key={source.id}
+                  className={source.isStale ? "border-t bg-amber-50/70" : "border-t"}
+                >
+                  <td className="px-4 py-3 align-top">
+                    <a
+                      href={source.sheetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {source.division}
+                    </a>
+                    {source.isStale && (
+                      <p className="mt-1 max-w-sm text-xs text-amber-800">
+                        {source.freshnessMessage}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 align-top font-mono text-xs">
+                    {source.fileHashPrefix ? `${source.fileHashPrefix}…` : "—"}
+                  </td>
+                  <td className="px-4 py-3 align-top">{formatDate(source.downloadedAt)}</td>
+                  <td className="px-4 py-3 align-top">{formatDate(source.loadedAt)}</td>
+                  <td className="px-4 py-3 align-top">
+                    {source.snapshotAgeDays == null
+                      ? "—"
+                      : `${source.snapshotAgeDays} day${source.snapshotAgeDays === 1 ? "" : "s"}`}
+                  </td>
+                  <td className="px-4 py-3 align-top text-right font-mono">
+                    {source.rowCount?.toLocaleString() ?? "—"}
+                  </td>
+                </tr>
+              ))}
+              {!provenance && (
+                <tr>
+                  <td className="px-4 py-5 text-muted-foreground" colSpan={6}>
+                    Loading source snapshots…
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

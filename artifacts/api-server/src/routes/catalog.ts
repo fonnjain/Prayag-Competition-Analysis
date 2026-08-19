@@ -7,8 +7,11 @@ import {
   mrpPriceHistoryTable,
   codeConflictsTable,
   competitorPricesTable,
+  mrpSourcesTable,
+  mrpLoadBatchesTable,
 } from "@workspace/db";
 import { loadCatalogSeed } from "../lib/catalogSeed";
+import { ensureOfficialMrpSources } from "../lib/mrpProvenance";
 
 const router: IRouter = Router();
 
@@ -23,6 +26,71 @@ function dateParam(value: unknown): string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value
     : new Date().toISOString().slice(0, 10);
+}
+
+type MrpSourceHealthRow = {
+  id: number;
+  division: string;
+  sheetId: string;
+  sheetUrl: string;
+  expectedFileName: string | null;
+  notes: string | null;
+  loadBatchId: number | null;
+  fileName: string | null;
+  fileSha256: string | null;
+  fileSizeBytes: number | null;
+  downloadedAt: string | null;
+  loadedAt: Date | null;
+  rowCount: number | null;
+  snapshotAgeDays: number | null;
+};
+
+export async function getMrpSourceHealth() {
+  await ensureOfficialMrpSources();
+  const result = await db.execute<MrpSourceHealthRow>(sql`
+    SELECT
+      s.id,
+      s.division,
+      s.sheet_id AS "sheetId",
+      s.sheet_url AS "sheetUrl",
+      s.expected_file_name AS "expectedFileName",
+      s.notes,
+      b.id AS "loadBatchId",
+      b.file_name AS "fileName",
+      b.file_sha256 AS "fileSha256",
+      b.file_size_bytes AS "fileSizeBytes",
+      b.downloaded_at AS "downloadedAt",
+      b.loaded_at AS "loadedAt",
+      b.row_count AS "rowCount",
+      CASE
+        WHEN b.downloaded_at IS NULL THEN NULL
+        ELSE (CURRENT_DATE - b.downloaded_at)::int
+      END AS "snapshotAgeDays"
+    FROM mrp_sources s
+    LEFT JOIN LATERAL (
+      SELECT *
+      FROM mrp_load_batches b
+      WHERE b.source_id = s.id
+      ORDER BY b.loaded_at DESC, b.id DESC
+      LIMIT 1
+    ) b ON TRUE
+    ORDER BY
+      CASE WHEN b.downloaded_at IS NULL THEN 1 ELSE 0 END,
+      b.downloaded_at ASC,
+      s.division ASC
+  `);
+
+  return result.rows.map((row) => ({
+    ...row,
+    fileHashPrefix: row.fileSha256?.slice(0, 12) ?? null,
+    isStale: row.snapshotAgeDays != null && row.snapshotAgeDays > 30,
+    freshnessMessage:
+      row.snapshotAgeDays == null
+        ? "No source snapshot has been loaded yet."
+        : row.snapshotAgeDays > 30
+          ? `${row.division} prices are from a snapshot taken ${row.snapshotAgeDays} days ago. The sheet may have changed since.`
+          : `${row.division} prices are from a snapshot taken ${row.snapshotAgeDays} days ago.`,
+  }));
 }
 
 async function getCurrentPriceMap(asOf: string): Promise<Map<string, CurrentPrice>> {
@@ -173,6 +241,28 @@ router.get("/catalog/filters", async (_req, res) => {
   res.json({ divisions, categories });
 });
 
+// GET /catalog/mrp-sources — the six canonical sheets for the MRP loader.
+router.get("/catalog/mrp-sources", async (_req, res) => {
+  await ensureOfficialMrpSources();
+  const sources = await db
+    .select()
+    .from(mrpSourcesTable)
+    .orderBy(asc(mrpSourcesTable.division));
+  res.json({ sources });
+});
+
+// GET /catalog/mrp-provenance — latest snapshot per official source.
+router.get("/catalog/mrp-provenance", async (_req, res) => {
+  const sources = await getMrpSourceHealth();
+  const dates = sources
+    .map((source) => source.downloadedAt)
+    .filter((date): date is string => !!date)
+    .sort();
+  const snapshotDate =
+    dates.length > 0 && new Set(dates).size === 1 ? dates[0] : null;
+  res.json({ sources, snapshotDate });
+});
+
 // GET /catalog/data-health — conflicts, missing prices, duplicate sources.
 router.get("/catalog/data-health", async (_req, res) => {
   const totalRow = await db
@@ -226,6 +316,8 @@ router.get("/catalog/data-health", async (_req, res) => {
     .orderBy(desc(sql`count(*)`))
     .limit(100);
 
+  const mrpSources = await getMrpSourceHealth();
+
   res.json({
     totalProducts,
     pricedProducts,
@@ -238,6 +330,7 @@ router.get("/catalog/data-health", async (_req, res) => {
     duplicateSources: dupRows
       .filter((d): d is { sourceFiles: string; count: number } => !!d.sourceFiles)
       .map((d) => ({ sourceFiles: d.sourceFiles, count: d.count })),
+    mrpSources,
   });
 });
 
