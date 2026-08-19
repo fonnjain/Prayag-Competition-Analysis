@@ -119,12 +119,10 @@ export const competitorPricesTable = pgTable(
     // matches; null when unknown. High/Medium are auto-accepted; Low + no-match
     // go to manual review.
     matchConfidence: text("match_confidence"),
-    // Period-matched Prayag MRP captured at compare/import time, taken straight
-    // from the verified competitor sheet's prayag_mrp (or snapshotted from the
-    // catalog at import time for auto-matched uploads). The competitor gap is
-    // computed ONLY against this persisted value — never a fresh
-    // catalog_products / mrp_price_history lookup — so a row's comparison stays
-    // stable even as the master catalog MRP changes over time.
+    // Prayag MRP captured when the competitor row is reviewed/imported. This is
+    // an audit snapshot only; the live analysis resolves Prayag MRP from
+    // mrp_price_history for the selected as-of date so displayed gaps remain
+    // consistent with the current period-aware catalog.
     prayagMrpAtCompare: doublePrecision("prayag_mrp_at_compare"),
     // Append-only period flag. True for the newest effectiveDate per
     // (competitor, matchedPrayagCode) pair. Recomputed after every import.

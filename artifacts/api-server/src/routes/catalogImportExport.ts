@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
 import { effectivePrice } from "../lib/analysis";
+import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -67,6 +68,88 @@ interface ParseResult {
   codeColHeader: string;
   priceColHeader: string;
   skippedRows: SkippedRow[];
+}
+
+interface DiscontinuationCorrectionManifest {
+  unmarkedCodes: string[];
+  confirmed: { itemCode: string; discontinuedFrom: string }[];
+}
+
+/**
+ * Recognizes the authoritative correction workbook produced from range/code
+ * sources. A code that appears in both sheets stays live: the grouped policy
+ * requires every occurrence to be REMOVED before it becomes discontinued.
+ */
+function parseDiscontinuationCorrectionWorkbook(
+  workbook: XLSX.WorkBook,
+): DiscontinuationCorrectionManifest | null {
+  const unmarkSheet = workbook.Sheets["1_UNMARK_not_discontinued"];
+  const confirmedSheet = workbook.Sheets["2_Confirmed_discontinued"];
+  if (!unmarkSheet || !confirmedSheet) return null;
+
+  const unmarkedCodes = XLSX.utils
+    .sheet_to_json<Record<string, unknown>>(unmarkSheet, { defval: null })
+    .map((row) => String(row.item_code ?? "").trim())
+    .filter(Boolean);
+  const confirmedRows = XLSX.utils
+    .sheet_to_json<Record<string, unknown>>(confirmedSheet, { defval: null })
+    .map((row) => ({
+      itemCode: String(row.item_code ?? "").trim(),
+      discontinuedFrom: String(row.discontinued_from ?? "").trim(),
+    }))
+    .filter(
+      (row) =>
+        row.itemCode.length > 0 &&
+        /^\d{4}-\d{2}-\d{2}$/.test(row.discontinuedFrom),
+    );
+
+  if (!unmarkedCodes.length || !confirmedRows.length) {
+    throw new Error("The discontinuation correction workbook has no usable rows.");
+  }
+
+  const confirmed = deriveConfirmedDiscontinuations([
+    ...unmarkedCodes.map((itemCode) => ({
+      itemCode,
+      discontinuedFrom: null,
+      isRemoved: false,
+    })),
+    ...confirmedRows.map((row) => ({
+      ...row,
+      isRemoved: true,
+    })),
+  ]);
+
+  if (confirmed.length !== confirmedRows.length) {
+    throw new Error(
+      "The correction workbook has overlapping live and removed codes; resolve them by code before importing.",
+    );
+  }
+
+  return { unmarkedCodes, confirmed };
+}
+
+async function applyDiscontinuationCorrection(
+  manifest: DiscontinuationCorrectionManifest,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    // The manifest is complete, so clear prior flags before applying only
+    // confirmed, code-grouped withdrawals. This makes re-import idempotent.
+    await tx
+      .update(catalogProductsTable)
+      .set({ discontinuedFrom: null, updatedAt: new Date() });
+    for (let index = 0; index < manifest.confirmed.length; index += 500) {
+      for (const row of manifest.confirmed.slice(index, index + 500)) {
+        await tx
+          .update(catalogProductsTable)
+          .set({
+            discontinuedFrom: row.discontinuedFrom,
+            updatedAt: new Date(),
+          })
+          .where(eq(catalogProductsTable.itemCode, row.itemCode));
+      }
+    }
+  });
+  await recomputeCurrentFlags();
 }
 
 function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
@@ -672,6 +755,24 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
 
   try {
     const reviewBatchId = randomUUID();
+    if (ext === "xlsx" || ext === "xls") {
+      const workbook = XLSX.read(file.buffer, { type: "buffer" });
+      const correction = parseDiscontinuationCorrectionWorkbook(workbook);
+      if (correction) {
+        await applyDiscontinuationCorrection(correction);
+        res.json({
+          results: {
+            file: name,
+            kind: "discontinuation-correction",
+            unmarkedCodes: correction.unmarkedCodes.length,
+            confirmedDiscontinuations: correction.confirmed.length,
+            message:
+              "Applied the grouped discontinuation correction. Re-importing this workbook is safe.",
+          },
+        });
+        return;
+      }
+    }
     const existingProducts = await db
       .select({ itemCode: catalogProductsTable.itemCode })
       .from(catalogProductsTable);

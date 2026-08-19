@@ -129,9 +129,8 @@ export async function loadCatalogSeed(): Promise<void> {
   }
 
   // Snapshot of the seed's current Prayag MRP (latest effective date per code).
-  // The analysis gap reads ONLY the per-row prayagMrpAtCompare, so matched
-  // competitor rows must carry this value or they would become non-comparable
-  // after a reset. Mirrors recomputeCurrentFlags' "latest effective date wins".
+  // This is retained for import auditability. The analysis gap itself resolves
+  // the selected period from mrp_price_history, rather than reading this value.
   const currentMrpByCode = new Map<string, number>();
   const latestDateByCode = new Map<string, string>();
   for (const r of data.priceHistory) {

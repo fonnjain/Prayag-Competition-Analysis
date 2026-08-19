@@ -32,3 +32,10 @@ uri = "file://reports/mrp-full-rebuild-inactive-codes.csv"
 type = "table"
 title = "Inactive codes after MRP rebuild"
 description = "The 556 catalog products absent from the authoritative rebuild catalog sheet; they were retained and marked inactive."
+
+[[outputs]]
+id = "xrtrSNS72kEKGWlqgIQT3"
+uri = "file://reports/post-rebuild-corrections-report.md"
+type = "text"
+title = "Post-rebuild corrections report"
+description = "Database-readback report for the discontinuation correction, live gap trace, and inactive-code review."
