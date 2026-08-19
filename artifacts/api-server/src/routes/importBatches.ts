@@ -45,13 +45,11 @@ const upload = multer({
 
 // Known Sparsh Pearl code aliases (Vol 6.2 verified).
 // After import diagnostics confirmed which codes are actually in the PDF extraction:
-//   - RPS-2285→RPS-2265 (competitor DB code vs catalogue code for same product)
 //   - WMP pipe renumbering: WMP-186→WMP-188 (2 Mtr), WMP-188→WMP-189 (3 Mtr)
 //   - WC-100→WC-180 (Waste Coupling Half Thread renumbered)
 // seedAliasesIfNeeded() does a full delete+insert so any correction here takes effect on next import.
 const SPARSH_ALIASES: Array<{ oldCode: string; newCode: string; note: string }> = [
   { oldCode: "WC-100",   newCode: "WC-180",   note: "Waste Coupling Half Thread renumbered" },
-  { oldCode: "RPS-2285", newCode: "RPS-2265", note: "Competitor DB code vs catalogue code for same product" },
   { oldCode: "PJS-255",  newCode: "PSJ-255",  note: "Jet Spray 1 Mtr — letters transposed" },
   { oldCode: "PJS-256",  newCode: "PSJ-256",  note: "Jet Spray 1.5 Mtr — letters transposed" },
   { oldCode: "WMH-2331", newCode: "WIH-2331", note: "Washing Machine Inlet Hose 1.5 Mtr" },

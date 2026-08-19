@@ -101,6 +101,18 @@ describe("exact code match", () => {
     expect(row.status).toBe("ok");
   });
 
+  it("keeps RPS-2285 as a direct Sink Mixer match", () => {
+    const { row } = matchOne(
+      { competitorCode: "RPS-2285", description: "Sink Mixer" },
+      { cat_no: "RPS-2285", product_name: "Sink Mixer", mrp: 1388 },
+    );
+    expect(row.status).toBe("ok");
+    expect(row.matchMethod).toBe("code+desc");
+    expect(row.competitorCodeCatalogue).toBe("RPS-2285");
+    expect(row.newMrp).toBe(1388);
+    expect(row.reviewReason).toBeNull();
+  });
+
   it("records the catalogue code on the staging row", () => {
     const { row } = matchOne(
       { competitorCode: "WMP-188" },

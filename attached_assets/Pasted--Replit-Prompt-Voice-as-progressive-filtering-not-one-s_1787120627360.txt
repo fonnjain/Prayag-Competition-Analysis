@@ -1,0 +1,97 @@
+# Replit Prompt — Voice as progressive filtering, not one-shot lookup
+
+Nobody says a full product name out loud. They say "PTMT", then "bib cock", then "15mm" — narrowing as they go, the way they'd talk to a colleague. Rebuild the voice lookup around that.
+
+> Upload the updated `Prayag_Category_Backfill.xlsx` first (it now carries PTMT series names), then paste everything below (from **GOAL**) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+Change voice lookup from "say the product, get the product" to **speak a term, see the list narrow**. Each utterance adds a filter. The user keeps speaking — or taps — until the list is small enough to choose from.
+
+## 1. Why one-shot matching cannot work here
+
+The vocabulary is broad and heavily repeated. Saying a single term rarely identifies one product:
+
+| Spoken term | Products matched |
+|---|---|
+| "PTMT" | 2,047 |
+| "bib cock" | 561 |
+| "pillar cock" | 314 |
+| "wall mixer" | 291 |
+| "stop cock" | 224 |
+| "elbow" | 217 |
+| "ball cock" | 50 |
+
+Returning "the top 3 matches" for "bib cock" is close to meaningless — it hides 558 others. The list itself is the answer until it is short enough to choose from.
+
+## 2. How it should behave
+
+Filters **accumulate**. Each spoken phrase is added to the active set and the result list narrows:
+
+```
+"PTMT"        →  2,047 products
+"bib cock"    →    423 products
+"Quadra"      →     28 products
+"15mm"        →      6 products   → user taps one
+```
+
+- Show the **active filters as chips**, in the order spoken, each individually removable. Removing one re-widens the list — this is how a user recovers from a misheard word without starting over.
+- Show the **live count** prominently: "28 products". The count is the feedback that tells them whether to keep narrowing.
+- **Never auto-select**, however small the list gets. Even at one result, the user taps to confirm. A confidently wrong price is worse than one more tap.
+- The mic stays available throughout, so the next term is one tap away. Typing into the same box adds a filter identically — voice and keyboard are the same mechanism.
+
+## 3. What a spoken term can match
+
+Match each term against **any** of: division, category/series, product name, item code, and size. The user does not know or care which field their word lives in.
+
+- **Divisions** — "PTMT", "pipes", "CP", "sanitaryware", "hardware"
+- **Series / categories** — "Quadra", "Cobra", "Diamond", "Black Pearl", "Regal", "Helix", "Sapphire", "Standard" (109 series in PTMT alone, 29 in CP, 165 in Sanitaryware)
+- **Product type** — "bib cock", "pillar cock", "ball cock", "wall mixer", "stop cock", "elbow", "tee", "coupling", "sink mixer", "angle cock"
+- **Size** — "15mm", "20mm", "half inch", "three quarter"
+- **Code** — "one twenty one B" → `121-B`
+
+Multi-word phrases must match as a phrase: "bib cock" is one filter, not "bib" AND "cock". Recognise the common two-word type names as units.
+
+## 4. Speech normalisation
+
+Spoken input needs cleaning before it can filter:
+
+- Numbers to digits: "fifteen mm" → `15mm`, "one twenty one B" → `121-B`, "twenty five" → `25`
+- Fractions: "half inch" → `½"` / `0.5 inch`, "three quarter" → `¾"`, "one and a quarter" → `1¼"`
+- Separators: "dash" / "hyphen" spoken aloud → `-`
+- Strip filler: "show me", "find", "what is the price of", "wala", "ka price"
+- Treat Hinglish connectors as filler, not filter terms
+
+Build a **synonym map** for what people actually say versus what the catalogue prints — "tap" → "cock", "PTMT" also matching the division "PTMT & Plastic Fittings", "SS" → the Hardware material grades. Extend it as real usage shows what's missing.
+
+## 5. When a term matches nothing
+
+Do not clear the filters and do not fail silently. Keep the current list, and say what happened:
+
+> "Nothing matched 'quadrat'. Showing 423 bib cock results." — with the unmatched word offered as a chip the user can tap to retry or edit.
+
+The transcript stays visible and editable throughout, so a misheard word is corrected in place rather than by repeating the whole chain.
+
+## 6. Suggesting the next narrowing
+
+When the list is still long (say over 25), show what would narrow it best — the two or three fields with the most distinct values in the current set, as tappable options:
+
+> 423 products · narrow by **Series** (18) · **Size** (7) · **Type** (5)
+
+This teaches the vocabulary. A user who sees "Series: Quadra, Cobra, Diamond…" learns what to say next time, which is how voice interfaces actually get adopted.
+
+## 7. Result
+
+Selecting a product opens the same result card as before — Prayag MRP as hero, validity window, next revision, competitor rows — and speaks the same short summary. Nothing about the card changes; only the path to it.
+
+## Validation
+
+- `"PTMT"` → 2,047 · `"bib cock"` → 423 · `"Quadra"` → 28 · `"15mm"` → a handful; each step shows a chip and a live count.
+- `"ball cock"` → 50 · `"20mm"` → 10, including `152`, `162`, `168`, `174`.
+- Removing the "Quadra" chip returns the list to 423, not to 6,330.
+- A single result still requires a tap; nothing auto-opens.
+- An unrecognised word leaves the existing filters intact and says so.
+- `"one twenty one B"` resolves to `121-B` as a code filter.
+- Typing a term produces exactly the same filtering as speaking it.

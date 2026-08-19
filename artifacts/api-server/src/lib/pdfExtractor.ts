@@ -29,10 +29,10 @@ import {
 /** The Claude model used for PDF catalogue extraction. */
 export const EXTRACTION_MODEL = "claude-opus-5" as const;
 
-// Maximum pages per API request. 17 profile pages << 25, so the normal
-// profile path uses a single request. The chunker only kicks in for the
-// widened-retry path (~45 pages → 2 chunks) or the full-PDF fallback.
-const MAX_PAGES_PER_REQUEST = 25;
+// Maximum pages per API request. Sparsh Pearl's 17 profile pages contain
+// enough densely-tabulated SKUs to exceed the model's JSON output cap when
+// sent together. Smaller chunks keep each strict-JSON response complete.
+const MAX_PAGES_PER_REQUEST = 6;
 // Coverage below this fraction triggers a widened-page retry.
 // 0.90 allows for ~10% of mapped codes that may be genuinely absent
 // (discontinued SKUs, slight naming differences) without causing an

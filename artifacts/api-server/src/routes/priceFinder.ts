@@ -9,6 +9,7 @@ type SearchRow = {
   product_name: string | null;
   division: string | null;
   category: string | null;
+  size: string | null;
   current_mrp: number | null;
   current_effective_date: string | null;
   has_competitor_data: boolean;
@@ -110,13 +111,78 @@ function normaliseSpokenQuery(value: string): string {
   return output.join(" ");
 }
 
+const FILTER_FILLER = /\b(?:show me|find|what is the price of|what's the price of|ka price|wala)\b/gi;
+
+function filterVariants(value: string): string[] {
+  const raw = value.trim().toLowerCase();
+  const cleaned = raw.replace(FILTER_FILLER, " ").replace(/\s+/g, " ").trim();
+  const spoken = normaliseSpokenQuery(cleaned);
+  const variants = [raw, cleaned, spoken];
+
+  if (cleaned.includes("half inch")) {
+    variants.push(cleaned.replace(/\bhalf inch\b/g, '½"'));
+    variants.push(cleaned.replace(/\bhalf inch\b/g, '0.5 inch'));
+  }
+  if (cleaned.includes("three quarter")) {
+    variants.push(cleaned.replace(/\bthree quarter\b/g, '¾"'));
+    variants.push(cleaned.replace(/\bthree quarter\b/g, '0.75 inch'));
+  }
+
+  const synonymVariants = [...variants];
+  for (const variant of variants) {
+    if (/\btap\b/.test(variant)) synonymVariants.push(variant.replace(/\btap\b/g, "cock"));
+    if (/\bptmt\b/.test(variant)) {
+      synonymVariants.push(variant.replace(/\bptmt\b/g, "ptmt & plastic fittings"));
+    }
+    if (/\bss\b/.test(variant)) synonymVariants.push(variant.replace(/\bss\b/g, "stainless steel"));
+  }
+
+  return synonymVariants.filter(
+    (candidate, index, all) => candidate && all.indexOf(candidate) === index,
+  );
+}
+
+function filterCondition(term: string) {
+  const conditions = filterVariants(term).flatMap((variant) => {
+    const like = `%${variant}%`;
+    const normalizedLike = `%${normalise(variant)}%`;
+    return [
+      sql`lower(p.item_code) LIKE ${like}`,
+      sql`lower(coalesce(p.product_name, '')) LIKE ${like}`,
+      sql`lower(coalesce(p.division, '')) LIKE ${like}`,
+      sql`lower(coalesce(p.category, '')) LIKE ${like}`,
+      sql`lower(coalesce(p.size, '')) LIKE ${like}`,
+      sql`regexp_replace(lower(p.item_code), '[^a-z0-9]', '', 'g') LIKE ${normalizedLike}`,
+      sql`regexp_replace(lower(coalesce(p.product_name, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedLike}`,
+      sql`regexp_replace(lower(coalesce(p.division, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedLike}`,
+      sql`regexp_replace(lower(coalesce(p.category, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedLike}`,
+      sql`regexp_replace(lower(coalesce(p.size, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedLike}`,
+    ];
+  });
+  return sql`(${sql.join(conditions, sql` OR `)})`;
+}
+
+function getFilterTerms(req: Request): string[] {
+  const rawFilters = req.query.filters;
+  const values = Array.isArray(rawFilters)
+    ? rawFilters
+    : typeof rawFilters === "string"
+      ? [rawFilters]
+      : typeof req.query.q === "string"
+        ? [req.query.q]
+        : [];
+  return values.map(String).map((value) => value.trim()).filter(Boolean);
+}
+
 function searchScore(row: SearchRow, query: string): number {
   const queries = [query, normaliseSpokenQuery(query)].filter(
     (candidate, index, all) => candidate && all.indexOf(candidate) === index,
   );
   const code = normalise(row.item_code);
   const name = normalise(row.product_name ?? "");
+  const division = normalise(row.division ?? "");
   const category = normalise(row.category ?? "");
+  const size = normalise(row.size ?? "");
 
   return Math.max(
     ...queries.map((candidate) => {
@@ -126,26 +192,25 @@ function searchScore(row: SearchRow, query: string): number {
       if (code.includes(q)) return 800 - Math.min(code.indexOf(q), 100) / 100;
       if (name.startsWith(q)) return 700;
       if (name.includes(q)) return 600 - Math.min(name.indexOf(q), 100) / 100;
+      if (division.includes(q)) return 550 - Math.min(division.indexOf(q), 100) / 100;
       if (category.startsWith(q)) return 500;
       if (category.includes(q)) return 400 - Math.min(category.indexOf(q), 100) / 100;
+      if (size.includes(q)) return 350 - Math.min(size.indexOf(q), 100) / 100;
       return 0;
     }),
   );
 }
 
 router.get("/price-finder/search", async (req, res) => {
-  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
-  if (!query) {
-    res.json({ results: [] });
+  const filters = getFilterTerms(req);
+  if (filters.length === 0) {
+    res.json({ results: [], totalCount: 0, filterSuggestions: [], unmatchedFilters: [] });
     return;
   }
 
   const rawLimit = Number(req.query.limit);
-  const limit = Math.min(20, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 20));
-  const like = `%${query.toLowerCase()}%`;
-  const spokenQuery = normaliseSpokenQuery(query);
-  const spokenLike = `%${spokenQuery.toLowerCase()}%`;
-  const normalizedSpokenLike = `%${normalise(spokenQuery)}%`;
+  const limit = Math.min(3000, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 3000));
+  const filterConditions = filters.map(filterCondition);
 
   const result = await db.execute<SearchRow>(sql`
     SELECT
@@ -153,6 +218,7 @@ router.get("/price-finder/search", async (req, res) => {
       p.product_name,
       p.division,
       p.category,
+      p.size,
       current_price.mrp AS current_mrp,
       current_price.effective_date AS current_effective_date,
       EXISTS (
@@ -173,21 +239,14 @@ router.get("/price-finder/search", async (req, res) => {
       LIMIT 1
     ) current_price ON true
     WHERE p.is_active IS TRUE
-      AND (
-       lower(p.item_code) LIKE ${like}
-       OR lower(coalesce(p.product_name, '')) LIKE ${like}
-       OR lower(coalesce(p.category, '')) LIKE ${like}
-       OR lower(p.item_code) LIKE ${spokenLike}
-       OR lower(coalesce(p.product_name, '')) LIKE ${spokenLike}
-       OR lower(coalesce(p.category, '')) LIKE ${spokenLike}
-       OR regexp_replace(lower(p.item_code), '[^a-z0-9]', '', 'g') LIKE ${normalizedSpokenLike}
-       OR regexp_replace(lower(coalesce(p.product_name, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedSpokenLike}
-       OR regexp_replace(lower(coalesce(p.category, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedSpokenLike}
-      )
+      AND ${sql.join(filterConditions, sql` AND `)}
   `);
 
   const results = result.rows
-    .map((row) => ({ row, score: searchScore(row, query) }))
+    .map((row) => ({
+      row,
+      score: filters.reduce((total, filter) => total + searchScore(row, filter), 0),
+    }))
     .filter(({ score }) => score > 0)
     .sort(
       (a, b) =>
@@ -207,7 +266,34 @@ router.get("/price-finder/search", async (req, res) => {
       hasCompetitorData: row.has_competitor_data,
     }));
 
-  res.json({ results });
+  const suggestionFields = [
+    { field: "Series", key: "category" as const },
+    { field: "Size", key: "size" as const },
+    { field: "Division", key: "division" as const },
+  ];
+  const filterSuggestions = suggestionFields
+    .map(({ field, key }) => {
+      const counts = new Map<string, number>();
+      for (const row of result.rows) {
+        const value = row[key]?.trim();
+        if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      const values = [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 5)
+        .map(([value, count]) => ({ value, count }));
+      return { field, distinctCount: counts.size, values };
+    })
+    .filter((suggestion) => suggestion.distinctCount > 1)
+    .sort((a, b) => b.distinctCount - a.distinctCount)
+    .slice(0, 3);
+
+  res.json({
+    results,
+    totalCount: result.rows.length,
+    filterSuggestions,
+    unmatchedFilters: result.rows.length === 0 ? [filters.at(-1)] : [],
+  });
 });
 
 router.get("/price-finder/browse", async (req, res) => {

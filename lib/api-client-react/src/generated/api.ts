@@ -959,10 +959,18 @@ export function useGetCatalogProduct<TData = Awaited<ReturnType<typeof getCatalo
 
 
 
-export const getGetPriceFinderSearchUrl = (params: GetPriceFinderSearchParams,) => {
+export const getGetPriceFinderSearchUrl = (params?: GetPriceFinderSearchParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["filters"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
 
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : value.toString())
@@ -975,9 +983,9 @@ export const getGetPriceFinderSearchUrl = (params: GetPriceFinderSearchParams,) 
 }
 
 /**
- * @summary Search products for the read-only Price Finder
+ * @summary Progressively filter Price Finder products by spoken or typed terms
  */
-export const getPriceFinderSearch = async (params: GetPriceFinderSearchParams, options?: RequestInit): Promise<PriceFinderSearchResponse> => {
+export const getPriceFinderSearch = async (params?: GetPriceFinderSearchParams, options?: RequestInit): Promise<PriceFinderSearchResponse> => {
 
   return customFetch<PriceFinderSearchResponse>(getGetPriceFinderSearchUrl(params),
   {
@@ -999,7 +1007,7 @@ export const getGetPriceFinderSearchQueryKey = (params?: GetPriceFinderSearchPar
     }
 
 
-export const getGetPriceFinderSearchQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderSearch>>, TError = ErrorType<unknown>>(params: GetPriceFinderSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPriceFinderSearchQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderSearch>>, TError = ErrorType<unknown>>(params?: GetPriceFinderSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -1022,11 +1030,11 @@ export type GetPriceFinderSearchQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Search products for the read-only Price Finder
+ * @summary Progressively filter Price Finder products by spoken or typed terms
  */
 
 export function useGetPriceFinderSearch<TData = Awaited<ReturnType<typeof getPriceFinderSearch>>, TError = ErrorType<unknown>>(
- params: GetPriceFinderSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetPriceFinderSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 

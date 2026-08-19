@@ -108,8 +108,22 @@ export interface PriceFinderSearchResult {
   hasCompetitorData: boolean;
 }
 
+export type PriceFinderFilterSuggestionValuesItem = {
+  value: string;
+  count: number;
+};
+
+export interface PriceFinderFilterSuggestion {
+  field: string;
+  distinctCount: number;
+  values: PriceFinderFilterSuggestionValuesItem[];
+}
+
 export interface PriceFinderSearchResponse {
   results: PriceFinderSearchResult[];
+  totalCount: number;
+  filterSuggestions: PriceFinderFilterSuggestion[];
+  unmatchedFilters: string[];
 }
 
 export interface PriceFinderBrowseDivision {
@@ -999,10 +1013,17 @@ pageSize?: number;
 };
 
 export type GetPriceFinderSearchParams = {
-q: string;
+/**
+ * Backwards-compatible single filter term.
+ */
+q?: string;
+/**
+ * Accumulating filter phrases. Each must match a product field.
+ */
+filters?: string[];
 /**
  * @minimum 1
- * @maximum 20
+ * @maximum 3000
  */
 limit?: number;
 };

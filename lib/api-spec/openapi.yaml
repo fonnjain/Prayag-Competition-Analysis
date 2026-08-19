@@ -322,24 +322,35 @@ paths:
     get:
       operationId: getPriceFinderSearch
       tags: [catalog]
-      summary: Search products for the read-only Price Finder
+      summary: Progressively filter Price Finder products by spoken or typed terms
       parameters:
         - name: q
           in: query
-          required: true
+          required: false
+          description: Backwards-compatible single filter term.
           schema:
             type: string
+        - name: filters
+          in: query
+          required: false
+          description: Accumulating filter phrases. Each must match a product field.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
         - name: limit
           in: query
           required: false
           schema:
             type: integer
             minimum: 1
-            maximum: 20
-            default: 20
+            maximum: 3000
+            default: 3000
       responses:
         "200":
-          description: Ranked Price Finder search results
+          description: Matching products, live count, and next-filter suggestions
           content:
             application/json:
               schema:
@@ -1547,12 +1558,40 @@ components:
           type: boolean
     PriceFinderSearchResponse:
       type: object
-      required: [results]
+      required: [results, totalCount, filterSuggestions, unmatchedFilters]
       properties:
         results:
           type: array
           items:
             $ref: "#/components/schemas/PriceFinderSearchResult"
+        totalCount:
+          type: integer
+        filterSuggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderFilterSuggestion"
+        unmatchedFilters:
+          type: array
+          items:
+            type: string
+    PriceFinderFilterSuggestion:
+      type: object
+      required: [field, distinctCount, values]
+      properties:
+        field:
+          type: string
+        distinctCount:
+          type: integer
+        values:
+          type: array
+          items:
+            type: object
+            required: [value, count]
+            properties:
+              value:
+                type: string
+              count:
+                type: integer
     PriceFinderBrowseDivision:
       type: object
       required: [division, count]

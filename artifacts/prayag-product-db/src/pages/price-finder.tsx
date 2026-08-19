@@ -14,7 +14,10 @@ import {
 } from "@workspace/api-client-react";
 
 // Voice search integration using native browser SpeechRecognition API
-function useVoiceSearch(onResult: (text: string) => void) {
+function useVoiceSearch(
+  onFinalResult: (text: string) => void,
+  onTranscript: (text: string) => void,
+) {
   const [isListening, setIsListening] = useState(false);
   const [supported, setSupported] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,12 +46,10 @@ function useVoiceSearch(onResult: (text: string) => void) {
         }
       }
       
-      const text = finalTranscript || interimTranscript;
-      if (text) {
-        onResult(text);
-      }
+      if (interimTranscript) onTranscript(interimTranscript);
       
       if (finalTranscript) {
+        onFinalResult(finalTranscript);
         setError(null);
         setIsListening(false);
         recognition.stop();
@@ -77,7 +78,7 @@ function useVoiceSearch(onResult: (text: string) => void) {
         recognitionRef.current.abort();
       }
     };
-  }, [onResult]);
+  }, [onFinalResult, onTranscript]);
 
   const toggle = useCallback(() => {
     if (isListening) {
@@ -100,6 +101,7 @@ function useVoiceSearch(onResult: (text: string) => void) {
 export default function PriceFinderPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
+  const [filters, setFilters] = useState<string[]>([]);
   const [selectedItemCode, setSelectedItemCode] = useState<string | null>(null);
   const [browseDivision, setBrowseDivision] = useState<string | null>(null);
   const [browseCategory, setBrowseCategory] = useState<string | null>(null);
@@ -111,11 +113,32 @@ export default function PriceFinderPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  useEffect(() => {
+  const addFilter = useCallback((term: string) => {
+    const cleaned = term.trim();
+    if (!cleaned) return;
+    setFilters((current) =>
+      current.some((filter) => filter.toLowerCase() === cleaned.toLowerCase())
+        ? current
+        : [...current, cleaned],
+    );
+    setSearchInput("");
     setSelectedItemCode(null);
-  }, [debouncedQ]);
+  }, []);
+
+  const removeFilter = useCallback((index: number, edit = false) => {
+    setFilters((current) => {
+      const removed = current[index];
+      if (edit && removed) setSearchInput(removed);
+      return current.filter((_, itemIndex) => itemIndex !== index);
+    });
+    setSelectedItemCode(null);
+  }, []);
 
   const handleVoiceResult = useCallback((text: string) => {
+    addFilter(text);
+  }, [addFilter]);
+
+  const handleVoiceTranscript = useCallback((text: string) => {
     setSearchInput(text);
   }, []);
 
@@ -124,20 +147,33 @@ export default function PriceFinderPage() {
     supported: voiceSupported,
     error: voiceError,
     toggle: toggleVoice,
-  } = useVoiceSearch(handleVoiceResult);
+  } = useVoiceSearch(handleVoiceResult, handleVoiceTranscript);
+
+  const queryFilters = [
+    ...filters,
+    ...(debouncedQ ? [debouncedQ] : []),
+  ];
+  const queryKey = queryFilters.join("\u0001");
+
+  useEffect(() => {
+    setSelectedItemCode(null);
+  }, [queryKey]);
 
   const { data: searchData, isLoading: isSearchLoading, isError: isSearchError } = useGetPriceFinderSearch(
-    { q: debouncedQ, limit: 10 },
+    { filters: queryFilters, limit: 3000 },
     {
       query: {
-        queryKey: ["price-finder-search", debouncedQ],
-        enabled: debouncedQ.length > 1,
+        queryKey: ["price-finder-search", queryFilters],
+        enabled: queryFilters.length > 0,
         staleTime: 1000 * 60,
       },
     },
   );
 
   const results: PriceFinderSearchResult[] = searchData?.results || [];
+  const totalCount = searchData?.totalCount ?? 0;
+  const unmatchedFilter = searchData?.unmatchedFilters?.[0];
+  const hasSearch = queryFilters.length > 0;
   const browseParams = {
     division: browseDivision ?? undefined,
     category: browseDivision && browseCategory ? browseCategory : undefined,
@@ -168,13 +204,20 @@ export default function PriceFinderPage() {
         </p>
       )}
 
-      {/* Search Box */}
+      {/* Progressive voice and text filters */}
+      <div className="space-y-3">
       <div className="relative flex items-center shadow-sm group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
         <Input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by code, product name, or category..."
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              addFilter(searchInput);
+            }
+          }}
+          placeholder={filters.length ? "Say or type the next narrowing term…" : "Say or type a product term…"}
           className="pl-12 pr-24 h-14 text-lg bg-card border-2 border-primary/20 focus-visible:ring-primary focus-visible:border-primary rounded-xl"
           autoFocus
         />
@@ -208,6 +251,74 @@ export default function PriceFinderPage() {
             </Button>
           )}
         </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+        {filters.map((filter, index) => (
+          <span key={`${filter}-${index}`} className="inline-flex items-center overflow-hidden rounded-full border border-primary/20 bg-primary/5 text-sm text-primary">
+            <button
+              type="button"
+              className="px-3 py-1.5 font-medium hover:bg-primary/10"
+              onClick={() => removeFilter(index, true)}
+              title={`Edit ${filter}`}
+            >
+              {filter}
+            </button>
+            <button
+              type="button"
+              className="border-l border-primary/15 px-2 py-1.5 hover:bg-primary/10"
+              onClick={() => removeFilter(index)}
+              aria-label={`Remove ${filter} filter`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        ))}
+        {filters.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-muted-foreground"
+            onClick={() => {
+              setFilters([]);
+              setSearchInput("");
+              setSelectedItemCode(null);
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+      {hasSearch && (
+        <p className="text-sm font-semibold text-foreground" aria-live="polite">
+          {isSearchLoading ? "Narrowing products…" : `${totalCount.toLocaleString("en-IN")} products`}
+          {filters.length > 0 && " · keep narrowing or choose a product"}
+        </p>
+      )}
+      {unmatchedFilter && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+          Nothing matched “{unmatchedFilter}”. Your earlier filters are still active—edit or remove this term to continue.
+        </div>
+      )}
+      {!unmatchedFilter && totalCount > 25 && (searchData?.filterSuggestions?.length ?? 0) > 0 && (
+        <div className="rounded-xl border border-dashed bg-muted/20 p-3">
+          <p className="mb-2 text-sm font-medium text-muted-foreground">Narrow further by</p>
+          <div className="flex flex-wrap gap-2">
+            {searchData!.filterSuggestions.flatMap((suggestion) =>
+              suggestion.values.slice(0, 3).map((option) => (
+                <Button
+                  key={`${suggestion.field}-${option.value}`}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addFilter(option.value)}
+                >
+                  {suggestion.field}: {option.value} <span className="ml-1 text-muted-foreground">({option.count})</span>
+                </Button>
+              )),
+            )}
+          </div>
+        </div>
+      )}
       </div>
 
       <section className="rounded-xl border bg-card p-4 md:p-5">
@@ -313,7 +424,7 @@ export default function PriceFinderPage() {
       </section>
 
       {/* Results Picker */}
-      {!selectedItemCode && debouncedQ.length > 1 && (
+      {!selectedItemCode && hasSearch && (
         <div className="bg-card border rounded-xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none">
           {isSearchLoading ? (
             <div className="p-6 text-center text-muted-foreground font-medium">Searching...</div>
@@ -324,10 +435,15 @@ export default function PriceFinderPage() {
             </div>
           ) : results.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              No products found for "<span className="font-medium text-foreground">{debouncedQ}</span>".
+              No products match the active filters. Remove or edit a chip to widen the list.
             </div>
           ) : (
             <div className="divide-y divide-border/50">
+              {totalCount > results.length && (
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  Showing the first {results.length.toLocaleString("en-IN")} of {totalCount.toLocaleString("en-IN")} matching products. Add another filter to narrow the list.
+                </p>
+              )}
               {results.map((res) => (
                 <button
                   key={res.itemCode}

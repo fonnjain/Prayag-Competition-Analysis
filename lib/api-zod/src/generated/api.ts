@@ -292,15 +292,16 @@ export const GetCatalogProductResponse = zod.object({
 
 
 /**
- * @summary Search products for the read-only Price Finder
+ * @summary Progressively filter Price Finder products by spoken or typed terms
  */
-export const getPriceFinderSearchQueryLimitDefault = 20;
-export const getPriceFinderSearchQueryLimitMax = 20;
+export const getPriceFinderSearchQueryLimitDefault = 3000;
+export const getPriceFinderSearchQueryLimitMax = 3000;
 
 
 
 export const GetPriceFinderSearchQueryParams = zod.object({
-  "q": zod.coerce.string(),
+  "q": zod.coerce.string().optional().describe('Backwards-compatible single filter term.'),
+  "filters": zod.array(zod.coerce.string()).optional().describe('Accumulating filter phrases. Each must match a product field.'),
   "limit": zod.coerce.number().min(1).max(getPriceFinderSearchQueryLimitMax).default(getPriceFinderSearchQueryLimitDefault)
 })
 
@@ -313,7 +314,17 @@ export const GetPriceFinderSearchResponse = zod.object({
   "currentMrp": zod.number().nullable(),
   "currentEffectiveDate": zod.string().nullable(),
   "hasCompetitorData": zod.boolean()
+})),
+  "totalCount": zod.number(),
+  "filterSuggestions": zod.array(zod.object({
+  "field": zod.string(),
+  "distinctCount": zod.number(),
+  "values": zod.array(zod.object({
+  "value": zod.string(),
+  "count": zod.number()
 }))
+})),
+  "unmatchedFilters": zod.array(zod.string())
 })
 
 
