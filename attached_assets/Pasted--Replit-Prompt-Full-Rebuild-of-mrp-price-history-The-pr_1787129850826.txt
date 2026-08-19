@@ -1,0 +1,127 @@
+# Replit Prompt — Full Rebuild of `mrp_price_history`
+
+The price history has drifted from its source. Rather than patch individual rows, replace it wholesale from a file built directly from the six official dated MRP workbooks.
+
+**Supersedes the pending BD-40 / 911-D row question.** Do not hand-insert those rows — the rebuild covers them.
+
+---
+
+## 1. Why a rebuild rather than a patch
+
+The database currently holds twelve effective dates. Four of them do not exist in any official file:
+
+| DB period | Rows | In the official files? |
+|---|---:|---|
+| 2026-02-01 | 2,283 | yes — Pipes & Fittings |
+| 2026-03-05 | 1,983 | yes, but short of the 2,167 the source lists |
+| 2026-05-01 | 1,515 | yes — CP + Sanitaryware |
+| 2026-08-01 | 1,223 | yes, but 5 short |
+| 2026-09-01 | 2,047 | yes — PTMT |
+| 2024-02-15 / 2024-06-01 / 2026-03-01 | 161 / 280 / 280 | yes |
+| **2026-04-20** | **930** | **no** |
+| **2025-06-01** | **1,243** | **no** |
+| **2026-01-20** | **1,120** | **no** |
+| **2024-01-01** | **398** | **no** |
+
+### The 2026-04-20 period is actively wrong and must go
+
+Those 930 rows are the **01 Sep 2026 revision under the wrong date**. Each value is the 05 Mar price multiplied by exactly 1.08, before the source rounded it:
+
+| Code | 05 Mar | × 1.08 | DB @ 20 Apr | Official 01 Sep |
+|---|---:|---:|---:|---:|
+| `123-Q` | 375.5232 | 405.5651 | 405.57 | 406.00 |
+| `121-B` | 226.00 | 244.08 | 244.08 | 244.00 |
+| `148-LS` | 385.56 | 416.40 | 416.40 | 416.00 |
+
+It covers only about half of PTMT, so the catalogue contradicts itself today. In the live Price Finder, `148-LS` (Erosa) shows ₹416.40 while `148-LSB` (Erosa Blue) shows ₹410.00 — the plain variant appearing dearer than the coloured one, when the official file has them at 385.56 and 410.00. Roughly 930 PTMT products are quoting September prices four months early.
+
+The other three unsourced dates are old periods carrying no current price, so they are a labelling problem rather than a live pricing one — but there is no reason to keep them once the rebuild has a properly dated history.
+
+---
+
+## 2. Input file
+
+`Prayag_MRP_AllPeriods_Rebuild.xlsx`
+
+| Sheet | Rows | Use |
+|---|---:|---|
+| `mrp_price_history` | 12,768 | one row per `item_code` × `effective_date` — this is the load |
+| `catalog_products` | 6,303 | code, division, name, period count, `discontinued_from` |
+| `discontinued` | 159 | codes marked `REMOVED` in the source, with the date they stop |
+| `conflicts_to_resolve` | 79 | same code priced twice in one period — needs a human decision |
+| `summary` | — | counts per period and per division |
+
+### How it was built
+
+- The six official workbooks only. Nothing else was consulted.
+- Every column headed `box`, `pcs`, `packing`, `qty`, `coupon`, `diff`, `%age`, `weight`, `erp`, `cost`, `purchase` or `kg` is rejected as a price. This is the guard the packing-quantity incident produced; do not weaken it.
+- Each code column is paired only with the price columns in **its own block**, up to the next code column. Wide multi-block sheets such as `PE-AL-PE FITTINGS-2` and `PPR PIPE` would otherwise pull prices from a neighbouring product.
+- **The `SINK` sheet has a dedicated handler.** Column `L` decides the layout: when populated the row is a Gloss/Matt block taking `I`/`J` for 05 Mar and `L`/`M` for 01 Sep, and `H`/`K` are **status columns, not prices**. That single adjacency is where the ₹0.05 and ₹0.06 sink prices came from.
+- Where `MASTER` and a per-range sheet disagree, `MASTER` wins. Per-range sheets supply only codes `MASTER` does not carry — which is how the 264 Without-Brass items such as `C121` (₹36) and `U121` (₹32.90) are picked up.
+- Undated `OLD MRP` / `NEW MRP` columns are dated from sibling sheets in the same workbook that do carry explicit dates. For example the Pipes & Fittings `MASTER` columns are undated, but `C Fittings` carries `MRP as on 1st May, 2024` and `MRP as on 1st Feb, 2026`, so those are the two periods.
+
+Twenty ground-truth values were checked against the source and all twenty match, including `U21` = 78 @ 2026-02-01, `C854` = 44.40 @ 2026-02-01, `121-B` = 226 → 244, `911-D` = 3,240 → 3,490 and `BD-40` = 3,680 → 3,990.
+
+---
+
+## 3. What to do
+
+### 3.1 Back up first
+
+Copy the whole of `mrp_price_history` to a timestamped backup table before touching anything, and report its row count. Do not proceed if the backup did not write.
+
+### 3.2 Replace
+
+Delete every row of `mrp_price_history` and load the `mrp_price_history` sheet in full. `catalog_products` is **not** deleted — competitor mappings reference it by `item_code`, and deleting underneath them would break the 150 verified Sparsh rows. Upsert products by `item_code` instead: update name, division and `discontinued_from`; insert codes that are new; and for codes present in the database but absent from the file, set `is_active = false` and report them rather than deleting.
+
+`discontinued_from` comes from the `discontinued` sheet. If the column does not exist yet, add it to `lib/db/src/schema/catalog.ts` as a nullable `date` and run `pnpm --filter @workspace/db run push`.
+
+### 3.3 Do not load the conflicts blind
+
+The 79 rows in `conflicts_to_resolve` are codes priced twice in the same period — nearly all are brass/black or finish variants sharing one item code in the source. The file uses the leftmost column's value deterministically. Load that value, but **flag every one of these codes** in the UI as having unresolved variant pricing so the user can settle them later. Do not silently present them as clean.
+
+### 3.4 Then recompute
+
+Run `recomputeCurrentFlags()` after loading. Remember that `is_current` is a convenience only — the current price must still resolve by `effective_date <= CURRENT_DATE` at query time, so PTMT's 01 Sep revision takes effect on its own with no re-import.
+
+---
+
+## 4. Acceptance tests
+
+```
+1.  mrp_price_history contains exactly 12,768 rows and 6,303 distinct item codes.
+2.  No row has effective_date = '2026-04-20'. Likewise no 2025-06-01, 2026-01-20
+    or 2024-01-01.
+3.  148-LS resolves to 385.56 today and 416.00 on 2026-09-01.
+4.  148-LSB resolves to 410.00 today — and 148-LS is now CHEAPER than 148-LSB,
+    which is the right way round.
+5.  123-Q resolves to 375.52 today, 406.00 on 2026-09-01. No 405.57 anywhere.
+6.  911-D resolves to 3,240 today and 3,490 on 2026-09-01.
+7.  BD-40 resolves to 3,990 today (2026-08-01 period present) and 3,680 on
+    2026-07-31.
+8.  U21 = 78.00 and C854 = 44.40 at 2026-02-01.
+9.  C121 = 36.00 at 2024-05-01 — a Without-Brass code that MASTER does not carry.
+10. PTMT items priced under Rs 50 at asOf = 2026-09-01: report the count. It should
+    be a small number in the low teens, and must NOT include any -D sink code.
+11. All 150 Sparsh Pearl competitor mappings still resolve to a catalog_products row.
+12. A code marked discontinued returns no price on or after its discontinued_from
+    date, and its correct price the day before.
+```
+
+Test 11 is the one that protects existing work — run it before and after and compare.
+
+---
+
+## 5. Report back
+
+Read every figure from the database, not from this prompt:
+
+- Backup table name and row count.
+- Rows and distinct codes loaded, against the expected 12,768 and 6,303.
+- Row count per `effective_date`, so the four unsourced periods can be seen to be gone.
+- Codes in the database but absent from the file, now `is_active = false`.
+- Count of PTMT items under ₹50 at 2026-09-01.
+- Result of all twelve acceptance tests.
+- The gap picture before and after: median Prayag-vs-Sparsh gap today. It should move from about +3% to about **+10.8%**, because the phantom period was inflating Prayag's current prices. That shift is the expected outcome, not a regression.
+
+One clean commit.
