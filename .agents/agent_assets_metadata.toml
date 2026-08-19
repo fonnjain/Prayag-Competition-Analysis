@@ -44,5 +44,5 @@ description = "Database-readback report for the discontinuation correction, live
 id = "73o8ALjT_-7zdbAyXpQcB"
 uri = "file://attached_assets/prayag-verified-catalog-sync.json"
 type = "unspecified"
-title = "Prayag verified catalog sync bundle"
-description = "Signed development export for the published Data Health sync flow. Select this JSON file, click Preview replacement, and review the incoming counts before applying."
+title = "Download: prayag-verified-catalog-sync.json"
+description = "Click the download control on this attachment first. Then choose the downloaded JSON file from your Windows Downloads folder in the production Data Health page."
