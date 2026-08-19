@@ -267,20 +267,49 @@ export default function PriceFinderPage() {
     setSelectionSequence((value) => value + 1);
     setSpeechRequested(speechEnabled);
   }, [cancelSpeech, speechEnabled]);
-  const browseParams = {
-    division: browseDivision ?? undefined,
-    category: browseDivision && browseCategory ? browseCategory : undefined,
-    limit: 300,
-  };
-  const { data: browseData, isLoading: isBrowseLoading } = useGetPriceFinderBrowse(
-    browseParams,
+  // Query 1: divisions list (no division selected)
+  const { data: divisionsData, isLoading: isDivisionsLoading } = useGetPriceFinderBrowse(
+    { limit: 300 },
     {
       query: {
-        queryKey: ["price-finder-browse", browseDivision, browseCategory],
+        queryKey: ["price-finder-browse-divisions"],
+        enabled: !browseDivision,
         staleTime: 1000 * 60,
       },
     },
   );
+
+  // Query 2: categories for selected division (tab list)
+  const { data: categoriesData, isLoading: isCategoriesLoading } = useGetPriceFinderBrowse(
+    { division: browseDivision ?? undefined, limit: 300 },
+    {
+      query: {
+        queryKey: ["price-finder-browse-categories", browseDivision],
+        enabled: !!browseDivision,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  // Query 3: products for selected division + category
+  const { data: productsData, isLoading: isProductsLoading } = useGetPriceFinderBrowse(
+    { division: browseDivision ?? undefined, category: browseCategory ?? undefined, limit: 300 },
+    {
+      query: {
+        queryKey: ["price-finder-browse-products", browseDivision, browseCategory],
+        enabled: !!browseDivision && !!browseCategory,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  // Auto-select first category when categories load
+  useEffect(() => {
+    if (browseDivision && !browseCategory && categoriesData?.categories?.length) {
+      const first = categoriesData.categories[0];
+      setBrowseCategory(first.category ?? "__uncategorised__");
+    }
+  }, [browseDivision, browseCategory, categoriesData]);
 
   return (
     <div
@@ -461,113 +490,149 @@ export default function PriceFinderPage() {
       <section className="rounded-xl border bg-card p-4 md:p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold">Browse the catalogue</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Search is fastest. Use division and category when you want to explore.
-            </p>
+            {browseDivision ? (
+              <>
+                <h2 className="font-semibold">{browseDivision}</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {isCategoriesLoading
+                    ? "Loading categories…"
+                    : `${categoriesData?.categories?.length ?? 0} categories`}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="font-semibold">Browse the catalogue</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Search is fastest. Use division and category when you want to explore.
+                </p>
+              </>
+            )}
           </div>
           {browseDivision && (
             <Button
               variant="ghost"
               size="sm"
+              className="shrink-0"
               onClick={() => {
                 setBrowseDivision(null);
                 setBrowseCategory(null);
+                setSelectedItemCode(null);
               }}
             >
-              All divisions
+              ← All divisions
             </Button>
           )}
         </div>
 
-        {isBrowseLoading && !browseData ? (
-          <p className="text-sm text-muted-foreground">Loading catalogue groups…</p>
-        ) : !browseDivision ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(browseData?.divisions ?? []).map((item) => (
-              <button
-                key={item.division}
-                type="button"
-                onClick={() => {
-                  setBrowseDivision(item.division);
-                  setBrowseCategory(null);
-                  setSelectedItemCode(null);
-                }}
-                className="flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <span className="font-medium">{item.division}</span>
-                <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
-              </button>
-            ))}
-          </div>
-        ) : !browseCategory ? (
-          <div>
-            <p className="mb-3 text-sm font-medium text-muted-foreground">
-              {browseDivision} · choose a category
-            </p>
+        {!browseDivision ? (
+          /* Division grid */
+          isDivisionsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading catalogue…</p>
+          ) : (
             <div className="grid gap-2 sm:grid-cols-2">
-              {(browseData?.categories ?? []).map((item) => {
-                const key = item.category ?? "__uncategorised__";
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => {
-                      setBrowseCategory(key);
-                      setSelectedItemCode(null);
-                    }}
-                    className="flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <span className="font-medium">{item.label}</span>
-                    <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-sm font-medium text-muted-foreground">
-                {browseDivision} ·{" "}
-                {browseData?.categories.find(
-                  (item) => (item.category ?? "__uncategorised__") === browseCategory,
-                )?.label ?? "Products"}
-              </p>
-              <Button variant="ghost" size="sm" onClick={() => setBrowseCategory(null)}>
-                Categories
-              </Button>
-            </div>
-            <div className="divide-y rounded-lg border">
-              {(browseData?.products ?? []).map((item) => (
+              {(divisionsData?.divisions ?? []).map((item) => (
                 <button
-                  key={item.itemCode}
+                  key={item.division}
                   type="button"
-                  onClick={() => confirmProduct(item.itemCode)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                  onClick={() => {
+                    setBrowseDivision(item.division);
+                    setBrowseCategory(null);
+                    setSelectedItemCode(null);
+                  }}
+                  className="flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <span>
-                    <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
-                    <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
-                    <DiscontinuationBadge value={item.discontinuedFrom} />
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block font-mono font-semibold">
-                      {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
-                    </span>
-                    <PriceWindowDetails
-                      compact
-                      currentPrice={item.currentMrp}
-                      validFrom={item.currentEffectiveDate}
-                      validTo={item.currentValidTo}
-                      upcomingPrice={item.upcomingMrp}
-                      upcomingEffectiveDate={item.upcomingEffectiveDate}
-                      upcomingChangePct={item.upcomingChangePct}
-                    />
-                  </span>
+                  <span className="font-medium">{item.division}</span>
+                  <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
                 </button>
               ))}
             </div>
+          )
+        ) : (
+          /* Category tabs + product list */
+          <div>
+            {/* Scrollable category tab pills */}
+            {isCategoriesLoading ? (
+              <p className="text-sm text-muted-foreground mb-4">Loading categories…</p>
+            ) : (
+              <div className="relative mb-4">
+                <div className="flex gap-2 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {(categoriesData?.categories ?? []).map((item) => {
+                    const key = item.category ?? "__uncategorised__";
+                    const isActive = browseCategory === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setBrowseCategory(key);
+                          setSelectedItemCode(null);
+                        }}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary",
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                        )}
+                      >
+                        {item.label}
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 font-mono text-[11px]",
+                            isActive
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-background text-muted-foreground",
+                          )}
+                        >
+                          {item.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* fade-out gradient on the right to hint scroll */}
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent" />
+              </div>
+            )}
+
+            {/* Product list for selected category */}
+            {browseCategory && (
+              isProductsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading products…</p>
+              ) : (productsData?.products ?? []).length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No products in this category.</p>
+              ) : (
+                <div className="divide-y rounded-lg border">
+                  {(productsData?.products ?? []).map((item) => (
+                    <button
+                      key={item.itemCode}
+                      type="button"
+                      onClick={() => confirmProduct(item.itemCode)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                    >
+                      <span>
+                        <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
+                        <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
+                        <DiscontinuationBadge value={item.discontinuedFrom} />
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-mono font-semibold">
+                          {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
+                        </span>
+                        <PriceWindowDetails
+                          compact
+                          currentPrice={item.currentMrp}
+                          validFrom={item.currentEffectiveDate}
+                          validTo={item.currentValidTo}
+                          upcomingPrice={item.upcomingMrp}
+                          upcomingEffectiveDate={item.upcomingEffectiveDate}
+                          upcomingChangePct={item.upcomingChangePct}
+                        />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
           </div>
         )}
       </section>
