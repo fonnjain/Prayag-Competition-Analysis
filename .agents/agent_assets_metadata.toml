@@ -18,3 +18,17 @@ id = "tQNrUnwyJGUPb821dMSD5"
 uri = "file://deliverables/How_Supplier_Prices_Are_Read.docx"
 type = "word_document"
 title = "How Individual Supplier Prices Are Read (Word)"
+
+[[outputs]]
+id = "xSFWjZuAVb2G93xilVzkq"
+uri = "file://reports/mrp-full-rebuild-report.md"
+type = "text"
+title = "MRP full rebuild report"
+description = "Database-readback acceptance report for the official full MRP history rebuild."
+
+[[outputs]]
+id = "SBGxgH-7glyUyeDRvuGfd"
+uri = "file://reports/mrp-full-rebuild-inactive-codes.csv"
+type = "table"
+title = "Inactive codes after MRP rebuild"
+description = "The 556 catalog products absent from the authoritative rebuild catalog sheet; they were retained and marked inactive."
