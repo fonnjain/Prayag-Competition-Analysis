@@ -44,6 +44,7 @@ function MrpCell({
   const [dateInput, setDateInput] = useState(
     () => new Date().toISOString().slice(0, 10)
   );
+  const [reasonInput, setReasonInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const { mutate, isPending } = usePatchCatalogProductMrp({
@@ -67,6 +68,7 @@ function MrpCell({
   const startEdit = () => {
     setMrpInput(currentMrp != null ? String(currentMrp) : "");
     setDateInput(effectiveDate ?? new Date().toISOString().slice(0, 10));
+    setReasonInput("");
     setError(null);
     setEditing(true);
   };
@@ -77,7 +79,14 @@ function MrpCell({
       setError("Enter a positive number");
       return;
     }
-    mutate({ itemCode, data: { mrp: val, effectiveDate: dateInput } });
+    if (!reasonInput.trim()) {
+      setError("Add a reason for this correction");
+      return;
+    }
+    mutate({
+      itemCode,
+      data: { mrp: val, effectiveDate: dateInput, reason: reasonInput.trim() },
+    });
   };
 
   if (editing) {
@@ -122,6 +131,18 @@ function MrpCell({
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
+          <Input
+            className="h-7 text-xs px-2"
+            value={reasonInput}
+            onChange={(e) => setReasonInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            placeholder="Reason for correction"
+            aria-label={`Reason for MRP correction for ${itemCode}`}
+            disabled={isPending}
+          />
         {error && <p className="text-xs text-destructive pl-4">{error}</p>}
       </div>
     );

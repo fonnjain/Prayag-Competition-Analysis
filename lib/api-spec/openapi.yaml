@@ -456,7 +456,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [mrp]
+              required: [mrp, reason]
               properties:
                 mrp:
                   type: number
@@ -464,9 +464,10 @@ paths:
                 effectiveDate:
                   type: string
                   description: "Effective date (YYYY-MM-DD). Defaults to today."
-                notes:
+                reason:
                   type: string
-                  description: Optional note for the audit trail
+                  minLength: 1
+                  description: Reviewer-supplied reason for this manual MRP correction
       responses:
         "200":
           description: MRP updated
@@ -1842,6 +1843,8 @@ components:
           missingPriceCount,
           duplicateSources,
           flaggedMrpCount,
+          untracedMrpCount,
+          untracedMrpRows,
         ]
       properties:
         totalProducts:
@@ -1868,6 +1871,27 @@ components:
             $ref: "#/components/schemas/CatalogDuplicateSource"
         flaggedMrpCount:
           type: integer
+        untracedMrpCount:
+          type: integer
+          description: Legacy MRP history rows with no official batch or manual correction event
+        untracedMrpRows:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogUntracedMrp"
+    CatalogUntracedMrp:
+      type: object
+      required: [itemCode, effectiveDate]
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        effectiveDate:
+          type: string
+        mrp:
+          type: ["number", "null"]
+        sourceFile:
+          type: ["string", "null"]
     HealthStatus:
       type: object
       properties:

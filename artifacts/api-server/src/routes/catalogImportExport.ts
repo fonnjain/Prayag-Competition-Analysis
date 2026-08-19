@@ -11,6 +11,7 @@ import {
   competitorPricesTable,
   mrpSourcesTable,
   mrpLoadBatchesTable,
+  mrpHistoryProvenanceEventsTable,
 } from "@workspace/db";
 import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
 import { effectivePrice } from "../lib/analysis";
@@ -710,7 +711,28 @@ async function persistParsedRows(
     }
     if (historyValues.length > 0) {
       for (let i = 0; i < historyValues.length; i += 500) {
-        await tx.insert(mrpPriceHistoryTable).values(historyValues.slice(i, i + 500));
+        const inserted = await tx
+          .insert(mrpPriceHistoryTable)
+          .values(historyValues.slice(i, i + 500))
+          .returning({
+            id: mrpPriceHistoryTable.id,
+            itemCode: mrpPriceHistoryTable.itemCode,
+            effectiveDate: mrpPriceHistoryTable.effectiveDate,
+            mrp: mrpPriceHistoryTable.mrp,
+            sourceFile: mrpPriceHistoryTable.sourceFile,
+            loadBatchId: mrpPriceHistoryTable.loadBatchId,
+          });
+        await tx.insert(mrpHistoryProvenanceEventsTable).values(
+          inserted.map((row) => ({
+            historyRowId: row.id,
+            itemCode: row.itemCode,
+            effectiveDate: row.effectiveDate,
+            action: "official_workbook_import",
+            sourceFile: row.sourceFile,
+            loadBatchId: row.loadBatchId,
+            mrp: row.mrp,
+          })),
+        );
       }
     }
 
@@ -987,14 +1009,39 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
 
 router.post("/catalog/mrp-review-batches/:batchId/approve", async (req, res) => {
   const batchId = req.params.batchId;
-  const approved = await db
-    .update(mrpPriceHistoryTable)
-    .set({ reviewStatus: "approved", reviewedAt: new Date() })
-    .where(
-      sql`${mrpPriceHistoryTable.importBatchId} = ${batchId}
-        AND ${mrpPriceHistoryTable.reviewStatus} = 'pending'`,
-    )
-    .returning({ id: mrpPriceHistoryTable.id });
+  const approved = await db.transaction(async (tx) => {
+    const pending = await tx
+      .select({
+        id: mrpPriceHistoryTable.id,
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        mrp: mrpPriceHistoryTable.mrp,
+        sourceFile: mrpPriceHistoryTable.sourceFile,
+        loadBatchId: mrpPriceHistoryTable.loadBatchId,
+      })
+      .from(mrpPriceHistoryTable)
+      .where(
+        sql`${mrpPriceHistoryTable.importBatchId} = ${batchId}
+          AND ${mrpPriceHistoryTable.reviewStatus} = 'pending'`,
+      );
+    if (pending.length === 0) return [];
+    await tx
+      .update(mrpPriceHistoryTable)
+      .set({ reviewStatus: "approved", reviewedAt: new Date() })
+      .where(inArray(mrpPriceHistoryTable.id, pending.map((row) => row.id)));
+    await tx.insert(mrpHistoryProvenanceEventsTable).values(
+      pending.map((row) => ({
+        historyRowId: row.id,
+        itemCode: row.itemCode,
+        effectiveDate: row.effectiveDate,
+        action: "review_approved",
+        sourceFile: row.sourceFile,
+        loadBatchId: row.loadBatchId,
+        mrp: row.mrp,
+      })),
+    );
+    return pending;
+  });
   if (approved.length === 0) {
     res.status(404).json({ error: "No pending MRP rows found for this review batch" });
     return;
@@ -1005,13 +1052,38 @@ router.post("/catalog/mrp-review-batches/:batchId/approve", async (req, res) => 
 
 router.post("/catalog/mrp-review-batches/:batchId/cancel", async (req, res) => {
   const batchId = req.params.batchId;
-  const removed = await db
-    .delete(mrpPriceHistoryTable)
-    .where(
-      sql`${mrpPriceHistoryTable.importBatchId} = ${batchId}
-        AND ${mrpPriceHistoryTable.reviewStatus} = 'pending'`,
-    )
-    .returning({ id: mrpPriceHistoryTable.id });
+  const removed = await db.transaction(async (tx) => {
+    const pending = await tx
+      .select({
+        id: mrpPriceHistoryTable.id,
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        mrp: mrpPriceHistoryTable.mrp,
+        sourceFile: mrpPriceHistoryTable.sourceFile,
+        loadBatchId: mrpPriceHistoryTable.loadBatchId,
+      })
+      .from(mrpPriceHistoryTable)
+      .where(
+        sql`${mrpPriceHistoryTable.importBatchId} = ${batchId}
+          AND ${mrpPriceHistoryTable.reviewStatus} = 'pending'`,
+      );
+    if (pending.length === 0) return [];
+    await tx.insert(mrpHistoryProvenanceEventsTable).values(
+      pending.map((row) => ({
+        historyRowId: row.id,
+        itemCode: row.itemCode,
+        effectiveDate: row.effectiveDate,
+        action: "review_cancelled",
+        sourceFile: row.sourceFile,
+        loadBatchId: row.loadBatchId,
+        mrp: row.mrp,
+      })),
+    );
+    await tx
+      .delete(mrpPriceHistoryTable)
+      .where(inArray(mrpPriceHistoryTable.id, pending.map((row) => row.id)));
+    return pending;
+  });
   if (removed.length === 0) {
     res.status(404).json({ error: "No pending MRP rows found for this review batch" });
     return;
@@ -1547,6 +1619,29 @@ router.delete("/catalog/mrp-period/:date", async (req, res) => {
         );
       }
 
+      const rowsToDelete = await tx
+        .select({
+          id: mrpPriceHistoryTable.id,
+          itemCode: mrpPriceHistoryTable.itemCode,
+          effectiveDate: mrpPriceHistoryTable.effectiveDate,
+          mrp: mrpPriceHistoryTable.mrp,
+          sourceFile: mrpPriceHistoryTable.sourceFile,
+          loadBatchId: mrpPriceHistoryTable.loadBatchId,
+        })
+        .from(mrpPriceHistoryTable)
+        .where(eq(mrpPriceHistoryTable.effectiveDate, date));
+
+      await tx.insert(mrpHistoryProvenanceEventsTable).values(
+        rowsToDelete.map((row) => ({
+          historyRowId: row.id,
+          itemCode: row.itemCode,
+          effectiveDate: row.effectiveDate,
+          action: "period_deleted",
+          sourceFile: row.sourceFile,
+          loadBatchId: row.loadBatchId,
+          mrp: row.mrp,
+        })),
+      );
       await tx
         .delete(mrpPriceHistoryTable)
         .where(eq(mrpPriceHistoryTable.effectiveDate, date));

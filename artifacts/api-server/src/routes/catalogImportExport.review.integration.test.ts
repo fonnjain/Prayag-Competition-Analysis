@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   catalogProductsTable,
   db,
+  mrpHistoryProvenanceEventsTable,
   mrpLoadBatchesTable,
   mrpPriceHistoryTable,
 } from "@workspace/db";
@@ -92,6 +93,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db
+    .delete(mrpHistoryProvenanceEventsTable)
+    .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, CODES));
+  await db
     .delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, CODES));
   await db
@@ -178,6 +182,16 @@ describe("MRP import blocking review", () => {
         (row) => row.itemCode === FLAGGED && row.effectiveDate === OLD_DATE,
       ),
     ).toMatchObject({ isCurrent: true });
+    const importEvents = await db
+      .select()
+      .from(mrpHistoryProvenanceEventsTable)
+      .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [FLAGGED, CLEAN]));
+    expect(importEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ itemCode: FLAGGED, action: "official_workbook_import" }),
+        expect.objectContaining({ itemCode: CLEAN, action: "official_workbook_import" }),
+      ]),
+    );
 
     const approval = await request.post(
       `/catalog/mrp-review-batches/${batchId}/approve`,
@@ -194,6 +208,15 @@ describe("MRP import blocking review", () => {
         (row) => row.itemCode === FLAGGED && row.effectiveDate === LOAD_DATE,
       ),
     ).toMatchObject({ reviewStatus: "approved", isCurrent: true });
+    const approvalEvents = await db
+      .select()
+      .from(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.action, "review_approved"));
+    expect(approvalEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ itemCode: FLAGGED, effectiveDate: LOAD_DATE }),
+      ]),
+    );
 
     const duplicate = await request
       .post("/catalog/load-mrp")
@@ -252,5 +275,14 @@ describe("MRP import blocking review", () => {
       effectiveDate: OLD_DATE,
       reviewStatus: "approved",
     });
+    const cancellationEvents = await db
+      .select()
+      .from(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.action, "review_cancelled"));
+    expect(cancellationEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ itemCode: CANCELLED, effectiveDate: LOAD_DATE }),
+      ]),
+    );
   });
 });

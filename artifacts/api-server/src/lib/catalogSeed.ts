@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   catalogProductsTable,
   mrpPriceHistoryTable,
+  mrpHistoryProvenanceEventsTable,
   codeConflictsTable,
   competitorPricesTable,
 } from "@workspace/db";
@@ -76,13 +77,39 @@ async function chunkedInsert<T>(
 }
 
 export async function loadCatalogSeed(): Promise<void> {
-  await db.delete(mrpPriceHistoryTable);
-  await db.delete(catalogProductsTable);
-  await db.delete(codeConflictsTable);
-  await db.delete(competitorPricesTable);
+  await db.transaction(async (tx) => {
+    const removedHistory = await tx
+      .select({
+        id: mrpPriceHistoryTable.id,
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        mrp: mrpPriceHistoryTable.mrp,
+        sourceFile: mrpPriceHistoryTable.sourceFile,
+        loadBatchId: mrpPriceHistoryTable.loadBatchId,
+      })
+      .from(mrpPriceHistoryTable);
+    if (removedHistory.length > 0) {
+      await tx.insert(mrpHistoryProvenanceEventsTable).values(
+        removedHistory.map((row) => ({
+          historyRowId: row.id,
+          itemCode: row.itemCode,
+          effectiveDate: row.effectiveDate,
+          action: "catalog_reset",
+          reason: "Catalog reset restored the clean seed data.",
+          sourceFile: row.sourceFile,
+          loadBatchId: row.loadBatchId,
+          mrp: row.mrp,
+        })),
+      );
+    }
 
-  await chunkedInsert(data.products, (batch) =>
-    db.insert(catalogProductsTable).values(
+    await tx.delete(mrpPriceHistoryTable);
+    await tx.delete(catalogProductsTable);
+    await tx.delete(codeConflictsTable);
+    await tx.delete(competitorPricesTable);
+
+    await chunkedInsert(data.products, (batch) =>
+      tx.insert(catalogProductsTable).values(
       batch.map((p) => ({
         itemCode: p.itemCode,
         productName: p.productName,
@@ -98,35 +125,51 @@ export async function loadCatalogSeed(): Promise<void> {
         sourceFiles: p.sourceFiles,
         dataFlag: p.dataFlag,
       })),
-    ),
-  );
-
-  await chunkedInsert(data.priceHistory, (batch) =>
-    db.insert(mrpPriceHistoryTable).values(
-      batch.map((r) => ({
-        itemCode: r.itemCode,
-        mrp: r.mrp,
-        netPrice: r.netPrice,
-        discountPct: r.discountPct,
-        priceBasis: r.priceBasis || "Verify",
-        effectiveDate: r.effectiveDate,
-        loadDate: r.loadDate,
-        sourceFile: r.sourceFile,
-        isCurrent: false,
-        notes: r.notes,
-      })),
-    ),
-  );
-
-  if (data.conflicts.length > 0) {
-    await db.insert(codeConflictsTable).values(
-      data.conflicts.map((c) => ({
-        itemCode: c.itemCode,
-        conflictingNames: c.conflictingNames,
-        sources: c.sources,
-      })),
+      ),
     );
-  }
+
+    await chunkedInsert(data.priceHistory, async (batch) => {
+      const inserted = await tx.insert(mrpPriceHistoryTable).values(
+        batch.map((r) => ({
+          itemCode: r.itemCode,
+          mrp: r.mrp,
+          netPrice: r.netPrice,
+          discountPct: r.discountPct,
+          priceBasis: r.priceBasis || "Verify",
+          effectiveDate: r.effectiveDate,
+          loadDate: r.loadDate,
+          sourceFile: r.sourceFile,
+          isCurrent: false,
+          notes: r.notes,
+        })),
+      ).returning({
+        id: mrpPriceHistoryTable.id,
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        mrp: mrpPriceHistoryTable.mrp,
+        sourceFile: mrpPriceHistoryTable.sourceFile,
+      });
+      await tx.insert(mrpHistoryProvenanceEventsTable).values(
+        inserted.map((row) => ({
+          historyRowId: row.id,
+          itemCode: row.itemCode,
+          effectiveDate: row.effectiveDate,
+          action: "legacy_seed_import",
+          sourceFile: row.sourceFile,
+          mrp: row.mrp,
+        })),
+      );
+    });
+
+    if (data.conflicts.length > 0) {
+      await tx.insert(codeConflictsTable).values(
+        data.conflicts.map((c) => ({
+          itemCode: c.itemCode,
+          conflictingNames: c.conflictingNames,
+          sources: c.sources,
+        })),
+      );
+    }
 
   // Snapshot of the seed's current Prayag MRP (latest effective date per code).
   // This is retained for import auditability. The analysis gap itself resolves
@@ -143,8 +186,8 @@ export async function loadCatalogSeed(): Promise<void> {
     }
   }
 
-  await chunkedInsert(competitorData.competitors, (batch) =>
-    db.insert(competitorPricesTable).values(
+    await chunkedInsert(competitorData.competitors, (batch) =>
+      tx.insert(competitorPricesTable).values(
       batch.map((c) => {
         const matched = c.matchStatus === "matched" && c.matchedPrayagCode;
         const prayagMrpAtCompare = matched
@@ -164,8 +207,9 @@ export async function loadCatalogSeed(): Promise<void> {
           prayagMrpAtCompare,
         };
       }),
-    ),
-  );
+      ),
+    );
+  });
 
   await recomputeCurrentFlags();
 }

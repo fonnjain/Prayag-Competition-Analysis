@@ -134,8 +134,29 @@ export const mrpPriceHistoryTable = pgTable(
   ],
 );
 
-// Known item-code conflicts flagged during cleaning (same code, different
-// names across source files). Surfaced on the Data Health page.
+export const mrpHistoryProvenanceEventsTable = pgTable(
+  "mrp_history_provenance_events",
+  {
+    id: serial("id").primaryKey(),
+    historyRowId: integer("history_row_id"),
+    itemCode: text("item_code").notNull(),
+    effectiveDate: date("effective_date", { mode: "string" }).notNull(),
+    action: text("action").notNull(),
+    reason: text("reason"),
+    sourceFile: text("source_file"),
+    loadBatchId: integer("load_batch_id"),
+    previousMrp: doublePrecision("previous_mrp"),
+    mrp: doublePrecision("mrp"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("mrp_history_provenance_history_idx").on(t.historyRowId),
+    index("mrp_history_provenance_item_date_idx").on(t.itemCode, t.effectiveDate),
+    index("mrp_history_provenance_action_idx").on(t.action),
+  ],
+);
 export const codeConflictsTable = pgTable("code_conflicts", {
   itemCode: text("item_code").primaryKey(),
   conflictingNames: text("conflicting_names"),
@@ -350,6 +371,9 @@ export const competitorCodeAliasesTable = pgTable(
 
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
+
+export type MrpHistoryProvenanceEvent =
+  typeof mrpHistoryProvenanceEventsTable.$inferSelect;
 export type CodeConflict = typeof codeConflictsTable.$inferSelect;
 export type CompetitorPrice = typeof competitorPricesTable.$inferSelect;
 export type AcceptBatch = typeof acceptBatchesTable.$inferSelect;

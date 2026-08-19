@@ -213,6 +213,47 @@ export default function DataHealthPage() {
         </div>
       </div>
 
+      <div className="bg-card border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b bg-muted/20">
+          <h2 className="font-semibold">MRP rows without provenance ({data.untracedMrpCount})</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            These legacy rows have neither an official workbook batch nor a recorded manual-correction reason. Verify their source before relying on them.
+          </p>
+        </div>
+        <div className="max-h-[360px] overflow-auto">
+          {data.untracedMrpRows.length === 0 ? (
+            <div className="p-6 text-sm text-green-700">
+              Every MRP history row has a traceable source.
+            </div>
+          ) : (
+            <table className="w-full min-w-[680px] text-sm text-left">
+              <thead className="sticky top-0 bg-muted/50">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Item code</th>
+                  <th className="px-4 py-2 font-medium">Product</th>
+                  <th className="px-4 py-2 font-medium">Effective</th>
+                  <th className="px-4 py-2 font-medium text-right">MRP</th>
+                  <th className="px-4 py-2 font-medium">Legacy source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.untracedMrpRows.map((row) => (
+                  <tr key={`${row.itemCode}-${row.effectiveDate}`} className="border-t">
+                    <td className="px-4 py-2 font-mono">{row.itemCode}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{row.productName ?? "—"}</td>
+                    <td className="px-4 py-2 font-mono">{row.effectiveDate}</td>
+                    <td className="px-4 py-2 text-right font-mono">
+                      {row.mrp == null ? "—" : `₹${row.mrp.toFixed(2)}`}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">{row.sourceFile ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card border rounded-lg p-6">
           <div className="text-sm text-muted-foreground mb-2 flex items-center gap-2">

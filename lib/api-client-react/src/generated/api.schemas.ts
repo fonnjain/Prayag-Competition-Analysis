@@ -283,6 +283,17 @@ export interface CatalogDuplicateSource {
   count: number;
 }
 
+export interface CatalogUntracedMrp {
+  itemCode: string;
+  /** @nullable */
+  productName?: string | null;
+  effectiveDate: string;
+  /** @nullable */
+  mrp?: number | null;
+  /** @nullable */
+  sourceFile?: string | null;
+}
+
 export interface CatalogDataHealth {
   totalProducts: number;
   pricedProducts: number;
@@ -293,6 +304,9 @@ export interface CatalogDataHealth {
   missingPrices: CatalogMissingPrice[];
   duplicateSources: CatalogDuplicateSource[];
   flaggedMrpCount: number;
+  /** Legacy MRP history rows with no official batch or manual correction event */
+  untracedMrpCount: number;
+  untracedMrpRows: CatalogUntracedMrp[];
 }
 
 export interface HealthStatus {
@@ -1265,8 +1279,11 @@ export type PatchCatalogProductMrpBody = {
   mrp: number;
   /** Effective date (YYYY-MM-DD). Defaults to today. */
   effectiveDate?: string;
-  /** Optional note for the audit trail */
-  notes?: string;
+  /**
+     * Reviewer-supplied reason for this manual MRP correction
+     * @minLength 1
+     */
+  reason: string;
 };
 
 export type PatchCatalogProductMrp200 = {

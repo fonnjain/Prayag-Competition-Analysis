@@ -9,6 +9,7 @@ import {
   competitorPricesTable,
   mrpSourcesTable,
   mrpLoadBatchesTable,
+  mrpHistoryProvenanceEventsTable,
 } from "@workspace/db";
 import { loadCatalogSeed } from "../lib/catalogSeed";
 import {
@@ -259,10 +260,7 @@ router.get("/catalog/filters", async (_req, res) => {
 // GET /catalog/mrp-sources — the six canonical sheets for the MRP loader.
 router.get("/catalog/mrp-sources", async (_req, res) => {
   await ensureOfficialMrpSources();
-  const sources = await db
-    .select()
-    .from(mrpSourcesTable)
-    .orderBy(asc(mrpSourcesTable.division));
+  const sources = await getMrpSourceHealth();
   res.json({ sources });
 });
 
@@ -278,7 +276,7 @@ router.get("/catalog/mrp-provenance", async (_req, res) => {
   res.json({ sources, snapshotDate });
 });
 
-// GET /catalog/data-health — conflicts, missing prices, duplicate sources.
+// GET /catalog/data-health — conflicts, missing prices, and untraceable history.
 router.get("/catalog/data-health", async (_req, res) => {
   const totalRow = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
@@ -298,6 +296,43 @@ router.get("/catalog/data-health", async (_req, res) => {
     .where(eq(mrpPriceHistoryTable.reviewStatus, "pending"));
   const flaggedMrpCount = flaggedRows[0]?.count ?? 0;
 
+  const untracedMrpCountRows = await db.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count
+    FROM mrp_price_history h
+    WHERE h.load_batch_id IS NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM mrp_history_provenance_events e
+        WHERE e.history_row_id = h.id
+          AND e.action = 'manual_correction'
+      )
+  `);
+  const untracedMrpRows = await db.execute<{
+    itemCode: string;
+    productName: string | null;
+    effectiveDate: string;
+    mrp: number | null;
+    sourceFile: string | null;
+  }>(sql`
+    SELECT
+      h.item_code AS "itemCode",
+      p.product_name AS "productName",
+      h.effective_date AS "effectiveDate",
+      h.mrp,
+      h.source_file AS "sourceFile"
+    FROM mrp_price_history h
+    LEFT JOIN catalog_products p ON p.item_code = h.item_code
+    WHERE h.load_batch_id IS NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM mrp_history_provenance_events e
+        WHERE e.history_row_id = h.id
+          AND e.action = 'manual_correction'
+      )
+    ORDER BY h.effective_date DESC, h.item_code ASC
+    LIMIT 500
+  `);
+  const untracedMrpCount = untracedMrpCountRows.rows[0]?.count ?? 0;
   const conflictRows = await db
     .select()
     .from(codeConflictsTable)
@@ -338,6 +373,8 @@ router.get("/catalog/data-health", async (_req, res) => {
     pricedProducts,
     pendingProducts,
     flaggedMrpCount,
+    untracedMrpCount,
+    untracedMrpRows: untracedMrpRows.rows,
     conflictCount: conflictRows.length,
     conflicts: conflictRows,
     missingPriceCount: pendingProducts,
@@ -446,49 +483,80 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
     mrp,
     reason,
   });
-  const createdBatch = await db
-    .insert(mrpLoadBatchesTable)
-    .values({
-      sourceId: manualSourceId,
-      fileName: `manual-correction:${itemCode}:${effectiveDate}`,
-      fileSha256: manualChecksum,
-      fileSizeBytes: 0,
-      downloadedAt: today,
-      loadedBy: req.user?.email ?? req.user?.id ?? null,
-      rowCount: 1,
-      notes: reason,
-    })
-    .returning({ id: mrpLoadBatchesTable.id });
-  const loadBatchId = createdBatch[0]!.id;
-
-  // Same-date corrections replace the visible price, but move it into an
-  // explicit manual audit batch instead of silently retaining workbook provenance.
-  await db
-    .insert(mrpPriceHistoryTable)
-    .values({
-      itemCode,
-      mrp,
-      netPrice: null,
-      discountPct: null,
-      priceBasis: "MRP",
-      effectiveDate,
-      loadDate: today,
-      sourceFile: "manual-edit",
-      isCurrent: false,
-      notes: `Manual correction: ${reason}`,
-      loadBatchId,
-    })
-    .onConflictDoUpdate({
-      target: [mrpPriceHistoryTable.itemCode, mrpPriceHistoryTable.effectiveDate],
-      set: {
+  const { loadBatchId } = await db.transaction(async (tx) => {
+    const existingRow = await tx
+      .select({ mrp: mrpPriceHistoryTable.mrp })
+      .from(mrpPriceHistoryTable)
+      .where(
+        and(
+          eq(mrpPriceHistoryTable.itemCode, itemCode),
+          eq(mrpPriceHistoryTable.effectiveDate, effectiveDate),
+        ),
+      )
+      .limit(1);
+    const [createdBatch] = await tx
+      .insert(mrpLoadBatchesTable)
+      .values({
+        sourceId: manualSourceId,
+        fileName: `manual-correction:${itemCode}:${effectiveDate}`,
+        fileSha256: manualChecksum,
+        fileSizeBytes: 0,
+        downloadedAt: today,
+        loadedBy: req.user?.email ?? req.user?.id ?? null,
+        rowCount: 1,
+        notes: reason,
+      })
+      .returning({ id: mrpLoadBatchesTable.id });
+    const [row] = await tx
+      .insert(mrpPriceHistoryTable)
+      .values({
+        itemCode,
         mrp,
+        netPrice: null,
+        discountPct: null,
         priceBasis: "MRP",
+        effectiveDate,
         loadDate: today,
         sourceFile: "manual-edit",
+        isCurrent: false,
         notes: `Manual correction: ${reason}`,
-        loadBatchId,
-      },
+        loadBatchId: createdBatch.id,
+        reviewStatus: "approved",
+        reviewReasons: null,
+        importBatchId: null,
+        reviewedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [mrpPriceHistoryTable.itemCode, mrpPriceHistoryTable.effectiveDate],
+        set: {
+          mrp,
+          netPrice: null,
+          discountPct: null,
+          priceBasis: "MRP",
+          loadDate: today,
+          sourceFile: "manual-edit",
+          notes: `Manual correction: ${reason}`,
+          loadBatchId: createdBatch.id,
+          reviewStatus: "approved",
+          reviewReasons: null,
+          importBatchId: null,
+          reviewedAt: new Date(),
+        },
+      })
+      .returning();
+    await tx.insert(mrpHistoryProvenanceEventsTable).values({
+      historyRowId: row.id,
+      itemCode,
+      effectiveDate,
+      action: "manual_correction",
+      reason,
+      sourceFile: "manual-edit",
+      loadBatchId: createdBatch.id,
+      previousMrp: existingRow[0]?.mrp ?? null,
+      mrp,
     });
+    return { loadBatchId: createdBatch.id };
+  });
 
   await recomputeCurrentFlags();
 

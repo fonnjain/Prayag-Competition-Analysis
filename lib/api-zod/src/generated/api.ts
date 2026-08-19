@@ -452,10 +452,13 @@ export const PatchCatalogProductMrpParams = zod.object({
   "itemCode": zod.coerce.string()
 })
 
+
+
+
 export const PatchCatalogProductMrpBody = zod.object({
   "mrp": zod.number().describe('New MRP value (must be positive)'),
   "effectiveDate": zod.string().optional().describe('Effective date (YYYY-MM-DD). Defaults to today.'),
-  "notes": zod.string().optional().describe('Optional note for the audit trail')
+  "reason": zod.string().min(1).describe('Reviewer-supplied reason for this manual MRP correction')
 })
 
 export const PatchCatalogProductMrpResponse = zod.object({
@@ -502,7 +505,15 @@ export const GetCatalogDataHealthResponse = zod.object({
   "sourceFiles": zod.string(),
   "count": zod.number()
 })),
-  "flaggedMrpCount": zod.number()
+  "flaggedMrpCount": zod.number(),
+  "untracedMrpCount": zod.number().describe('Legacy MRP history rows with no official batch or manual correction event'),
+  "untracedMrpRows": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullish(),
+  "effectiveDate": zod.string(),
+  "mrp": zod.number().nullish(),
+  "sourceFile": zod.string().nullish()
+}))
 })
 
 

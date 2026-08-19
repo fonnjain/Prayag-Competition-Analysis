@@ -12,3 +12,9 @@ Validity is inclusive through the day before the earliest later non-null priced 
 **Why:** Scheduled prices and corrected same-day imports make current flags stale or ambiguous. Null placeholders and superseded rows are audit records, not periods in which a price was quotable.
 
 **How to apply:** Resolve current, validity end, and only the earliest next winning revision together. Use the resolved current rows for every headline gap; never mix a future price or stale snapshot into current-versus-current math.
+
+**Concurrency rule:** Serialize the global two-step current-flag recomputation with a transaction-scoped advisory lock.
+
+**Why:** Imports, review decisions, and manual corrections can finish concurrently. Without serialization, each operation clears and reassigns flags over the same table, causing PostgreSQL deadlocks or transiently inconsistent current flags.
+
+**How to apply:** Keep the lock limited to the flag reset/set transaction; do not use it to serialize parsing, uploads, or unrelated catalog work.

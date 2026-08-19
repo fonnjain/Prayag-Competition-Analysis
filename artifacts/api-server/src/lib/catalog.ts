@@ -5,22 +5,28 @@ import { db, competitorPricesTable } from "@workspace/db";
 // (tie-broken by highest id / most recent load) is current; all others false.
 // This is the only place is_current is mutated — price rows are never deleted.
 export async function recomputeCurrentFlags(): Promise<void> {
-  await db.execute(sql`UPDATE mrp_price_history SET is_current = false`);
-  await db.execute(sql`
-    UPDATE mrp_price_history m
-    SET is_current = true
-    FROM (
-      SELECT DISTINCT ON (h.item_code) h.id
-      FROM mrp_price_history h
-      JOIN catalog_products p ON p.item_code = h.item_code
-      WHERE h.effective_date <= CURRENT_DATE
-        AND h.review_status = 'approved'
-        AND p.is_active IS TRUE
-        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
-      ORDER BY h.item_code, h.effective_date DESC, h.id DESC
-    ) latest
-    WHERE m.id = latest.id
-  `);
+  await db.transaction(async (tx) => {
+    // Several MRP mutation routes can finish at once. The two-step reset/set
+    // must run as one serialized operation or concurrent writes can deadlock
+    // (or briefly leave every row non-current).
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(917_130)`);
+    await tx.execute(sql`UPDATE mrp_price_history SET is_current = false`);
+    await tx.execute(sql`
+      UPDATE mrp_price_history m
+      SET is_current = true
+      FROM (
+        SELECT DISTINCT ON (h.item_code) h.id
+        FROM mrp_price_history h
+        JOIN catalog_products p ON p.item_code = h.item_code
+        WHERE h.effective_date <= CURRENT_DATE
+          AND h.review_status = 'approved'
+          AND p.is_active IS TRUE
+          AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+        ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+      ) latest
+      WHERE m.id = latest.id
+    `);
+  });
 }
 
 // Recompute is_current on competitor_prices for a given brand after a period
