@@ -163,15 +163,18 @@ router.get("/price-finder/search", async (req, res) => {
           AND cp.effective_date <= CURRENT_DATE
       ) AS has_competitor_data
     FROM catalog_products p
-    LEFT JOIN LATERAL (
+    JOIN LATERAL (
       SELECT h.mrp, h.effective_date
       FROM mrp_price_history h
       WHERE h.item_code = p.item_code
         AND h.effective_date <= CURRENT_DATE
+        AND h.mrp IS NOT NULL
       ORDER BY h.effective_date DESC, h.id DESC
       LIMIT 1
     ) current_price ON true
-    WHERE lower(p.item_code) LIKE ${like}
+    WHERE p.is_active IS TRUE
+      AND (
+       lower(p.item_code) LIKE ${like}
        OR lower(coalesce(p.product_name, '')) LIKE ${like}
        OR lower(coalesce(p.category, '')) LIKE ${like}
        OR lower(p.item_code) LIKE ${spokenLike}
@@ -180,6 +183,7 @@ router.get("/price-finder/search", async (req, res) => {
        OR regexp_replace(lower(p.item_code), '[^a-z0-9]', '', 'g') LIKE ${normalizedSpokenLike}
        OR regexp_replace(lower(coalesce(p.product_name, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedSpokenLike}
        OR regexp_replace(lower(coalesce(p.category, '')), '[^a-z0-9]', '', 'g') LIKE ${normalizedSpokenLike}
+      )
   `);
 
   const results = result.rows
@@ -223,6 +227,14 @@ router.get("/price-finder/browse", async (req, res) => {
       coalesce(nullif(trim(p.division), ''), 'Uncategorised') AS division,
       count(*)::int AS count
     FROM catalog_products p
+    WHERE p.is_active IS TRUE
+      AND EXISTS (
+        SELECT 1
+        FROM mrp_price_history h
+        WHERE h.item_code = p.item_code
+          AND h.effective_date <= CURRENT_DATE
+          AND h.mrp IS NOT NULL
+      )
     GROUP BY coalesce(nullif(trim(p.division), ''), 'Uncategorised')
     ORDER BY division
   `);
@@ -238,6 +250,14 @@ router.get("/price-finder/browse", async (req, res) => {
         count(*)::int AS count
       FROM catalog_products p
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
+        AND p.is_active IS TRUE
+        AND EXISTS (
+          SELECT 1
+          FROM mrp_price_history h
+          WHERE h.item_code = p.item_code
+            AND h.effective_date <= CURRENT_DATE
+            AND h.mrp IS NOT NULL
+        )
       GROUP BY nullif(trim(p.category), '')
       ORDER BY category NULLS LAST
     `);
@@ -270,16 +290,18 @@ router.get("/price-finder/browse", async (req, res) => {
             AND cp.effective_date <= CURRENT_DATE
         ) AS has_competitor_data
       FROM catalog_products p
-      LEFT JOIN LATERAL (
+      JOIN LATERAL (
         SELECT h.mrp, h.effective_date
         FROM mrp_price_history h
         WHERE h.item_code = p.item_code
           AND h.effective_date <= CURRENT_DATE
+          AND h.mrp IS NOT NULL
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND ${categoryCondition}
+        AND p.is_active IS TRUE
       ORDER BY p.item_code
       LIMIT ${limit}
     `);
@@ -338,11 +360,12 @@ router.get(
         upcoming_price.mrp AS upcoming_mrp,
         upcoming_price.effective_date AS upcoming_effective_date
       FROM catalog_products p
-      LEFT JOIN LATERAL (
+      JOIN LATERAL (
         SELECT h.mrp, h.effective_date
         FROM mrp_price_history h
         WHERE h.item_code = p.item_code
           AND h.effective_date <= CURRENT_DATE
+          AND h.mrp IS NOT NULL
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
@@ -355,6 +378,7 @@ router.get(
         LIMIT 1
       ) upcoming_price ON true
       WHERE p.item_code = ${itemCode}
+        AND p.is_active IS TRUE
       LIMIT 1
     `);
 
