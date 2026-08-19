@@ -9,6 +9,7 @@ import apiKeysRouter from "./apiKeys";
 import externalV1Router from "./externalV1";
 import importBatchesRouter from "./importBatches";
 import priceFinderRouter from "./priceFinder";
+import catalogSyncRouter from "./catalogSync";
 
 const router: IRouter = Router();
 
@@ -33,6 +34,7 @@ router.use(apiKeysRouter);
 router.use(priceFinderRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
+router.use(catalogSyncRouter);
 router.use(importBatchesRouter);
 router.use(comparisonRouter);
 router.use(analysisRouter);

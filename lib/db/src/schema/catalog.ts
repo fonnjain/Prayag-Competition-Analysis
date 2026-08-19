@@ -369,6 +369,30 @@ export const competitorCodeAliasesTable = pgTable(
   ],
 );
 
+// Durable audit for explicit development → production catalog bundle imports.
+// The bundle itself is never stored; only its digest and before/after summaries.
+export const catalogSyncAuditsTable = pgTable(
+  "catalog_sync_audits",
+  {
+    id: serial("id").primaryKey(),
+    bundleSha256: text("bundle_sha256").notNull(),
+    bundleCreatedAt: timestamp("bundle_created_at", { withTimezone: true }).notNull(),
+    actorEmail: text("actor_email").notNull(),
+    status: text("status").notNull(),
+    beforeSummary: text("before_summary").notNull(),
+    afterSummary: text("after_summary"),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("catalog_sync_audits_started_idx").on(t.startedAt),
+    index("catalog_sync_audits_bundle_idx").on(t.bundleSha256),
+  ],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 
@@ -381,3 +405,4 @@ export type DiscountSetting = typeof discountSettingsTable.$inferSelect;
 export type ImportBatch = typeof importBatchesTable.$inferSelect;
 export type CompetitorPriceStaging = typeof competitorPriceStagingTable.$inferSelect;
 export type CompetitorCodeAlias = typeof competitorCodeAliasesTable.$inferSelect;
+export type CatalogSyncAudit = typeof catalogSyncAuditsTable.$inferSelect;

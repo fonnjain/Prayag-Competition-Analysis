@@ -5,10 +5,20 @@ import {
   getGetCatalogProductsQueryKey,
   getGetCatalogFiltersQueryKey,
 } from "@workspace/api-client-react";
-import { AlertTriangle, CheckCircle2, Database, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Database,
+  Download,
+  Loader2,
+  RotateCcw,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +48,47 @@ interface MrpSourceHealth {
   freshnessMessage: string;
 }
 
+interface CatalogSyncSummary {
+  counts: {
+    catalogProducts: number;
+    mrpSources: number;
+    mrpLoadBatches: number;
+    mrpPriceHistory: number;
+    mrpHistoryProvenanceEvents: number;
+    codeConflicts: number;
+    competitorPrices: number;
+    competitorCodeAliases: number;
+  };
+  distinctHistoryCodes: number;
+  unlinkedHistoryRows: number;
+  discontinuedProducts: number;
+  resolvedSparshMappings: number;
+}
+
+interface CatalogSyncStatus {
+  environment: "development" | "production";
+  confirmationPhrase: string;
+  current: CatalogSyncSummary;
+  recentAudits: Array<{
+    id: number;
+    bundleSha256: string;
+    status: string;
+    actorEmail: string;
+    startedAt: string;
+    completedAt: string | null;
+    afterSummary: string | null;
+  }>;
+}
+
+interface CatalogSyncPreview {
+  checksum: string;
+  createdAt: string;
+  incoming: CatalogSyncSummary;
+  current: CatalogSyncSummary;
+  preflightToken: string;
+  expiresInMinutes: number;
+}
+
 function formatDate(value: string | null): string {
   if (!value) return "Not loaded";
   return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", {
@@ -45,6 +96,373 @@ function formatDate(value: string | null): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function formatTimestamp(value: string | null): string {
+  if (!value) return "In progress";
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function SyncSummary({
+  title,
+  summary,
+}: {
+  title: string;
+  summary: CatalogSyncSummary;
+}) {
+  const metrics = [
+    ["Products", summary.counts.catalogProducts],
+    ["MRP history", summary.counts.mrpPriceHistory],
+    ["MRP source batches", summary.counts.mrpLoadBatches],
+    ["Provenance events", summary.counts.mrpHistoryProvenanceEvents],
+    ["Competitor prices", summary.counts.competitorPrices],
+    ["Verified aliases", summary.counts.competitorCodeAliases],
+    ["Discontinuations", summary.discontinuedProducts],
+    ["Resolved Sparsh mappings", summary.resolvedSparshMappings],
+  ] as const;
+  return (
+    <div className="rounded-md border bg-background p-4">
+      <h4 className="mb-3 text-sm font-semibold">{title}</h4>
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-2 text-sm">
+        {metrics.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-3">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="font-mono font-medium">{value.toLocaleString()}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function CatalogSyncPanel({
+  onApplied,
+}: {
+  onApplied: () => void;
+}) {
+  const { toast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<CatalogSyncPreview | null>(null);
+  const [confirmation, setConfirmation] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [exportedChecksum, setExportedChecksum] = useState<string | null>(null);
+  const [completed, setCompleted] = useState<{
+    auditId: number;
+    completedAt: string;
+    checksum: string;
+    after: CatalogSyncSummary;
+  } | null>(null);
+
+  const statusQuery = useQuery<CatalogSyncStatus | null>({
+    queryKey: ["catalog", "sync", "status"],
+    retry: false,
+    queryFn: async () => {
+      const response = await fetch("/api/catalog/sync/status");
+      if (response.status === 403) return null;
+      if (!response.ok) throw new Error("Could not load catalog sync status.");
+      return response.json();
+    },
+  });
+  const status = statusQuery.data;
+  if (!status || statusQuery.isError) return null;
+
+  async function readError(response: Response, fallback: string): Promise<string> {
+    try {
+      const body = (await response.json()) as { error?: string };
+      return body.error ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  async function exportBundle() {
+    setIsExporting(true);
+    try {
+      const response = await fetch("/api/catalog/sync/export");
+      if (!response.ok) throw new Error(await readError(response, "Export failed."));
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") ?? "";
+      const fileName =
+        disposition.match(/filename="([^"]+)"/)?.[1] ?? "prayag-catalog-sync.json";
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      const checksum = response.headers.get("X-Catalog-Sync-Sha256");
+      setExportedChecksum(checksum);
+      toast({
+        title: "Catalog bundle downloaded",
+        description: checksum
+          ? `Checksum ${checksum.slice(0, 12)}…`
+          : "Keep this file private until it is imported in production.",
+      });
+    } catch (error) {
+      toast({
+        title: "Catalog export failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function previewBundle() {
+    if (!file) return;
+    setIsPreviewing(true);
+    setPreview(null);
+    setCompleted(null);
+    setConfirmation("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch("/api/catalog/sync/preflight", {
+        method: "POST",
+        body: form,
+      });
+      if (!response.ok) {
+        throw new Error(await readError(response, "The bundle could not be previewed."));
+      }
+      setPreview(await response.json());
+    } catch (error) {
+      toast({
+        title: "Bundle rejected",
+        description: error instanceof Error ? error.message : "The bundle is invalid.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewing(false);
+    }
+  }
+
+  async function applyBundle() {
+    if (!file || !preview) return;
+    setIsApplying(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("preflightToken", preview.preflightToken);
+      form.append("confirmation", confirmation);
+      const response = await fetch("/api/catalog/sync/apply", {
+        method: "POST",
+        body: form,
+      });
+      if (!response.ok) {
+        throw new Error(await readError(response, "Production catalog replacement failed."));
+      }
+      const result = (await response.json()) as {
+        auditId: number;
+        completedAt: string;
+        checksum: string;
+        after: CatalogSyncSummary;
+      };
+      setCompleted(result);
+      setPreview(null);
+      setConfirmation("");
+      await statusQuery.refetch();
+      onApplied();
+      toast({
+        title: "Production catalog replaced",
+        description: `Audit #${result.auditId} recorded successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Catalog sync failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Production data was not changed.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApplying(false);
+    }
+  }
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-blue-200 bg-blue-50/40">
+      <div className="flex items-start gap-3 border-b border-blue-200 px-5 py-4">
+        <ShieldCheck className="mt-0.5 h-5 w-5 text-blue-700" />
+        <div>
+          <h2 className="font-semibold">Verified catalog production sync</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Administrator-only transfer of catalog records. Accounts, sessions,
+            API keys, and application settings are never included.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <SyncSummary
+          title={
+            status.environment === "development"
+              ? "Development catalog"
+              : "Current production catalog"
+          }
+          summary={status.current}
+        />
+
+        {status.environment === "development" ? (
+          <div className="space-y-3">
+            <p className="text-sm">
+              Download a signed snapshot after verifying the counts above. Import
+              this exact file from the published Data Health page.
+            </p>
+            <Button onClick={exportBundle} disabled={isExporting}>
+              {isExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isExporting ? "Preparing bundle…" : "Download verified bundle"}
+            </Button>
+            {exportedChecksum && (
+              <p className="break-all rounded bg-white/80 px-3 py-2 font-mono text-xs">
+                SHA-256: {exportedChecksum}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium" htmlFor="catalog-sync-file">
+                Development catalog bundle
+              </label>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  id="catalog-sync-file"
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) => {
+                    setFile(event.target.files?.[0] ?? null);
+                    setPreview(null);
+                    setCompleted(null);
+                  }}
+                  className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <Button
+                  variant="outline"
+                  onClick={previewBundle}
+                  disabled={!file || isPreviewing || isApplying}
+                >
+                  {isPreviewing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  {isPreviewing ? "Validating…" : "Preview replacement"}
+                </Button>
+              </div>
+            </div>
+
+            {preview && (
+              <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4">
+                <div>
+                  <h3 className="font-semibold text-red-900">
+                    Production replacement preview
+                  </h3>
+                  <p className="mt-1 break-all font-mono text-xs text-red-800">
+                    SHA-256: {preview.checksum}
+                  </p>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <SyncSummary title="Current production" summary={preview.current} />
+                  <SyncSummary title="Incoming development" summary={preview.incoming} />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-red-950">
+                    Type{" "}
+                    <span className="font-mono">
+                      {status.confirmationPhrase}
+                    </span>{" "}
+                    to continue
+                  </label>
+                  <input
+                    value={confirmation}
+                    onChange={(event) => setConfirmation(event.target.value)}
+                    autoComplete="off"
+                    className="w-full rounded-md border border-red-300 bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={applyBundle}
+                  disabled={
+                    isApplying || confirmation !== status.confirmationPhrase
+                  }
+                >
+                  {isApplying && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {isApplying ? "Replacing production catalog…" : "Replace production catalog"}
+                </Button>
+              </div>
+            )}
+
+            {completed && (
+              <div className="space-y-3 rounded-lg border border-green-200 bg-green-50 p-4 text-green-950">
+                <div className="flex items-center gap-2 font-semibold">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Production catalog sync completed
+                </div>
+                <p className="text-sm">
+                  Audit reference <span className="font-mono">#{completed.auditId}</span>
+                  {" · "}
+                  {formatTimestamp(completed.completedAt)}
+                </p>
+                <p className="break-all font-mono text-xs">
+                  Source SHA-256: {completed.checksum}
+                </p>
+                <SyncSummary title="Resulting production catalog" summary={completed.after} />
+              </div>
+            )}
+
+            {status.recentAudits.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Recent sync audits</h3>
+                <div className="divide-y rounded-md border bg-background">
+                  {status.recentAudits.map((audit) => (
+                    <div
+                      key={audit.id}
+                      className="flex flex-col justify-between gap-1 px-3 py-2 text-sm sm:flex-row"
+                    >
+                      <span>
+                        <span className="font-mono">#{audit.id}</span>{" "}
+                        <span
+                          className={
+                            audit.status === "succeeded"
+                              ? "text-green-700"
+                              : audit.status === "failed"
+                                ? "text-red-700"
+                                : "text-amber-700"
+                          }
+                        >
+                          {audit.status}
+                        </span>
+                      </span>
+                      <span className="text-muted-foreground">
+                        {formatTimestamp(audit.completedAt ?? audit.startedAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 export default function DataHealthPage() {
@@ -79,6 +497,11 @@ export default function DataHealthPage() {
       },
     },
   });
+  const invalidateCatalog = () => {
+    queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetCatalogFiltersQueryKey() });
+  };
 
   if (isLoading) {
     return <div className="p-8 text-center">Loading health metrics...</div>;
@@ -122,6 +545,8 @@ export default function DataHealthPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      <CatalogSyncPanel onApplied={invalidateCatalog} />
 
       <div className="bg-card border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b bg-muted/20 font-semibold">
