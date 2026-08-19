@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   catalogProductsTable,
   db,
@@ -38,15 +38,20 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db
-    .delete(mrpHistoryProvenanceEventsTable)
-    .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, CODES));
-  await db
-    .delete(mrpPriceHistoryTable)
-    .where(inArray(mrpPriceHistoryTable.itemCode, CODES));
-  await db
-    .delete(catalogProductsTable)
-    .where(inArray(catalogProductsTable.itemCode, CODES));
+  await db.transaction(async (tx) => {
+    // Other MRP tests can finish at the same time. Share the mutation lock so
+    // teardown never interleaves deletes across the related audit tables.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(917_130)`);
+    await tx
+      .delete(mrpHistoryProvenanceEventsTable)
+      .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, CODES));
+    await tx
+      .delete(mrpPriceHistoryTable)
+      .where(inArray(mrpPriceHistoryTable.itemCode, CODES));
+    await tx
+      .delete(catalogProductsTable)
+      .where(inArray(catalogProductsTable.itemCode, CODES));
+  });
 });
 
 describe("manual MRP provenance", () => {
