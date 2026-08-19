@@ -1,0 +1,95 @@
+# Replit Prompt — Reconcile the Catalog Against the Official Code List
+
+## 1. The rule
+
+The six official dated MRP workbooks are the entire Prayag catalogue. **A product exists only if its code appears in one of those six files.** Nothing else belongs in `catalog_products`.
+
+`Competitor_Master_-_PTMT.xlsx` is **not** a source of Prayag products. It was built for a one-off Sparsh-vs-Prayag comparison. Any genuine Prayag code in it is already in the PTMT master, so it adds nothing and should never appear as a product's origin.
+
+## 2. Why this is needed
+
+The current `catalog_products` table has 6,736 rows with this provenance:
+
+| source_files | Rows |
+|---|---:|
+| ptmt.xlsx | 1,931 |
+| pipe_fitting.xlsx | 1,555 |
+| cp_mrp.xlsx | 1,171 |
+| sanitaryware.xlsx | 217 |
+| quaa_fern.xlsx | 155 |
+| `Competitor_Master_-_PTMT.xlsx` | 150 |
+| NULL or empty | 1,557 |
+
+Three problems are visible in that table:
+
+1. **1,557 rows carry no source at all**, and every one of them is `is_active = true`. Live products with no traceable origin.
+2. **No hardware source appears anywhere**, yet the Hardware division is populated. Its 277 codes have lost their attribution.
+3. **150 rows are attributed to the competitor master.** Those 150 codes have been checked against the official PTMT file and all 150 are present there, so the products are real — only the label is wrong. Do not delete them; relabel them.
+
+## 3. Input file
+
+`Prayag_Allowed_Codes_Master.xlsx` — the authoritative list, built by reading every sheet of all six official workbooks.
+
+- Sheet `Allowed_Codes` — **7,144** rows. Columns: `item_code`, `division`, `tier`, `source_sheets`.
+- `tier` is either `Priced` (**6,730** codes, carrying a real MRP somewhere in the source) or `No price in source` (**414** codes that appear in the files but never with a price — index listings, packing tables and similar).
+
+Codes are normalised as uppercase, whitespace stripped, trailing `.0` removed. Apply the same normalisation on the database side before comparing, or the match will fail on Excel-derived numeric codes such as `121.0`.
+
+## 4. What to build
+
+Add a **Catalog Reconciliation** tool to the Data Health page. It takes the file above and produces a report **before changing anything**. Nothing is deleted until the user has seen the report and confirmed.
+
+### Report buckets
+
+| Bucket | Definition | Proposed action |
+|---|---|---|
+| **A. Orphans** | In `catalog_products`, absent from `Allowed_Codes` | Delete — no source in any official file |
+| **B. Unpriced-in-source** | Present, `tier = No price in source` | Set `is_active = false`, keep the row |
+| **C. Missing** | In `Allowed_Codes` with `tier = Priced`, absent from `catalog_products` | Report only — a gap in the load, needs a fresh MRP load, not an insert here |
+| **D. Mislabelled source** | `source_files` = `Competitor_Master_-_PTMT.xlsx` or NULL, but the code IS in `Allowed_Codes` | Rewrite `source_files` from the file's `source_sheets` column |
+
+Bucket C matters: the allowed list holds 6,730 priced codes while the database holds roughly 6,330 priced products. If that gap is real, several hundred products are missing and the reconciliation must surface it rather than quietly pass.
+
+### Report contents
+
+For each bucket: a count, a division breakdown, and a downloadable Excel export of the rows. For bucket A also show, per row, whether the code has any `mrp_price_history` rows and whether any `competitor_prices.matched_prayag_code` points at it.
+
+**That last check is a hard gate.** If an orphan is referenced by a competitor mapping, do not delete it — list it separately as `Orphan (referenced)` and leave it alone. The Sparsh Pearl mappings reference `catalog_products` by `item_code`, and deleting underneath them would silently break 150 verified rows.
+
+### Applying
+
+Once the user confirms, apply the actions in the table above inside a single transaction. Delete `mrp_price_history` rows for deleted codes as well, so no orphaned price history is left behind. Write a summary row to an audit log: counts per bucket, timestamp, filename.
+
+## 5. Constraints
+
+- Follow the repo conventions. Contract-first: edit `lib/api-spec/openapi.yaml`, run `pnpm --filter @workspace/api-spec run codegen`, never hand-edit `lib/api-hooks` or `lib/api-zod`. Schema changes go in `lib/db/src/schema/catalog.ts` then `pnpm --filter @workspace/db run push`.
+- **Do not auto-run this on upload.** Report first, confirm, then apply. The project keeps a human in the loop on anything that changes price data.
+- **Never infer a Prayag product from a competitor file** — in this tool or anywhere else. If any loader still writes `catalog_products` rows from a competitor master, remove that path and say which file it was in.
+
+## 6. Acceptance tests
+
+```
+1. A code in catalog_products absent from Allowed_Codes lands in bucket A.
+2. An orphan referenced by competitor_prices.matched_prayag_code is NOT deleted
+   and is reported as "Orphan (referenced)".
+3. A code whose tier is "No price in source" ends with is_active = false and its
+   row still present — not deleted.
+4. All 150 codes currently sourced to Competitor_Master_-_PTMT.xlsx land in
+   bucket D, none in bucket A.
+5. Code normalisation: catalog code "121.0" matches allowed code "121".
+6. A dry run changes no rows — row counts before and after are identical.
+7. After applying, every remaining catalog_products row has a non-null source_files.
+```
+
+Test 6 is the important one. The report must be genuinely read-only.
+
+## 7. Report back
+
+Read these from the database, not from this prompt:
+
+- Row counts for buckets A, B, C, D, and the referenced-orphan sub-count.
+- Division breakdown for bucket A.
+- The `source_files` breakdown after applying — the NULL count should be zero.
+- Total `catalog_products` rows before and after.
+
+One clean commit.
