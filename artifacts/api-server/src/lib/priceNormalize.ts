@@ -3,7 +3,10 @@
 // Competitor and Prayag prices are quoted on different bases for length-based
 // products (pipes/coils): some per piece for a standard pack length ("3 Mtr"),
 // some per running metre, some per foot. To compare like-for-like we reduce
-// every length-based price to a price per 1 metre before computing diff%.
+// every length-based price to a price per 1 metre before computing the
+// canonical market gap (competitor - Prayag) / Prayag.
+
+import { marketGapPct } from "./analysis.js";
 //
 // Ground truth: Prayag MRP is per-piece and scales linearly with pack length
 // (PS-1 3 MTR = 237, PS-1S 5 MTR = 395 → both exactly ₹79/m), so dividing a
@@ -259,10 +262,7 @@ export function computeCompareNorm(args: {
 
   const compPerMetre = comp.perMetre!;
   const prayagPerMetre = pr.perMetre;
-  const perMetreDiffPct =
-    compPerMetre > 0
-      ? Math.round(((prayagPerMetre - compPerMetre) / compPerMetre) * 1000) / 10
-      : null;
+  const perMetreDiffPct = marketGapPct(prayagPerMetre, compPerMetre);
   return {
     compPerMetre,
     prayagPerMetre,

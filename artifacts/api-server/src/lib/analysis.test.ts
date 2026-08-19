@@ -10,6 +10,9 @@ import {
   median,
   mean,
   pct,
+  MARKET_GAP_DEFINITION,
+  marketGapPct,
+  prayagCheaperForGap,
   resolveCompetitorPeriodDate,
   type PrayagInfo,
   type CompInput,
@@ -64,6 +67,24 @@ describe("effectivePrice (basis normalization)", () => {
   });
   it("trims whitespace around the ex-GST marker", () => {
     expect(effectivePrice("  Rate (ex-GST)  ", 100)).toBeCloseTo(118, 5);
+  });
+});
+
+describe("canonical market-gap definition", () => {
+  it("documents the population, basis, period, and positive-is-Prayag-cheaper sign", () => {
+    expect(MARKET_GAP_DEFINITION.population).toContain("confirmed-matched, priced");
+    expect(MARKET_GAP_DEFINITION.priceBasis).toContain("Ex-GST");
+    expect(MARKET_GAP_DEFINITION.pricePeriod).toContain("on or before one as-of date");
+    expect(MARKET_GAP_DEFINITION.signConvention).toContain("positive means Prayag is cheaper");
+  });
+
+  it("uses competitor-minus-Prayag over Prayag, without rounding the row gap", () => {
+    expect(marketGapPct(100, 112.34)).toBeCloseTo(12.34, 8);
+    expect(marketGapPct(100, 90)).toBeCloseTo(-10, 8);
+    expect(marketGapPct(0, 100)).toBeNull();
+    expect(prayagCheaperForGap(0.01)).toBe(true);
+    expect(prayagCheaperForGap(0)).toBe(false);
+    expect(prayagCheaperForGap(-0.01)).toBe(false);
   });
 });
 

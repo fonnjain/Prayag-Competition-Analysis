@@ -6,7 +6,7 @@ description: How the /analysis dashboard computes competitor price gaps from exi
 # Competition Analysis dashboard (@workspace/prayag-analysis, /analysis/)
 
 A read-only analytics dashboard layered on the SAME tables the Console uses
-(`catalog_products`, `mrp_price_history` where `is_current`, `competitor_prices`).
+(`catalog_products`, approved period-aware `mrp_price_history`, `competitor_prices`).
 No new tables, no migration, no cache — every `/api/analysis/*` endpoint recomputes
 in-memory per request (dataset is small: ~8.7k competitor rows).
 
@@ -19,37 +19,29 @@ in-memory per request (dataset is small: ~8.7k competitor rows).
   row-building to `buildRow`.
 
 ## Rules that MUST stay consistent (subtle, easy to silently break)
-- **Gap basis = persisted per-row MRP, NEVER a catalog lookup.** The competitor
-  gap and the displayed "Prayag MRP" come ONLY from
-  `competitor_prices.prayag_mrp_at_compare` (the period-matched `prayag_mrp` from
-  the source sheet, snapshotted on the row at compare/import time). `buildRow`
-  reads `c.prayagMrpAtCompare` for matched rows and null otherwise — it does NOT
-  re-read `catalog_products` / `mrp_price_history` for the MRP. **Why:** the user
-  wants each comparison frozen to the MRP that was in effect when the competitor
-  sheet was matched, so it stays stable as the master catalog MRP later moves.
-  The catalog (`mrp_price_history` is_current) is for the full-range catalog view
-  (prayag-product-db) only. NOTE: `getPrayagCatalogMap` still selects `mrp` but
-  that value is now unused by the gap — it only supplies division/category/name.
-- **Every write path must populate `prayag_mrp_at_compare` for matched rows**, or
-  those rows silently become non-comparable: (1) the verified-sheet reload loader
-  stores the sheet's own `prayag_mrp`; (2) `POST /catalog/load-competitor`
-  snapshots the catalog's current MRP at import time (raw sheets carry no Prayag
-  MRP); (3) `loadCatalogSeed` (`lib/catalogSeed.ts`, the `/catalog/reset` path)
-  snapshots the seed price-history's latest-effective MRP. Miss any one and a
-  reset/import leaves matched rows with null MRP → excluded from all gap stats.
-- **Basis normalization:** `competitor_prices.unit` trimmed === `"Rate (ex-GST)"`
-  → multiply price by 1.18 (GST gross-up) before comparing; null/empty/anything
-  else is treated as already MRP-comparable.
-- **Comparability gate:** a price gap is computed ONLY when
-  `match_status === "matched"` AND `prayagMrpAtCompare > 0` AND competitor price
-  present. Non-comparable rows still count toward coverage / match-quality but are
-  excluded from gap stats.
+- **Gap MRP is period-aware, not a stored import snapshot.** Resolve the latest
+  approved, non-null Prayag MRP in force on the chosen as-of date and join it to
+  an active, non-discontinued catalog product. **Why:** the market report must
+  reproduce the official price period after history rebuilds; the import snapshot
+  is retained as provenance, not as the canonical gap input.
+- **Population selection:** for each `(competitor, matched Prayag code)`, first
+  require `match_status = "matched"` and a non-null price, then choose the latest
+  revision on or before the as-of date. **Why:** a later row awaiting review must
+  not silently erase an earlier confirmed price. Future, inactive, discontinued,
+  unmatched, and null-price rows are excluded from gap aggregates.
+- **Basis normalization:** explicit `price_basis = Ex-GST` uses row `gst_pct`
+  (default 18%); legacy `unit = Rate (ex-GST)` uses 18%. Other rows are already
+  MRP-comparable. Per-metre normalization is a comparison-row display aid and
+  must never feed the official dashboard/report aggregate.
+- **Comparability gate:** a price gap is computed only for the canonical
+  population with a positive in-force Prayag MRP. Non-comparable rows still count
+  toward coverage / match-quality but are excluded from gap stats.
 - **Sign convention:** `priceDiff = competitorEffectivePrice − prayagMrp`;
   `prayagCheaper = competitorEffectivePrice > prayagMrp`. Positive diff% = Prayag
   cheaper = GREEN/good (margin headroom). Negative = Prayag costlier = RED threat.
   The frontend color language depends on this sign — do not flip it.
 - **No catalog-attribute leakage:** `buildRow` only hydrates division/category
-  (and the per-row MRP) for `matched` rows, even if a non-matched row carries a
+  (and the period-resolved MRP) for `matched` rows, even if a non-matched row carries a
   stray `matchedPrayagCode`. **Why:** otherwise unmatched rows would pollute
   per-category breakdowns.
 

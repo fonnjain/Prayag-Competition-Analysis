@@ -199,6 +199,7 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
         SELECT DISTINCT ON (competitor, matched_prayag_code) *
         FROM competitor_prices
         WHERE matched_prayag_code IS NOT NULL
+          AND match_status = 'matched'
           AND effective_date IS NOT NULL
           AND effective_date <= ${resolvedDate}
           AND price IS NOT NULL

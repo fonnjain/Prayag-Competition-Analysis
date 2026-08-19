@@ -305,7 +305,7 @@ describe("comparison current price windows", () => {
       upcomingPrayagMrp: 165,
       upcomingPrayagEffectiveDate: NEXT_DATE,
       upcomingPrayagChangePct: 10,
-      diffPct: 50,
+      diffPct: -33.3,
     });
     expect(row.competitors).toEqual(
       expect.arrayContaining([
@@ -317,7 +317,7 @@ describe("comparison current price windows", () => {
           upcomingPrice: 10,
           upcomingEffectiveDate: NEXT_DATE,
           upcomingChangePct: -90,
-          diffPct: 50,
+          diffPct: -33.3,
         }),
       ]),
     );
@@ -391,7 +391,7 @@ describe("comparison current price windows", () => {
     const currentRow = rows.find((row) => row[dateIndex] === CURRENT_DATE)!;
     const futureRow = rows.find((row) => row[dateIndex] === NEXT_DATE)!;
     expect(currentRow[currentIndex]).toBe("yes");
-    expect(Number(currentRow[gapIndex])).toBe(50);
+    expect(Number(currentRow[gapIndex])).toBe(-33.3);
     expect(futureRow[currentIndex]).toBe("no");
     expect(futureRow[gapIndex]).toBe("");
   });
@@ -423,7 +423,7 @@ describe("comparison current price windows", () => {
       upcomingCompetitorPrice: 132,
       upcomingCompetitorEffectiveDate: NEXT_DATE,
       upcomingCompetitorChangePct: 10,
-      diffPct: 25,
+      diffPct: -20,
     });
     const placeholder = comparison.body.rows.find(
       (row: { description: string }) =>
@@ -460,7 +460,7 @@ describe("comparison current price windows", () => {
       totalRows: 1,
       matchedRows: 1,
       comparableRows: 1,
-      avgDiffPct: 25,
+      avgDiffPct: -20,
     });
 
     expect(exported.status).toBe(200);
@@ -484,7 +484,7 @@ describe("comparison current price windows", () => {
     )!;
     expect(exportedCurrent[currentIndex]).toBe("yes");
     expect(Number(exportedCurrent[nextPriceIndex])).toBe(132);
-    expect(Number(exportedCurrent[gapIndex])).toBe(25);
+    expect(Number(exportedCurrent[gapIndex])).toBe(-20);
     const exportedPlaceholder = exportRows.find(
       (row) => row[descriptionIndex] === "Later null-price placeholder",
     )!;

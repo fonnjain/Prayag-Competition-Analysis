@@ -18,6 +18,11 @@ import {
   type NormResult,
 } from "../lib/priceNormalize";
 import { priceChangePct, validToFromNextDateOrDiscontinuation, validToFromNextDate } from "../lib/priceWindow";
+import {
+  effectivePrice,
+  marketGapPct,
+  prayagCheaperForGap,
+} from "../lib/analysis.js";
 
 const router: IRouter = Router();
 
@@ -276,32 +281,44 @@ async function getAllCompetitorWindows(): Promise<Map<number, CompetitorWindow>>
   return getCompetitorWindows(rows);
 }
 
+// The official market-gap population uses the newest confirmed mapping, not a
+// stale matched revision superseded by an unreviewed/rejected revision. Keeping
+// this window separate lets the row-list still display history for review while
+// every comparable KPI shares the dashboard/report definition.
+async function getAllMatchedCompetitorWindows(): Promise<Map<number, CompetitorWindow>> {
+  const rows = await db
+    .select()
+    .from(competitorPricesTable)
+    .where(eq(competitorPricesTable.matchStatus, "matched"));
+  return getCompetitorWindows(rows);
+}
+
 function buildComparisonRow(
   c: CompRow,
   maps: Map<string, PrayagInfo>,
   window?: CompetitorWindow,
+  matchedWindow?: CompetitorWindow,
 ) {
   const key = c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
   const prayagMrp = prayag?.mrp ?? null;
-  let diffPct: number | null = null;
-  let prayagCheaper: boolean | null = null;
-  if (
-    (window?.isCurrent ?? true) &&
-    prayagMrp != null &&
-    c.price != null &&
-    c.price > 0
-  ) {
-    diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
-    prayagCheaper = prayagMrp <= c.price;
-  }
+  const competitorEffectivePrice =
+    c.price == null
+      ? null
+      : effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct);
+  const rawGapPct =
+    c.matchStatus === "matched" && (matchedWindow?.isCurrent ?? window?.isCurrent ?? true)
+      ? marketGapPct(prayagMrp, competitorEffectivePrice)
+      : null;
+  const diffPct = rawGapPct == null ? null : Math.round(rawGapPct * 10) / 10;
+  const prayagCheaper = prayagCheaperForGap(rawGapPct);
 
   // Reduce length-based prices (pipes/coils) to a per-metre basis so the diff
   // is like-for-like; flag rows whose unit basis is ambiguous for review.
   // Rows without a competitor price (verified mapping, MRP pending) skip
   // normalization entirely — there is nothing to compare yet.
   const norm =
-    c.price == null
+    competitorEffectivePrice == null
       ? NO_NORM
       : computeCompareNorm({
           prayagName: prayag?.productName ?? null,
@@ -309,17 +326,16 @@ function buildComparisonRow(
           description: c.description,
           size: c.size,
           unit: c.unit,
-          price: c.price,
+          price: competitorEffectivePrice,
         });
-  const effectiveDiffPct = !(window?.isCurrent ?? true)
+  const effectiveDiffPct = rawGapPct == null
     ? null
     : norm.unitAmbiguous
     ? null
     : norm.lengthNormalized
       ? norm.perMetreDiffPct
       : diffPct;
-  const effectivePrayagCheaper =
-    effectiveDiffPct == null ? null : effectiveDiffPct <= 0;
+  const effectivePrayagCheaper = prayagCheaperForGap(effectiveDiffPct);
 
   return {
     id: c.id,
@@ -407,10 +423,13 @@ router.get("/catalog/comparison", async (req, res) => {
     asc(competitorPricesTable.id),
   );
 
-  const windows = await getAllCompetitorWindows();
+  const [windows, matchedWindows] = await Promise.all([
+    getAllCompetitorWindows(),
+    getAllMatchedCompetitorWindows(),
+  ]);
   let rows = all
     .filter((row) => isAvailableComparisonRow(row, maps))
-    .map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
+    .map((c) => buildComparisonRow(c, maps, windows.get(c.id), matchedWindows.get(c.id)));
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
   if (ambiguousOnly) rows = rows.filter((r) => r.unitAmbiguous);
 
@@ -448,10 +467,13 @@ router.get("/catalog/comparison/export", async (req, res) => {
     asc(competitorPricesTable.id),
   );
 
-  const windows = await getAllCompetitorWindows();
+  const [windows, matchedWindows] = await Promise.all([
+    getAllCompetitorWindows(),
+    getAllMatchedCompetitorWindows(),
+  ]);
   let rows = all
     .filter((row) => isAvailableComparisonRow(row, maps))
-    .map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
+    .map((c) => buildComparisonRow(c, maps, windows.get(c.id), matchedWindows.get(c.id)));
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
 
   const header = [
@@ -525,17 +547,48 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   let q = db.select().from(competitorPricesTable).$dynamic();
   if (competitor) q = q.where(eq(competitorPricesTable.competitor, competitor));
   const all = await q;
-  const windows = await getAllCompetitorWindows();
+  const [windows, matchedWindows] = await Promise.all([
+    getAllCompetitorWindows(),
+    getAllMatchedCompetitorWindows(),
+  ]);
+  // Keep full precision for the official aggregate. `diffPct` on the response
+  // is intentionally rounded for display, so it must not be summed here.
+  const canonicalGaps = new Map<number, number | null>();
+  for (const c of all) {
+    const prayag = c.matchedPrayagCode
+      ? maps.get(normCode(c.matchedPrayagCode))
+      : undefined;
+    canonicalGaps.set(
+      c.id,
+      c.matchStatus === "matched" &&
+        matchedWindows.get(c.id)?.isCurrent === true &&
+        c.price != null
+        ? marketGapPct(
+            prayag?.mrp ?? null,
+            effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct),
+          )
+        : null,
+    );
+  }
   const rows = all
     .filter((row) => isAvailableComparisonRow(row, maps))
-    .map((c) => buildComparisonRow(c, maps, windows.get(c.id)))
-    .filter((row) => row.competitorPriceIsCurrent);
+    .map((c) => buildComparisonRow(c, maps, windows.get(c.id), matchedWindows.get(c.id)))
+    // Preserve the ordinary current row for mapping-review counts, while also
+    // retaining the current *confirmed match* when a newer revision is pending
+    // review. Comparable KPIs below then use the same population as analysis.
+    .filter(
+      (row) =>
+        row.competitorPriceIsCurrent ||
+        matchedWindows.get(row.id)?.isCurrent === true,
+    );
 
   const matched = rows.filter((r) => !!r.matchedPrayagCode);
-  // Comparable rows use the per-metre-normalized diff where it applies, and
-  // exclude rows whose unit basis is ambiguous (those go to manual review).
-  const comparable = rows.filter((r) => r.effectiveDiffPct != null);
-  const cheaper = comparable.filter((r) => r.effectivePrayagCheaper);
+  // The summary is the official market-gap KPI, so it deliberately uses the
+  // raw MRP-basis canonical gap. Per-metre fields remain a like-for-like row
+  // display aid only; allowing them into this aggregate would diverge from the
+  // Analysis dashboard and the reproducible rebuild report.
+  const comparable = rows.filter((r) => canonicalGaps.get(r.id) != null);
+  const cheaper = comparable.filter((r) => (canonicalGaps.get(r.id) ?? 0) > 0);
   const reviewRows = rows.filter((r) => r.matchStatus !== "matched");
   const ambiguousRows = rows.filter((r) => r.unitAmbiguous);
 
@@ -549,7 +602,7 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   const avgDiffPct =
     comparable.length > 0
       ? Math.round(
-          (comparable.reduce((s, r) => s + (r.effectiveDiffPct ?? 0), 0) /
+          (comparable.reduce((s, r) => s + (canonicalGaps.get(r.id) ?? 0), 0) /
             comparable.length) *
             10,
         ) / 10
@@ -563,8 +616,8 @@ router.get("/catalog/comparison/summary", async (req, res) => {
     const cat = r.category ?? "Uncategorized";
     const e = byCat.get(cat) ?? { comparable: 0, cheaper: 0, diffSum: 0 };
     e.comparable++;
-    if (r.effectivePrayagCheaper) e.cheaper++;
-    e.diffSum += r.effectiveDiffPct ?? 0;
+    if ((canonicalGaps.get(r.id) ?? 0) > 0) e.cheaper++;
+    e.diffSum += canonicalGaps.get(r.id) ?? 0;
     byCat.set(cat, e);
   }
   const categoryWinRates = [...byCat.entries()]
@@ -915,7 +968,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     .select()
     .from(competitorPricesTable)
     .where(and(...conditions));
-  const competitorWindows = await getAllCompetitorWindows();
+  const competitorWindows = await getAllMatchedCompetitorWindows();
   const currentMatchedRows = matchedRows.filter(
     (row) =>
       competitorWindows.get(row.id)?.isCurrent &&
@@ -927,6 +980,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
   // pick the most aggressive quote per competitor after per-metre normalization.
   interface CompCandidate {
     price: number;
+    priceBasis: string | null;
+    gstPct: number | null;
     description: string | null;
     size: string | null;
     unit: string | null;
@@ -962,6 +1017,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     const priceWindow = competitorWindows.get(c.id);
     list.push({
       price: c.price,
+      priceBasis: c.priceBasis,
+      gstPct: c.gstPct,
       description: c.description,
       size: c.size,
       unit: c.unit,
@@ -1015,12 +1072,18 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
         let perMetre: number | null = null;
         let basisPrice: number | null;
         let ambiguous = false;
+        const effectiveCandidatePrice = effectivePrice(
+          cand.unit,
+          cand.price,
+          cand.priceBasis,
+          cand.gstPct,
+        );
         if (isLenRow) {
           const n = normalizePerMetre({
             description: cand.description,
             size: cand.size,
             unit: cand.unit,
-            price: cand.price,
+            price: effectiveCandidatePrice,
           });
           if (n.status === "normalized") {
             perMetre = n.perMetre;
@@ -1030,7 +1093,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
             ambiguous = true;
           }
         } else {
-          basisPrice = cand.price;
+          basisPrice = effectiveCandidatePrice;
         }
         const candPick: Picked = {
           competitor,
@@ -1070,10 +1133,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     const competitors = picks
       .map((p) => {
         let diffPct: number | null = null;
-        if (prayagBasis != null && p.basisPrice != null && p.basisPrice > 0) {
-          diffPct =
-            Math.round(((prayagBasis - p.basisPrice) / p.basisPrice) * 1000) / 10;
-        }
+        const rawGap = marketGapPct(prayagBasis, p.basisPrice);
+        diffPct = rawGap == null ? null : Math.round(rawGap * 10) / 10;
         return {
           competitor: p.competitor,
           price: p.price,
@@ -1091,9 +1152,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       .sort((a, b) => a.competitor.localeCompare(b.competitor));
 
     let diffPct: number | null = null;
-    if (prayagBasis != null && cheapestRival != null && cheapestRival > 0) {
-      diffPct = Math.round(((prayagBasis - cheapestRival) / cheapestRival) * 1000) / 10;
-    }
+    const rawCheapestGap = marketGapPct(prayagBasis, cheapestRival);
+    diffPct =
+      rawCheapestGap == null ? null : Math.round(rawCheapestGap * 10) / 10;
     const prayagLowest =
       prayagBasis != null && cheapestRival != null && prayagBasis <= cheapestRival;
 
@@ -1322,13 +1383,19 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
     .select()
     .from(competitorPricesTable)
     .where(eq(competitorPricesTable.matchStatus, "matched"));
+  const matchedWindows = getCompetitorWindows(all);
 
-  const available = all.filter((row) => isAvailableComparisonRow(row, maps));
+  const available = all.filter(
+    (row) =>
+      matchedWindows.get(row.id)?.isCurrent &&
+      isAvailableComparisonRow(row, maps),
+  );
   const competitors = [...new Set(available.map((c) => c.competitor))].sort();
 
   interface Cell {
     competitor: string;
     price: number | null;
+    effectivePrice: number | null;
     diffPct: number | null;
     prayagCheaper: boolean | null;
     matchConfidence: string | null;
@@ -1360,10 +1427,14 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
     const prayagMrp = group.prayagMrp;
     let diffPct: number | null = null;
     let prayagCheaper: boolean | null = null;
-    if (prayagMrp != null && c.price != null && c.price > 0) {
-      diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
-      prayagCheaper = prayagMrp <= c.price;
-    }
+    const rawGap = marketGapPct(
+      prayagMrp,
+      c.price == null
+        ? null
+        : effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct),
+    );
+    diffPct = rawGap == null ? null : Math.round(rawGap * 10) / 10;
+    prayagCheaper = prayagCheaperForGap(rawGap);
     // If a competitor has multiple rows mapped to the same Prayag code, keep
     // the cheapest (most aggressive) competitor price for that competitor.
     const existing = group.cells.find((x) => x.competitor === c.competitor);
@@ -1371,15 +1442,21 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
       group.cells.push({
         competitor: c.competitor,
         price: c.price,
+        effectivePrice:
+          c.price == null
+            ? null
+            : effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct),
         diffPct,
         prayagCheaper,
         matchConfidence: c.matchConfidence,
       });
     } else if (
       c.price != null &&
-      (existing.price == null || c.price < existing.price)
+      (existing.effectivePrice == null ||
+        effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct) < existing.effectivePrice)
     ) {
       existing.price = c.price;
+      existing.effectivePrice = effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct);
       existing.diffPct = diffPct;
       existing.prayagCheaper = prayagCheaper;
       existing.matchConfidence = c.matchConfidence;
@@ -1410,7 +1487,10 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
   const start = (page - 1) * pageSize;
   res.json({
     competitors,
-    rows: rows.slice(start, start + pageSize),
+    rows: rows.slice(start, start + pageSize).map((row) => ({
+      ...row,
+      cells: row.cells.map(({ effectivePrice: _effectivePrice, ...cell }) => cell),
+    })),
     total,
     page,
     pageSize,

@@ -1980,6 +1980,9 @@ components:
           type: ["number", "null"]
         diffPct:
           type: ["number", "null"]
+          description: >-
+            Canonical market gap: (competitor effective price - Prayag MRP) /
+            Prayag MRP × 100. Positive means Prayag is cheaper.
         prayagCheaper:
           type: ["boolean", "null"]
         compPerMetre:
@@ -1990,7 +1993,7 @@ components:
           description: Prayag MRP reduced to ₹/metre, when length-normalizable.
         perMetreDiffPct:
           type: ["number", "null"]
-          description: (prayagPerMetre − compPerMetre) / compPerMetre × 100.
+          description: (compPerMetre − prayagPerMetre) / prayagPerMetre × 100; positive means Prayag is cheaper.
         lengthNormalized:
           type: boolean
           description: True when both sides were compared on a per-metre basis.
@@ -2009,7 +2012,7 @@ components:
             otherwise, null when unit-ambiguous.
         effectivePrayagCheaper:
           type: ["boolean", "null"]
-          description: True when effectiveDiffPct ≤ 0 (Prayag cheaper).
+          description: True when effectiveDiffPct is positive (Prayag cheaper).
     ComparisonList:
       type: object
       required: [rows, total, page, pageSize]
@@ -2058,7 +2061,8 @@ components:
           type: ["number", "null"]
           description: >-
             Diff% on the SKU's comparison basis (per metre when the Prayag SKU is
-            length-based, else raw); null when this cell's unit is ambiguous.
+            length-based, else raw), using the canonical positive-is-Prayag-cheaper
+            convention; null when this cell's unit is ambiguous.
         isCheapest:
           type: boolean
         unitAmbiguous:
@@ -2171,6 +2175,9 @@ components:
           type: ["number", "null"]
         avgDiffPct:
           type: ["number", "null"]
+          description: >-
+            Average canonical raw-MRP market gap. Per-metre normalization does
+            not change this official KPI.
     ComparisonSummary:
       type: object
       required:

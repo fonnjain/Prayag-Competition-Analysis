@@ -528,7 +528,7 @@ export default function ComparisonPage() {
                                 {cell.unitAmbiguous ? (
                                   <AmbiguousBadge />
                                 ) : (
-                                  <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.diffPct != null ? cell.diffPct <= 0 : null} />
+                                  <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.diffPct != null ? cell.diffPct > 0 : null} />
                                 )}
                               </div>
                             </td>

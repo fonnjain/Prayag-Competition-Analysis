@@ -9,9 +9,38 @@ import { priceChangePct } from "./priceWindow.js";
 //   - 'Ex-GST'   -> ex-GST; gross up by gstPct% (default 18) before comparing
 //   - null/other -> legacy rows; fall back to checking the unit string
 //                   ("Rate (ex-GST)" → multiply by GST_MULTIPLIER)
-// All comparisons are against Prayag's current MRP.
+// All comparisons are against the date-resolved, in-force Prayag MRP.
 // ---------------------------------------------------------------------------
 export const GST_MULTIPLIER = 1.18;
+
+/**
+ * The one canonical definition used by the analysis dashboard, the catalog
+ * comparison, and the rebuild readback query in reports/mrp-full-rebuild-report.md.
+ *
+ * Population: latest confirmed-matched, priced competitor revision on or
+ * before the requested as-of date for each (competitor, matched Prayag code),
+ * joined to an active, non-discontinued Prayag product with an approved,
+ * in-force MRP. The match predicate is applied before revision selection; null
+ * competitor prices never enter gap stats.
+ *
+ * Basis: a competitor row marked Ex-GST is grossed up using its gst_pct
+ * (18% when absent). MRP rows, and legacy rows without the ex-GST unit marker,
+ * are already comparable. The report and UI calculate on unrounded row values,
+ * then round only the displayed aggregate to one decimal.
+ *
+ * Sign: (competitor effective price - Prayag MRP) / Prayag MRP * 100.
+ * Positive means Prayag is cheaper; negative means Prayag is costlier.
+ */
+export const MARKET_GAP_DEFINITION = {
+  population:
+    "Latest confirmed-matched, priced competitor revisions joined to active Prayag products with approved in-force MRPs.",
+  priceBasis:
+    "Ex-GST competitor rows are grossed up by gst_pct (default 18%); MRP and other rows are used as listed. Length normalization never changes official aggregates.",
+  pricePeriod:
+    "Both sides resolve to their latest eligible priced revision on or before one as-of date; future revisions are excluded.",
+  signConvention:
+    "(competitor effective price - Prayag MRP) / Prayag MRP * 100; positive means Prayag is cheaper.",
+} as const;
 
 export function effectivePrice(
   unit: string | null,
@@ -27,6 +56,26 @@ export function effectivePrice(
     return price * GST_MULTIPLIER;
   }
   return price;
+}
+
+/** Calculate the canonical market-gap percentage before display rounding. */
+export function marketGapPct(
+  prayagMrp: number | null,
+  competitorEffectivePrice: number | null,
+): number | null {
+  if (
+    prayagMrp == null ||
+    prayagMrp <= 0 ||
+    competitorEffectivePrice == null
+  ) {
+    return null;
+  }
+  return ((competitorEffectivePrice - prayagMrp) / prayagMrp) * 100;
+}
+
+/** Positive canonical gap means the competitor costs more, so Prayag is cheaper. */
+export function prayagCheaperForGap(gapPct: number | null): boolean | null {
+  return gapPct == null ? null : gapPct > 0;
 }
 
 export interface PrayagInfo {
@@ -178,15 +227,12 @@ export function buildRow(
   const comparable =
     matched && prayagBasis != null && prayagBasis > 0 && competitorBasis != null;
 
-  let priceDiff: number | null = null;
-  let priceDiffPct: number | null = null;
-  let prayagCheaper: boolean | null = null;
-  if (comparable && prayagBasis != null && competitorBasis != null) {
-    priceDiff = competitorBasis - prayagBasis;
-    priceDiffPct = (priceDiff / prayagBasis) * 100;
-    // Competitor more expensive than Prayag => Prayag cheaper (good).
-    prayagCheaper = competitorBasis > prayagBasis;
-  }
+  const priceDiff =
+    comparable && prayagBasis != null && competitorBasis != null
+      ? competitorBasis - prayagBasis
+      : null;
+  const priceDiffPct = marketGapPct(prayagBasis, competitorBasis);
+  const prayagCheaper = prayagCheaperForGap(priceDiffPct);
 
   return {
     id: c.id,
