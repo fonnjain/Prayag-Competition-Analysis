@@ -13,6 +13,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Palette,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,12 @@ export default function PriceFinderPage() {
     new URLSearchParams(window.location.search).getAll("filter").filter(Boolean),
   );
   const [selectedItemCode, setSelectedItemCode] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  // When a suggestion is selected from the dropdown, we clear searchInput which
+  // triggers the debounce → queryKey change → the effect below would normally
+  // reset selectedItemCode.  This ref suppresses that single reset.
+  const suppressSelectionResetRef = useRef(false);
   const [browseDivision, setBrowseDivision] = useState<string | null>(null);
   const [browseCategory, setBrowseCategory] = useState<string | null>(null);
   const [selectionSequence, setSelectionSequence] = useState(0);
@@ -209,6 +216,15 @@ export default function PriceFinderPage() {
     }, 250);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Reset keyboard cursor whenever the query changes
+  useEffect(() => {
+    setActiveSuggestion(-1);
+  }, [debouncedQ]);
+
+  // True while the user has typed but the debounce hasn't settled yet.
+  // During this window show a loading indicator and block stale-result selection.
+  const isDebouncing = searchInput.trim() !== debouncedQ;
 
   const writeFiltersToUrl = useCallback((nextFilters: string[]) => {
     const params = new URLSearchParams(window.location.search);
@@ -297,6 +313,10 @@ export default function PriceFinderPage() {
   const queryKey = queryFilters.join("\u0001");
 
   useEffect(() => {
+    if (suppressSelectionResetRef.current) {
+      suppressSelectionResetRef.current = false;
+      return;
+    }
     setSelectedItemCode(null);
     setSpeechRequested(false);
     cancelSpeech();
@@ -423,10 +443,48 @@ export default function PriceFinderPage() {
             setSpeechRequested(false);
             setSearchInput(e.target.value);
           }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => {
+            // Delay so click on a suggestion registers first
+            setTimeout(() => setIsFocused(false), 150);
+          }}
           onKeyDown={(event) => {
+            const suggestionList = results.slice(0, 8);
+            const dropdownOpen = isFocused && debouncedQ.length >= 2 && suggestionList.length > 0;
+
+            if (event.key === "ArrowDown") {
+              // Block navigation while debounce is unsettled — results are stale
+              if (!dropdownOpen || isDebouncing) return;
+              event.preventDefault();
+              setActiveSuggestion((i) => Math.min(i + 1, suggestionList.length - 1));
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              if (!dropdownOpen || isDebouncing) return;
+              event.preventDefault();
+              setActiveSuggestion((i) => Math.max(i - 1, -1));
+              return;
+            }
+            if (event.key === "Escape") {
+              setIsFocused(false);
+              setActiveSuggestion(-1);
+              return;
+            }
             if (event.key === "Enter") {
               event.preventDefault();
-              addFilter(searchInput);
+              // Only select a suggestion when the debounce has settled and a row is highlighted
+              if (dropdownOpen && !isDebouncing && activeSuggestion >= 0) {
+                const chosen = suggestionList[activeSuggestion];
+                if (chosen) {
+                  suppressSelectionResetRef.current = true;
+                  confirmProduct(chosen.itemCode);
+                  setSearchInput("");
+                  setIsFocused(false);
+                  setActiveSuggestion(-1);
+                }
+              } else {
+                addFilter(searchInput);
+              }
             }
           }}
           placeholder={filters.length ? "Say or type the next narrowing term…" : "Say or type a product term…"}
@@ -444,6 +502,7 @@ export default function PriceFinderPage() {
                 setSearchInput("");
                 setSelectedItemCode(null);
                 setSpeechRequested(false);
+                setIsFocused(false);
               }}
               title="Clear search"
             >
@@ -469,6 +528,75 @@ export default function PriceFinderPage() {
             </Button>
           )}
         </div>
+
+        {/* ── Predictive suggestions dropdown ── */}
+        {isFocused && (isDebouncing || debouncedQ.length >= 2) && searchInput.trim().length >= 2 && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-1.5 rounded-xl border bg-card shadow-xl overflow-hidden">
+            {/* Show loading while debounce is pending OR request is in flight */}
+            {isDebouncing || isSearchLoading ? (
+              <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground animate-pulse">
+                <Search className="w-4 h-4 shrink-0" />
+                Searching…
+              </div>
+            ) : results.length === 0 ? null : (
+              <>
+                {results.slice(0, 8).map((res, idx) => {
+                  const isActive = idx === activeSuggestion;
+                  return (
+                    <button
+                      key={res.itemCode}
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors border-b last:border-b-0",
+                        isActive ? "bg-primary/10" : "hover:bg-muted/50",
+                      )}
+                      onMouseEnter={() => setActiveSuggestion(idx)}
+                      onMouseLeave={() => setActiveSuggestion(-1)}
+                      onClick={() => {
+                        suppressSelectionResetRef.current = true;
+                        confirmProduct(res.itemCode);
+                        setSearchInput("");
+                        setIsFocused(false);
+                        setActiveSuggestion(-1);
+                      }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-mono text-xs font-bold text-primary shrink-0">{res.itemCode}</span>
+                          {res.division && (
+                            <span className="text-[11px] text-muted-foreground truncate">
+                              {res.division}{res.category ? ` · ${res.category}` : ""}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-sm text-foreground leading-snug truncate">{res.productName}</p>
+                        <CompetitorLine
+                          brand={res.bestCompetitorBrand}
+                          price={res.bestCompetitorPrice}
+                          gapPct={res.bestCompetitorGapPct}
+                        />
+                      </div>
+                      <div className="shrink-0 text-right ml-2">
+                        {res.currentMrp != null ? (
+                          <span className="font-mono font-bold text-sm text-foreground">₹{res.currentMrp.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-xs font-medium text-amber-600">Pending</span>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-muted-foreground mt-0.5 ml-auto" />
+                      </div>
+                    </button>
+                  );
+                })}
+                {results.length > 8 && (
+                  <div className="px-4 py-2.5 text-xs text-muted-foreground bg-muted/30 flex items-center gap-1">
+                    <Tag className="w-3 h-3 shrink-0" />
+                    {results.length - 8} more — press Enter or add a filter to narrow
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
         {filters.map((filter, index) => (
@@ -682,6 +810,12 @@ export default function PriceFinderPage() {
                           upcomingEffectiveDate={item.upcomingEffectiveDate}
                           upcomingChangePct={item.upcomingChangePct}
                         />
+                        {item.colourVariantCount != null && item.colourVariantCount > 0 && (
+                          <span className="mt-1 flex items-center justify-end gap-1 text-xs text-indigo-600 font-medium">
+                            <Palette className="w-3 h-3 shrink-0" />
+                            +{item.colourVariantCount} colour option{item.colourVariantCount > 1 ? "s" : ""}
+                          </span>
+                        )}
                       </span>
                     </button>
                   ))}
@@ -733,6 +867,12 @@ export default function PriceFinderPage() {
                       price={res.bestCompetitorPrice}
                       gapPct={res.bestCompetitorGapPct}
                     />
+                    {res.colourVariantCount != null && res.colourVariantCount > 0 && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-indigo-600 font-medium">
+                        <Palette className="w-3 h-3 shrink-0" />
+                        +{res.colourVariantCount} colour option{res.colourVariantCount > 1 ? "s" : ""}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-right">
                     <div className="hidden sm:block">
@@ -829,7 +969,7 @@ function ProductView({
     );
   }
 
-  const { product, competitors } = data;
+  const { product, competitors, variants } = data;
 
   return (
     <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
@@ -929,6 +1069,50 @@ function ProductView({
             )}
           </div>
         </div>
+
+        {/* Colour variant pricing table */}
+        {variants && variants.length > 0 && (
+          <div className="border-t pt-5">
+            <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-widest flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5 text-indigo-500" />
+              Colour Variant Pricing
+            </p>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Variant</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Current MRP</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Upcoming</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {variants.map((v) => (
+                    <tr key={v.variant} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-3 py-2.5 font-medium text-foreground flex items-center gap-1.5">
+                        <Palette className="w-3 h-3 text-indigo-400 shrink-0" />
+                        {v.variant}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono font-semibold">
+                        {v.currentMrp != null ? `₹${v.currentMrp.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        {v.upcomingMrp != null ? (
+                          <span className="text-amber-700 dark:text-amber-400">
+                            ₹{v.upcomingMrp.toFixed(2)}
+                            {v.upcomingChangePct != null && (
+                              <span className="ml-1 text-[10px]">({v.upcomingChangePct > 0 ? "+" : ""}{v.upcomingChangePct.toFixed(1)}%)</span>
+                            )}
+                          </span>
+                        ) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

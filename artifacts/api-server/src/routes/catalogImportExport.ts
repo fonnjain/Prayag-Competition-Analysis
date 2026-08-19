@@ -58,6 +58,8 @@ interface ParsedRow {
   price: number;
   productName: string | null;
   category: string | null;
+  /** 'Standard' for the base article; colour name for sanitaryware colour variants. */
+  variant?: string;
 }
 
 export interface SkippedRow {
@@ -342,6 +344,62 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
   }
 
   const codeColHeader = rawHeaders[codeCol] ?? String(codeCol);
+
+  // Sanitaryware variant detection: look for colour sub-headers before falling
+  // back to the single-price-column path. 'White' maps to 'Standard' (the base
+  // article) so the new rows align with existing schema defaults. Requires ≥2
+  // matching headers before entering variant mode, to avoid false positives.
+  const SANITARYWARE_VARIANTS = new Map([
+    ["white", "Standard"],
+    ["ivory", "Ivory"],
+    ["white with jet", "White with Jet"],
+    ["pink / green / blue", "Pink / Green / Blue"],
+    ["pink/green/blue", "Pink / Green / Blue"],
+  ]);
+  const variantCols: { col: number; variant: string }[] = [];
+  for (let c = 0; c < maxCols; c++) {
+    if (c === codeCol) continue;
+    const h = (headers[c] ?? "").toLowerCase().trim();
+    const variantName = SANITARYWARE_VARIANTS.get(h);
+    if (variantName !== undefined) variantCols.push({ col: c, variant: variantName });
+  }
+
+  if (variantCols.length >= 2) {
+    // Multi-variant mode: emit one ParsedRow per (item_code, variant) for each
+    // non-empty price cell. Empty cells mean the variant is not offered — no row.
+    const variantRows: ParsedRow[] = [];
+    const variantSkipped: SkippedRow[] = [];
+    for (let r = 0; r < grid.length; r++) {
+      if (r === headerRow) continue;
+      const row = grid[r] ?? [];
+      const code = normCode(row[codeCol]);
+      if (!code) continue;
+      const productName = nameCol !== -1 ? (norm(row[nameCol]) || null) : null;
+      const category = categoryCol !== -1 ? (norm(row[categoryCol]) || null) : null;
+      for (const { col, variant } of variantCols) {
+        const rawPrice = row[col];
+        if (rawPrice == null || rawPrice === "") continue; // not offered for this variant
+        const price = Number(rawPrice);
+        if (isNaN(price) || price <= 0) {
+          variantSkipped.push({ rawCode: code, rawPrice: norm(rawPrice), reason: "Price is zero or negative" });
+          continue;
+        }
+        variantRows.push({ itemCode: code, price, productName, category, variant });
+      }
+    }
+    return {
+      rows: variantRows,
+      basis: "MRP",
+      codeCol,
+      priceCol: variantCols[0]?.col ?? -1,
+      nameCol,
+      categoryCol,
+      codeColHeader,
+      priceColHeader: "Variant MRP",
+      skippedRows: variantSkipped,
+    };
+  }
+
   const priceColHeader = rawHeaders[priceCol] ?? String(priceCol);
 
   const rows: ParsedRow[] = [];
@@ -539,11 +597,20 @@ async function persistParsedRows(
   reviewBatchId: string,
   loadBatchId: number,
 ): Promise<LoadSummary> {
-  // De-duplicate within the uploaded file by item code (keep last occurrence).
-  const byCode = new Map<string, { price: number; productName: string | null; category: string | null }>();
-  for (const r of parsedRows) byCode.set(r.itemCode, { price: r.price, productName: r.productName, category: r.category });
+  // De-duplicate by (item code, variant) — keep last occurrence per combo.
+  const byCodeVariant = new Map<string, {
+    itemCode: string; price: number; productName: string | null;
+    category: string | null; variant: string;
+  }>();
+  for (const r of parsedRows) {
+    const variant = r.variant ?? "Standard";
+    byCodeVariant.set(`${r.itemCode}__${variant}`, {
+      itemCode: r.itemCode, price: r.price,
+      productName: r.productName, category: r.category, variant,
+    });
+  }
 
-  if (byCode.size === 0) {
+  if (byCodeVariant.size === 0) {
     return {
       file: filename,
       effectiveDate,
@@ -569,14 +636,14 @@ async function persistParsedRows(
   const today = new Date().toISOString().slice(0, 10);
   // Sanity-check: count prices below ₹50.  For PTMT / CP products a count above
   // zero almost certainly means a packing-quantity column was imported by mistake.
-  const lowMrpCount = [...byCode.values()].filter((v) => v.price < 50).length;
+  const lowMrpCount = [...byCodeVariant.values()].filter((v) => v.price < 50).length;
   const summary: LoadSummary = {
     file: filename,
     effectiveDate,
     basis,
     codeColHeader,
     priceColHeader,
-    totalRows: byCode.size,
+    totalRows: byCodeVariant.size,
     matchedProducts: 0,
     newProducts: 0,
     newHistoryRows: 0,
@@ -596,11 +663,12 @@ async function persistParsedRows(
     const existingPairs = await tx
       .select({
         itemCode: mrpPriceHistoryTable.itemCode,
-        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        variant: mrpPriceHistoryTable.variant,
       })
       .from(mrpPriceHistoryTable)
       .where(eq(mrpPriceHistoryTable.effectiveDate, effectiveDate));
-    const dupSet = new Set(existingPairs.map((p) => normCode(p.itemCode)));
+    // Key = "CODE__VARIANT" so a Standard row doesn't block a new Ivory row.
+    const dupSet = new Set(existingPairs.map((p) => `${normCode(p.itemCode)}__${p.variant}`));
 
     // Fetch existing products that are missing name or division so we can backfill.
     const existingRows = await tx
@@ -621,6 +689,7 @@ async function persistParsedRows(
       WHERE effective_date < ${effectiveDate}
         AND review_status = 'approved'
         AND mrp IS NOT NULL
+        AND variant = 'Standard'
       ORDER BY item_code, effective_date DESC, id DESC
     `);
     const previousMrp = new Map(
@@ -631,8 +700,10 @@ async function persistParsedRows(
     const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
     // Backfill updates: itemCode -> {productName?, division?, category?}
     const backfillMap = new Map<string, Partial<typeof catalogProductsTable.$inferInsert>>();
+    // Track which codes have had their catalog product created/updated this run.
+    const processedItemCodes = new Set<string>();
 
-    for (const [code, { price, productName, category }] of byCode) {
+    for (const [, { itemCode: code, price, productName, category, variant }] of byCodeVariant) {
       const isKnown = knownCodes.has(code);
       const storedCode = canonical.get(code) ?? code;
       const existing = existingMap.get(storedCode);
@@ -643,34 +714,39 @@ async function persistParsedRows(
         division,
       );
 
-      if (!isKnown) {
-        newProductValues.push({
-          itemCode: storedCode,
-          productName: productName ?? null,
-          division: inferredDivision,
-          category: category ?? null,
-          uom: "NOS",
-          isActive: true,
-          sourceFiles: filename,
-          dataFlag: "new_from_load",
-        });
-        summary.newProducts++;
-        summary.unmatchedCodes.push(storedCode);
-        knownCodes.add(code);
-        canonical.set(code, storedCode);
-      } else {
-        summary.matchedProducts++;
-        // Backfill any null metadata on existing products.
-        if (existing) {
-          const patch: Partial<typeof catalogProductsTable.$inferInsert> = {};
-          if (!existing.productName && productName) patch.productName = productName;
-          if (!existing.division && inferredDivision) patch.division = inferredDivision;
-          if (!existing.category && category) patch.category = category;
-          if (Object.keys(patch).length > 0) backfillMap.set(storedCode, patch);
+      // catalog_products has one row per item code — only act once per code.
+      if (!processedItemCodes.has(code)) {
+        processedItemCodes.add(code);
+        if (!isKnown) {
+          newProductValues.push({
+            itemCode: storedCode,
+            productName: productName ?? null,
+            division: inferredDivision,
+            category: category ?? null,
+            uom: "NOS",
+            isActive: true,
+            sourceFiles: filename,
+            dataFlag: "new_from_load",
+          });
+          summary.newProducts++;
+          summary.unmatchedCodes.push(storedCode);
+          knownCodes.add(code);
+          canonical.set(code, storedCode);
+        } else {
+          summary.matchedProducts++;
+          // Backfill any null metadata on existing products.
+          if (existing) {
+            const patch: Partial<typeof catalogProductsTable.$inferInsert> = {};
+            if (!existing.productName && productName) patch.productName = productName;
+            if (!existing.division && inferredDivision) patch.division = inferredDivision;
+            if (!existing.category && category) patch.category = category;
+            if (Object.keys(patch).length > 0) backfillMap.set(storedCode, patch);
+          }
         }
       }
 
-      if (dupSet.has(code)) {
+      const dupKey = `${code}__${variant}`;
+      if (dupSet.has(dupKey)) {
         summary.skippedDuplicates++;
         continue;
       }
@@ -689,6 +765,7 @@ async function persistParsedRows(
         importBatchId: reviewBatchId,
         loadBatchId,
         reviewedAt: reasons.length > 0 ? null : new Date(),
+        variant,
       });
       if (reasons.length > 0) {
         summary.flaggedRows.push({
@@ -700,7 +777,7 @@ async function persistParsedRows(
         summary.flaggedMrpCount++;
         summary.reviewBatchId = reviewBatchId;
       }
-      dupSet.add(code);
+      dupSet.add(dupKey);
       summary.newHistoryRows++;
     }
 
@@ -1160,6 +1237,7 @@ router.get("/catalog/export", async (req, res) => {
       JOIN catalog_products p ON p.item_code = h.item_code
       WHERE h.effective_date <= CURRENT_DATE
         AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
         AND p.is_active IS TRUE
         AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       ORDER BY h.item_code, h.effective_date DESC, h.id DESC
@@ -1444,6 +1522,7 @@ router.post(
         JOIN catalog_products p ON p.item_code = h.item_code
         WHERE h.effective_date <= CURRENT_DATE
           AND h.review_status = 'approved'
+          AND h.variant = 'Standard'
           AND p.is_active IS TRUE
           AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
         ORDER BY h.item_code, h.effective_date DESC, h.id DESC
@@ -1652,14 +1731,14 @@ router.delete("/catalog/mrp-period/:date", async (req, res) => {
         UPDATE mrp_price_history m
         SET is_current = true
         FROM (
-          SELECT DISTINCT ON (h.item_code) h.id
+          SELECT DISTINCT ON (h.item_code, h.variant) h.id
           FROM mrp_price_history h
           JOIN catalog_products p ON p.item_code = h.item_code
           WHERE h.effective_date <= CURRENT_DATE
             AND h.review_status = 'approved'
             AND p.is_active IS TRUE
             AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
-          ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+          ORDER BY h.item_code, h.variant, h.effective_date DESC, h.id DESC
         ) latest
         WHERE m.id = latest.id
       `);

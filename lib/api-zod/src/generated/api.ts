@@ -356,6 +356,7 @@ export const GetPriceFinderSearchResponse = zod.object({
   "bestCompetitorBrand": zod.string().nullish().describe('Brand name of the cheapest matched competitor, or null when none.'),
   "bestCompetitorPrice": zod.number().nullish().describe('Normalized (incl-GST) price of the cheapest competitor, or null.'),
   "bestCompetitorGapPct": zod.number().nullish().describe('Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'),
+  "colourVariantCount": zod.number().optional().describe('Number of non-Standard colour variants with a current price. 0 when no colour options exist.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 })),
   "totalCount": zod.number(),
@@ -410,6 +411,7 @@ export const GetPriceFinderBrowseResponse = zod.object({
   "bestCompetitorBrand": zod.string().nullish().describe('Brand name of the cheapest matched competitor, or null when none.'),
   "bestCompetitorPrice": zod.number().nullish().describe('Normalized (incl-GST) price of the cheapest competitor, or null.'),
   "bestCompetitorGapPct": zod.number().nullish().describe('Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'),
+  "colourVariantCount": zod.number().optional().describe('Number of non-Standard colour variants with a current price. 0 when no colour options exist.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 }))
 })
@@ -447,7 +449,15 @@ export const GetPriceFinderProductResponse = zod.object({
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming price; zero is retained.'),
   "gapPct": zod.number().nullable(),
   "message": zod.string().nullable()
-}))
+})),
+  "variants": zod.array(zod.object({
+  "variant": zod.string().describe('Colour name, e.g. \"Ivory\", \"White with Jet\", \"Pink \/ Green \/ Blue\".'),
+  "currentMrp": zod.number().nullable(),
+  "currentEffectiveDate": zod.string().nullable(),
+  "upcomingMrp": zod.number().nullable(),
+  "upcomingEffectiveDate": zod.string().nullable(),
+  "upcomingChangePct": zod.number().nullable()
+})).describe('Colour variants beyond Standard. Empty array when no colour options exist.')
 })
 
 

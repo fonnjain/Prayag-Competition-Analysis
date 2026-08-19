@@ -120,16 +120,21 @@ export const mrpPriceHistoryTable = pgTable(
     // Null is retained only for legacy rows so Data Health can surface them.
     loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // Colour / material variant within a single Cat No.  'Standard' is the base
+    // article (= White for sanitaryware) and carries the existing behaviour.
+    // Products with no colour options have only one 'Standard' row.
+    variant: text("variant").notNull().default("Standard"),
   },
   (t) => [
     index("mrp_price_history_item_code_idx").on(t.itemCode),
     index("mrp_price_history_current_idx").on(t.itemCode, t.isCurrent),
     index("mrp_price_history_review_idx").on(t.reviewStatus, t.importBatchId),
-    // Append-only safety: one price row per (item_code, effective_date).
+    // Append-only safety: one price row per (item_code, effective_date, variant).
     // Makes duplicate prevention race-safe at the DB level, not just in app code.
     uniqueIndex("mrp_price_history_code_date_idx").on(
       t.itemCode,
       t.effectiveDate,
+      t.variant,
     ),
   ],
 );

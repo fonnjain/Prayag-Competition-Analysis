@@ -96,6 +96,7 @@ async function getCurrentPrayagMrp(): Promise<Map<string, number>> {
     JOIN catalog_products p ON p.item_code = h.item_code
     WHERE h.effective_date <= CURRENT_DATE
       AND h.review_status = 'approved'
+      AND h.variant = 'Standard'
       AND p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
     ORDER BY h.item_code, h.effective_date DESC, h.id DESC
@@ -534,6 +535,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
       JOIN catalog_products p ON p.item_code = h.item_code
       WHERE h.effective_date <= CURRENT_DATE
         AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
         AND p.is_active IS TRUE
         AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       ORDER BY h.item_code, h.effective_date DESC, h.id DESC

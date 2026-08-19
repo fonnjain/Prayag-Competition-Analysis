@@ -85,6 +85,7 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
       WHERE effective_date <= ${todayStr}
         AND mrp IS NOT NULL
         AND review_status = 'approved'
+        AND variant = 'Standard'
       ORDER BY item_code, effective_date DESC, id DESC
     `),
     db.execute<PriceRow>(sql`
@@ -93,6 +94,7 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
       WHERE effective_date > ${todayStr}
         AND mrp IS NOT NULL
         AND review_status = 'approved'
+        AND variant = 'Standard'
       ORDER BY item_code, effective_date ASC, id DESC
     `),
     db.select({
@@ -184,6 +186,7 @@ async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
     FROM mrp_price_history
     WHERE effective_date <= ${todayForCandidates}
       AND review_status = 'approved'
+      AND variant = 'Standard'
     ORDER BY item_code, effective_date DESC, id DESC
   `);
 

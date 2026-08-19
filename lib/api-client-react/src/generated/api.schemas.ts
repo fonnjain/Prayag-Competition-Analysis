@@ -152,6 +152,8 @@ export interface PriceFinderSearchResult {
      * @nullable
      */
   bestCompetitorGapPct?: number | null;
+  /** Number of non-Standard colour variants with a current price. 0 when no colour options exist. */
+  colourVariantCount?: number;
   /** @nullable */
   discontinuedFrom: string | null;
 }
@@ -259,9 +261,26 @@ export interface PriceFinderCompetitor {
   message: string | null;
 }
 
+export interface PriceFinderVariant {
+  /** Colour name, e.g. "Ivory", "White with Jet", "Pink / Green / Blue". */
+  variant: string;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentEffectiveDate: string | null;
+  /** @nullable */
+  upcomingMrp: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+  /** @nullable */
+  upcomingChangePct: number | null;
+}
+
 export interface PriceFinderProductResponse {
   product: PriceFinderProduct;
   competitors: PriceFinderCompetitor[];
+  /** Colour variants beyond Standard. Empty array when no colour options exist. */
+  variants: PriceFinderVariant[];
 }
 
 export interface CatalogCategoryOption {

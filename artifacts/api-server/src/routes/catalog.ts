@@ -123,6 +123,7 @@ async function getCurrentPriceMap(asOf: string): Promise<Map<string, CurrentPric
     JOIN catalog_products p ON p.item_code = h.item_code
     WHERE h.effective_date <= ${asOf}
       AND h.review_status = 'approved'
+      AND h.variant = 'Standard'
       AND p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
     ORDER BY h.item_code, h.effective_date DESC, h.id DESC
@@ -525,9 +526,14 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
         reviewReasons: null,
         importBatchId: null,
         reviewedAt: new Date(),
+        variant: "Standard",
       })
       .onConflictDoUpdate({
-        target: [mrpPriceHistoryTable.itemCode, mrpPriceHistoryTable.effectiveDate],
+        target: [
+          mrpPriceHistoryTable.itemCode,
+          mrpPriceHistoryTable.effectiveDate,
+          mrpPriceHistoryTable.variant,
+        ],
         set: {
           mrp,
           netPrice: null,
@@ -571,6 +577,7 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
       and(
         eq(mrpPriceHistoryTable.itemCode, itemCode),
         eq(mrpPriceHistoryTable.isCurrent, true),
+        eq(mrpPriceHistoryTable.variant, "Standard"),
       ),
     )
     .limit(1);

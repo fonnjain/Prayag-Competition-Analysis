@@ -1,6 +1,7 @@
 - [Orval zod coerce.boolean trap](orval-zod-boolean.md) — z.coerce.boolean() turns any non-empty query string (incl. "false") into true; read raw query value for booleans.
 - [Prayag suggestion scorer](prayag-suggestion-scorer.md) — catalog size lives in product names (parse last `<num> mm`); keep category out of the text channel; words beat numbers.
 - [Prayag Product Database app](prayag-product-db.md) — append-only MRP history rules, unique-index backstop, invalidate via generated query-key helpers, dedupe category filters.
+- [Sanitaryware colour-variant pricing](variant-pricing.md) — mrp_price_history carries variant col; unique index is (item_code, effective_date, variant); every Standard-only query needs AND variant='Standard'; manual correction upsert must include variant='Standard' in both values and conflict target.
 - [Competitor import price-gap guardrail](competitor-import-guardrail.md) — auto-matched imports reject gap vs Prayag MRP outside ~-80%..+100%; verified manual reuploads bypass it.
 - [Prayag Competition Analysis dashboard](prayag-analysis-dashboard.md) — /analysis live-compute over existing tables; ex-GST×1.18 basis, comparability gate, green=Prayag-cheaper sign convention.
 - [Prayag external API keys](prayag-external-api-keys.md) — /api/v1 is a GET-only allowlist behind X-API-Key (hash-only storage); never mount internal routers under /v1.
