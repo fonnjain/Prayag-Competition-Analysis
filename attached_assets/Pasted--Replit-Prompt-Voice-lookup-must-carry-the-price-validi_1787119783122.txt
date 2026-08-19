@@ -1,0 +1,77 @@
+# Replit Prompt — Voice lookup must carry the price validity too
+
+A voice query is usually made hands-free, often mid-conversation with a customer. The answer must include the same validity and upcoming-revision information as the visual card — otherwise someone quotes a price that changes next week.
+
+> Paste everything below (from **GOAL**) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+Extend the Price Finder's voice lookup so its result — both what is shown and what is spoken — carries the MRP's validity window and any scheduled revision, exactly as the typed-search result does.
+
+## 1. The visual result is identical
+
+A voice query resolves to the **same result card** as a typed search: Prayag MRP as the hero, its validity window, the next price where one exists, then the competitor rows. There is no reduced "voice version" of the card. The only difference is how the product was chosen.
+
+## 2. Speak the answer
+
+Add spoken output using the browser's `speechSynthesis` API with `lang = 'en-IN'`. No API cost, nothing leaves the browser.
+
+Keep it short. A card can hold a dozen facts; a spoken sentence cannot. Speak only:
+
+1. The product, briefly — enough to confirm the right item was found
+2. Prayag's MRP
+3. The revision, **only when the price actually changes**
+4. The competitor price, when there is exactly one
+
+**Script templates**
+
+Price changing soon:
+> "Quadra Bib Cock with Flange. Prayag MRP one hundred thirty six rupees. This changes to one hundred sixty six rupees on the first of September."
+
+No revision scheduled:
+> "Ball Valve Butterfly Handle, half inch. Prayag MRP seventy eight rupees."
+
+Revision exists but price unchanged — **do not mention it at all**. Saying "no change on the first of September" out loud adds nothing and lengthens every answer. The card still shows it.
+
+With a competitor:
+> "Bib Cock Fancy fifteen mm. Prayag MRP two hundred forty four rupees. Sparsh Pearl two hundred seventy three. Prayag is eleven point eight percent cheaper."
+
+More than one competitor — do not read them all:
+> "…Prayag MRP one hundred forty four rupees. Three competitor prices on screen, lowest is Sparsh Pearl at one hundred fifty one."
+
+## 3. Reading numbers and dates aloud
+
+- **Round to whole rupees when speaking.** "Two hundred forty four rupees", not "two hundred forty four point zero eight". The card shows ₹244.08; the spoken figure is for recognition, not for invoicing. Where paise are non-trivial (≥ ₹0.50 and the item is under ₹100), speak them.
+- **Dates spoken naturally**: "the first of September", not "2026-09-01". Include the year only when the date is not in the current year.
+- **Relative urgency**: when the revision is within 30 days, say "on the first of September" — near enough that the date itself carries the urgency. Beyond 30 days, "from January" is sufficient.
+
+## 4. Controls
+
+- **A toggle for spoken output**, remembered between sessions. A showroom floor and a quiet office need different defaults, and the user should not have to fight it.
+- **Speaking stops** as soon as the user taps anything, starts a new query, or presses the mic again. Never let a spoken answer talk over the next question.
+- **Speak only after the user has confirmed the product.** Since voice returns the top 3 matches rather than auto-selecting, the spoken answer comes after the tap — never guess aloud.
+- Respect `prefers-reduced-motion` for any accompanying animation, and make sure the page is fully usable with speech output off.
+
+## 5. What must not happen
+
+- A spoken answer that gives the current price and omits a revision taking effect within days. This is the failure this change exists to prevent.
+- Speaking a price for a product the user has not confirmed.
+- Speaking the full competitor list — it is unusable as audio and the card already has it.
+
+## Validation
+
+| Query | Spoken answer must include |
+|---|---|
+| `PEA-3S` | ₹136 **and** the change to ₹166 on 1 September |
+| `U21` | ₹78, with no mention of any revision |
+| `CNS-15` | ₹1,020, with **no** mention of 1 September (price unchanged) |
+| `121-B` | ₹244, Sparsh Pearl ₹273, and that Prayag is 11.8% cheaper |
+
+Also confirm:
+
+- The visual card after a voice query is identical to the typed-search card, including the validity window.
+- Turning spoken output off leaves voice *input* working and the card unchanged.
+- Starting a new query cuts off any answer still being spoken.
+- With speech synthesis unsupported, the toggle is hidden and everything else works.

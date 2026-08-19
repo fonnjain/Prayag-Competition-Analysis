@@ -1,0 +1,92 @@
+# Replit Prompt — Show each MRP's validity window and the next revision
+
+Wherever a price is shown, it should answer three questions at once: what is the price, **since when**, and **until when**. Where a revision is already scheduled, show it — so nobody quotes a price that is about to change.
+
+> Paste everything below (from **GOAL**) into the Replit AI Agent.
+
+---
+
+## GOAL
+
+Every MRP displayed in the app — Price Finder, Comparison, and the review export — carries its **validity window** and, where one exists, the **next scheduled price**. Applies to Prayag and to competitors alike.
+
+## 1. Deriving the window
+
+`mrp_price_history` is append-only, one row per period. A price is valid from its own `effective_date` until the day before the next period begins:
+
+```
+valid_from = this row's effective_date
+valid_to   = (next effective_date for this item) − 1 day
+             or NULL when no later period exists
+```
+
+Same derivation for `competitor_prices` per (competitor, matched_prayag_code).
+
+The **current** price is still the latest row with `effective_date <= CURRENT_DATE`. The **next** price is the earliest row with `effective_date > CURRENT_DATE`. Both come from the same query — do not add a separate stored column, and do not rely on `is_current`.
+
+## 2. What to show
+
+**When a later period exists and the price changes**
+
+> **₹136.00**
+> Valid 01 Feb 2026 – 31 Aug 2026
+> **From 01 Sep 2026: ₹166.00** (+22.1%)
+
+The change is the point — state the direction and the amount, not just the new number.
+
+**When a later period exists but the price is unchanged** — 516 items are in this position. Do not show a "new price" line; it reads as a change when nothing changes:
+
+> **₹1,020.00**
+> Valid from 01 Aug 2026 · no change on 01 Sep 2026
+
+**When no revision is scheduled** — 4,274 items:
+
+> **₹78.00**
+> Valid from 01 Feb 2026
+
+No end date, because none is known. Do not invent one, and do not write "valid till further notice" — an open window is simply open.
+
+**Counts for reference:** 1,988 items have a scheduled next period (1,472 change, 516 do not); 4,274 have none.
+
+## 3. Emphasis
+
+The **current** price stays the hero — it is what the user is quoting today. The upcoming line is secondary in size and weight but must not be so quiet that it is missed; someone quoting a price in late August needs to see that it moves on 1 September.
+
+Where the upcoming date is **within 30 days**, give that line a visible marker (a subtle badge or accent) so an imminent change stands out from one that is months away. Do not rely on colour alone to carry it.
+
+## 4. Competitors get the same treatment
+
+Each competitor row in the Price Finder and Comparison shows its own MRP with its own effective date, and its own upcoming price where the data has one. Competitor revisions do not align with Prayag's — that mismatch is exactly what the user needs to see.
+
+Where a gap is shown alongside an upcoming price on either side, make clear which prices the gap is computed from. The headline gap is always **current vs current**; do not silently mix a current price with a future one.
+
+## 5. API
+
+Extend the existing price payloads rather than adding a new endpoint. For each price:
+
+```
+{
+  mrp: number,
+  effectiveDate: date,        // valid_from
+  validTo: date | null,       // day before the next period, null if open
+  next: { mrp: number, effectiveDate: date, changePct: number } | null
+}
+```
+
+`changePct` is `(next.mrp − mrp) / mrp × 100`, rounded to one decimal. When `next.mrp` equals `mrp`, still return the object with `changePct: 0` and let the UI render the "no change" wording — the API should not decide presentation.
+
+## Validation
+
+| Item | Expected |
+|---|---|
+| `PEA-3S` | ₹136 · valid 01 Feb 2026 – 31 Aug 2026 · from 01 Sep 2026: ₹166 (+22.1%) |
+| `CNS-15` | ₹1,020 · valid from 01 Aug 2026 · "no change on 01 Sep 2026" |
+| `U21` | ₹78 · valid from 01 Feb 2026 · no next-price line at all |
+| `121-B` | ₹244.08 · valid 20 Apr 2026 – 31 Aug 2026 · next period shown |
+
+Also confirm:
+
+- On **01 Sep 2026** the current price flips by itself, with no re-import and no flag recompute — the previously "upcoming" price becomes current and its own window opens.
+- The 68 PTMT products whose only price is dated 01 Sep 2026 remain excluded from Price Finder today, and appear on 01 Sep without intervention.
+- The headline gap in Comparison is computed from current vs current, never from a future price.
+- An item with three or more periods shows only the current window and the single next period — not the full history inline. Full history belongs in the price-history panel.
