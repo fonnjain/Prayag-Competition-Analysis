@@ -11,3 +11,4 @@
 - [MRP history rebuild safety](mrp-history-rebuild-safety.md) — preserve verified history backups; source-period rebuilds supersede row-by-row price repairs.
 - [MRP source provenance](mrp-source-provenance.md) — trace MRP rows to official snapshots by server-side SHA-256 and supplied download date; preserve known hash limitations honestly.
 - [Non-interactive Drizzle push conflicts](drizzle-push-conflicts.md) — verify additive tables exist after merges; never force an ambiguous non-TTY schema prompt.
+- [API integration test database isolation](api-integration-test-database-isolation.md) — parallel Vitest workers can deadlock during shared PostgreSQL cleanup; validate serially until isolated.

@@ -83,9 +83,9 @@ describe("manual MRP provenance", () => {
       .where(eq(mrpPriceHistoryTable.itemCode, MANUAL_CODE));
     expect(history).toMatchObject({
       mrp: 125,
-      sourceFile: "manual-correction",
-      notes: "Verified against the distributor correction notice",
-      loadBatchId: null,
+      sourceFile: "manual-edit",
+      notes: "Manual correction: Verified against the distributor correction notice",
+      loadBatchId: expect.any(Number),
       reviewStatus: "approved",
       reviewReasons: null,
       importBatchId: null,
@@ -100,6 +100,8 @@ describe("manual MRP provenance", () => {
       itemCode: MANUAL_CODE,
       effectiveDate: EFFECTIVE_DATE,
       reason: "Verified against the distributor correction notice",
+      sourceFile: "manual-edit",
+      loadBatchId: history.loadBatchId,
       previousMrp: 100,
       mrp: 125,
     });
@@ -118,6 +120,8 @@ describe("manual MRP provenance", () => {
     expect(stillManual).toMatchObject({
       mrp: 125,
       reviewStatus: "approved",
+      sourceFile: "manual-edit",
+      loadBatchId: expect.any(Number),
       importBatchId: null,
     });
   });
