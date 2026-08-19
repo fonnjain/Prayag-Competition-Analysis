@@ -1,4 +1,4 @@
-import { Factory, PackageSearch, FileSpreadsheet, Hexagon, BarChart3, Scale, LogOut } from "lucide-react";
+import { Factory, PackageSearch, FileSpreadsheet, Hexagon, BarChart3, Scale, Search, LogOut } from "lucide-react";
 import React from "react";
 import { useAuth } from "@workspace/replit-auth-web";
 
@@ -42,7 +42,7 @@ export default function Home() {
         </header>
 
         {/* Apps Grid */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           
           {/* Product DB Card */}
           <a 
@@ -106,6 +106,39 @@ export default function Home() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <BarChart3 className="w-4 h-4 text-primary/60" />
                 <span>Coverage & Gaps</span>
+              </div>
+            </div>
+          </a>
+
+          {/* Price Finder Card */}
+          <a
+            href="/product-db/price-finder"
+            className="group relative bg-card rounded-2xl p-8 border border-border shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col gap-6 hover:border-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            data-testid="link-price-finder"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
+
+            <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300">
+              <Search className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
+                Price Finder
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Quickly look up current Prayag MRP, upcoming revisions, and competitor price gaps by product code, name, or category.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-auto pt-6 border-t border-border/50">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Search className="w-4 h-4 text-primary/60" />
+                <span>Quick Lookup</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <PackageSearch className="w-4 h-4 text-primary/60" />
+                <span>Voice Search</span>
               </div>
             </div>
           </a>
