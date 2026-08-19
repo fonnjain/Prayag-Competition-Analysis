@@ -1,0 +1,169 @@
+# Replit Prompt — Harden Catalogue Price Extraction
+
+**Goal:** when a competitor catalogue PDF is uploaded, prices come out right the first time, and anything the extractor is unsure about is surfaced rather than shipped as a confident wrong number.
+
+The pipeline already works end to end — sub-PDF build, `claude-opus-5` vision extraction, matching, staging, review. What follows fixes seven specific gaps found by reading `artifacts/api-server/src/lib/pdfExtractor.ts` and `catalogueMatcher.ts` against the Sparsh Pearl Vol 6.2 ground truth.
+
+**The governing principle:** a wrong price that looks plausible is far more dangerous than one that looks absurd. ₹0.05 gets caught by eye. ₹2273 instead of ₹273 does not, and neither does the 2 Mtr pipe's price on the 3 Mtr product. Every change below exists to catch the plausible-looking errors.
+
+---
+
+## 1. Two-pass read with adjudication (the important one)
+
+Today each chunk is read **once**, and whatever comes back is trusted. The `RPS-2285` incident came from exactly this: a single read of an ambiguous digit, accepted without challenge, which then propagated into a seeded database alias and into the verification baseline.
+
+Change `runChunks()` so every chunk is read **twice** — two independent calls with the same prompt — and the two results reconciled per `cat_no`:
+
+| Condition | Action |
+|---|---|
+| Both passes agree on code and price | Accept, `confidence = "high"` |
+| Same code, different price | **Adjudicate** (below) |
+| Code present in one pass only | **Adjudicate** |
+
+**Adjudication:** re-render that one page alone at high resolution and read just it, with a prompt naming the specific code and asking only for its code and price. Take the high-resolution reading as final and set `confidence = "adjudicated"`, recording both original readings in the staging row.
+
+Do not average, do not prefer the first pass, and do not let a tie-break rule silently pick one. The whole point is that a disagreement means the page needs a closer look.
+
+The static prompt is already cached with `cache_control: ephemeral`, so the second pass pays the cache-read rate. Cost is roughly a third more, not double. That is worth it — a bad commit costs far more.
+
+---
+
+## 2. Runtime plausibility checks
+
+The only validation today is `!isNaN(x.mrp) && x.mrp > 0` at line ~341. Add a check pass that **flags** items — never silently drops them — with the reason recorded on the staging row and shown in the review UI:
+
+1. **Price equals a nearby code's digits.** If `mrp` matches the numeric part of any `cat_no` extracted from the same page, flag `possible_adjacent_code`. This is how `ED-951` returned 952.
+2. **Price matches another item's price on the same page and both are two-code-tile siblings.** Flag `possible_tile_merge`.
+3. **Leading-digit anomaly.** If dropping the first digit puts the price within 20% of the series median while the full value sits above 3× that median, flag `possible_currency_glyph`. This is `REG-771` returning 2273 for ₹273.
+4. **Series outlier.** More than 3× or less than one-third of the median for its own series. Compute **per series, never batch-wide** — the allied group genuinely moved 0% to −19% while faucets moved +16%, so a batch-wide benchmark falsely flags the whole allied group.
+5. **Duplicate `cat_no` across pages** with differing prices.
+
+Flagged items still enter staging and still show their price. They land in **Needs Review**, sorted to the top, with the reason visible. The user decides — automatic price rejection was deliberately dropped from this project and should stay dropped.
+
+---
+
+## 3. Known-answer gate on every import
+
+Add a `spotChecks` array to the catalogue profile (`catalogue-profiles/sparsh-pearl.json`) so ground truth is **data, not test code**:
+
+```json
+"spotChecks": [
+  { "code": "ED-950",   "mrp": 467,  "tests": "ordinary grid tile" },
+  { "code": "ED-951",   "mrp": 555,  "tests": "two-code tile, must differ from ED-969" },
+  { "code": "ED-969",   "mrp": 561,  "tests": "two-code tile" },
+  { "code": "ED-964",   "mrp": 520,  "tests": "not 2225, that is ED-960's price" },
+  { "code": "REG-771",  "mrp": 273,  "tests": "not 2273, currency glyph misread" },
+  { "code": "RS-104",   "mrp": 359,  "tests": "hero page 24" },
+  { "code": "RPS-2279", "mrp": 753,  "tests": "hero page 26" },
+  { "code": "RPS-2285", "mrp": 1388, "tests": "direct code match, NO alias" },
+  { "code": "TS-101",   "mrp": 227,  "tests": "Standard series" },
+  { "code": "EVA-480",  "mrp": 310,  "tests": "Eva series" },
+  { "code": "RPS-2271", "mrp": 267,  "tests": "Royal Plus series" },
+  { "code": "TR-532",   "mrp": 538,  "tests": "page 98 first section" },
+  { "code": "TR-535",   "mrp": 336,  "tests": "page 98, must not stop at section 1" },
+  { "code": "WMP-189",  "mrp": 592,  "tests": "3 Mtr pipe, not 462 which is the 2 Mtr" }
+]
+```
+
+After extraction, check every spot-check code. Show the result prominently at the top of the review screen: **"Ground truth: 14 of 14 passed"**. If any fail, mark the batch `suspect`, list which failed with expected vs actual, and **disable Approve & Commit** until the user explicitly overrides with a typed confirmation.
+
+A single spot-check failure usually means something systemic — a structure change or a page-map drift — not one bad product. Treat it that way.
+
+---
+
+## 4. Stop suppressing new products
+
+Rule 9 of the static prompt says *"ONLY return codes from the target list"*. That directly conflicts with the review UI's **New Products** bucket, which can therefore never populate. It is why page 98's `BA-` codes have never surfaced.
+
+Rewrite rule 9:
+
+> Return every priced item whose code belongs to one of the listed code families, whether or not it appears in the target list. Do not return codes from the ignored families.
+
+Then split the result in code: target codes go to matching, non-target codes in a wanted family go to **New Products**. The ignored-families list in the profile (`FTS-`, `EDE-`, `EDP-`, …) already does the filtering that rule 9 was crudely approximating — `FTS-` in particular is the Standard **Full Turn** series, genuinely separate from `TS-`, not a renumbering.
+
+---
+
+## 5. Page 98 reads as two sections
+
+`tablePages` is `[83, 84, 96, 97]`, correctly excluding 98 — but nothing tells the model that page 98 is a **grid page carrying two separate sections**, `TRANSPARENT` (`TR-` codes) and `P.T.M.T` (`BA-` codes). The extractor stops after the first.
+
+Add to the profile a `multiSectionPages` entry describing 98 and its two sections, and add a prompt rule:
+
+> Some pages carry more than one titled section. Read the entire page top to bottom and extract from every section. Do not stop after the first section heading.
+
+Verify with `TR-535` (₹336, second half of page 98) — already in the spot checks above.
+
+---
+
+## 6. Prompt corrections
+
+Two fixes in `buildStaticPrompt()`:
+
+- Rule 3 hardcodes *"Table pages (pp. 83, 84, 96, 97)"*. Those page numbers belong to the profile, not the prompt string. Interpolate from `profile.tablePages` so a new volume with different pagination does not silently mislead the model.
+- The rules say nothing about what to do when a digit is genuinely unclear. Add:
+
+> If a digit is unclear, do not guess and do not pick the most likely reading. Return the item with `"uncertain": true` and describe what is ambiguous in a `note` field.
+
+Then route every `uncertain` item straight to adjudication (§1) regardless of whether the two passes agreed. A model that says "I am not sure" is giving you the single most valuable signal in this pipeline — do not throw it away.
+
+---
+
+## 7. Keep the alias table honest
+
+`SPARSH_ALIASES` in `routes/importBatches.ts` currently holds the correct **seven** entries, and `seedAliasesIfNeeded()` re-seeds by full delete-and-insert, so corrections propagate. Keep both properties.
+
+Add a comment above the array recording why there are seven and not eight:
+
+```
+// RPS-2285 is NOT an alias. An eighth entry (RPS-2285 -> RPS-2265) was added in error
+// from a 105 DPI misread; at 250 DPI page 27 clearly prints RPS-2285 for the Sink Mixer
+// at Rs 1388, and no RPS-2265 appears anywhere on that page. A code that looks like it
+// drifted is more often a misread than a renumbering — re-render at high resolution
+// before adding a row here.
+```
+
+Add a guard in the matcher: **never create an alias automatically.** A `desc+size` match on a code the target list does not contain goes to review as a *proposed* alias with the page number attached, and only becomes an alias once a human approves it. Every one of the seven real aliases was found this way; the one false alias was created without that step.
+
+---
+
+## 8. Acceptance tests
+
+```
+1.  Two passes agreeing on ED-950 = 467 yields confidence "high", one API call set,
+    no adjudication.
+2.  Two passes disagreeing (467 vs 476) triggers exactly one adjudication call for
+    that page, and the adjudicated value is stored with both originals recorded.
+3.  An item returned with uncertain:true is adjudicated even when both passes agree.
+4.  A price equal to a cat_no on the same page is flagged possible_adjacent_code and
+    still appears in staging with its price.
+5.  Ground-truth gate: all 14 spot checks pass on Vol 6.2, and Approve & Commit is
+    enabled. Force one to fail and Approve & Commit is disabled.
+6.  A code in a wanted family but not in the target list lands in New Products,
+    not discarded. Specifically: BA- codes from page 98 appear.
+7.  A code in an ignored family (FTS-) does NOT appear anywhere.
+8.  TR-535 (page 98 second section) is extracted at 336.
+9.  Series-outlier detection is computed per series: the allied group's genuine
+    -19% moves are NOT flagged when faucets moved +16%.
+10. No alias is created without human approval; a desc+size match on an unknown
+    code produces a proposed alias in review, not a row in competitor_code_aliases.
+```
+
+Test 9 is the one most likely to be got wrong — batch-wide medians are the easy implementation and the wrong one.
+
+---
+
+## 9. Constraints and reporting
+
+Follow repo conventions: contract-first via `lib/api-spec/openapi.yaml` then `pnpm --filter @workspace/api-spec run codegen`, never hand-edit `lib/api-hooks` or `lib/api-zod`; schema changes in `lib/db/src/schema/catalog.ts` then `pnpm --filter @workspace/db run push`. New staging columns (`confidence`, `flags`, `uncertain_note`, `pass1_mrp`, `pass2_mrp`) go through the schema, not ad-hoc JSON.
+
+Re-run the Vol 6.2 import after the changes and report, read from the database rather than restated from here:
+
+- Items extracted, and how many were adjudicated.
+- Spot-check result, 14 of 14 expected.
+- Count per flag reason.
+- New Products found — `BA-` codes should now appear for the first time.
+- Confirmation that all 150 target codes still resolve and prices still match `Sparsh_Pearl_New_Prices_Verified.xlsx` (the corrected copy, in which `RPS-2285` resolves by direct code match with 7 aliases, not 8).
+
+If any price now differs from that baseline, stop and report it rather than committing. The baseline is hand-read from the catalogue pages and is the acceptance standard.
+
+One clean commit.

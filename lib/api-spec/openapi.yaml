@@ -1441,6 +1441,9 @@ components:
           type: ["string", "null"]
         isActive:
           type: boolean
+        discontinuedFrom:
+          type: ["string", "null"]
+          format: date
         dataFlag:
           type: ["string", "null"]
         hasPrice:
@@ -1491,6 +1494,9 @@ components:
           type: ["number", "null"]
         isActive:
           type: boolean
+        discontinuedFrom:
+          type: ["string", "null"]
+          format: date
         sourceFiles:
           type: ["string", "null"]
         dataFlag:
@@ -1570,6 +1576,10 @@ components:
         upcomingChangePct:
           type: ["number", "null"]
           description: One-decimal change from current to upcoming MRP; zero is retained.
+        discontinuedFrom:
+          type: ["string", "null"]
+          format: date
+          description: Scheduled withdrawal date, when applicable.
         hasCompetitorData:
           type: boolean
     PriceFinderSearchResponse:
@@ -1680,6 +1690,10 @@ components:
         upcomingChangePct:
           type: ["number", "null"]
           description: One-decimal change from current to upcoming MRP; zero is retained.
+        discontinuedFrom:
+          type: ["string", "null"]
+          format: date
+          description: Scheduled withdrawal date, when applicable.
     PriceFinderCompetitor:
       type: object
       required:

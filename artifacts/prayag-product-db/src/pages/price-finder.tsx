@@ -718,6 +718,11 @@ function ProductView({
             <span className="bg-primary text-primary-foreground px-2 py-0.5 rounded font-bold tracking-wider">{product.itemCode}</span>
             {product.division && <span>• {product.division}</span>}
             {product.category && <span>• {product.category}</span>}
+                      {product.discontinuedFrom && (
+                        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                          Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+                        </span>
+                      )}
           </div>
           <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
         </div>

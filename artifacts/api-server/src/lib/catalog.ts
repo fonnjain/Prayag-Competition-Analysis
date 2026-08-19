@@ -1,19 +1,22 @@
 import { sql, eq } from "drizzle-orm";
 import { db, competitorPricesTable } from "@workspace/db";
 
-// Recompute is_current per item_code: the row with the latest effective_date
-// (tie-broken by highest id / most recent load) is current; all others false.
-// This is the only place is_current is mutated — price rows are never deleted.
+// Recompute is_current per live item_code: the row with the latest
+// effective_date (tie-broken by highest id / most recent load) is current; all
+// others false. A scheduled withdrawal takes effect on its stated date.
 export async function recomputeCurrentFlags(): Promise<void> {
   await db.execute(sql`UPDATE mrp_price_history SET is_current = false`);
   await db.execute(sql`
     UPDATE mrp_price_history m
     SET is_current = true
     FROM (
-      SELECT DISTINCT ON (item_code) id
-      FROM mrp_price_history
-      WHERE effective_date <= CURRENT_DATE
-      ORDER BY item_code, effective_date DESC, id DESC
+      SELECT DISTINCT ON (h.item_code) h.id
+      FROM mrp_price_history h
+      JOIN catalog_products p ON p.item_code = h.item_code
+      WHERE h.effective_date <= CURRENT_DATE
+        AND p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+      ORDER BY h.item_code, h.effective_date DESC, h.id DESC
     ) latest
     WHERE m.id = latest.id
   `);

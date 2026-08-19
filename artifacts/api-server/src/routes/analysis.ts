@@ -60,7 +60,9 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
         category: catalogProductsTable.category,
       })
       .from(catalogProductsTable)
-      .where(eq(catalogProductsTable.isActive, true)),
+      .where(
+        sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${resolvedDate})`,
+      ),
     db.execute<PriceRow>(sql`
       SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
       FROM mrp_price_history

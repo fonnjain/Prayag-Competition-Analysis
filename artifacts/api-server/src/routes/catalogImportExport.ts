@@ -746,12 +746,22 @@ router.get("/catalog/export", async (req, res) => {
     const products = await db
       .select()
       .from(catalogProductsTable)
+      .where(
+        sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`,
+      )
       .orderBy(asc(catalogProductsTable.itemCode));
-    const current = await db
-      .select()
-      .from(mrpPriceHistoryTable)
-      .where(eq(mrpPriceHistoryTable.isCurrent, true));
-    const curMap = new Map(current.map((c) => [c.itemCode, c]));
+    const current = await db.execute<{
+      item_code: string;
+      mrp: number | null;
+      price_basis: string;
+      effective_date: string;
+    }>(sql`
+      SELECT DISTINCT ON (item_code) item_code, mrp, price_basis, effective_date
+      FROM mrp_price_history
+      WHERE effective_date <= CURRENT_DATE AND mrp IS NOT NULL
+      ORDER BY item_code, effective_date DESC, id DESC
+    `);
+    const curMap = new Map(current.rows.map((c) => [c.item_code, c]));
     const header = [
       "Item Code",
       "Product Name",
@@ -764,6 +774,7 @@ router.get("/catalog/export", async (req, res) => {
       "Basis",
       "Effective Date",
       "Active",
+      "Discontinued From",
       "Data Flag",
     ];
     const body = products.map((p) => {
@@ -777,9 +788,10 @@ router.get("/catalog/export", async (req, res) => {
         p.size,
         p.uom,
         cur?.mrp ?? null,
-        cur?.priceBasis ?? null,
-        cur?.effectiveDate ?? null,
+        cur?.price_basis ?? null,
+        cur?.effective_date ?? null,
         p.isActive ? "Yes" : "No",
+        p.discontinuedFrom,
         p.dataFlag,
       ];
     });
@@ -1208,10 +1220,13 @@ router.delete("/catalog/mrp-period/:date", async (req, res) => {
         UPDATE mrp_price_history m
         SET is_current = true
         FROM (
-          SELECT DISTINCT ON (item_code) id
-          FROM mrp_price_history
-          WHERE effective_date <= CURRENT_DATE
-          ORDER BY item_code, effective_date DESC, id DESC
+          SELECT DISTINCT ON (h.item_code) h.id
+          FROM mrp_price_history h
+          JOIN catalog_products p ON p.item_code = h.item_code
+          WHERE h.effective_date <= CURRENT_DATE
+            AND p.is_active IS TRUE
+            AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+          ORDER BY h.item_code, h.effective_date DESC, h.id DESC
         ) latest
         WHERE m.id = latest.id
       `);

@@ -92,7 +92,9 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
       productName: catalogProductsTable.productName,
     })
       .from(catalogProductsTable)
-      .where(eq(catalogProductsTable.isActive, true)),
+      .where(
+        sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayStr})`,
+      ),
   ]);
 
   const nameMap = new Map<string, string | null>();
@@ -139,6 +141,8 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
 // Catalog products with their current MRP, prepared for fuzzy matching. Built
 // once per request so per-row scoring is cheap.
 async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
+  const _cd = new Date();
+  const todayForCandidates = `${_cd.getFullYear()}-${String(_cd.getMonth() + 1).padStart(2, "0")}-${String(_cd.getDate()).padStart(2, "0")}`;
   const products = await db
     .select({
       itemCode: catalogProductsTable.itemCode,
@@ -147,9 +151,10 @@ async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
       category: catalogProductsTable.category,
       size: catalogProductsTable.size,
     })
-    .from(catalogProductsTable);
-  const _cd = new Date();
-  const todayForCandidates = `${_cd.getFullYear()}-${String(_cd.getMonth() + 1).padStart(2, "0")}-${String(_cd.getDate()).padStart(2, "0")}`;
+    .from(catalogProductsTable)
+    .where(
+      sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayForCandidates})`,
+    );
   type MrpPriceRow = { item_code: string; mrp: number | null };
   const currentMrps = await db.execute<MrpPriceRow>(sql`
     SELECT DISTINCT ON (item_code) item_code, mrp

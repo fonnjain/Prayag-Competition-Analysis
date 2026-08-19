@@ -20,23 +20,27 @@ interface CurrentPrice {
 }
 
 async function getCurrentPriceMap(): Promise<Map<string, CurrentPrice>> {
-  const rows = await db
-    .select({
-      itemCode: mrpPriceHistoryTable.itemCode,
-      mrp: mrpPriceHistoryTable.mrp,
-      net: mrpPriceHistoryTable.netPrice,
-      basis: mrpPriceHistoryTable.priceBasis,
-      effectiveDate: mrpPriceHistoryTable.effectiveDate,
-    })
-    .from(mrpPriceHistoryTable)
-    .where(eq(mrpPriceHistoryTable.isCurrent, true));
+  const rows = await db.execute<{
+    item_code: string;
+    mrp: number | null;
+    net_price: number | null;
+    price_basis: string | null;
+    effective_date: string | null;
+  }>(sql`
+    SELECT DISTINCT ON (item_code)
+      item_code, mrp, net_price, price_basis, effective_date
+    FROM mrp_price_history
+    WHERE effective_date <= CURRENT_DATE
+      AND mrp IS NOT NULL
+    ORDER BY item_code, effective_date DESC, id DESC
+  `);
   const map = new Map<string, CurrentPrice>();
-  for (const r of rows) {
-    map.set(r.itemCode, {
+  for (const r of rows.rows) {
+    map.set(r.item_code, {
       mrp: r.mrp,
-      net: r.net,
-      basis: r.basis,
-      effectiveDate: r.effectiveDate,
+      net: r.net_price,
+      basis: r.price_basis,
+      effectiveDate: r.effective_date,
     });
   }
   return map;
@@ -62,7 +66,10 @@ router.get("/catalog/products", async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
-  const conditions = [];
+  const conditions = [
+    eq(catalogProductsTable.isActive, true),
+    sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`,
+  ];
   if (division) conditions.push(eq(catalogProductsTable.division, division));
   if (category) conditions.push(eq(catalogProductsTable.category, category));
   if (search) {
@@ -102,6 +109,7 @@ router.get("/catalog/products", async (req, res) => {
       size: p.size,
       uom: p.uom,
       isActive: p.isActive,
+      discontinuedFrom: p.discontinuedFrom,
       dataFlag: p.dataFlag,
       hasPrice: !!cur,
       currentMrp: cur?.mrp ?? null,
@@ -129,6 +137,7 @@ router.get("/catalog/filters", async (_req, res) => {
   const divRows = await db
     .selectDistinct({ division: catalogProductsTable.division })
     .from(catalogProductsTable)
+    .where(sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`)
     .orderBy(asc(catalogProductsTable.division));
   const catRows = await db
     .selectDistinct({
@@ -136,6 +145,7 @@ router.get("/catalog/filters", async (_req, res) => {
       division: catalogProductsTable.division,
     })
     .from(catalogProductsTable)
+    .where(sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`)
     .orderBy(asc(catalogProductsTable.category));
 
   const divisions = divRows
@@ -216,7 +226,12 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
   const products = await db
     .select()
     .from(catalogProductsTable)
-    .where(eq(catalogProductsTable.itemCode, itemCode))
+    .where(
+      and(
+        eq(catalogProductsTable.itemCode, itemCode),
+        sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`,
+      ),
+    )
     .limit(1);
   const product = products[0];
   if (!product) {
@@ -245,6 +260,7 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
       uom: product.uom,
       kgCost: product.kgCost,
       isActive: product.isActive,
+        discontinuedFrom: product.discontinuedFrom,
       sourceFiles: product.sourceFiles,
       dataFlag: product.dataFlag,
     },

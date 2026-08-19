@@ -290,6 +290,11 @@ export default function CatalogPage() {
                           {product.itemCode}
                         </div>
                       </Link>
+                      {product.discontinuedFrom && (
+                        <div className="mt-1 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                          Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">{product.productName}</td>
                     <td className="px-4 py-3 text-muted-foreground">{product.category}</td>

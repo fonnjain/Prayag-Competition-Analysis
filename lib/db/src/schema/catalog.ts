@@ -27,6 +27,9 @@ export const catalogProductsTable = pgTable(
     uom: text("uom").notNull().default("NOS"),
     kgCost: doublePrecision("kg_cost"),
     isActive: boolean("is_active").notNull().default(true),
+    // A scheduled withdrawal is date-effective: the product remains live
+    // through the day before this date so historical price lookups stay valid.
+    discontinuedFrom: date("discontinued_from"),
     sourceFiles: text("source_files"),
     dataFlag: text("data_flag"),
     createdAt: timestamp("created_at", { withTimezone: true })

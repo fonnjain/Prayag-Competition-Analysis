@@ -15,8 +15,21 @@ type SearchRow = {
   current_effective_date: string | null;
   upcoming_mrp: number | null;
   upcoming_effective_date: string | null;
+  discontinued_from: string | null;
   has_competitor_data: boolean;
 };
+
+function validToForProduct(
+  upcomingEffectiveDate: string | null,
+  discontinuedFrom: string | null,
+): string | null {
+  const nextBoundary =
+    upcomingEffectiveDate &&
+    (!discontinuedFrom || upcomingEffectiveDate < discontinuedFrom)
+      ? upcomingEffectiveDate
+      : discontinuedFrom;
+  return validToFromNextDate(nextBoundary);
+}
 
 function toSearchResult(row: SearchRow) {
   return {
@@ -26,10 +39,14 @@ function toSearchResult(row: SearchRow) {
     category: row.category,
     currentMrp: row.current_mrp,
     currentEffectiveDate: row.current_effective_date,
-    currentValidTo: validToFromNextDate(row.upcoming_effective_date),
+    currentValidTo: validToForProduct(
+      row.upcoming_effective_date,
+      row.discontinued_from,
+    ),
     upcomingMrp: row.upcoming_mrp,
     upcomingEffectiveDate: row.upcoming_effective_date,
     upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
+    discontinuedFrom: row.discontinued_from,
     hasCompetitorData: row.has_competitor_data,
   };
 }
@@ -226,6 +243,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       p.division,
       p.category,
       p.size,
+      p.discontinued_from,
       current_price.mrp AS current_mrp,
       current_price.effective_date AS current_effective_date,
       upcoming_price.mrp AS upcoming_mrp,
@@ -253,10 +271,12 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       WHERE h.item_code = p.item_code
         AND h.effective_date > CURRENT_DATE
         AND h.mrp IS NOT NULL
+        AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
       ORDER BY h.effective_date ASC, h.id DESC
       LIMIT 1
     ) upcoming_price ON true
     WHERE p.is_active IS TRUE
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       AND ${sql.join(filterConditions, sql` AND `)}
   `);
   return result.rows;
@@ -351,6 +371,7 @@ router.get("/price-finder/browse", async (req, res) => {
       count(*)::int AS count
     FROM catalog_products p
     WHERE p.is_active IS TRUE
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       AND EXISTS (
         SELECT 1
         FROM mrp_price_history h
@@ -374,6 +395,7 @@ router.get("/price-finder/browse", async (req, res) => {
       FROM catalog_products p
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
         AND EXISTS (
           SELECT 1
           FROM mrp_price_history h
@@ -403,6 +425,7 @@ router.get("/price-finder/browse", async (req, res) => {
         p.product_name,
         p.division,
         p.category,
+        p.discontinued_from,
         current_price.mrp AS current_mrp,
         current_price.effective_date AS current_effective_date,
         upcoming_price.mrp AS upcoming_mrp,
@@ -430,12 +453,14 @@ router.get("/price-finder/browse", async (req, res) => {
         WHERE h.item_code = p.item_code
           AND h.effective_date > CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
       ) upcoming_price ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND ${categoryCondition}
         AND p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       ORDER BY p.item_code
       LIMIT ${limit}
     `);
@@ -461,6 +486,7 @@ type ProductRow = {
   current_effective_date: string | null;
   upcoming_mrp: number | null;
   upcoming_effective_date: string | null;
+  discontinued_from: string | null;
 };
 
 type CompetitorRow = {
@@ -483,6 +509,7 @@ router.get(
         p.product_name,
         p.division,
         p.category,
+        p.discontinued_from,
         current_price.mrp AS current_mrp,
         current_price.effective_date AS current_effective_date,
         upcoming_price.mrp AS upcoming_mrp,
@@ -503,11 +530,13 @@ router.get(
         WHERE h.item_code = p.item_code
           AND h.effective_date > CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
       ) upcoming_price ON true
       WHERE p.item_code = ${itemCode}
         AND p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       LIMIT 1
     `);
 
@@ -604,10 +633,14 @@ router.get(
         category: product.category,
         currentMrp: product.current_mrp,
         currentEffectiveDate: product.current_effective_date,
-        currentValidTo: validToFromNextDate(product.upcoming_effective_date),
+        currentValidTo: validToForProduct(
+          product.upcoming_effective_date,
+          product.discontinued_from,
+        ),
         upcomingMrp: product.upcoming_mrp,
         upcomingEffectiveDate: product.upcoming_effective_date,
         upcomingChangePct: priceChangePct(product.current_mrp, product.upcoming_mrp),
+        discontinuedFrom: product.discontinued_from,
       },
       competitors: competitorItems,
     });

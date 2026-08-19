@@ -97,6 +97,7 @@ export const ExternalListProductsResponse = zod.object({
   "size": zod.string().nullish(),
   "uom": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
+  "discontinuedFrom": zod.coerce.date().nullish(),
   "dataFlag": zod.string().nullish(),
   "hasPrice": zod.boolean(),
   "currentMrp": zod.number().nullish(),
@@ -129,6 +130,7 @@ export const ExternalGetProductResponse = zod.object({
   "uom": zod.string().nullish(),
   "kgCost": zod.number().nullish(),
   "isActive": zod.boolean().optional(),
+  "discontinuedFrom": zod.coerce.date().nullish(),
   "sourceFiles": zod.string().nullish(),
   "dataFlag": zod.string().nullish()
 }),
@@ -249,6 +251,7 @@ export const GetCatalogProductsResponse = zod.object({
   "size": zod.string().nullish(),
   "uom": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
+  "discontinuedFrom": zod.coerce.date().nullish(),
   "dataFlag": zod.string().nullish(),
   "hasPrice": zod.boolean(),
   "currentMrp": zod.number().nullish(),
@@ -281,6 +284,7 @@ export const GetCatalogProductResponse = zod.object({
   "uom": zod.string().nullish(),
   "kgCost": zod.number().nullish(),
   "isActive": zod.boolean().optional(),
+  "discontinuedFrom": zod.coerce.date().nullish(),
   "sourceFiles": zod.string().nullish(),
   "dataFlag": zod.string().nullish()
 }),
@@ -326,6 +330,7 @@ export const GetPriceFinderSearchResponse = zod.object({
   "upcomingMrp": zod.number().nullable().describe('Earliest scheduled MRP after today, or null.'),
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
+  "discontinuedFrom": zod.coerce.date().nullish().describe('Scheduled withdrawal date, when applicable.'),
   "hasCompetitorData": zod.boolean()
 })),
   "totalCount": zod.number(),
@@ -337,7 +342,7 @@ export const GetPriceFinderSearchResponse = zod.object({
   "count": zod.number()
 }))
 })),
-  "unmatchedFilters": zod.array(zod.string())
+  "unmatchedFilters": zod.array(zod.string()).describe('Terms rejected during progressive narrowing. Results and totalCount retain the last successful filter set.')
 })
 
 
@@ -376,6 +381,7 @@ export const GetPriceFinderBrowseResponse = zod.object({
   "upcomingMrp": zod.number().nullable().describe('Earliest scheduled MRP after today, or null.'),
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
+  "discontinuedFrom": zod.coerce.date().nullish().describe('Scheduled withdrawal date, when applicable.'),
   "hasCompetitorData": zod.boolean()
 }))
 })
@@ -399,7 +405,8 @@ export const GetPriceFinderProductResponse = zod.object({
   "currentValidTo": zod.string().nullable().describe('Final day the current MRP is valid, or null when open-ended.'),
   "upcomingMrp": zod.number().nullable(),
   "upcomingEffectiveDate": zod.string().nullable(),
-  "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.')
+  "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
+  "discontinuedFrom": zod.coerce.date().nullish().describe('Scheduled withdrawal date, when applicable.')
 }),
   "competitors": zod.array(zod.object({
   "competitor": zod.string(),
@@ -1406,3 +1413,5 @@ export const LogoutMobileSessionHeader = zod.object({
 export const LogoutMobileSessionResponse = zod.object({
   "success": zod.boolean()
 })
+
+

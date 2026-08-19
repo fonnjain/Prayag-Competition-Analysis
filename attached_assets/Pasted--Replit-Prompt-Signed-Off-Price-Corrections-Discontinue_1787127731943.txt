@@ -1,0 +1,184 @@
+# Replit Prompt — Signed-Off Price Corrections + Discontinued Products
+
+**Supersedes `Replit_Sink_MRP_Repair_Prompt.md`.** That version covered 7 sink prices and 9 discontinued codes, based on my own reading of the source. Preeti has since signed off the full flagged list against the official price lists, and a wider scan found discontinuations across all three main divisions. Use this document instead.
+
+**Deadline: before 01 Sep 2026.** Everything below is inert today and goes live automatically on that date, because prices resolve by `effective_date <= CURRENT_DATE`.
+
+---
+
+## 1. Input file
+
+`Prayag_Signed_Off_Corrections_and_Discontinued.xlsx`
+
+| Sheet | Contents |
+|---|---|
+| `1_Signed_Off_Corrections` | **12** prices to correct, each signed off by Preeti against the official lists |
+| `2_Discontinued_All_Divisions` | **150** codes carrying a `REMOVED` marker in the official files |
+| `3_Summary` | Counts |
+
+Of the 108 originally flagged prices, **94 were confirmed correct as they stand** — no action. Two could not be resolved and are handled separately in §4.
+
+---
+
+## 2. Part A — the 12 corrections
+
+Correct the `mrp` **in place** on the existing `mrp_price_history` row. Do not insert new rows: the unique index `mrp_price_history_code_date_idx` on `(item_code, effective_date)` forbids a second row for the same period, and this is a repair of a wrong value within an existing period, not a new price period.
+
+**Six sinks, effective 2026-09-01** — currently holding stray marker values:
+
+| item_code | Wrong | Correct | 05 Mar 2026 |
+|---|---:|---:|---:|
+| `911-D` | 0.05 | **3490** | 3240 |
+| `816-D` | 0.06 | **2690** | 2490 |
+| `930-D` | 0.05 | **7440** | 6890 |
+| `932-D` | 0.05 | **9930** | 9190 |
+| `842-D` | 0.06 | **7970** | 7380 |
+| `1232-D` | 0.05 | **11650** | 10790 |
+
+**Three CP accessories, effective 2026-08-01:**
+
+| item_code | Wrong | Correct |
+|---|---:|---:|
+| `BD-40` | 3680 | **3990** |
+| `BEA-105` | 1090 | **1490** |
+| `BOS-196` | 1690 | **2140** |
+
+**Three Teflon tapes, effective 2026-05-01:**
+
+| item_code | Wrong | Correct |
+|---|---:|---:|
+| `TTS - 01` | 34 | **36** |
+| `TTS - 02` | 38 | **40** |
+| `TTS - 03` | 26 | **28** |
+
+Take the exact values from the spreadsheet, not from this table — the spreadsheet is the signed record.
+
+### A note on the Teflon tapes — this one needs care
+
+`TTS-01`, `TTS-02` and `TTS-03` appear in **three different official files**, with two different price sets:
+
+- CP (`New CP MRP w.e.f. 01st Aug, 2026`, ACCESSORIES) — 36 / 40 / 28
+- PTMT (`MASTER`, Teflon Tape) — 34 / 38 / 26
+- Pipes & Fittings (`MASTER`, CPVC Fittings) — 34 / 38 / 26
+
+The CP values are the signed-off ones. Whichever loader ran last currently wins, silently, and nothing surfaces the conflict. After applying the correction, **report every other `item_code` that appears in more than one official division with differing MRPs.** The `code_conflicts` table already exists for exactly this; populate it and show the conflicts on Data Health. Do not attempt to auto-resolve them — list them for a human.
+
+Set `notes` on every corrected row to:
+
+```
+Corrected 19 Aug 2026, signed off by Preeti against the official price list.
+```
+
+`1230-D` was **not** flagged and needs no correction — an earlier draft of this work wrongly listed it. Leave it alone.
+
+---
+
+## 3. Part B — 150 discontinued products
+
+The official files mark withdrawn products with a literal `REMOVED` in the new-price column. A scan of all six files found **239 such marker cells resolving to 150 distinct codes**:
+
+| Division | Codes |
+|---|---:|
+| CP Fittings / Faucets | 109 |
+| PTMT & Plastic Fittings | 33 |
+| Pipes & Fittings | 8 |
+
+This is much wider than the 9 PTMT sinks identified earlier. The danger is that for many of these the price column **still holds a carried-over calculated figure**, so they look like ordinary priced products — a wrong-but-plausible number that passes visual review, unlike ₹0.05.
+
+### B1. Schema
+
+In `lib/db/src/schema/catalog.ts`, add to `catalogProductsTable`:
+
+```ts
+discontinuedFrom: date("discontinued_from"),
+```
+
+Nullable; `null` means not scheduled for withdrawal. Then `pnpm --filter @workspace/db run push`.
+
+Setting `is_active = false` instead would be wrong — these products are legitimately on sale until their division's revision date. The mechanism has to be date-effective.
+
+### B2. Apply
+
+For each of the 150 codes: set `discontinued_from` to the effective date of the revision that withdrew it — **01 Sep 2026** for PTMT, **01 Aug 2026** for CP, **01 Feb 2026** for Pipes & Fittings — and delete any `mrp_price_history` row dated on or after that date. Earlier price rows stay untouched.
+
+Pipes & Fittings is already past its date, so those 8 take effect immediately. Report them separately so the user sees what disappears today.
+
+### B3. Respect the flag at query time
+
+A product is live at `:asOf` when `discontinued_from IS NULL OR discontinued_from > :asOf`. Apply at every site that resolves a current price. These exist today — verify the list is still complete rather than assuming:
+
+- `artifacts/api-server/src/lib/catalog.ts` — `recomputeCurrentFlags()`
+- `artifacts/api-server/src/routes/analysis.ts` (the `DISTINCT ON (item_code)` CTEs)
+- `artifacts/api-server/src/routes/comparison.ts`
+- `artifacts/api-server/src/routes/priceFinder.ts`
+- `artifacts/api-server/src/routes/catalogImportExport.ts`
+
+A discontinued product must still resolve for an `asOf` before its `discontinued_from`, so historical comparisons stay reproducible.
+
+### B4. Surface it
+
+Contract-first: add `discontinuedFrom` (nullable date) to the product schemas in `lib/api-spec/openapi.yaml`, then `pnpm --filter @workspace/api-spec run codegen`. Never hand-edit `lib/api-hooks` or `lib/api-zod`.
+
+Show a badge on any product with a future `discontinuedFrom`: `Discontinued from 01 Sep 2026`. The sales team needs to see a withdrawal coming, not discover it on the day.
+
+---
+
+## 4. Part C — two orphan codes
+
+Two flagged rows could not be resolved because the codes are not real:
+
+- `Cistern` — priced 0.04. Preeti: *"Not Mention proper cat no."*
+- `BS-111` — priced 1990. Preeti: *"Cat no. doesn't exist."*
+
+These are not price errors, they are orphan rows. Leave them for the catalog reconciliation work (`Replit_Catalog_Reconciliation_Prompt.md`), which deletes codes with no source in the official files. Do not delete them here, and do not invent prices for them.
+
+---
+
+## 5. Part D — prevent recurrence
+
+Add a post-load validation pass to the MRP loader that **reports, never silently drops**, any row where:
+
+1. MRP is below ₹50 in PTMT, CP or Sanitaryware.
+2. Period-over-period change is above +60% or below −20%.
+3. MRP is below ₹1 in any division.
+4. The source cell for the new price contains a non-numeric marker such as `REMOVED`, `NEW`, or `On the Way`.
+
+Rule 4 is the one that would have caught both defects in this document. Surface results on the **Load MRP** page as a blocking review step: the load completes, flagged rows are listed with old value, new value and reason, and the user confirms or cancels before rows become current. Do not auto-reject — this project keeps a human in the loop on price data.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  911-D resolves to 3490 at asOf = 2026-09-01 and 3240 at asOf = 2026-08-31.
+2.  BD-40 resolves to 3990 at asOf = 2026-08-01.
+3.  TTS - 01 resolves to 36, and the TTS codes appear in code_conflicts with all
+    three divisional values recorded.
+4.  No PTMT item has an MRP below Rs 50 at asOf = 2026-09-01 except the 12 known
+    genuine low-value items. Assert exactly 12, not "small".
+5.  A PTMT code marked REMOVED returns no price at asOf = 2026-09-01 and its
+    correct price at asOf = 2026-08-31.
+6.  All 150 discontinued codes have discontinued_from set, and zero price rows
+    dated on or after that date.
+7.  discontinued_from is null for every product not in the 150.
+8.  The 68 PTMT products dated only from 01 Sep 2026 still resolve on that date.
+9.  1230-D is unchanged by this migration.
+```
+
+Test 8 matters — those 68 are a different group from the 150, and an over-broad filter would hide them.
+
+---
+
+## 7. Report back
+
+Read every figure from the database, not from this prompt:
+
+- The 12 corrected prices, read back after applying.
+- Count of discontinued codes per division, and which 8 take effect immediately.
+- The `code_conflicts` contents after populating.
+- PTMT items priced under ₹50 at `asOf = 2026-09-01`. Expected: **12**.
+- Confirmation that all nine acceptance tests pass.
+
+Create the repair as a one-time admin endpoint, run it in dev, verify, run it in production, then remove the endpoint before the final commit. The schema change, query changes, loader validation and tests all stay.
+
+One clean commit.

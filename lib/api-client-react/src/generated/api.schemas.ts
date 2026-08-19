@@ -26,6 +26,8 @@ export interface CatalogProductListItem {
   uom?: string | null;
   isActive?: boolean;
   /** @nullable */
+  discontinuedFrom?: string | null;
+  /** @nullable */
   dataFlag?: string | null;
   hasPrice: boolean;
   /** @nullable */
@@ -63,6 +65,8 @@ export interface CatalogProduct {
   /** @nullable */
   kgCost?: number | null;
   isActive?: boolean;
+  /** @nullable */
+  discontinuedFrom?: string | null;
   /** @nullable */
   sourceFiles?: string | null;
   /** @nullable */
@@ -125,6 +129,11 @@ export interface PriceFinderSearchResult {
      * @nullable
      */
   upcomingChangePct: number | null;
+  /**
+     * Scheduled withdrawal date, when applicable.
+     * @nullable
+     */
+  discontinuedFrom?: string | null;
   hasCompetitorData: boolean;
 }
 
@@ -143,6 +152,7 @@ export interface PriceFinderSearchResponse {
   results: PriceFinderSearchResult[];
   totalCount: number;
   filterSuggestions: PriceFinderFilterSuggestion[];
+  /** Terms rejected during progressive narrowing. Results and totalCount retain the last successful filter set. */
   unmatchedFilters: string[];
 }
 
@@ -193,6 +203,11 @@ export interface PriceFinderProduct {
      * @nullable
      */
   upcomingChangePct: number | null;
+  /**
+     * Scheduled withdrawal date, when applicable.
+     * @nullable
+     */
+  discontinuedFrom?: string | null;
 }
 
 export interface PriceFinderCompetitor {
@@ -1525,3 +1540,4 @@ iss?: string;
 export type LogoutBrowserSessionParams = {
 returnTo?: string;
 };
+
