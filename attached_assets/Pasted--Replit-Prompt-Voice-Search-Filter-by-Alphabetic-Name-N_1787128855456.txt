@@ -1,0 +1,140 @@
+# Replit Prompt — Voice Search: Filter by Alphabetic Name, Not by Numbers
+
+## 1. The problem, from the screenshot
+
+A search returns four rows that are visually identical:
+
+```
+148-LS    20mm Concealed Stop Cock    PTMT & Plastic Fittings    ₹416.40
+148-LSB   20mm Concealed Stop Cock    PTMT & Plastic Fittings    ₹410.00
+148-LSG   20mm Concealed Stop Cock    PTMT & Plastic Fittings    ₹410.00
+148-0     20mm Concealed Stop Cock    PTMT & Plastic Fittings    ₹401.76
+```
+
+Same name, same subtitle, four different prices. Nobody can pick the right one — and by voice it is worse, because there is nothing to say that would narrow it down.
+
+**The distinguishing attribute exists and is not being shown.** In the official PTMT file every one of these carries a `SERIES` value, and those values are pure alphabetic names:
+
+| Code | Series | 05 Mar MRP | 01 Sep MRP |
+|---|---|---:|---:|
+| `148-LS` | **Erosa** | 385.56 | 416.00 |
+| `148-LSB` | **Erosa Blue** | 410.00 | 442.00 |
+| `148-LSG` | **Erosa Gold** | 410.00 | 442.00 |
+| `148-O` | **Standard (Old Handle)** | 372.00 | 402.00 |
+
+The subtitle currently shows the division (`PTMT & Plastic Fittings`), which is identical for all of them and therefore useless. It should show the series.
+
+The same `148` product also exists as Quadra, Delta, Ibix, Ovian, Sapphire, Black Sapphire, Diamond, Helix, Grand, Standard (New Handle), and four Helix colours. Roughly twenty variants of one item, separated **only** by an alphabetic series name.
+
+---
+
+## 2. The rule
+
+**The primary filter is the alphabetic product name, including the series. Numbers are secondary.**
+
+Sizes like `20mm`, `15mm`, `1/2"` are refinements, never the identifier. A spoken query is a sequence of words; the words are what identify the product. The current implementation gets this backwards.
+
+### Why it is backwards today
+
+In `artifacts/api-server/src/routes/priceFinder.ts`, `searchScore()` matches the query as one undivided string, and `name.startsWith(q)` scores **700**. Product names in this catalogue literally begin with the size — `"20mm Concealed Stop Cock"` — so a numeric-leading query scores as a strong name match while carrying no product identity at all. Meanwhile `series_range` is not in the scored fields, and not in the `LIKE` clause list either.
+
+---
+
+## 3. What to build
+
+### 3.1 Split the query into two kinds of token
+
+Before scoring, parse the query into:
+
+- **Alpha tokens** — words with no digits: `concealed`, `stop`, `cock`, `erosa`, `gold`
+- **Measure tokens** — sizes and dimensions: `20mm`, `15 mm`, `1/2"`, `1.5 inch`, and their spoken forms (`twenty mm`)
+- **Code tokens** — anything matching a catalogue-code shape: `148-LS`, `121-B`
+
+`normaliseSpokenQuery()` already converts spoken numbers via `SPOKEN_NUMBERS`. Keep it, but route its output into the **measure** bucket, not into the name match.
+
+### 3.2 Score in that order
+
+1. **Code token present** → exact-code lookup wins outright, as it does now. Someone who says a code means that code.
+2. Otherwise, **alpha tokens are the primary filter**, matched against a new derived field `name_alpha` (§3.3) **and** against `series_range`. All alpha tokens must match something for a row to qualify.
+3. **Measure tokens narrow the surviving set.** They never promote a row that failed the alpha filter, and a row with no size recorded is not eliminated by a measure token — it is ranked below rows that match it explicitly.
+
+A query of only measure tokens (`"20mm"`) should return a prompt to name the product, not a list of every 20mm item in the catalogue.
+
+### 3.3 Add `name_alpha`
+
+Add a generated/stored column on `catalog_products`: `product_name` with all measurement and numeric tokens stripped.
+
+```
+"20mm Concealed Stop Cock"          → "concealed stop cock"
+"Concealed Stop Cock 20mm with ..." → "concealed stop cock with ..."
+```
+
+Note those two forms are the same product written two ways. Stripping the measurements makes them collapse to the same key, which is exactly what voice matching needs. Index it, and add it to both the `LIKE` clause list (~line 150) and `searchScore()`.
+
+### 3.4 Populate and display the series
+
+`series_range` exists on `catalog_products`. Load it from the `SERIES` column of the official files — it is the second column of the PTMT `MASTER` sheet, and equivalent columns elsewhere. Check how much of it is currently populated and report the number; the series names may have been loaded into `category` instead during the earlier backfill.
+
+Then change the result row subtitle from division to **series — division**:
+
+```
+148-LS    Concealed Stop Cock    Erosa · PTMT & Plastic Fittings         ₹416.40
+148-LSB   Concealed Stop Cock    Erosa Blue · PTMT & Plastic Fittings    ₹410.00
+```
+
+When several results share a `name_alpha`, the differing attribute must be visible without opening the row. Repeating an identical line four times is the bug.
+
+### 3.5 Progressive filtering for voice
+
+Do not one-shot match. Narrow in this order, asking only when the current step leaves more than one candidate:
+
+1. **Product** — alpha tokens → `"Concealed Stop Cock"` → 20 candidates
+2. **Series** — *"Which series? Erosa, Quadra, Helix, Diamond, Sapphire, Standard…"* → 3 candidates
+3. **Size** — *"Which size? 15mm or 20mm"* → 1
+4. **Finish**, where a series has colour variants — *"Plain, Blue, or Gold?"*
+
+At each step offer only the values that actually exist among the current candidates — never a fixed list. If one candidate remains, stop asking and show it. Spoken answers match against the same alpha-first rule, so *"Erosa Gold"* resolves directly.
+
+---
+
+## 4. A code corruption to fix while you are here
+
+The screenshot shows **`148-0`** (digit zero). The official file has **`148-O`** — letter O, for *Standard (Old Handle)*.
+
+The letter has been turned into a digit somewhere in the load or normalisation path. This is a real defect, not a display quirk: `148-O` and `148-0` are different strings, so any lookup or competitor mapping using the correct code silently fails to match.
+
+Find where it happens and fix it. Then scan `catalog_products` for other codes where a letter `O` may have become `0` or vice versa, and report the list — do not auto-correct them, since some codes legitimately contain zeros. Whatever normalisation the matcher uses must not conflate `O` and `0` either.
+
+---
+
+## 5. Acceptance tests
+
+```
+1.  "concealed stop cock" returns all 148 variants, each showing a distinct series.
+2.  "erosa gold concealed stop cock" returns exactly 148-LSG.
+3.  "20mm" alone does NOT return a product list; it asks which product.
+4.  "twenty mm concealed stop cock" behaves identically to "20mm concealed stop cock".
+5.  "148-LS" returns that code directly, no progressive questions.
+6.  A product whose name is "Concealed Stop Cock 20mm" and one named
+    "20mm Concealed Stop Cock" both match the query "concealed stop cock".
+7.  Progressive filter: after "concealed stop cock", the offered series list contains
+    only series that actually have a 148 variant — not every series in the catalogue.
+8.  A row with no size recorded is not excluded by a measure token, only ranked lower.
+9.  148-O is stored with a letter O and is retrievable by that code.
+```
+
+Test 3 is the one that encodes the whole point of this change: a number is not an identity.
+
+---
+
+## 6. Constraints and reporting
+
+Contract-first: `lib/api-spec/openapi.yaml` then `pnpm --filter @workspace/api-spec run codegen`; never hand-edit `lib/api-hooks` or `lib/api-zod`. Schema changes in `lib/db/src/schema/catalog.ts` then `pnpm --filter @workspace/db run push`.
+
+Report, read from the database rather than restated from here:
+
+- How many `catalog_products` rows have `series_range` populated, before and after.
+- The 148 family listed with code, series and current MRP, to confirm all variants are now distinguishable.
+- The list of codes where `O`/`0` may have been transposed.
+
+One clean commit.
