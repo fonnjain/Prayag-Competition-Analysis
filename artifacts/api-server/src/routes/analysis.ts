@@ -157,6 +157,8 @@ type RawCompetitorRow = {
   upcoming_effective_date: string | null;
   upcoming_price_basis: string | null;
   upcoming_gst_pct: number | null;
+  newer_revision_effective_date: string | null;
+  newer_revision_review_status: string | null;
 };
 
 function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
@@ -185,6 +187,8 @@ function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
     upcomingEffectiveDate: r.upcoming_effective_date ?? null,
     upcomingPriceBasis: r.upcoming_price_basis ?? null,
     upcomingGstPct: r.upcoming_gst_pct ?? null,
+    newerRevisionEffectiveDate: r.newer_revision_effective_date ?? null,
+    newerRevisionReviewStatus: r.newer_revision_review_status ?? null,
     // created_at / updated_at are NOT NULL in the schema; cast directly.
     createdAt: r.created_at as Date,
     updatedAt: r.updated_at as Date,
@@ -210,7 +214,9 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
         next_price.price AS upcoming_price,
         next_price.effective_date AS upcoming_effective_date,
         next_price.price_basis AS upcoming_price_basis,
-        next_price.gst_pct AS upcoming_gst_pct
+        next_price.gst_pct AS upcoming_gst_pct,
+        pending_revision.effective_date AS newer_revision_effective_date,
+        pending_revision.match_status AS newer_revision_review_status
       FROM current_rows
       LEFT JOIN LATERAL (
         SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
@@ -222,6 +228,17 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
         ORDER BY cp.effective_date ASC, cp.id DESC
         LIMIT 1
       ) next_price ON true
+      LEFT JOIN LATERAL (
+        SELECT cp.effective_date, cp.match_status
+        FROM competitor_prices cp
+        WHERE cp.competitor = current_rows.competitor
+          AND cp.matched_prayag_code = current_rows.matched_prayag_code
+          AND cp.effective_date > current_rows.effective_date
+          AND cp.price IS NOT NULL
+          AND cp.match_status <> 'matched'
+        ORDER BY cp.effective_date DESC, cp.id DESC
+        LIMIT 1
+      ) pending_revision ON true
     `),
     db.execute<RawCompetitorRow>(sql`
       SELECT
@@ -229,7 +246,9 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
         NULL::double precision AS upcoming_price,
         NULL::date AS upcoming_effective_date,
         NULL::text AS upcoming_price_basis,
-        NULL::double precision AS upcoming_gst_pct
+        NULL::double precision AS upcoming_gst_pct,
+        NULL::date AS newer_revision_effective_date,
+        NULL::text AS newer_revision_review_status
       FROM competitor_prices cp
       JOIN (
         SELECT competitor, MAX(effective_date) AS max_date
@@ -420,6 +439,7 @@ router.get("/analysis/overview", async (req, res) => {
     medianPriceDiffPct: gap.medianPriceDiffPct,
     competitorCount: new Set(rows.map((r) => r.competitor)).size,
     matchQuality: confidenceCounts(rows),
+    pendingRevisionCount: rows.filter((r) => r.newerRevisionAwaitingReview).length,
     prayagMrpDate,
     competitorPeriodDate,
   });
@@ -605,6 +625,10 @@ router.get("/analysis/export", async (req, res) => {
     "Competitor Next Effective Price",
     "Competitor Next Effective Date",
     "Competitor Next Change %",
+    "Official Gap Note",
+    "Newer Revision Awaiting Review",
+    "Newer Revision Effective Date",
+    "Newer Revision Review Status",
     "Current-vs-Current Price Diff",
     "Current-vs-Current Price Diff %",
     "Prayag Cheaper (Current-vs-Current)",
@@ -635,6 +659,12 @@ router.get("/analysis/export", async (req, res) => {
       : round1(r.upcomingCompetitorEffectivePrice),
     r.upcomingCompetitorPriceDate,
     r.upcomingCompetitorChangePct,
+    r.newerRevisionAwaitingReview
+      ? "Using confirmed price; newer revision awaits review"
+      : "",
+    r.newerRevisionAwaitingReview ? "yes" : "no",
+    r.newerRevisionEffectiveDate,
+    r.newerRevisionReviewStatus,
     r.priceDiff == null ? null : round1(r.priceDiff),
     r.priceDiffPct == null ? null : round1(r.priceDiffPct),
     r.prayagCheaper == null ? "" : r.prayagCheaper ? "Yes" : "No",

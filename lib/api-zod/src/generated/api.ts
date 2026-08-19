@@ -184,6 +184,9 @@ export const ExternalGetComparisonResponse = zod.object({
   "upcomingCompetitorEffectiveDate": zod.string().nullable(),
   "upcomingCompetitorChangePct": zod.number().nullable().describe('One-decimal row-to-next-period change; zero is retained.'),
   "competitorPriceIsCurrent": zod.boolean().describe('True only for the latest row already in force; only these rows receive headline gaps.'),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this confirmed price still drives the official gap while a newer unconfirmed mapping for the same competitor and Prayag SKU awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision, such as needs_review.'),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
   "matchConfidence": zod.string().nullish(),
@@ -194,16 +197,16 @@ export const ExternalGetComparisonResponse = zod.object({
   "upcomingPrayagMrp": zod.number().nullable(),
   "upcomingPrayagEffectiveDate": zod.string().nullable(),
   "upcomingPrayagChangePct": zod.number().nullable(),
-  "diffPct": zod.number().nullable(),
+  "diffPct": zod.number().nullable().describe('Canonical market gap: (competitor effective price - Prayag MRP) \/ Prayag MRP × 100. Positive means Prayag is cheaper.'),
   "prayagCheaper": zod.boolean().nullable(),
   "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
   "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
-  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(compPerMetre − prayagPerMetre) \/ prayagPerMetre × 100; positive means Prayag is cheaper.'),
   "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
   "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
   "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
   "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
-  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct is positive (Prayag cheaper).')
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -233,7 +236,8 @@ export const ExternalGetAnalysisOverviewResponse = zod.object({
   "none": zod.number()
 }),
   "prayagMrpDate": zod.string().describe('Effective date of the Prayag MRP used for this overview.'),
-  "competitorPeriodDate": zod.string().nullable().describe('Effective date of the competitor period used for this overview.')
+  "competitorPeriodDate": zod.string().nullable().describe('Effective date of the competitor period used for this overview.'),
+  "pendingRevisionCount": zod.number().describe('Confirmed market prices still used while a newer revision awaits review.')
 })
 
 
@@ -540,6 +544,9 @@ export const GetComparisonResponse = zod.object({
   "upcomingCompetitorEffectiveDate": zod.string().nullable(),
   "upcomingCompetitorChangePct": zod.number().nullable().describe('One-decimal row-to-next-period change; zero is retained.'),
   "competitorPriceIsCurrent": zod.boolean().describe('True only for the latest row already in force; only these rows receive headline gaps.'),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this confirmed price still drives the official gap while a newer unconfirmed mapping for the same competitor and Prayag SKU awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision, such as needs_review.'),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
   "matchConfidence": zod.string().nullish(),
@@ -550,16 +557,16 @@ export const GetComparisonResponse = zod.object({
   "upcomingPrayagMrp": zod.number().nullable(),
   "upcomingPrayagEffectiveDate": zod.string().nullable(),
   "upcomingPrayagChangePct": zod.number().nullable(),
-  "diffPct": zod.number().nullable(),
+  "diffPct": zod.number().nullable().describe('Canonical market gap: (competitor effective price - Prayag MRP) \/ Prayag MRP × 100. Positive means Prayag is cheaper.'),
   "prayagCheaper": zod.boolean().nullable(),
   "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
   "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
-  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(compPerMetre − prayagPerMetre) \/ prayagPerMetre × 100; positive means Prayag is cheaper.'),
   "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
   "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
   "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
   "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
-  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct is positive (Prayag cheaper).')
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -584,6 +591,7 @@ export const GetComparisonSummaryResponse = zod.object({
   "avgDiffPct": zod.number().nullish(),
   "reviewCount": zod.number(),
   "ambiguousCount": zod.number().optional().describe('Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and therefore excluded from KPIs and flagged for manual review.'),
+  "pendingRevisionCount": zod.number().describe('Confirmed market prices still used in official gaps while a newer revision for the same quote awaits review.'),
   "confidenceCounts": zod.object({
   "high": zod.number(),
   "medium": zod.number(),
@@ -595,7 +603,7 @@ export const GetComparisonSummaryResponse = zod.object({
   "comparable": zod.number(),
   "prayagCheaper": zod.number(),
   "prayagCheaperPct": zod.number().nullable(),
-  "avgDiffPct": zod.number().nullish()
+  "avgDiffPct": zod.number().nullish().describe('Average canonical raw-MRP market gap. Per-metre normalization does not change this official KPI.')
 }))
 })
 
@@ -634,8 +642,11 @@ export const GetComparisonByProductResponse = zod.object({
   "upcomingPrice": zod.number().nullable(),
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable(),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this confirmed cell still drives the official gap while a newer revision awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision.'),
   "perMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
-  "diffPct": zod.number().nullable().describe('Diff% on the SKU\'s comparison basis (per metre when the Prayag SKU is length-based, else raw); null when this cell\'s unit is ambiguous.'),
+  "diffPct": zod.number().nullable().describe('Diff% on the SKU\'s comparison basis (per metre when the Prayag SKU is length-based, else raw), using the canonical positive-is-Prayag-cheaper convention; null when this cell\'s unit is ambiguous.'),
   "isCheapest": zod.boolean(),
   "unitAmbiguous": zod.boolean().optional().describe('True when this cell\'s unit basis cannot be resolved.')
 })),
@@ -772,6 +783,9 @@ export const BulkUpdateCompetitorMappingsResponse = zod.object({
   "upcomingCompetitorEffectiveDate": zod.string().nullable(),
   "upcomingCompetitorChangePct": zod.number().nullable().describe('One-decimal row-to-next-period change; zero is retained.'),
   "competitorPriceIsCurrent": zod.boolean().describe('True only for the latest row already in force; only these rows receive headline gaps.'),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this confirmed price still drives the official gap while a newer unconfirmed mapping for the same competitor and Prayag SKU awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision, such as needs_review.'),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
   "matchConfidence": zod.string().nullish(),
@@ -782,16 +796,16 @@ export const BulkUpdateCompetitorMappingsResponse = zod.object({
   "upcomingPrayagMrp": zod.number().nullable(),
   "upcomingPrayagEffectiveDate": zod.string().nullable(),
   "upcomingPrayagChangePct": zod.number().nullable(),
-  "diffPct": zod.number().nullable(),
+  "diffPct": zod.number().nullable().describe('Canonical market gap: (competitor effective price - Prayag MRP) \/ Prayag MRP × 100. Positive means Prayag is cheaper.'),
   "prayagCheaper": zod.boolean().nullable(),
   "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
   "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
-  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(compPerMetre − prayagPerMetre) \/ prayagPerMetre × 100; positive means Prayag is cheaper.'),
   "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
   "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
   "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
   "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
-  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct is positive (Prayag cheaper).')
 }))
 })
 
@@ -905,6 +919,9 @@ export const UpdateCompetitorMappingResponse = zod.object({
   "upcomingCompetitorEffectiveDate": zod.string().nullable(),
   "upcomingCompetitorChangePct": zod.number().nullable().describe('One-decimal row-to-next-period change; zero is retained.'),
   "competitorPriceIsCurrent": zod.boolean().describe('True only for the latest row already in force; only these rows receive headline gaps.'),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this confirmed price still drives the official gap while a newer unconfirmed mapping for the same competitor and Prayag SKU awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision, such as needs_review.'),
   "matchedPrayagCode": zod.string().nullable(),
   "matchStatus": zod.string(),
   "matchConfidence": zod.string().nullish(),
@@ -915,16 +932,16 @@ export const UpdateCompetitorMappingResponse = zod.object({
   "upcomingPrayagMrp": zod.number().nullable(),
   "upcomingPrayagEffectiveDate": zod.string().nullable(),
   "upcomingPrayagChangePct": zod.number().nullable(),
-  "diffPct": zod.number().nullable(),
+  "diffPct": zod.number().nullable().describe('Canonical market gap: (competitor effective price - Prayag MRP) \/ Prayag MRP × 100. Positive means Prayag is cheaper.'),
   "prayagCheaper": zod.boolean().nullable(),
   "compPerMetre": zod.number().nullish().describe('Competitor price reduced to ₹\/metre, when length-normalizable.'),
   "prayagPerMetre": zod.number().nullish().describe('Prayag MRP reduced to ₹\/metre, when length-normalizable.'),
-  "perMetreDiffPct": zod.number().nullish().describe('(prayagPerMetre − compPerMetre) \/ compPerMetre × 100.'),
+  "perMetreDiffPct": zod.number().nullish().describe('(compPerMetre − prayagPerMetre) \/ prayagPerMetre × 100; positive means Prayag is cheaper.'),
   "lengthNormalized": zod.boolean().optional().describe('True when both sides were compared on a per-metre basis.'),
   "unitAmbiguous": zod.boolean().optional().describe('True when the row\'s unit basis (per pc vs per mtr vs per ft) cannot be resolved, so it is excluded from KPIs and flagged for review.'),
   "normalizationNote": zod.string().nullish().describe('Human-readable explanation of how the row was normalized\/flagged.'),
   "effectiveDiffPct": zod.number().nullish().describe('The diff% to trust: per-metre diff when length-normalized, raw diff otherwise, null when unit-ambiguous.'),
-  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct ≤ 0 (Prayag cheaper).')
+  "effectivePrayagCheaper": zod.boolean().nullish().describe('True when effectiveDiffPct is positive (Prayag cheaper).')
 })
 
 
@@ -1019,7 +1036,8 @@ export const GetAnalysisOverviewResponse = zod.object({
   "none": zod.number()
 }),
   "prayagMrpDate": zod.string().describe('Effective date of the Prayag MRP used for this overview.'),
-  "competitorPeriodDate": zod.string().nullable().describe('Effective date of the competitor period used for this overview.')
+  "competitorPeriodDate": zod.string().nullable().describe('Effective date of the competitor period used for this overview.'),
+  "pendingRevisionCount": zod.number().describe('Confirmed market prices still used while a newer revision awaits review.')
 })
 
 
@@ -1192,7 +1210,10 @@ export const GetAnalysisOpportunitiesResponse = zod.object({
   "upcomingCompetitorPrice": zod.number().nullish(),
   "upcomingCompetitorEffectivePrice": zod.number().nullish(),
   "upcomingCompetitorPriceDate": zod.string().nullish(),
-  "upcomingCompetitorChangePct": zod.number().nullish().describe('One-decimal current-to-next competitor change; zero is retained.')
+  "upcomingCompetitorChangePct": zod.number().nullish().describe('One-decimal current-to-next competitor change; zero is retained.'),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this official gap still uses a confirmed price while a newer revision awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision.')
 })),
   "priceThreats": zod.array(zod.object({
   "id": zod.number(),
@@ -1217,7 +1238,10 @@ export const GetAnalysisOpportunitiesResponse = zod.object({
   "upcomingCompetitorPrice": zod.number().nullish(),
   "upcomingCompetitorEffectivePrice": zod.number().nullish(),
   "upcomingCompetitorPriceDate": zod.string().nullish(),
-  "upcomingCompetitorChangePct": zod.number().nullish().describe('One-decimal current-to-next competitor change; zero is retained.')
+  "upcomingCompetitorChangePct": zod.number().nullish().describe('One-decimal current-to-next competitor change; zero is retained.'),
+  "newerRevisionAwaitingReview": zod.boolean().optional().describe('True when this official gap still uses a confirmed price while a newer revision awaits review.'),
+  "newerRevisionEffectiveDate": zod.string().nullish().describe('Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.'),
+  "newerRevisionReviewStatus": zod.string().nullish().describe('Review status of the newer revision.')
 })),
   "prayagMrpDate": zod.string().describe('The resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison. Always ≤ today — future-dated competitor periods still use the most recent in-effect Prayag MRP.\n')
 })

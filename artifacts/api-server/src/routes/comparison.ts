@@ -212,6 +212,11 @@ interface CompetitorWindow {
   upcomingChangePct: number | null;
 }
 
+interface PendingRevision {
+  effectiveDate: string;
+  reviewStatus: string;
+}
+
 function competitorWindowKey(row: CompRow): string {
   const mapping = row.matchedPrayagCode
     ? `matched:${normCode(row.matchedPrayagCode)}`
@@ -276,6 +281,52 @@ function getCompetitorWindows(rows: CompRow[]): Map<number, CompetitorWindow> {
   return result;
 }
 
+// The official gap uses the latest confirmed ("matched") revision. A newer
+// unconfirmed mapping must never displace that price, but reviewers still need
+// to know why the displayed market price is older than the latest upload.
+function getPendingRevisions(rows: CompRow[]): Map<number, PendingRevision> {
+  const result = new Map<number, PendingRevision>();
+  const byKey = new Map<string, CompRow[]>();
+  for (const row of rows) {
+    if (!row.matchedPrayagCode) continue;
+    const key = `${row.competitor}\u0000${normCode(row.matchedPrayagCode)}`;
+    const list = byKey.get(key) ?? [];
+    list.push(row);
+    byKey.set(key, list);
+  }
+
+  for (const list of byKey.values()) {
+    for (const confirmed of list) {
+      if (
+        confirmed.matchStatus !== "matched" ||
+        confirmed.effectiveDate == null ||
+        confirmed.price == null
+      ) {
+        continue;
+      }
+      const pending = list
+        .filter(
+          (candidate) =>
+            candidate.matchStatus !== "matched" &&
+            candidate.price != null &&
+            candidate.effectiveDate != null &&
+            candidate.effectiveDate > confirmed.effectiveDate!,
+        )
+        .sort(
+          (a, b) =>
+            b.effectiveDate!.localeCompare(a.effectiveDate!) || b.id - a.id,
+        )[0];
+      if (pending?.effectiveDate) {
+        result.set(confirmed.id, {
+          effectiveDate: pending.effectiveDate,
+          reviewStatus: pending.matchStatus,
+        });
+      }
+    }
+  }
+  return result;
+}
+
 async function getAllCompetitorWindows(): Promise<Map<number, CompetitorWindow>> {
   const rows = await db.select().from(competitorPricesTable);
   return getCompetitorWindows(rows);
@@ -298,6 +349,7 @@ function buildComparisonRow(
   maps: Map<string, PrayagInfo>,
   window?: CompetitorWindow,
   matchedWindow?: CompetitorWindow,
+  pendingRevision?: PendingRevision,
 ) {
   const key = c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
@@ -351,6 +403,9 @@ function buildComparisonRow(
     upcomingCompetitorEffectiveDate: window?.upcomingEffectiveDate ?? null,
     upcomingCompetitorChangePct: window?.upcomingChangePct ?? null,
     competitorPriceIsCurrent: window?.isCurrent ?? true,
+    newerRevisionAwaitingReview: pendingRevision != null,
+    newerRevisionEffectiveDate: pendingRevision?.effectiveDate ?? null,
+    newerRevisionReviewStatus: pendingRevision?.reviewStatus ?? null,
     matchedPrayagCode: c.matchedPrayagCode,
     matchStatus: c.matchStatus,
     matchConfidence: c.matchConfidence,
@@ -413,23 +468,33 @@ router.get("/catalog/comparison", async (req, res) => {
     );
   }
 
-  const maps = await getPrayagMaps();
-
   let q = db.select().from(competitorPricesTable).$dynamic();
   if (conditions.length > 0) q = q.where(and(...conditions));
-  const all = await q.orderBy(
-    asc(competitorPricesTable.category),
-    asc(competitorPricesTable.description),
-    asc(competitorPricesTable.id),
-  );
-
-  const [windows, matchedWindows] = await Promise.all([
-    getAllCompetitorWindows(),
-    getAllMatchedCompetitorWindows(),
+  const [maps, all, revisionRows] = await Promise.all([
+    getPrayagMaps(),
+    q.orderBy(
+      asc(competitorPricesTable.category),
+      asc(competitorPricesTable.description),
+      asc(competitorPricesTable.id),
+    ),
+    db.select().from(competitorPricesTable),
   ]);
+  const windows = getCompetitorWindows(revisionRows);
+  const matchedWindows = getCompetitorWindows(
+    revisionRows.filter((row) => row.matchStatus === "matched"),
+  );
+  const pendingRevisions = getPendingRevisions(revisionRows);
   let rows = all
     .filter((row) => isAvailableComparisonRow(row, maps))
-    .map((c) => buildComparisonRow(c, maps, windows.get(c.id), matchedWindows.get(c.id)));
+    .map((c) =>
+      buildComparisonRow(
+        c,
+        maps,
+        windows.get(c.id),
+        matchedWindows.get(c.id),
+        pendingRevisions.get(c.id),
+      ),
+    );
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
   if (ambiguousOnly) rows = rows.filter((r) => r.unitAmbiguous);
 
@@ -458,22 +523,33 @@ router.get("/catalog/comparison/export", async (req, res) => {
     );
   }
 
-  const maps = await getPrayagMaps();
   let q = db.select().from(competitorPricesTable).$dynamic();
   if (conditions.length > 0) q = q.where(and(...conditions));
-  const all = await q.orderBy(
-    asc(competitorPricesTable.category),
-    asc(competitorPricesTable.description),
-    asc(competitorPricesTable.id),
-  );
-
-  const [windows, matchedWindows] = await Promise.all([
-    getAllCompetitorWindows(),
-    getAllMatchedCompetitorWindows(),
+  const [maps, all, revisionRows] = await Promise.all([
+    getPrayagMaps(),
+    q.orderBy(
+      asc(competitorPricesTable.category),
+      asc(competitorPricesTable.description),
+      asc(competitorPricesTable.id),
+    ),
+    db.select().from(competitorPricesTable),
   ]);
+  const windows = getCompetitorWindows(revisionRows);
+  const matchedWindows = getCompetitorWindows(
+    revisionRows.filter((row) => row.matchStatus === "matched"),
+  );
+  const pendingRevisions = getPendingRevisions(revisionRows);
   let rows = all
     .filter((row) => isAvailableComparisonRow(row, maps))
-    .map((c) => buildComparisonRow(c, maps, windows.get(c.id), matchedWindows.get(c.id)));
+    .map((c) =>
+      buildComparisonRow(
+        c,
+        maps,
+        windows.get(c.id),
+        matchedWindows.get(c.id),
+        pendingRevisions.get(c.id),
+      ),
+    );
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
 
   const header = [
@@ -489,6 +565,10 @@ router.get("/catalog/comparison/export", async (req, res) => {
     "Competitor Next Effective Date",
     "Competitor Next Change %",
     "Competitor Price Is Current",
+    "Official Gap Note",
+    "Newer Revision Awaiting Review",
+    "Newer Revision Effective Date",
+    "Newer Revision Review Status",
     "Prayag Code",
     "Prayag Product Name",
     "Prayag Current MRP",
@@ -519,6 +599,12 @@ router.get("/catalog/comparison/export", async (req, res) => {
     r.upcomingCompetitorEffectiveDate,
     r.upcomingCompetitorChangePct,
     r.competitorPriceIsCurrent ? "yes" : "no",
+    r.newerRevisionAwaitingReview
+      ? "Using confirmed price; newer revision awaits review"
+      : "",
+    r.newerRevisionAwaitingReview ? "yes" : "no",
+    r.newerRevisionEffectiveDate,
+    r.newerRevisionReviewStatus,
     r.matchedPrayagCode,
     r.prayagProductName,
     r.prayagMrp,
@@ -542,15 +628,14 @@ router.get("/catalog/comparison/export", async (req, res) => {
 // GET /catalog/comparison/summary — competitive share KPI + category win-rate.
 router.get("/catalog/comparison/summary", async (req, res) => {
   const competitor = strParam(req.query.competitor);
-  const maps = await getPrayagMaps();
-
   let q = db.select().from(competitorPricesTable).$dynamic();
   if (competitor) q = q.where(eq(competitorPricesTable.competitor, competitor));
-  const all = await q;
-  const [windows, matchedWindows] = await Promise.all([
-    getAllCompetitorWindows(),
-    getAllMatchedCompetitorWindows(),
-  ]);
+  const [maps, all] = await Promise.all([getPrayagMaps(), q]);
+  const windows = getCompetitorWindows(all);
+  const matchedWindows = getCompetitorWindows(
+    all.filter((row) => row.matchStatus === "matched"),
+  );
+  const pendingRevisions = getPendingRevisions(all);
   // Keep full precision for the official aggregate. `diffPct` on the response
   // is intentionally rounded for display, so it must not be summed here.
   const canonicalGaps = new Map<number, number | null>();
@@ -572,7 +657,15 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   }
   const rows = all
     .filter((row) => isAvailableComparisonRow(row, maps))
-    .map((c) => buildComparisonRow(c, maps, windows.get(c.id), matchedWindows.get(c.id)))
+    .map((c) =>
+      buildComparisonRow(
+        c,
+        maps,
+        windows.get(c.id),
+        matchedWindows.get(c.id),
+        pendingRevisions.get(c.id),
+      ),
+    )
     // Preserve the ordinary current row for mapping-review counts, while also
     // retaining the current *confirmed match* when a newer revision is pending
     // review. Comparable KPIs below then use the same population as analysis.
@@ -647,6 +740,7 @@ router.get("/catalog/comparison/summary", async (req, res) => {
     avgDiffPct,
     reviewCount: reviewRows.length,
     ambiguousCount: ambiguousRows.length,
+    pendingRevisionCount: rows.filter((r) => r.newerRevisionAwaitingReview).length,
     confidenceCounts,
     categoryWinRates,
   });
@@ -953,7 +1047,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
-  const conditions = [eq(competitorPricesTable.matchStatus, "matched")];
+  const conditions = [];
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
@@ -962,13 +1056,16 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     );
   }
 
-  const maps = await getPrayagMaps();
-
-  const matchedRows = await db
-    .select()
-    .from(competitorPricesTable)
-    .where(and(...conditions));
-  const competitorWindows = await getAllMatchedCompetitorWindows();
+  const [maps, allRows, revisionRows] = await Promise.all([
+    getPrayagMaps(),
+    db.select().from(competitorPricesTable).where(and(...conditions)),
+    db.select().from(competitorPricesTable),
+  ]);
+  const matchedRows = allRows.filter((row) => row.matchStatus === "matched");
+  const competitorWindows = getCompetitorWindows(
+    revisionRows.filter((row) => row.matchStatus === "matched"),
+  );
+  const pendingRevisions = getPendingRevisions(revisionRows);
   const currentMatchedRows = matchedRows.filter(
     (row) =>
       competitorWindows.get(row.id)?.isCurrent &&
@@ -990,6 +1087,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     upcomingPrice: number | null;
     upcomingEffectiveDate: string | null;
     upcomingChangePct: number | null;
+    newerRevisionAwaitingReview: boolean;
+    newerRevisionEffectiveDate: string | null;
+    newerRevisionReviewStatus: string | null;
   }
   interface Group {
     itemCode: string;
@@ -1027,6 +1127,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       upcomingPrice: priceWindow?.upcomingPrice ?? null,
       upcomingEffectiveDate: priceWindow?.upcomingEffectiveDate ?? null,
       upcomingChangePct: priceWindow?.upcomingChangePct ?? null,
+      newerRevisionAwaitingReview: pendingRevisions.has(c.id),
+      newerRevisionEffectiveDate: pendingRevisions.get(c.id)?.effectiveDate ?? null,
+      newerRevisionReviewStatus: pendingRevisions.get(c.id)?.reviewStatus ?? null,
     });
     g.byCompetitor.set(c.competitor, list);
   }
@@ -1064,6 +1167,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       upcomingPrice: number | null;
       upcomingEffectiveDate: string | null;
       upcomingChangePct: number | null;
+      newerRevisionAwaitingReview: boolean;
+      newerRevisionEffectiveDate: string | null;
+      newerRevisionReviewStatus: string | null;
     }
     const picks: Picked[] = [];
     for (const [competitor, candidates] of g.byCompetitor) {
@@ -1106,6 +1212,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           upcomingPrice: cand.upcomingPrice,
           upcomingEffectiveDate: cand.upcomingEffectiveDate,
           upcomingChangePct: cand.upcomingChangePct,
+          newerRevisionAwaitingReview: cand.newerRevisionAwaitingReview,
+          newerRevisionEffectiveDate: cand.newerRevisionEffectiveDate,
+          newerRevisionReviewStatus: cand.newerRevisionReviewStatus,
         };
         // Prefer rows that can be placed on the basis; among those, the cheapest.
         if (!best) best = candPick;
@@ -1147,6 +1256,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           upcomingPrice: p.upcomingPrice,
           upcomingEffectiveDate: p.upcomingEffectiveDate,
           upcomingChangePct: p.upcomingChangePct,
+          newerRevisionAwaitingReview: p.newerRevisionAwaitingReview,
+          newerRevisionEffectiveDate: p.newerRevisionEffectiveDate,
+          newerRevisionReviewStatus: p.newerRevisionReviewStatus,
         };
       })
       .sort((a, b) => a.competitor.localeCompare(b.competitor));

@@ -99,6 +99,7 @@ describe("market-gap report and analysis dashboard", () => {
       comparableSkus: 5,
       medianPriceDiffPct: 7,
       avgPriceDiffPct: -5.3,
+      pendingRevisionCount: 1,
     });
 
     type Readback = {
@@ -176,6 +177,48 @@ describe("market-gap report and analysis dashboard", () => {
     expect(summary.body).toMatchObject({
       comparableRows: 5,
       avgDiffPct: -5.3,
+      pendingRevisionCount: 1,
     });
-  });
+
+    const confirmedRow = await request.get(
+      `/catalog/comparison?${new URLSearchParams({
+        competitor: COMPETITOR,
+        search: ITEM_F,
+      })}`,
+    );
+    expect(confirmedRow.status).toBe(200);
+    expect(confirmedRow.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          competitorPrice: 107,
+          diffPct: 7,
+          newerRevisionAwaitingReview: true,
+          newerRevisionEffectiveDate: MRP_DATE,
+          newerRevisionReviewStatus: "needs_review",
+        }),
+      ]),
+    );
+
+    const exportResponse = await request.get(
+      `/analysis/export?${new URLSearchParams({
+        competitor: COMPETITOR,
+        effectivePeriod: AS_OF_DATE,
+        format: "csv",
+      })}`,
+    );
+    expect(exportResponse.status).toBe(200);
+    const exportRows = exportResponse.text
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => line.split(",").map((cell) => cell.replace(/^"|"$/g, "")));
+    const exportHeader = exportRows[0]!;
+    const itemRow = exportRows
+      .slice(1)
+      .find((row) => row[exportHeader.indexOf("Prayag Code")] === ITEM_F)!;
+    expect(itemRow[exportHeader.indexOf("Official Gap Note")]).toBe(
+      "Using confirmed price; newer revision awaits review",
+    );
+    expect(itemRow[exportHeader.indexOf("Newer Revision Effective Date")]).toBe(MRP_DATE);
+    expect(itemRow[exportHeader.indexOf("Newer Revision Review Status")]).toBe("needs_review");
+  }, 20_000);
 });

@@ -352,6 +352,18 @@ export interface ComparisonRow {
   upcomingCompetitorChangePct: number | null;
   /** True only for the latest row already in force; only these rows receive headline gaps. */
   competitorPriceIsCurrent: boolean;
+  /** True when this confirmed price still drives the official gap while a newer unconfirmed mapping for the same competitor and Prayag SKU awaits review. */
+  newerRevisionAwaitingReview?: boolean;
+  /**
+     * Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.
+     * @nullable
+     */
+  newerRevisionEffectiveDate?: string | null;
+  /**
+     * Review status of the newer revision, such as needs_review.
+     * @nullable
+     */
+  newerRevisionReviewStatus?: string | null;
   /** @nullable */
   matchedPrayagCode: string | null;
   matchStatus: string;
@@ -371,7 +383,10 @@ export interface ComparisonRow {
   upcomingPrayagEffectiveDate: string | null;
   /** @nullable */
   upcomingPrayagChangePct: number | null;
-  /** @nullable */
+  /**
+     * Canonical market gap: (competitor effective price - Prayag MRP) / Prayag MRP × 100. Positive means Prayag is cheaper.
+     * @nullable
+     */
   diffPct: number | null;
   /** @nullable */
   prayagCheaper: boolean | null;
@@ -386,7 +401,7 @@ export interface ComparisonRow {
      */
   prayagPerMetre?: number | null;
   /**
-     * (prayagPerMetre − compPerMetre) / compPerMetre × 100.
+     * (compPerMetre − prayagPerMetre) / prayagPerMetre × 100; positive means Prayag is cheaper.
      * @nullable
      */
   perMetreDiffPct?: number | null;
@@ -405,7 +420,7 @@ export interface ComparisonRow {
      */
   effectiveDiffPct?: number | null;
   /**
-     * True when effectiveDiffPct ≤ 0 (Prayag cheaper).
+     * True when effectiveDiffPct is positive (Prayag cheaper).
      * @nullable
      */
   effectivePrayagCheaper?: boolean | null;
@@ -431,13 +446,25 @@ export interface ProductComparisonCell {
   upcomingEffectiveDate: string | null;
   /** @nullable */
   upcomingChangePct: number | null;
+  /** True when this confirmed cell still drives the official gap while a newer revision awaits review. */
+  newerRevisionAwaitingReview?: boolean;
+  /**
+     * Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.
+     * @nullable
+     */
+  newerRevisionEffectiveDate?: string | null;
+  /**
+     * Review status of the newer revision.
+     * @nullable
+     */
+  newerRevisionReviewStatus?: string | null;
   /**
      * Competitor price reduced to ₹/metre, when length-normalizable.
      * @nullable
      */
   perMetre?: number | null;
   /**
-     * Diff% on the SKU's comparison basis (per metre when the Prayag SKU is length-based, else raw); null when this cell's unit is ambiguous.
+     * Diff% on the SKU's comparison basis (per metre when the Prayag SKU is length-based, else raw), using the canonical positive-is-Prayag-cheaper convention; null when this cell's unit is ambiguous.
      * @nullable
      */
   diffPct: number | null;
@@ -520,7 +547,10 @@ export interface ComparisonCategoryWinRate {
   prayagCheaper: number;
   /** @nullable */
   prayagCheaperPct: number | null;
-  /** @nullable */
+  /**
+     * Average canonical raw-MRP market gap. Per-metre normalization does not change this official KPI.
+     * @nullable
+     */
   avgDiffPct?: number | null;
 }
 
@@ -545,6 +575,8 @@ export interface ComparisonSummary {
   reviewCount: number;
   /** Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and therefore excluded from KPIs and flagged for manual review. */
   ambiguousCount?: number;
+  /** Confirmed market prices still used in official gaps while a newer revision for the same quote awaits review. */
+  pendingRevisionCount: number;
   confidenceCounts?: ConfidenceCounts;
   categoryWinRates: ComparisonCategoryWinRate[];
 }
@@ -761,6 +793,8 @@ export interface AnalysisOverview {
      * @nullable
      */
   competitorPeriodDate: string | null;
+  /** Confirmed market prices still used while a newer revision awaits review. */
+  pendingRevisionCount: number;
 }
 
 export interface AnalysisBrandStat {
@@ -893,6 +927,18 @@ export interface AnalysisOpportunityItem {
      * @nullable
      */
   upcomingCompetitorChangePct?: number | null;
+  /** True when this official gap still uses a confirmed price while a newer revision awaits review. */
+  newerRevisionAwaitingReview?: boolean;
+  /**
+     * Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.
+     * @nullable
+     */
+  newerRevisionEffectiveDate?: string | null;
+  /**
+     * Review status of the newer revision.
+     * @nullable
+     */
+  newerRevisionReviewStatus?: string | null;
 }
 
 export interface AnalysisOpportunities {

@@ -12,7 +12,7 @@ import {
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler, Clock3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
@@ -98,6 +98,25 @@ function AmbiguousBadge({ note }: { note?: string | null }) {
       <AlertTriangle className="w-3 h-3" />
       Review
     </span>
+  );
+}
+
+function PendingRevisionNote({
+  effectiveDate,
+  reviewStatus,
+}: {
+  effectiveDate?: string | null;
+  reviewStatus?: string | null;
+}) {
+  if (!effectiveDate || !reviewStatus) return null;
+  return (
+    <div
+      title="The official gap still uses the confirmed price shown above."
+      className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300 cursor-help"
+    >
+      <Clock3 className="w-3 h-3 shrink-0" />
+      <span>Confirmed price used · newer {effectiveDate} revision: {reviewStatus}</span>
+    </div>
   );
 }
 
@@ -264,7 +283,7 @@ export default function ComparisonPage() {
       </div>
 
       {!summaryLoading && summaryData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
           <div className="bg-card border rounded-lg p-5">
             <div className="text-sm text-muted-foreground mb-1 flex items-center gap-2">
               <Scale className="w-4 h-4" />
@@ -339,6 +358,18 @@ export default function ComparisonPage() {
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               Ambiguous unit basis (per pc/mtr/ft)
+            </div>
+          </div>
+          <div className="bg-card border border-amber-200 dark:border-amber-900/60 rounded-lg p-5">
+            <div className="text-sm text-muted-foreground mb-1 flex items-center gap-2">
+              <Clock3 className="w-4 h-4 text-amber-600" />
+              Newer Revision in Review
+            </div>
+            <div className="text-3xl font-bold font-mono text-amber-700 dark:text-amber-300">
+              {summaryData.pendingRevisionCount ?? 0}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Official gaps still use confirmed prices
             </div>
           </div>
         </div>
@@ -559,6 +590,12 @@ export default function ComparisonPage() {
                                 upcomingChangePct={cell.upcomingChangePct}
                                 className="mt-1 min-w-[190px]"
                               />
+                              {cell.newerRevisionAwaitingReview && (
+                                <PendingRevisionNote
+                                  effectiveDate={cell.newerRevisionEffectiveDate}
+                                  reviewStatus={cell.newerRevisionReviewStatus}
+                                />
+                              )}
                               <div className="mt-1 flex justify-end">
                                 {cell.unitAmbiguous ? (
                                   <AmbiguousBadge />
@@ -676,6 +713,12 @@ export default function ComparisonPage() {
                             upcomingChangePct={row.upcomingCompetitorChangePct}
                             className="mt-1 min-w-[190px]"
                           />
+                          {row.newerRevisionAwaitingReview && (
+                            <PendingRevisionNote
+                              effectiveDate={row.newerRevisionEffectiveDate}
+                              reviewStatus={row.newerRevisionReviewStatus}
+                            />
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {isMapped ? (

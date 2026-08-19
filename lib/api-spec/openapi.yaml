@@ -1958,6 +1958,17 @@ components:
         competitorPriceIsCurrent:
           type: boolean
           description: True only for the latest row already in force; only these rows receive headline gaps.
+        newerRevisionAwaitingReview:
+          type: boolean
+          description: >-
+            True when this confirmed price still drives the official gap while a
+            newer unconfirmed mapping for the same competitor and Prayag SKU awaits review.
+        newerRevisionEffectiveDate:
+          type: ["string", "null"]
+          description: Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.
+        newerRevisionReviewStatus:
+          type: ["string", "null"]
+          description: Review status of the newer revision, such as needs_review.
         matchedPrayagCode:
           type: ["string", "null"]
         matchStatus:
@@ -2054,6 +2065,15 @@ components:
           type: ["string", "null"]
         upcomingChangePct:
           type: ["number", "null"]
+        newerRevisionAwaitingReview:
+          type: boolean
+          description: True when this confirmed cell still drives the official gap while a newer revision awaits review.
+        newerRevisionEffectiveDate:
+          type: ["string", "null"]
+          description: Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.
+        newerRevisionReviewStatus:
+          type: ["string", "null"]
+          description: Review status of the newer revision.
         perMetre:
           type: ["number", "null"]
           description: Competitor price reduced to ₹/metre, when length-normalizable.
@@ -2188,6 +2208,7 @@ components:
         - prayagCheaperCount
         - prayagCheaperPct
         - reviewCount
+        - pendingRevisionCount
         - categoryWinRates
       properties:
         competitor:
@@ -2211,6 +2232,11 @@ components:
           description: >-
             Rows whose unit basis (per pc vs per mtr vs per ft) is ambiguous and
             therefore excluded from KPIs and flagged for manual review.
+        pendingRevisionCount:
+          type: integer
+          description: >-
+            Confirmed market prices still used in official gaps while a newer
+            revision for the same quote awaits review.
         confidenceCounts:
           $ref: "#/components/schemas/ConfidenceCounts"
         categoryWinRates:
@@ -2517,6 +2543,7 @@ components:
         - matchQuality
         - prayagMrpDate
         - competitorPeriodDate
+        - pendingRevisionCount
       properties:
         totalSkus:
           type: integer
@@ -2550,6 +2577,9 @@ components:
         competitorPeriodDate:
           type: ["string", "null"]
           description: Effective date of the competitor period used for this overview.
+        pendingRevisionCount:
+          type: integer
+          description: Confirmed market prices still used while a newer revision awaits review.
     AnalysisBrandStat:
       type: object
       required:
@@ -2748,6 +2778,15 @@ components:
         upcomingCompetitorChangePct:
           type: ["number", "null"]
           description: One-decimal current-to-next competitor change; zero is retained.
+        newerRevisionAwaitingReview:
+          type: boolean
+          description: True when this official gap still uses a confirmed price while a newer revision awaits review.
+        newerRevisionEffectiveDate:
+          type: ["string", "null"]
+          description: Effective date (YYYY-MM-DD) of the newer unconfirmed revision, if any.
+        newerRevisionReviewStatus:
+          type: ["string", "null"]
+          description: Review status of the newer revision.
     AnalysisOpportunities:
       type: object
       required: [thresholdPct, marginHeadroom, priceThreats, prayagMrpDate]

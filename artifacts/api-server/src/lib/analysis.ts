@@ -117,6 +117,9 @@ export interface CompInput {
   upcomingEffectiveDate?: string | null;
   upcomingPriceBasis?: string | null;
   upcomingGstPct?: number | null;
+  /** A newer unconfirmed competitor mapping for this same quote. */
+  newerRevisionEffectiveDate?: string | null;
+  newerRevisionReviewStatus?: string | null;
 }
 
 export interface AnalysisRow {
@@ -150,6 +153,10 @@ export interface AnalysisRow {
   upcomingCompetitorEffectivePrice: number | null;
   upcomingCompetitorPriceDate: string | null;
   upcomingCompetitorChangePct: number | null;
+  /** True when the official gap still uses this confirmed quote. */
+  newerRevisionAwaitingReview: boolean;
+  newerRevisionEffectiveDate: string | null;
+  newerRevisionReviewStatus: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,6 +278,11 @@ export function buildRow(
       competitorBasis,
       upcomingCompetitorBasis,
     ),
+    newerRevisionAwaitingReview:
+      c.newerRevisionEffectiveDate != null &&
+      c.newerRevisionReviewStatus != null,
+    newerRevisionEffectiveDate: c.newerRevisionEffectiveDate ?? null,
+    newerRevisionReviewStatus: c.newerRevisionReviewStatus ?? null,
   };
 }
 
@@ -477,5 +489,8 @@ export function toOpportunityItem(r: AnalysisRow) {
         : round1(r.upcomingCompetitorEffectivePrice),
     upcomingCompetitorPriceDate: r.upcomingCompetitorPriceDate,
     upcomingCompetitorChangePct: r.upcomingCompetitorChangePct,
+    newerRevisionAwaitingReview: r.newerRevisionAwaitingReview,
+    newerRevisionEffectiveDate: r.newerRevisionEffectiveDate,
+    newerRevisionReviewStatus: r.newerRevisionReviewStatus,
   };
 }
