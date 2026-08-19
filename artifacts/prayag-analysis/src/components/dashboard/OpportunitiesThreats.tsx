@@ -19,6 +19,51 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronRight, TrendingUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+function shortDate(value?: string | null): string {
+  if (!value) return "date unavailable";
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function validityLabel(from?: string | null, to?: string | null): string | null {
+  if (!from) return null;
+  return to
+    ? `Valid ${shortDate(from)} – ${shortDate(to)}`
+    : `Valid from ${shortDate(from)}`;
+}
+
+function RevisionLine({
+  current,
+  next,
+  nextDate,
+  changePct,
+}: {
+  current?: number | null;
+  next?: number | null;
+  nextDate?: string | null;
+  changePct?: number | null;
+}) {
+  if (current == null || next == null || !nextDate) return null;
+  const unchanged = current === next;
+  return (
+    <div className="mt-0.5 whitespace-nowrap text-[10px] font-normal text-orange-600">
+      {unchanged
+        ? `No change on ${shortDate(nextDate)}`
+        : `${next > current ? "↑" : "↓"} ₹${next.toFixed(2)} on ${shortDate(nextDate)}${
+            changePct == null
+              ? ""
+              : ` (${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%)`
+          }`}
+    </div>
+  );
+}
+
 export function OpportunitiesThreats({ filters }: { filters: DashboardFilters }) {
   const [thresholdPct, setThresholdPct] = useState(10);
 
@@ -130,15 +175,30 @@ function OpportunityTable({ items, isThreat, prayagMrpDate }: { items: AnalysisO
                   </TableCell>
                   <TableCell className="text-right">
                     <div>₹{item.prayagMrp?.toFixed(2) ?? '-'}</div>
-                    {item.upcomingPrayagMrp != null && item.upcomingPrayagMrpDate && (
-                      <div className="text-[10px] text-orange-600 font-normal mt-0.5 whitespace-nowrap">
-                        ↑ ₹{item.upcomingPrayagMrp.toFixed(2)} w.e.f. {item.upcomingPrayagMrpDate}
-                      </div>
-                    )}
+                    <div className="mt-0.5 whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                      {validityLabel(item.prayagEffectiveDate, item.prayagValidTo)}
+                    </div>
+                    <RevisionLine
+                      current={item.prayagMrp}
+                      next={item.upcomingPrayagMrp}
+                      nextDate={item.upcomingPrayagMrpDate}
+                      changePct={item.upcomingPrayagChangePct}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
-                    ₹{item.competitorEffectivePrice?.toFixed(2) ?? '-'}
-                    {item.unit && <span className="text-xs text-muted-foreground ml-1">/{item.unit}</span>}
+                    <div>
+                      ₹{item.competitorEffectivePrice?.toFixed(2) ?? '-'}
+                      {item.unit && <span className="text-xs text-muted-foreground ml-1">/{item.unit}</span>}
+                    </div>
+                    <div className="mt-0.5 whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                      {validityLabel(item.competitorEffectiveDate, item.competitorValidTo)}
+                    </div>
+                    <RevisionLine
+                      current={item.competitorEffectivePrice}
+                      next={item.upcomingCompetitorEffectivePrice}
+                      nextDate={item.upcomingCompetitorPriceDate}
+                      changePct={item.upcomingCompetitorChangePct}
+                    />
                   </TableCell>
                   <TableCell className={`text-right font-bold ${isThreat ? 'text-destructive' : 'text-success'}`}>
                     {item.priceDiffPct > 0 ? "+" : ""}{item.priceDiffPct.toFixed(1)}%

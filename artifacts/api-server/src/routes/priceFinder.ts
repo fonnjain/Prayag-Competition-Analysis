@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
+import { priceChangePct, validToFromNextDate } from "../lib/priceWindow.js";
 
 const router: IRouter = Router();
 
@@ -12,9 +13,26 @@ type SearchRow = {
   size: string | null;
   current_mrp: number | null;
   current_effective_date: string | null;
+  upcoming_mrp: number | null;
+  upcoming_effective_date: string | null;
   has_competitor_data: boolean;
 };
 
+function toSearchResult(row: SearchRow) {
+  return {
+    itemCode: row.item_code,
+    productName: row.product_name,
+    division: row.division,
+    category: row.category,
+    currentMrp: row.current_mrp,
+    currentEffectiveDate: row.current_effective_date,
+    currentValidTo: validToFromNextDate(row.upcoming_effective_date),
+    upcomingMrp: row.upcoming_mrp,
+    upcomingEffectiveDate: row.upcoming_effective_date,
+    upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
+    hasCompetitorData: row.has_competitor_data,
+  };
+}
 function normalise(value: string): string {
   return value.toLowerCase().replace(/[\s\-_.]/g, "");
 }
@@ -175,9 +193,7 @@ function getFilterTerms(req: Request): string[] {
 }
 
 function searchScore(row: SearchRow, query: string): number {
-  const queries = [query, normaliseSpokenQuery(query)].filter(
-    (candidate, index, all) => candidate && all.indexOf(candidate) === index,
-  );
+  const queries = filterVariants(query);
   const code = normalise(row.item_code);
   const name = normalise(row.product_name ?? "");
   const division = normalise(row.division ?? "");
@@ -201,17 +217,8 @@ function searchScore(row: SearchRow, query: string): number {
   );
 }
 
-router.get("/price-finder/search", async (req, res) => {
-  const filters = getFilterTerms(req);
-  if (filters.length === 0) {
-    res.json({ results: [], totalCount: 0, filterSuggestions: [], unmatchedFilters: [] });
-    return;
-  }
-
-  const rawLimit = Number(req.query.limit);
-  const limit = Math.min(3000, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 3000));
+async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
   const filterConditions = filters.map(filterCondition);
-
   const result = await db.execute<SearchRow>(sql`
     SELECT
       p.item_code,
@@ -221,6 +228,8 @@ router.get("/price-finder/search", async (req, res) => {
       p.size,
       current_price.mrp AS current_mrp,
       current_price.effective_date AS current_effective_date,
+      upcoming_price.mrp AS upcoming_mrp,
+      upcoming_price.effective_date AS upcoming_effective_date,
       EXISTS (
         SELECT 1
         FROM competitor_prices cp
@@ -238,14 +247,50 @@ router.get("/price-finder/search", async (req, res) => {
       ORDER BY h.effective_date DESC, h.id DESC
       LIMIT 1
     ) current_price ON true
+    LEFT JOIN LATERAL (
+      SELECT h.mrp, h.effective_date
+      FROM mrp_price_history h
+      WHERE h.item_code = p.item_code
+        AND h.effective_date > CURRENT_DATE
+        AND h.mrp IS NOT NULL
+      ORDER BY h.effective_date ASC, h.id DESC
+      LIMIT 1
+    ) upcoming_price ON true
     WHERE p.is_active IS TRUE
       AND ${sql.join(filterConditions, sql` AND `)}
   `);
+  return result.rows;
+}
 
-  const results = result.rows
+router.get("/price-finder/search", async (req, res) => {
+  const filters = getFilterTerms(req);
+  if (filters.length === 0) {
+    res.json({ results: [], totalCount: 0, filterSuggestions: [], unmatchedFilters: [] });
+    return;
+  }
+
+  const rawLimit = Number(req.query.limit);
+  const limit = Math.min(3000, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 3000));
+  const acceptedFilters: string[] = [];
+  let searchRows: SearchRow[] = [];
+  const unmatchedFilters: string[] = [];
+  for (const filter of filters) {
+    const narrowedRows = await findSearchRows([...acceptedFilters, filter]);
+    if (narrowedRows.length === 0) {
+      unmatchedFilters.push(filter);
+      break;
+    }
+    acceptedFilters.push(filter);
+    searchRows = narrowedRows;
+  }
+
+  const results = searchRows
     .map((row) => ({
       row,
-      score: filters.reduce((total, filter) => total + searchScore(row, filter), 0),
+      score: acceptedFilters.reduce(
+        (total, filter) => total + searchScore(row, filter),
+        0,
+      ),
     }))
     .filter(({ score }) => score > 0)
     .sort(
@@ -256,15 +301,7 @@ router.get("/price-finder/search", async (req, res) => {
         }),
     )
     .slice(0, limit)
-    .map(({ row }) => ({
-      itemCode: row.item_code,
-      productName: row.product_name,
-      division: row.division,
-      category: row.category,
-      currentMrp: row.current_mrp,
-      currentEffectiveDate: row.current_effective_date,
-      hasCompetitorData: row.has_competitor_data,
-    }));
+    .map(({ row }) => toSearchResult(row));
 
   const suggestionFields = [
     { field: "Series", key: "category" as const },
@@ -274,7 +311,7 @@ router.get("/price-finder/search", async (req, res) => {
   const filterSuggestions = suggestionFields
     .map(({ field, key }) => {
       const counts = new Map<string, number>();
-      for (const row of result.rows) {
+      for (const row of searchRows) {
         const value = row[key]?.trim();
         if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
       }
@@ -290,9 +327,9 @@ router.get("/price-finder/search", async (req, res) => {
 
   res.json({
     results,
-    totalCount: result.rows.length,
+    totalCount: searchRows.length,
     filterSuggestions,
-    unmatchedFilters: result.rows.length === 0 ? [filters.at(-1)] : [],
+    unmatchedFilters,
   });
 });
 
@@ -368,6 +405,8 @@ router.get("/price-finder/browse", async (req, res) => {
         p.category,
         current_price.mrp AS current_mrp,
         current_price.effective_date AS current_effective_date,
+        upcoming_price.mrp AS upcoming_mrp,
+        upcoming_price.effective_date AS upcoming_effective_date,
         EXISTS (
           SELECT 1
           FROM competitor_prices cp
@@ -385,6 +424,15 @@ router.get("/price-finder/browse", async (req, res) => {
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
+      LEFT JOIN LATERAL (
+        SELECT h.mrp, h.effective_date
+        FROM mrp_price_history h
+        WHERE h.item_code = p.item_code
+          AND h.effective_date > CURRENT_DATE
+          AND h.mrp IS NOT NULL
+        ORDER BY h.effective_date ASC, h.id DESC
+        LIMIT 1
+      ) upcoming_price ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND ${categoryCondition}
         AND p.is_active IS TRUE
@@ -400,15 +448,7 @@ router.get("/price-finder/browse", async (req, res) => {
       count: Number(row.count),
     })),
     categories,
-    products: products.map((row) => ({
-      itemCode: row.item_code,
-      productName: row.product_name,
-      division: row.division,
-      category: row.category,
-      currentMrp: row.current_mrp,
-      currentEffectiveDate: row.current_effective_date,
-      hasCompetitorData: row.has_competitor_data,
-    })),
+    products: products.map(toSearchResult),
   });
 });
 
@@ -429,6 +469,8 @@ type CompetitorRow = {
   effective_date: string | null;
   price_basis: string | null;
   gst_pct: number | null;
+  upcoming_price: number | null;
+  upcoming_effective_date: string | null;
 };
 
 router.get(
@@ -460,7 +502,8 @@ router.get(
         FROM mrp_price_history h
         WHERE h.item_code = p.item_code
           AND h.effective_date > CURRENT_DATE
-        ORDER BY h.effective_date ASC, h.id ASC
+          AND h.mrp IS NOT NULL
+        ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
       ) upcoming_price ON true
       WHERE p.item_code = ${itemCode}
@@ -475,21 +518,50 @@ router.get(
     }
 
     const competitors = await db.execute<CompetitorRow>(sql`
-      SELECT DISTINCT ON (cp.competitor)
-        cp.competitor,
+      SELECT
+        brands.competitor,
         CASE
-          WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
-            THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
-          ELSE cp.price
+          WHEN lower(coalesce(current_price.price_basis, '')) = 'ex-gst'
+            THEN current_price.price * (1 + coalesce(current_price.gst_pct, 18) / 100.0)
+          ELSE current_price.price
         END AS price,
-        cp.effective_date,
-        cp.price_basis,
-        cp.gst_pct
-      FROM competitor_prices cp
-      WHERE cp.matched_prayag_code = ${product.item_code}
-        AND cp.price IS NOT NULL
-        AND cp.effective_date <= CURRENT_DATE
-      ORDER BY cp.competitor, cp.effective_date DESC, cp.id DESC
+        current_price.effective_date,
+        current_price.price_basis,
+        current_price.gst_pct,
+        CASE
+          WHEN lower(coalesce(upcoming_price.price_basis, '')) = 'ex-gst'
+            THEN upcoming_price.price * (1 + coalesce(upcoming_price.gst_pct, 18) / 100.0)
+          ELSE upcoming_price.price
+        END AS upcoming_price,
+        upcoming_price.effective_date AS upcoming_effective_date
+      FROM (
+        SELECT DISTINCT cp.competitor
+        FROM competitor_prices cp
+        WHERE cp.matched_prayag_code = ${product.item_code}
+          AND cp.price IS NOT NULL
+          AND cp.effective_date <= CURRENT_DATE
+      ) brands
+      JOIN LATERAL (
+        SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
+        FROM competitor_prices cp
+        WHERE cp.competitor = brands.competitor
+          AND cp.matched_prayag_code = ${product.item_code}
+          AND cp.price IS NOT NULL
+          AND cp.effective_date <= CURRENT_DATE
+        ORDER BY cp.effective_date DESC, cp.id DESC
+        LIMIT 1
+      ) current_price ON true
+      LEFT JOIN LATERAL (
+        SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
+        FROM competitor_prices cp
+        WHERE cp.competitor = brands.competitor
+          AND cp.matched_prayag_code = ${product.item_code}
+          AND cp.price IS NOT NULL
+          AND cp.effective_date > CURRENT_DATE
+        ORDER BY cp.effective_date ASC, cp.id DESC
+        LIMIT 1
+      ) upcoming_price ON true
+      ORDER BY brands.competitor
     `);
 
     const prayagMrp = product.current_mrp;
@@ -513,7 +585,11 @@ router.get(
           competitor: row.competitor,
           price: row.price,
           effectiveDate: row.effective_date,
+          validTo: validToFromNextDate(row.upcoming_effective_date),
           priceBasis: row.price_basis,
+          upcomingPrice: row.upcoming_price,
+          upcomingEffectiveDate: row.upcoming_effective_date,
+          upcomingChangePct: priceChangePct(row.price, row.upcoming_price),
           gapPct,
           message,
         };
@@ -528,8 +604,10 @@ router.get(
         category: product.category,
         currentMrp: product.current_mrp,
         currentEffectiveDate: product.current_effective_date,
+        currentValidTo: validToFromNextDate(product.upcoming_effective_date),
         upcomingMrp: product.upcoming_mrp,
         upcomingEffectiveDate: product.upcoming_effective_date,
+        upcomingChangePct: priceChangePct(product.current_mrp, product.upcoming_mrp),
       },
       competitors: competitorItems,
     });

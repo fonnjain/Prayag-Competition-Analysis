@@ -97,7 +97,7 @@ describe("OverviewCards — competitorPeriodDate callback", () => {
     await waitFor(() => expect(spy).toHaveBeenLastCalledWith("2026-03-10"));
   });
 
-  it("calls the callback with null when data is not yet available (loading state)", async () => {
+  it("calls the callback with undefined when data is not yet available (loading state)", async () => {
     // When the hook is loading, `data` is undefined.  The effect fires with
     // null so the parent can clear any stale chip date immediately.
     setupHook(null, /* isLoading */ true);
@@ -105,6 +105,6 @@ describe("OverviewCards — competitorPeriodDate callback", () => {
 
     render(<OverviewCards filters={{}} onCompetitorPeriodDate={spy} />);
 
-    await waitFor(() => expect(spy).toHaveBeenCalledWith(null));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(undefined));
   });
 });

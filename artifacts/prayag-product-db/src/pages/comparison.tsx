@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { PriceWindowDetails } from "@/components/price-window";
 
 const PAGE_SIZE = 50;
 
@@ -479,6 +480,16 @@ export default function ComparisonPage() {
                                   ₹{row.prayagPerMetre.toFixed(2)}/m
                                 </div>
                               )}
+                              <PriceWindowDetails
+                                compact
+                                currentPrice={row.prayagMrp}
+                                validFrom={row.prayagEffectiveDate}
+                                validTo={row.prayagValidTo}
+                                upcomingPrice={row.upcomingPrayagMrp}
+                                upcomingEffectiveDate={row.upcomingPrayagEffectiveDate}
+                                upcomingChangePct={row.upcomingPrayagChangePct}
+                                className="mt-1 min-w-[190px]"
+                              />
                             </>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -503,6 +514,16 @@ export default function ComparisonPage() {
                                   ₹{cell.perMetre.toFixed(2)}/m
                                 </div>
                               )}
+                              <PriceWindowDetails
+                                compact
+                                currentPrice={cell.price}
+                                validFrom={cell.effectiveDate}
+                                validTo={cell.validTo}
+                                upcomingPrice={cell.upcomingPrice}
+                                upcomingEffectiveDate={cell.upcomingEffectiveDate}
+                                upcomingChangePct={cell.upcomingChangePct}
+                                className="mt-1 min-w-[190px]"
+                              />
                               <div className="mt-1 flex justify-end">
                                 {cell.unitAmbiguous ? (
                                   <AmbiguousBadge />
@@ -610,6 +631,16 @@ export default function ComparisonPage() {
                               ₹{row.compPerMetre.toFixed(2)}/m
                             </div>
                           )}
+                          <PriceWindowDetails
+                            compact
+                            currentPrice={row.competitorPrice}
+                            validFrom={row.effectiveDate}
+                            validTo={row.competitorValidTo}
+                            upcomingPrice={row.upcomingCompetitorPrice}
+                            upcomingEffectiveDate={row.upcomingCompetitorEffectiveDate}
+                            upcomingChangePct={row.upcomingCompetitorChangePct}
+                            className="mt-1 min-w-[190px]"
+                          />
                         </td>
                         <td className="px-4 py-3">
                           {isMapped ? (
@@ -644,6 +675,16 @@ export default function ComparisonPage() {
                                   ₹{row.prayagPerMetre.toFixed(2)}/m
                                 </div>
                               )}
+                              <PriceWindowDetails
+                                compact
+                                currentPrice={row.prayagMrp}
+                                validFrom={row.prayagEffectiveDate}
+                                validTo={row.prayagValidTo}
+                                upcomingPrice={row.upcomingPrayagMrp}
+                                upcomingEffectiveDate={row.upcomingPrayagEffectiveDate}
+                                upcomingChangePct={row.upcomingPrayagChangePct}
+                                className="mt-1 min-w-[190px]"
+                              />
                             </>
                           ) : (
                             <span className="text-muted-foreground">-</span>

@@ -17,6 +17,7 @@ import {
   normalizePerMetre,
   type NormResult,
 } from "../lib/priceNormalize";
+import { priceChangePct, validToFromNextDate } from "../lib/priceWindow";
 
 const router: IRouter = Router();
 
@@ -56,6 +57,10 @@ function sendSheet(
 interface PrayagInfo {
   mrp: number | null;
   effectiveDate: string | null;
+  validTo: string | null;
+  upcomingMrp: number | null;
+  upcomingEffectiveDate: string | null;
+  upcomingChangePct: number | null;
   productName: string | null;
 }
 
@@ -67,28 +72,49 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   type PriceRow = { item_code: string; mrp: number | null; effective_date: string | null };
 
-  const [currentResult, products] = await Promise.all([
+  const [currentResult, upcomingResult, products] = await Promise.all([
     db.execute<PriceRow>(sql`
       SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
       FROM mrp_price_history
       WHERE effective_date <= ${todayStr}
+        AND mrp IS NOT NULL
       ORDER BY item_code, effective_date DESC, id DESC
+    `),
+    db.execute<PriceRow>(sql`
+      SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
+      FROM mrp_price_history
+      WHERE effective_date > ${todayStr}
+        AND mrp IS NOT NULL
+      ORDER BY item_code, effective_date ASC, id DESC
     `),
     db.select({
       itemCode: catalogProductsTable.itemCode,
       productName: catalogProductsTable.productName,
-    }).from(catalogProductsTable),
+    })
+      .from(catalogProductsTable)
+      .where(eq(catalogProductsTable.isActive, true)),
   ]);
 
   const nameMap = new Map<string, string | null>();
   for (const p of products) nameMap.set(normCode(p.itemCode), p.productName);
 
+  const upcomingMap = new Map<string, PriceRow>();
+  for (const row of upcomingResult.rows) {
+    upcomingMap.set(normCode(row.item_code), row);
+  }
+
   const map = new Map<string, PrayagInfo>();
   for (const c of currentResult.rows) {
     const key = normCode(c.item_code);
+    if (!nameMap.has(key)) continue;
+    const upcoming = upcomingMap.get(key);
     map.set(key, {
       mrp: c.mrp,
       effectiveDate: c.effective_date,
+      validTo: validToFromNextDate(upcoming?.effective_date ?? null),
+      upcomingMrp: upcoming?.mrp ?? null,
+      upcomingEffectiveDate: upcoming?.effective_date ?? null,
+      upcomingChangePct: priceChangePct(c.mrp, upcoming?.mrp ?? null),
       productName: nameMap.get(key) ?? null,
     });
   }
@@ -99,6 +125,10 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
       map.set(key, {
         mrp: null,
         effectiveDate: null,
+        validTo: null,
+        upcomingMrp: null,
+        upcomingEffectiveDate: null,
+        upcomingChangePct: null,
         productName: p.productName,
       });
     }
@@ -145,13 +175,99 @@ async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
 
 type CompRow = typeof competitorPricesTable.$inferSelect;
 
-function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
+interface CompetitorWindow {
+  isCurrent: boolean;
+  validTo: string | null;
+  upcomingPrice: number | null;
+  upcomingEffectiveDate: string | null;
+  upcomingChangePct: number | null;
+}
+
+function competitorWindowKey(row: CompRow): string {
+  const mapping = row.matchedPrayagCode
+    ? `matched:${normCode(row.matchedPrayagCode)}`
+    : `unmatched:${row.competitorCode ?? ""}:${row.description ?? ""}:${row.size ?? ""}`;
+  return `${row.competitor}\u0000${mapping}`;
+}
+
+function getCompetitorWindows(rows: CompRow[]): Map<number, CompetitorWindow> {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const groups = new Map<string, CompRow[]>();
+  for (const row of rows) {
+    const key = competitorWindowKey(row);
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
+
+  const result = new Map<number, CompetitorWindow>();
+  for (const list of groups.values()) {
+    const revisionsByDate = new Map<string, CompRow>();
+    for (const row of list) {
+      if (row.effectiveDate == null || row.price == null) continue;
+      const existing = revisionsByDate.get(row.effectiveDate);
+      if (!existing || row.id > existing.id) {
+        revisionsByDate.set(row.effectiveDate, row);
+      }
+    }
+    const revisions = [...revisionsByDate.values()].sort((a, b) =>
+      a.effectiveDate!.localeCompare(b.effectiveDate!),
+    );
+    const current =
+      revisions.filter((row) => row.effectiveDate! <= todayStr).at(-1);
+
+    for (const row of list) {
+      const isWinningRevision =
+        row.effectiveDate != null &&
+        row.price != null &&
+        revisionsByDate.get(row.effectiveDate)?.id === row.id;
+      const next =
+        !isWinningRevision
+          ? undefined
+          : revisions.find(
+              (candidate) => candidate.effectiveDate! > row.effectiveDate!,
+            );
+      result.set(row.id, {
+        isCurrent: isWinningRevision && row.id === current?.id,
+        validTo:
+          !isWinningRevision
+            ? null
+            : validToFromNextDate(next?.effectiveDate ?? null),
+        upcomingPrice: !isWinningRevision ? null : (next?.price ?? null),
+        upcomingEffectiveDate:
+          !isWinningRevision ? null : (next?.effectiveDate ?? null),
+        upcomingChangePct:
+          !isWinningRevision
+            ? null
+            : priceChangePct(row.price, next?.price ?? null),
+      });
+    }
+  }
+  return result;
+}
+
+async function getAllCompetitorWindows(): Promise<Map<number, CompetitorWindow>> {
+  const rows = await db.select().from(competitorPricesTable);
+  return getCompetitorWindows(rows);
+}
+
+function buildComparisonRow(
+  c: CompRow,
+  maps: Map<string, PrayagInfo>,
+  window?: CompetitorWindow,
+) {
   const key = c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
   const prayagMrp = prayag?.mrp ?? null;
   let diffPct: number | null = null;
   let prayagCheaper: boolean | null = null;
-  if (prayagMrp != null && c.price != null && c.price > 0) {
+  if (
+    (window?.isCurrent ?? true) &&
+    prayagMrp != null &&
+    c.price != null &&
+    c.price > 0
+  ) {
     diffPct = Math.round(((prayagMrp - c.price) / c.price) * 1000) / 10;
     prayagCheaper = prayagMrp <= c.price;
   }
@@ -171,7 +287,9 @@ function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
           unit: c.unit,
           price: c.price,
         });
-  const effectiveDiffPct = norm.unitAmbiguous
+  const effectiveDiffPct = !(window?.isCurrent ?? true)
+    ? null
+    : norm.unitAmbiguous
     ? null
     : norm.lengthNormalized
       ? norm.perMetreDiffPct
@@ -188,12 +306,21 @@ function buildComparisonRow(c: CompRow, maps: Map<string, PrayagInfo>) {
     competitorPrice: c.price,
     unit: c.unit,
     effectiveDate: c.effectiveDate,
+    competitorValidTo: window?.validTo ?? null,
+    upcomingCompetitorPrice: window?.upcomingPrice ?? null,
+    upcomingCompetitorEffectiveDate: window?.upcomingEffectiveDate ?? null,
+    upcomingCompetitorChangePct: window?.upcomingChangePct ?? null,
+    competitorPriceIsCurrent: window?.isCurrent ?? true,
     matchedPrayagCode: c.matchedPrayagCode,
     matchStatus: c.matchStatus,
     matchConfidence: c.matchConfidence,
     prayagProductName: prayag?.productName ?? null,
     prayagMrp,
     prayagEffectiveDate: prayag?.effectiveDate ?? null,
+    prayagValidTo: prayag?.validTo ?? null,
+    upcomingPrayagMrp: prayag?.upcomingMrp ?? null,
+    upcomingPrayagEffectiveDate: prayag?.upcomingEffectiveDate ?? null,
+    upcomingPrayagChangePct: prayag?.upcomingChangePct ?? null,
     diffPct,
     prayagCheaper,
     compPerMetre: norm.compPerMetre,
@@ -246,7 +373,8 @@ router.get("/catalog/comparison", async (req, res) => {
     asc(competitorPricesTable.id),
   );
 
-  let rows = all.map((c) => buildComparisonRow(c, maps));
+  const windows = await getAllCompetitorWindows();
+  let rows = all.map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
   if (ambiguousOnly) rows = rows.filter((r) => r.unitAmbiguous);
 
@@ -284,7 +412,8 @@ router.get("/catalog/comparison/export", async (req, res) => {
     asc(competitorPricesTable.id),
   );
 
-  let rows = all.map((c) => buildComparisonRow(c, maps));
+  const windows = await getAllCompetitorWindows();
+  let rows = all.map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
 
   const header = [
@@ -292,14 +421,23 @@ router.get("/catalog/comparison/export", async (req, res) => {
     "Category",
     "Description",
     "Size",
-    "Competitor Price",
+    "Competitor Price (Row Period)",
     "Unit",
-    "Effective Date",
+    "Competitor Valid From",
+    "Competitor Valid To",
+    "Competitor Next Price",
+    "Competitor Next Effective Date",
+    "Competitor Next Change %",
+    "Competitor Price Is Current",
     "Prayag Code",
     "Prayag Product Name",
-    "Prayag MRP",
-    "Prayag Effective Date",
-    "Diff %",
+    "Prayag Current MRP",
+    "Prayag Current Valid From",
+    "Prayag Current Valid To",
+    "Prayag Next MRP",
+    "Prayag Next Effective Date",
+    "Prayag Next Change %",
+    "Current-vs-Current Diff %",
     "Competitor ₹/m",
     "Prayag ₹/m",
     "Per-metre Diff %",
@@ -316,10 +454,19 @@ router.get("/catalog/comparison/export", async (req, res) => {
     r.competitorPrice,
     r.unit,
     r.effectiveDate,
+    r.competitorValidTo,
+    r.upcomingCompetitorPrice,
+    r.upcomingCompetitorEffectiveDate,
+    r.upcomingCompetitorChangePct,
+    r.competitorPriceIsCurrent ? "yes" : "no",
     r.matchedPrayagCode,
     r.prayagProductName,
     r.prayagMrp,
     r.prayagEffectiveDate,
+    r.prayagValidTo,
+    r.upcomingPrayagMrp,
+    r.upcomingPrayagEffectiveDate,
+    r.upcomingPrayagChangePct,
     r.diffPct,
     r.compPerMetre,
     r.prayagPerMetre,
@@ -340,7 +487,10 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   let q = db.select().from(competitorPricesTable).$dynamic();
   if (competitor) q = q.where(eq(competitorPricesTable.competitor, competitor));
   const all = await q;
-  const rows = all.map((c) => buildComparisonRow(c, maps));
+  const windows = await getAllCompetitorWindows();
+  const rows = all
+    .map((c) => buildComparisonRow(c, maps, windows.get(c.id)))
+    .filter((row) => row.competitorPriceIsCurrent);
 
   const matched = rows.filter((r) => !!r.matchedPrayagCode);
   // Comparable rows use the per-metre-normalized diff where it applies, and
@@ -438,11 +588,8 @@ function normalizeMapping(body: {
   return { matchedPrayagCode, matchStatus, matchConfidence };
 }
 
-// The analysis dashboard reads each row's persisted prayag_mrp_at_compare (never
-// a live catalog lookup), so any mapping change written here MUST re-snapshot it
-// in the same update: the catalog's current MRP for a confirmed match, null
-// otherwise. Skipping this leaves a remapped/unmatched row with a stale or
-// missing MRP, which silently corrupts the analysis gap.
+// Keep the persisted prayag_mrp_at_compare audit snapshot aligned whenever a
+// mapping changes. Live analysis resolves its comparison MRP by effective date.
 function snapshotPrayagMrp(
   maps: Map<string, PrayagInfo>,
   matchedPrayagCode: string | null,
@@ -491,9 +638,12 @@ router.patch("/catalog/competitor-prices/bulk", async (req, res) => {
     if (result[0]) updatedRows.push(result[0]);
   }
 
+  const windows = await getAllCompetitorWindows();
   res.json({
     updated: updatedRows.length,
-    rows: updatedRows.map((r) => buildComparisonRow(r, maps)),
+    rows: updatedRows.map((r) =>
+      buildComparisonRow(r, maps, windows.get(r.id)),
+    ),
   });
 });
 
@@ -726,6 +876,10 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     .select()
     .from(competitorPricesTable)
     .where(and(...conditions));
+  const competitorWindows = await getAllCompetitorWindows();
+  const currentMatchedRows = matchedRows.filter(
+    (row) => competitorWindows.get(row.id)?.isCurrent,
+  );
 
   // Group competitor rows by the Prayag SKU they map to. A competitor can have
   // several rows for one SKU (e.g. different sizes), so we keep every row and
@@ -735,6 +889,11 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     description: string | null;
     size: string | null;
     unit: string | null;
+    effectiveDate: string | null;
+    validTo: string | null;
+    upcomingPrice: number | null;
+    upcomingEffectiveDate: string | null;
+    upcomingChangePct: number | null;
   }
   interface Group {
     itemCode: string;
@@ -742,7 +901,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     byCompetitor: Map<string, CompCandidate[]>;
   }
   const groups = new Map<string, Group>();
-  for (const c of matchedRows) {
+  for (const c of currentMatchedRows) {
     if (!c.matchedPrayagCode) continue;
     const key = normCode(c.matchedPrayagCode);
     let g = groups.get(key);
@@ -759,11 +918,17 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     // candidate; keep the group but skip the candidate.
     if (c.price == null) continue;
     const list = g.byCompetitor.get(c.competitor) ?? [];
+    const priceWindow = competitorWindows.get(c.id);
     list.push({
       price: c.price,
       description: c.description,
       size: c.size,
       unit: c.unit,
+      effectiveDate: c.effectiveDate,
+      validTo: priceWindow?.validTo ?? null,
+      upcomingPrice: priceWindow?.upcomingPrice ?? null,
+      upcomingEffectiveDate: priceWindow?.upcomingEffectiveDate ?? null,
+      upcomingChangePct: priceWindow?.upcomingChangePct ?? null,
     });
     g.byCompetitor.set(c.competitor, list);
   }
@@ -796,6 +961,11 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       perMetre: number | null;
       basisPrice: number | null;
       unitAmbiguous: boolean;
+      effectiveDate: string | null;
+      validTo: string | null;
+      upcomingPrice: number | null;
+      upcomingEffectiveDate: string | null;
+      upcomingChangePct: number | null;
     }
     const picks: Picked[] = [];
     for (const [competitor, candidates] of g.byCompetitor) {
@@ -827,6 +997,11 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           perMetre,
           basisPrice,
           unitAmbiguous: ambiguous,
+          effectiveDate: cand.effectiveDate,
+          validTo: cand.validTo,
+          upcomingPrice: cand.upcomingPrice,
+          upcomingEffectiveDate: cand.upcomingEffectiveDate,
+          upcomingChangePct: cand.upcomingChangePct,
         };
         // Prefer rows that can be placed on the basis; among those, the cheapest.
         if (!best) best = candPick;
@@ -865,6 +1040,11 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           diffPct,
           isCheapest: p.competitor === cheapestRivalName,
           unitAmbiguous: p.unitAmbiguous,
+          effectiveDate: p.effectiveDate,
+          validTo: p.validTo,
+          upcomingPrice: p.upcomingPrice,
+          upcomingEffectiveDate: p.upcomingEffectiveDate,
+          upcomingChangePct: p.upcomingChangePct,
         };
       })
       .sort((a, b) => a.competitor.localeCompare(b.competitor));
@@ -917,6 +1097,10 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       lengthNormalized: isLenRow,
       unitAmbiguous: competitors.some((c) => c.unitAmbiguous),
       prayagEffectiveDate: prayag?.effectiveDate ?? null,
+      prayagValidTo: prayag?.validTo ?? null,
+      upcomingPrayagMrp: prayag?.upcomingMrp ?? null,
+      upcomingPrayagEffectiveDate: prayag?.upcomingEffectiveDate ?? null,
+      upcomingPrayagChangePct: prayag?.upcomingChangePct ?? null,
       competitors,
       cheapestRival,
       cheapestRivalName,
@@ -928,7 +1112,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       marketMax,
       marketPosition,
     };
-  });
+  }).filter((row) => row.prayagMrp != null && row.competitors.length > 0);
 
   if (expensiveOnly) {
     rows = rows.filter(
@@ -1224,7 +1408,8 @@ router.patch("/catalog/competitor-prices/:id", async (req: Request<{ id: string 
     return;
   }
 
-  res.json(buildComparisonRow(row, maps));
+  const windows = await getAllCompetitorWindows();
+  res.json(buildComparisonRow(row, maps, windows.get(row.id)));
 });
 
 // GET /catalog/mapping-review/export — full filtered review list as CSV/XLSX.
@@ -1254,19 +1439,32 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
       asc(competitorPricesTable.description),
       asc(competitorPricesTable.id),
     );
-  const rows = all.map((c) => buildComparisonRow(c, maps));
+  const windows = await getAllCompetitorWindows();
+  const rows = all.map((c) =>
+    buildComparisonRow(c, maps, windows.get(c.id)),
+  );
 
   const header = [
     "Competitor",
     "Category",
     "Description",
     "Size",
-    "Competitor Price",
+    "Competitor Price (Row Period)",
     "Unit",
-    "Effective Date",
+    "Competitor Valid From",
+    "Competitor Valid To",
+    "Competitor Next Price",
+    "Competitor Next Effective Date",
+    "Competitor Next Change %",
+    "Competitor Price Is Current",
     "Prayag Code",
-    "Prayag MRP",
-    "Diff %",
+    "Prayag Current MRP",
+    "Prayag Current Valid From",
+    "Prayag Current Valid To",
+    "Prayag Next MRP",
+    "Prayag Next Effective Date",
+    "Prayag Next Change %",
+    "Current-vs-Current Diff %",
     "Status",
   ];
   const body = rows.map((r) => [
@@ -1277,8 +1475,18 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
     r.competitorPrice,
     r.unit,
     r.effectiveDate,
+    r.competitorValidTo,
+    r.upcomingCompetitorPrice,
+    r.upcomingCompetitorEffectiveDate,
+    r.upcomingCompetitorChangePct,
+    r.competitorPriceIsCurrent ? "yes" : "no",
     r.matchedPrayagCode,
     r.prayagMrp,
+    r.prayagEffectiveDate,
+    r.prayagValidTo,
+    r.upcomingPrayagMrp,
+    r.upcomingPrayagEffectiveDate,
+    r.upcomingPrayagChangePct,
     r.diffPct,
     r.matchStatus,
   ]);

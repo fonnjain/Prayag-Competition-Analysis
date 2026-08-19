@@ -4,11 +4,11 @@
  * Scenario: three mrp_price_history revisions for a single test item:
  *   2026-03-05 → 375.52
  *   2026-04-20 → 405.57  (w.e.f. 20 Apr)
- *   2026-09-01 → 406.00
+ *   2026-09-01 → 406.00, then corrected to 407.00 on the same date
  *
  * The DISTINCT ON … WHERE effective_date <= resolvedDate query must select:
- *   asOf 2026-08-17 → Apr revision (405.57), upcoming = Sep (406)
- *   asOf 2026-09-01 → Sep revision (406.00), upcoming = null
+ *   asOf 2026-08-17 → Apr revision (405.57), upcoming = Sep correction (407)
+ *   asOf 2026-09-01 → corrected Sep revision (407.00), upcoming = null
  *   asOf 2026-03-10 → Mar revision (375.52), upcoming = Apr (405.57)
  *
  * Tests run at two levels:
@@ -27,7 +27,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -47,6 +47,9 @@ import { normCode } from "../lib/catalog.js";
 
 const ITEM_CODE = `__TEST_PERIOD_${Date.now()}__`;
 const COMPETITOR = `__test_period_comp_${Date.now()}__`;
+const INACTIVE_ITEM_CODE = `__TEST_INACTIVE_PERIOD_${Date.now()}__`;
+const INACTIVE_COMPETITOR = `__test_inactive_comp_${Date.now()}__`;
+const LEGACY_MRP_TABLE = `mrp_price_history_analysis_test_${process.pid}_${Date.now()}`;
 
 // The three revisions under test (matching task spec):
 const MAR_DATE = "2026-03-05";
@@ -56,7 +59,8 @@ const APR_DATE = "2026-04-20";
 const APR_MRP = 405.57;
 
 const SEP_DATE = "2026-09-01";
-const SEP_MRP = 406.0;
+const SEP_SUPERSEDED_MRP = 406.0;
+const SEP_MRP = 407.0;
 
 // asOf dates for assertions:
 const AS_OF_AUG = "2026-08-17"; // today in the task; must resolve to Apr
@@ -69,12 +73,21 @@ const AS_OF_MAR = "2026-03-10"; // must resolve to Mar
 
 beforeAll(async () => {
   // Insert catalog product
-  await db.insert(catalogProductsTable).values({
-    itemCode: ITEM_CODE,
-    productName: "Test Period Product",
-    division: "Test Division",
-    category: "Test Category",
-  });
+  await db.insert(catalogProductsTable).values([
+    {
+      itemCode: ITEM_CODE,
+      productName: "Test Period Product",
+      division: "Test Division",
+      category: "Test Category",
+    },
+    {
+      itemCode: INACTIVE_ITEM_CODE,
+      productName: "Inactive Test Period Product",
+      division: "Test Division",
+      category: "Test Category",
+      isActive: false,
+    },
+  ]);
 
   // Insert three MRP history rows
   await db.insert(mrpPriceHistoryTable).values([
@@ -96,33 +109,77 @@ beforeAll(async () => {
     },
     {
       itemCode: ITEM_CODE,
-      mrp: SEP_MRP,
+      mrp: null,
+      priceBasis: "MRP",
+      effectiveDate: "2026-07-01",
+      loadDate: "2026-07-01",
+      isCurrent: true,
+    },
+    {
+      itemCode: ITEM_CODE,
+      mrp: SEP_SUPERSEDED_MRP,
       priceBasis: "MRP",
       effectiveDate: SEP_DATE,
       loadDate: SEP_DATE,
       isCurrent: false,
     },
+    {
+      itemCode: INACTIVE_ITEM_CODE,
+      mrp: 500,
+      priceBasis: "MRP",
+      effectiveDate: APR_DATE,
+      loadDate: APR_DATE,
+      isCurrent: true,
+    },
   ]);
 
+  // Preserve the unique parent index while simulating a legacy same-day row.
+  // PostgreSQL parent-table reads include inherited child rows, whose later ID
+  // must win as the corrected revision.
+  await db.execute(
+    sql.raw(
+      `CREATE TABLE ${LEGACY_MRP_TABLE} () INHERITS (mrp_price_history)`,
+    ),
+  );
+  await db.execute(sql`
+    INSERT INTO ${sql.raw(LEGACY_MRP_TABLE)}
+      (item_code, mrp, price_basis, effective_date, load_date, is_current)
+    VALUES
+      (${ITEM_CODE}, ${SEP_MRP}, 'MRP', ${SEP_DATE}, ${SEP_DATE}, false)
+  `);
+
   // Insert a matched competitor price row so opportunities has something to
-  // return in the HTTP tests. prayagMrpAtCompare is set to the Apr MRP so
-  // the row is comparable. Competitor price is higher so it appears as margin
-  // headroom.
+  // return in the HTTP tests. Keep an intentionally stale audit snapshot so
+  // the route proves its displayed price and gap come from the resolved map.
   // priceBasis / gstPct omitted: stale generated types don't include them yet
   // (task #61). unit=null means effectivePrice() returns price as-is (no GST
   // gross-up), which is correct for this MRP-basis test row.
-  await db.insert(competitorPricesTable).values({
-    competitor: COMPETITOR,
-    description: "Test Period Competitor SKU",
-    price: 600,
-    unit: null,
-    matchedPrayagCode: ITEM_CODE,
-    matchStatus: "matched",
-    matchConfidence: "High",
-    prayagMrpAtCompare: APR_MRP,
-    effectiveDate: APR_DATE,
-    isCurrent: true,
-  });
+  await db.insert(competitorPricesTable).values([
+    {
+      competitor: COMPETITOR,
+      description: "Test Period Competitor SKU",
+      price: 600,
+      unit: null,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      prayagMrpAtCompare: 1,
+      effectiveDate: APR_DATE,
+      isCurrent: true,
+    },
+    {
+      competitor: INACTIVE_COMPETITOR,
+      description: "Inactive Test Period Competitor SKU",
+      price: 600,
+      unit: null,
+      matchedPrayagCode: INACTIVE_ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      prayagMrpAtCompare: 500,
+      effectiveDate: APR_DATE,
+      isCurrent: true,
+    },
+  ]);
 });
 
 afterAll(async () => {
@@ -130,11 +187,21 @@ afterAll(async () => {
     .delete(competitorPricesTable)
     .where(eq(competitorPricesTable.competitor, COMPETITOR));
   await db
+    .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, INACTIVE_COMPETITOR));
+  await db.execute(sql.raw(`DROP TABLE IF EXISTS ${LEGACY_MRP_TABLE}`));
+  await db
     .delete(mrpPriceHistoryTable)
     .where(eq(mrpPriceHistoryTable.itemCode, ITEM_CODE));
   await db
+    .delete(mrpPriceHistoryTable)
+    .where(eq(mrpPriceHistoryTable.itemCode, INACTIVE_ITEM_CODE));
+  await db
     .delete(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, ITEM_CODE));
+  await db
+    .delete(catalogProductsTable)
+    .where(eq(catalogProductsTable.itemCode, INACTIVE_ITEM_CODE));
 });
 
 // ---------------------------------------------------------------------------
@@ -142,7 +209,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe("getPrayagCatalogMapForPeriod — direct date resolution", () => {
-  it("asOf 2026-08-17 (today) → resolves to Apr revision (405.57), upcoming = Sep (406)", async () => {
+  it("asOf 2026-08-17 resolves the highest-id same-day Sep correction", async () => {
     const map = await getPrayagCatalogMapForPeriod(AS_OF_AUG);
     const info = map.get(normCode(ITEM_CODE));
 
@@ -158,7 +225,7 @@ describe("getPrayagCatalogMapForPeriod — direct date resolution", () => {
     const info = map.get(normCode(ITEM_CODE));
 
     expect(info).toBeDefined();
-    expect(info!.mrp).toBe(SEP_MRP); // 406, not Apr or Mar
+    expect(info!.mrp).toBe(SEP_MRP); // corrected same-day winner, not 406
     expect(info!.effectiveDate).toBe(SEP_DATE);
     expect(info!.upcomingMrp).toBeNull(); // no revision after Sep 1
     expect(info!.upcomingMrpDate).toBeNull();
@@ -186,6 +253,17 @@ describe("getPrayagCatalogMapForPeriod — direct date resolution", () => {
     // Upcoming should be the earliest revision (Mar)
     expect(info!.upcomingMrp).toBe(MAR_MRP);
     expect(info!.upcomingMrpDate).toBe(MAR_DATE);
+  });
+
+  it("ignores null placeholders when resolving priced revisions", async () => {
+    const map = await getPrayagCatalogMapForPeriod(AS_OF_AUG);
+    const info = map.get(normCode(ITEM_CODE));
+    expect(info).toMatchObject({
+      mrp: APR_MRP,
+      effectiveDate: APR_DATE,
+      upcomingMrp: SEP_MRP,
+      upcomingMrpDate: SEP_DATE,
+    });
   });
 });
 
@@ -250,6 +328,18 @@ describe("GET /analysis/overview — comparableSkus non-zero after mapCompetitor
     expect(body.prayagCheaperCount).toBe(1);
     expect(body.prayagCostlierCount).toBe(0);
   });
+
+  it("does not surface matched prices for inactive Prayag products", async () => {
+    const qs = new URLSearchParams({
+      effectivePeriod: AS_OF_AUG,
+      competitor: INACTIVE_COMPETITOR,
+      thresholdPct: "0",
+    });
+    const res = await overviewRequest.get(`/analysis/opportunities?${qs}`);
+    expect(res.status).toBe(200);
+    expect(res.body.marginHeadroom).toEqual([]);
+    expect(res.body.priceThreats).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -289,16 +379,48 @@ describe("GET /analysis/opportunities — upcomingPrayagMrp reflects period-reso
     return found!;
   }
 
-  it("asOf 2026-08-17 → upcomingPrayagMrp=406, upcomingPrayagMrpDate=2026-09-01", async () => {
+  it("asOf 2026-08-17 exposes the corrected same-day revision as upcoming", async () => {
     const item = await fetchTestItem(AS_OF_AUG);
+    expect(item.prayagMrp).toBe(APR_MRP);
     expect(item.upcomingPrayagMrp).toBe(SEP_MRP);
     expect(item.upcomingPrayagMrpDate).toBe(SEP_DATE);
   });
 
-  it("asOf 2026-09-01 → upcomingPrayagMrp=null (no future revision)", async () => {
+  it("exports the corrected same-day revision and matching validity window", async () => {
+    const qs = new URLSearchParams({
+      effectivePeriod: AS_OF_AUG,
+      competitor: COMPETITOR,
+      format: "csv",
+    });
+    const res = await request.get(`/analysis/export?${qs}`);
+    expect(res.status).toBe(200);
+
+    const rows = res.text
+      .trim()
+      .split(/\r?\n/)
+      .map((line) =>
+        line.split(",").map((cell) => cell.replace(/^"|"$/g, "")),
+      );
+    const header = rows[0]!;
+    const itemRow = rows
+      .slice(1)
+      .find((row) => row[header.indexOf("Prayag Code")] === ITEM_CODE)!;
+
+    expect(itemRow).toBeDefined();
+    expect(itemRow[header.indexOf("Prayag Current Valid To")]).toBe(
+      "2026-08-31",
+    );
+    expect(Number(itemRow[header.indexOf("Prayag Next MRP")])).toBe(SEP_MRP);
+    expect(itemRow[header.indexOf("Prayag Next Effective Date")]).toBe(
+      SEP_DATE,
+    );
+    expect(Number(itemRow[header.indexOf("Prayag Next Change %")])).toBe(0.4);
+  });
+
+  it("future-selected period keeps today's current MRP and exposes the Sep revision as next", async () => {
     const item = await fetchTestItem(AS_OF_SEP);
-    expect(item.upcomingPrayagMrp).toBeNull();
-    expect(item.upcomingPrayagMrpDate).toBeNull();
+    expect(item.upcomingPrayagMrp).toBe(SEP_MRP);
+    expect(item.upcomingPrayagMrpDate).toBe(SEP_DATE);
   });
 
   it("asOf 2026-03-10 → upcomingPrayagMrp=405.57, upcomingPrayagMrpDate=2026-04-20", async () => {
@@ -417,6 +539,100 @@ describe("getCompetitorRowsForPeriod — DISTINCT ON selects latest batch on-or-
   });
 });
 
+describe("getCompetitorRowsForPeriod — priced revisions ignore placeholders and resolve same-day ties", () => {
+  const CP_ITEM = `__TEST_COMP_EDGE_${Date.now()}__`;
+  const CP_COMP = `__test_comp_edge_${Date.now()}__`;
+  const CURRENT_DATE = "2027-01-01";
+  const PLACEHOLDER_DATE = "2027-02-01";
+  const NEXT_DATE = "2027-03-01";
+
+  beforeAll(async () => {
+    await db.insert(competitorPricesTable).values([
+      {
+        competitor: CP_COMP,
+        description: "Same-day superseded current price",
+        price: 610,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        effectiveDate: CURRENT_DATE,
+        isCurrent: true,
+      },
+      {
+        competitor: CP_COMP,
+        description: "Same-day current winner",
+        price: 620,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        effectiveDate: CURRENT_DATE,
+        isCurrent: false,
+      },
+      {
+        competitor: CP_COMP,
+        description: "Later null-price placeholder",
+        price: null,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        effectiveDate: PLACEHOLDER_DATE,
+        isCurrent: true,
+      },
+      {
+        competitor: CP_COMP,
+        description: "Same-day superseded next price",
+        price: 650,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        effectiveDate: NEXT_DATE,
+        isCurrent: true,
+      },
+      {
+        competitor: CP_COMP,
+        description: "Same-day next winner",
+        price: 660,
+        matchedPrayagCode: CP_ITEM,
+        matchStatus: "matched",
+        matchConfidence: "High",
+        effectiveDate: NEXT_DATE,
+        isCurrent: false,
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(competitorPricesTable)
+      .where(eq(competitorPricesTable.competitor, CP_COMP));
+  });
+
+  it("keeps the latest priced same-day row current and skips the null placeholder boundary", async () => {
+    const rows = await getCompetitorRowsForPeriod("2027-02-15");
+    const row = rows.find(
+      (candidate) =>
+        candidate.competitor === CP_COMP &&
+        candidate.matchedPrayagCode === CP_ITEM,
+    );
+    expect(row).toBeDefined();
+    expect(row).toMatchObject({
+      description: "Same-day current winner",
+      price: 620,
+      effectiveDate: CURRENT_DATE,
+    });
+    const window = row as unknown as {
+      validTo: string | null;
+      upcomingPrice: number | null;
+      upcomingEffectiveDate: string | null;
+    };
+    expect(window).toMatchObject({
+      validTo: "2027-02-28",
+      upcomingPrice: 660,
+      upcomingEffectiveDate: NEXT_DATE,
+    });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Level 4: prayagMrpDate resolution — future vs past effectivePeriod
 // ---------------------------------------------------------------------------
@@ -487,7 +703,7 @@ describe("prayagMrpDate resolution — future vs past effectivePeriod", () => {
   // ── /analysis/export column header ──────────────────────────────────────
 
   it(
-    'future effectivePeriod → export CSV column header contains "Prayag MRP (as of <today>)"',
+    'future effectivePeriod → export CSV labels the Prayag current price and window unambiguously',
     async () => {
       const qs = new URLSearchParams({
         effectivePeriod: futureDateStr(),
@@ -497,12 +713,13 @@ describe("prayagMrpDate resolution — future vs past effectivePeriod", () => {
       expect(res.status).toBe(200);
 
       const firstLine = (res.text as string).split("\n")[0];
-      expect(firstLine).toContain(`Prayag MRP (as of ${todayStr()})`);
+      expect(firstLine).toContain("Prayag Current MRP");
+      expect(firstLine).toContain("Prayag Current Valid From");
     },
   );
 
   it(
-    'past effectivePeriod → export CSV column header contains "Prayag MRP (as of <past date>)"',
+    'past effectivePeriod → export CSV retains explicit current and window labels',
     async () => {
       const past = pastDateStr();
       const qs = new URLSearchParams({
@@ -513,7 +730,8 @@ describe("prayagMrpDate resolution — future vs past effectivePeriod", () => {
       expect(res.status).toBe(200);
 
       const firstLine = (res.text as string).split("\n")[0];
-      expect(firstLine).toContain(`Prayag MRP (as of ${past})`);
+      expect(firstLine).toContain("Prayag Current MRP");
+      expect(firstLine).toContain("Prayag Current Valid From");
     },
   );
 });
@@ -539,13 +757,11 @@ describe("prayagMrpDate resolution — future vs past effectivePeriod", () => {
 //   4  Category
 //   5  Match Status
 //   6  Match Confidence
-//   7  Prayag MRP (as of <date>)
-//   8  Competitor Price         ← asserted below
-//   9  Unit / Basis
-//  10  Competitor Effective Price
-//  11  Price Diff
-//  12  Price Diff %
-//  13  Prayag Cheaper
+//   7  Prayag Current MRP
+//   8–12  Prayag current window + next revision
+//  13  Competitor Current Listed Price ← asserted below
+//  14–21  Competitor current window + next revision
+//  22–24  Current-vs-current gap fields
 
 describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () => {
   const EX_ITEM = `__TEST_EXP_PERIOD_${Date.now()}__`;
@@ -705,8 +921,8 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
         dataRow,
         `Row for ${EX_COMP} not found in CSV (effectivePeriod=${AS_OF_BETWEEN})`,
       ).toBeDefined();
-      // Column 8 = "Competitor Price"
-      expect(Number(dataRow![8])).toBe(EX_JAN_PRICE);
+      // Column 13 = "Competitor Current Listed Price"
+      expect(Number(dataRow![13])).toBe(EX_JAN_PRICE);
     },
   );
 
@@ -728,7 +944,7 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
         dataRow,
         `Row for ${EX_COMP} not found in CSV (effectivePeriod=${AS_OF_AFTER})`,
       ).toBeDefined();
-      expect(Number(dataRow![8])).toBe(EX_JUN_PRICE);
+      expect(Number(dataRow![13])).toBe(EX_JUN_PRICE);
     },
   );
 
@@ -748,7 +964,7 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
         dataRow,
         `Row for ${EX_COMP} not found in XLSX (effectivePeriod=${AS_OF_BETWEEN})`,
       ).toBeDefined();
-      expect(Number(dataRow![8])).toBe(EX_JAN_PRICE);
+      expect(Number(dataRow![13])).toBe(EX_JAN_PRICE);
     },
   );
 
@@ -766,7 +982,7 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
         dataRow,
         `Row for ${EX_COMP} not found in XLSX (effectivePeriod=${AS_OF_AFTER})`,
       ).toBeDefined();
-      expect(Number(dataRow![8])).toBe(EX_JUN_PRICE);
+      expect(Number(dataRow![13])).toBe(EX_JUN_PRICE);
     },
   );
 });

@@ -103,8 +103,28 @@ export interface PriceFinderSearchResult {
   category: string | null;
   /** @nullable */
   currentMrp: number | null;
-  /** @nullable */
+  /**
+     * First day the current MRP is valid (YYYY-MM-DD).
+     * @nullable
+     */
   currentEffectiveDate: string | null;
+  /**
+     * Final day the current MRP is valid, or null when open-ended.
+     * @nullable
+     */
+  currentValidTo: string | null;
+  /**
+     * Earliest scheduled MRP after today, or null.
+     * @nullable
+     */
+  upcomingMrp: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+  /**
+     * One-decimal change from current to upcoming MRP; zero is retained.
+     * @nullable
+     */
+  upcomingChangePct: number | null;
   hasCompetitorData: boolean;
 }
 
@@ -154,21 +174,54 @@ export interface PriceFinderProduct {
   category: string | null;
   /** @nullable */
   currentMrp: number | null;
-  /** @nullable */
+  /**
+     * First day the current MRP is valid (YYYY-MM-DD).
+     * @nullable
+     */
   currentEffectiveDate: string | null;
+  /**
+     * Final day the current MRP is valid, or null when open-ended.
+     * @nullable
+     */
+  currentValidTo: string | null;
   /** @nullable */
   upcomingMrp: number | null;
   /** @nullable */
   upcomingEffectiveDate: string | null;
+  /**
+     * One-decimal change from current to upcoming MRP; zero is retained.
+     * @nullable
+     */
+  upcomingChangePct: number | null;
 }
 
 export interface PriceFinderCompetitor {
   competitor: string;
   price: number;
-  /** @nullable */
+  /**
+     * First day the current competitor price is valid (YYYY-MM-DD).
+     * @nullable
+     */
   effectiveDate: string | null;
+  /**
+     * Final day the current competitor price is valid, or null when open-ended.
+     * @nullable
+     */
+  validTo: string | null;
   /** @nullable */
   priceBasis: string | null;
+  /**
+     * Earliest scheduled competitor price after today, on the same comparison basis.
+     * @nullable
+     */
+  upcomingPrice: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+  /**
+     * One-decimal change from current to upcoming price; zero is retained.
+     * @nullable
+     */
+  upcomingChangePct: number | null;
   /** @nullable */
   gapPct: number | null;
   /** @nullable */
@@ -261,8 +314,27 @@ export interface ComparisonRow {
   competitorPrice: number | null;
   /** @nullable */
   unit?: string | null;
-  /** @nullable */
+  /**
+     * First day this competitor row's price is valid.
+     * @nullable
+     */
   effectiveDate?: string | null;
+  /**
+     * Final day this competitor row's price is valid, or null when open-ended.
+     * @nullable
+     */
+  competitorValidTo: string | null;
+  /** @nullable */
+  upcomingCompetitorPrice: number | null;
+  /** @nullable */
+  upcomingCompetitorEffectiveDate: string | null;
+  /**
+     * One-decimal row-to-next-period change; zero is retained.
+     * @nullable
+     */
+  upcomingCompetitorChangePct: number | null;
+  /** True only for the latest row already in force; only these rows receive headline gaps. */
+  competitorPriceIsCurrent: boolean;
   /** @nullable */
   matchedPrayagCode: string | null;
   matchStatus: string;
@@ -274,6 +346,14 @@ export interface ComparisonRow {
   prayagMrp: number | null;
   /** @nullable */
   prayagEffectiveDate?: string | null;
+  /** @nullable */
+  prayagValidTo: string | null;
+  /** @nullable */
+  upcomingPrayagMrp: number | null;
+  /** @nullable */
+  upcomingPrayagEffectiveDate: string | null;
+  /** @nullable */
+  upcomingPrayagChangePct: number | null;
   /** @nullable */
   diffPct: number | null;
   /** @nullable */
@@ -324,6 +404,16 @@ export interface ComparisonList {
 export interface ProductComparisonCell {
   competitor: string;
   price: number;
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  validTo: string | null;
+  /** @nullable */
+  upcomingPrice: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+  /** @nullable */
+  upcomingChangePct: number | null;
   /**
      * Competitor price reduced to ₹/metre, when length-normalizable.
      * @nullable
@@ -372,6 +462,14 @@ export interface ProductComparisonRow {
   unitAmbiguous?: boolean;
   /** @nullable */
   prayagEffectiveDate?: string | null;
+  /** @nullable */
+  prayagValidTo: string | null;
+  /** @nullable */
+  upcomingPrayagMrp: number | null;
+  /** @nullable */
+  upcomingPrayagEffectiveDate: string | null;
+  /** @nullable */
+  upcomingPrayagChangePct: number | null;
   competitors: ProductComparisonCell[];
   /** @nullable */
   cheapestRival: number | null;
@@ -742,6 +840,42 @@ export interface AnalysisOpportunityItem {
      * @nullable
      */
   upcomingPrayagMrpDate?: string | null;
+  /**
+     * First day the current Prayag MRP is valid.
+     * @nullable
+     */
+  prayagEffectiveDate?: string | null;
+  /**
+     * Final day the current Prayag MRP is valid, or null when open-ended.
+     * @nullable
+     */
+  prayagValidTo?: string | null;
+  /**
+     * One-decimal current-to-next Prayag change; zero is retained.
+     * @nullable
+     */
+  upcomingPrayagChangePct?: number | null;
+  /**
+     * First day the current competitor price is valid.
+     * @nullable
+     */
+  competitorEffectiveDate?: string | null;
+  /**
+     * Final day the current competitor price is valid, or null when open-ended.
+     * @nullable
+     */
+  competitorValidTo?: string | null;
+  /** @nullable */
+  upcomingCompetitorPrice?: number | null;
+  /** @nullable */
+  upcomingCompetitorEffectivePrice?: number | null;
+  /** @nullable */
+  upcomingCompetitorPriceDate?: string | null;
+  /**
+     * One-decimal current-to-next competitor change; zero is retained.
+     * @nullable
+     */
+  upcomingCompetitorChangePct?: number | null;
 }
 
 export interface AnalysisOpportunities {
@@ -1391,4 +1525,3 @@ iss?: string;
 export type LogoutBrowserSessionParams = {
 returnTo?: string;
 };
-

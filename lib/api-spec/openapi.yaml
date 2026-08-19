@@ -1540,6 +1540,10 @@ components:
         - category
         - currentMrp
         - currentEffectiveDate
+        - currentValidTo
+        - upcomingMrp
+        - upcomingEffectiveDate
+        - upcomingChangePct
         - hasCompetitorData
       properties:
         itemCode:
@@ -1554,6 +1558,18 @@ components:
           type: ["number", "null"]
         currentEffectiveDate:
           type: ["string", "null"]
+          description: First day the current MRP is valid (YYYY-MM-DD).
+        currentValidTo:
+          type: ["string", "null"]
+          description: Final day the current MRP is valid, or null when open-ended.
+        upcomingMrp:
+          type: ["number", "null"]
+          description: Earliest scheduled MRP after today, or null.
+        upcomingEffectiveDate:
+          type: ["string", "null"]
+        upcomingChangePct:
+          type: ["number", "null"]
+          description: One-decimal change from current to upcoming MRP; zero is retained.
         hasCompetitorData:
           type: boolean
     PriceFinderSearchResponse:
@@ -1572,6 +1588,7 @@ components:
             $ref: "#/components/schemas/PriceFinderFilterSuggestion"
         unmatchedFilters:
           type: array
+          description: Terms rejected during progressive narrowing. Results and totalCount retain the last successful filter set.
           items:
             type: string
     PriceFinderFilterSuggestion:
@@ -1635,8 +1652,10 @@ components:
         - category
         - currentMrp
         - currentEffectiveDate
+        - currentValidTo
         - upcomingMrp
         - upcomingEffectiveDate
+        - upcomingChangePct
       properties:
         itemCode:
           type: string
@@ -1650,17 +1669,28 @@ components:
           type: ["number", "null"]
         currentEffectiveDate:
           type: ["string", "null"]
+          description: First day the current MRP is valid (YYYY-MM-DD).
+        currentValidTo:
+          type: ["string", "null"]
+          description: Final day the current MRP is valid, or null when open-ended.
         upcomingMrp:
           type: ["number", "null"]
         upcomingEffectiveDate:
           type: ["string", "null"]
+        upcomingChangePct:
+          type: ["number", "null"]
+          description: One-decimal change from current to upcoming MRP; zero is retained.
     PriceFinderCompetitor:
       type: object
       required:
         - competitor
         - price
         - effectiveDate
+        - validTo
         - priceBasis
+        - upcomingPrice
+        - upcomingEffectiveDate
+        - upcomingChangePct
         - gapPct
         - message
       properties:
@@ -1670,8 +1700,20 @@ components:
           type: number
         effectiveDate:
           type: ["string", "null"]
+          description: First day the current competitor price is valid (YYYY-MM-DD).
+        validTo:
+          type: ["string", "null"]
+          description: Final day the current competitor price is valid, or null when open-ended.
         priceBasis:
           type: ["string", "null"]
+        upcomingPrice:
+          type: ["number", "null"]
+          description: Earliest scheduled competitor price after today, on the same comparison basis.
+        upcomingEffectiveDate:
+          type: ["string", "null"]
+        upcomingChangePct:
+          type: ["number", "null"]
+          description: One-decimal change from current to upcoming price; zero is retained.
         gapPct:
           type: ["number", "null"]
         message:
@@ -1816,8 +1858,17 @@ components:
         - competitor
         - matchStatus
         - competitorPrice
+        - competitorValidTo
+        - upcomingCompetitorPrice
+        - upcomingCompetitorEffectiveDate
+        - upcomingCompetitorChangePct
+        - competitorPriceIsCurrent
         - matchedPrayagCode
         - prayagMrp
+        - prayagValidTo
+        - upcomingPrayagMrp
+        - upcomingPrayagEffectiveDate
+        - upcomingPrayagChangePct
         - diffPct
         - prayagCheaper
       properties:
@@ -1839,6 +1890,20 @@ components:
           type: ["string", "null"]
         effectiveDate:
           type: ["string", "null"]
+          description: First day this competitor row's price is valid.
+        competitorValidTo:
+          type: ["string", "null"]
+          description: Final day this competitor row's price is valid, or null when open-ended.
+        upcomingCompetitorPrice:
+          type: ["number", "null"]
+        upcomingCompetitorEffectiveDate:
+          type: ["string", "null"]
+        upcomingCompetitorChangePct:
+          type: ["number", "null"]
+          description: One-decimal row-to-next-period change; zero is retained.
+        competitorPriceIsCurrent:
+          type: boolean
+          description: True only for the latest row already in force; only these rows receive headline gaps.
         matchedPrayagCode:
           type: ["string", "null"]
         matchStatus:
@@ -1851,6 +1916,14 @@ components:
           type: ["number", "null"]
         prayagEffectiveDate:
           type: ["string", "null"]
+        prayagValidTo:
+          type: ["string", "null"]
+        upcomingPrayagMrp:
+          type: ["number", "null"]
+        upcomingPrayagEffectiveDate:
+          type: ["string", "null"]
+        upcomingPrayagChangePct:
+          type: ["number", "null"]
         diffPct:
           type: ["number", "null"]
         prayagCheaper:
@@ -1899,12 +1972,31 @@ components:
           type: integer
     ProductComparisonCell:
       type: object
-      required: [competitor, price, diffPct, isCheapest]
+      required:
+        - competitor
+        - price
+        - effectiveDate
+        - validTo
+        - upcomingPrice
+        - upcomingEffectiveDate
+        - upcomingChangePct
+        - diffPct
+        - isCheapest
       properties:
         competitor:
           type: string
         price:
           type: number
+        effectiveDate:
+          type: ["string", "null"]
+        validTo:
+          type: ["string", "null"]
+        upcomingPrice:
+          type: ["number", "null"]
+        upcomingEffectiveDate:
+          type: ["string", "null"]
+        upcomingChangePct:
+          type: ["number", "null"]
         perMetre:
           type: ["number", "null"]
           description: Competitor price reduced to ₹/metre, when length-normalizable.
@@ -1923,6 +2015,10 @@ components:
       required:
         - itemCode
         - prayagMrp
+        - prayagValidTo
+        - upcomingPrayagMrp
+        - upcomingPrayagEffectiveDate
+        - upcomingPrayagChangePct
         - competitors
         - cheapestRival
         - cheapestRivalName
@@ -1953,6 +2049,14 @@ components:
           description: True when any competitor cell for this SKU has an ambiguous unit.
         prayagEffectiveDate:
           type: ["string", "null"]
+        prayagValidTo:
+          type: ["string", "null"]
+        upcomingPrayagMrp:
+          type: ["number", "null"]
+        upcomingPrayagEffectiveDate:
+          type: ["string", "null"]
+        upcomingPrayagChangePct:
+          type: ["number", "null"]
         competitors:
           type: array
           items:
@@ -2559,6 +2663,30 @@ components:
         upcomingPrayagMrpDate:
           type: ["string", "null"]
           description: Effective date (YYYY-MM-DD) of the upcoming revision, or null.
+        prayagEffectiveDate:
+          type: ["string", "null"]
+          description: First day the current Prayag MRP is valid.
+        prayagValidTo:
+          type: ["string", "null"]
+          description: Final day the current Prayag MRP is valid, or null when open-ended.
+        upcomingPrayagChangePct:
+          type: ["number", "null"]
+          description: One-decimal current-to-next Prayag change; zero is retained.
+        competitorEffectiveDate:
+          type: ["string", "null"]
+          description: First day the current competitor price is valid.
+        competitorValidTo:
+          type: ["string", "null"]
+          description: Final day the current competitor price is valid, or null when open-ended.
+        upcomingCompetitorPrice:
+          type: ["number", "null"]
+        upcomingCompetitorEffectivePrice:
+          type: ["number", "null"]
+        upcomingCompetitorPriceDate:
+          type: ["string", "null"]
+        upcomingCompetitorChangePct:
+          type: ["number", "null"]
+          description: One-decimal current-to-next competitor change; zero is retained.
     AnalysisOpportunities:
       type: object
       required: [thresholdPct, marginHeadroom, priceThreats, prayagMrpDate]

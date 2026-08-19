@@ -29,7 +29,7 @@ export function OverviewCards({
     // successful response.  While data is undefined (loading or error), pass
     // undefined so the chip stays hidden — not "No competitor data".
     onCompetitorPeriodDate?.(
-      data === undefined
+      data == null
         ? undefined
         : ((data as any).competitorPeriodDate ?? null),
     );

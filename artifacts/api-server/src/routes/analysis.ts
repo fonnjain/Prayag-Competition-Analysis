@@ -29,6 +29,7 @@ import {
   type CompareMode,
   type BuildRowOpts,
 } from "../lib/analysis";
+import { priceChangePct, validToFromNextDate } from "../lib/priceWindow.js";
 
 const router: IRouter = Router();
 
@@ -58,18 +59,21 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
         division: catalogProductsTable.division,
         category: catalogProductsTable.category,
       })
-      .from(catalogProductsTable),
+      .from(catalogProductsTable)
+      .where(eq(catalogProductsTable.isActive, true)),
     db.execute<PriceRow>(sql`
       SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
       FROM mrp_price_history
       WHERE effective_date <= ${resolvedDate}
+        AND mrp IS NOT NULL
       ORDER BY item_code, effective_date DESC, id DESC
     `),
     db.execute<PriceRow>(sql`
       SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
       FROM mrp_price_history
       WHERE effective_date > ${resolvedDate}
-      ORDER BY item_code, effective_date ASC, id ASC
+        AND mrp IS NOT NULL
+      ORDER BY item_code, effective_date ASC, id DESC
     `),
   ]);
 
@@ -96,6 +100,8 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
       effectiveDate: price?.effectiveDate ?? null,
       upcomingMrp: upcoming?.mrp ?? null,
       upcomingMrpDate: upcoming?.effectiveDate ?? null,
+      validTo: validToFromNextDate(upcoming?.effectiveDate ?? null),
+      upcomingChangePct: priceChangePct(price?.mrp ?? null, upcoming?.mrp ?? null),
     });
   }
   return map;
@@ -130,6 +136,10 @@ type RawCompetitorRow = {
   gst_pct: number | null;
   created_at: Date | null;
   updated_at: Date | null;
+  upcoming_price: number | null;
+  upcoming_effective_date: string | null;
+  upcoming_price_basis: string | null;
+  upcoming_gst_pct: number | null;
 };
 
 function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
@@ -153,6 +163,11 @@ function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
     isCurrent: r.is_current ?? true,
     priceBasis: r.price_basis ?? null,
     gstPct: r.gst_pct ?? null,
+    validTo: validToFromNextDate(r.upcoming_effective_date ?? null),
+    upcomingPrice: r.upcoming_price ?? null,
+    upcomingEffectiveDate: r.upcoming_effective_date ?? null,
+    upcomingPriceBasis: r.upcoming_price_basis ?? null,
+    upcomingGstPct: r.upcoming_gst_pct ?? null,
     // created_at / updated_at are NOT NULL in the schema; cast directly.
     createdAt: r.created_at as Date,
     updatedAt: r.updated_at as Date,
@@ -163,15 +178,40 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
   const resolvedDate = atDate ?? todayString();
   const [matched, unmatched] = await Promise.all([
     db.execute<RawCompetitorRow>(sql`
-      SELECT DISTINCT ON (competitor, matched_prayag_code) *
-      FROM competitor_prices
-      WHERE matched_prayag_code IS NOT NULL
-        AND effective_date IS NOT NULL
-        AND effective_date <= ${resolvedDate}
-      ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC
+      WITH current_rows AS (
+        SELECT DISTINCT ON (competitor, matched_prayag_code) *
+        FROM competitor_prices
+        WHERE matched_prayag_code IS NOT NULL
+          AND effective_date IS NOT NULL
+          AND effective_date <= ${resolvedDate}
+          AND price IS NOT NULL
+        ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC
+      )
+      SELECT
+        current_rows.*,
+        next_price.price AS upcoming_price,
+        next_price.effective_date AS upcoming_effective_date,
+        next_price.price_basis AS upcoming_price_basis,
+        next_price.gst_pct AS upcoming_gst_pct
+      FROM current_rows
+      LEFT JOIN LATERAL (
+        SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
+        FROM competitor_prices cp
+        WHERE cp.competitor = current_rows.competitor
+          AND cp.matched_prayag_code = current_rows.matched_prayag_code
+          AND cp.effective_date > current_rows.effective_date
+          AND cp.price IS NOT NULL
+        ORDER BY cp.effective_date ASC, cp.id DESC
+        LIMIT 1
+      ) next_price ON true
     `),
     db.execute<RawCompetitorRow>(sql`
-      SELECT cp.*
+      SELECT
+        cp.*,
+        NULL::double precision AS upcoming_price,
+        NULL::date AS upcoming_effective_date,
+        NULL::text AS upcoming_price_basis,
+        NULL::double precision AS upcoming_gst_pct
       FROM competitor_prices cp
       JOIN (
         SELECT competitor, MAX(effective_date) AS max_date
@@ -265,9 +305,12 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Filtered
   // upcomingPrayagMrp / upcomingPrayagMrpDate on each row instead.
   const today = todayString();
   const prayagMrpDate = atDate && atDate < today ? atDate : today;
+  // A future period may be selected for planning, but headline comparisons
+  // must remain current-vs-current until that period actually starts.
+  const competitorAsOfDate = atDate && atDate < today ? atDate : today;
   const [maps, all, discounts] = await Promise.all([
     getPrayagCatalogMapForPeriod(prayagMrpDate),
-    getCompetitorRowsForPeriod(atDate),
+    getCompetitorRowsForPeriod(competitorAsOfDate),
     mode === "net"
       ? getDiscounts()
       : Promise.resolve<ResolvedDiscounts>({
@@ -281,7 +324,13 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Filtered
     prayagDiscount: discounts.prayag,
     discountFor: (c) => discounts.byCompetitor.get(c) ?? DEFAULT_COMPETITOR_DISCOUNT,
   };
-  const rows = all.map((c) => buildRow(c, maps, opts));
+  const rows = all
+    .filter((c) => {
+      if (c.matchStatus !== "matched") return true;
+      if (!c.matchedPrayagCode) return false;
+      return maps.get(normCode(c.matchedPrayagCode))?.mrp != null;
+    })
+    .map((c) => buildRow(c, maps, opts));
   const competitorPeriodDate = resolveCompetitorPeriodDate(all);
   return { rows: applyFilters(rows, parseFilters(query)), prayagMrpDate, competitorPeriodDate };
 }
@@ -523,14 +572,24 @@ router.get("/analysis/export", async (req, res) => {
     "Category",
     "Match Status",
     "Match Confidence",
-    "Prayag MRP",
-    "Prayag Effective Date",
-    "Competitor Price",
+    "Prayag Current MRP",
+    "Prayag Current Valid From",
+    "Prayag Current Valid To",
+    "Prayag Next MRP",
+    "Prayag Next Effective Date",
+    "Prayag Next Change %",
+    "Competitor Current Listed Price",
     "Unit / Basis",
-    "Competitor Effective Price",
-    "Price Diff",
-    "Price Diff %",
-    "Prayag Cheaper",
+    "Competitor Current Effective Price",
+    "Competitor Current Valid From",
+    "Competitor Current Valid To",
+    "Competitor Next Listed Price",
+    "Competitor Next Effective Price",
+    "Competitor Next Effective Date",
+    "Competitor Next Change %",
+    "Current-vs-Current Price Diff",
+    "Current-vs-Current Price Diff %",
+    "Prayag Cheaper (Current-vs-Current)",
   ];
 
   const body = rows.map((r) => [
@@ -543,9 +602,21 @@ router.get("/analysis/export", async (req, res) => {
     r.matchConfidence,
     r.prayagMrp,
     r.prayagEffectiveDate,
+    r.prayagValidTo,
+    r.upcomingPrayagMrp,
+    r.upcomingPrayagMrpDate,
+    r.upcomingPrayagChangePct,
     r.competitorPrice,
     r.unit,
     r.competitorEffectivePrice == null ? null : round1(r.competitorEffectivePrice),
+    r.competitorEffectiveDate,
+    r.competitorValidTo,
+    r.upcomingCompetitorPrice,
+    r.upcomingCompetitorEffectivePrice == null
+      ? null
+      : round1(r.upcomingCompetitorEffectivePrice),
+    r.upcomingCompetitorPriceDate,
+    r.upcomingCompetitorChangePct,
     r.priceDiff == null ? null : round1(r.priceDiff),
     r.priceDiffPct == null ? null : round1(r.priceDiffPct),
     r.prayagCheaper == null ? "" : r.prayagCheaper ? "Yes" : "No",

@@ -101,22 +101,20 @@ describe("buildRow comparability + diff conventions", () => {
     expect(r.prayagCheaper).toBeNull();
   });
 
-  it("is NOT comparable when the persisted Prayag MRP is missing", () => {
-    // Even though the catalog map carries an MRP, a row with no persisted
-    // prayagMrpAtCompare is not comparable — the catalog value is never used.
+  it("uses the resolved catalog MRP even when the audit snapshot is missing", () => {
     const r = buildRow(comp({ price: 120, prayagMrpAtCompare: null }), maps);
-    expect(r.comparable).toBe(false);
-    expect(r.priceDiff).toBeNull();
+    expect(r.comparable).toBe(true);
+    expect(r.priceDiff).toBe(20);
   });
 
-  it("uses the persisted row MRP for the gap, not the catalog MRP", () => {
-    const staleCatalog = prayagMap({
+  it("uses the resolved catalog MRP for both the displayed value and gap", () => {
+    const currentCatalog = prayagMap({
       PG1: { mrp: 999, division: "Pipes", category: "SWR" },
     });
-    const r = buildRow(comp({ price: 120, prayagMrpAtCompare: 100 }), staleCatalog);
-    expect(r.prayagMrp).toBe(100); // persisted value, not the catalog's 999
-    expect(r.priceDiffPct).toBeCloseTo(20, 5);
-    expect(r.prayagCheaper).toBe(true);
+    const r = buildRow(comp({ price: 120, prayagMrpAtCompare: 100 }), currentCatalog);
+    expect(r.prayagMrp).toBe(999);
+    expect(r.priceDiffPct).toBeCloseTo(-87.988, 3);
+    expect(r.prayagCheaper).toBe(false);
   });
 
   it("pulls division/category from the matched catalog entry", () => {
@@ -227,11 +225,11 @@ describe("buildRow Net-to-Net mode", () => {
     expect(r.competitorEffectivePrice).toBeCloseTo(60, 5);
   });
 
-  it("stays not-comparable in net mode when the persisted MRP is missing", () => {
+  it("uses the resolved MRP in net mode when the audit snapshot is missing", () => {
     const maps = prayagMap({ PG1: { mrp: 100 } });
     const r = buildRow(comp({ price: 120, prayagMrpAtCompare: null }), maps, netOpts());
-    expect(r.comparable).toBe(false);
-    expect(r.priceDiffPct).toBeNull();
+    expect(r.comparable).toBe(true);
+    expect(r.prayagMrp).toBeCloseTo(95, 5);
   });
 });
 

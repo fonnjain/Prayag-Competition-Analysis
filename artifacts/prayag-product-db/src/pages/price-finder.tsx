@@ -1,10 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { 
-  Search, Mic, MicOff, ChevronRight, Info, AlertCircle, X, Tag
+import {
+  Search,
+  Mic,
+  MicOff,
+  ChevronRight,
+  Info,
+  AlertCircle,
+  X,
+  Tag,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { PriceWindowDetails } from "@/components/price-window";
+import { buildSpokenPriceSummary } from "@/lib/priceSpeech";
+import { getPriceFinderSearchDisplay } from "@/lib/priceFinderSearchState";
 import {
   useGetPriceFinderBrowse,
   useGetPriceFinderProduct,
@@ -107,6 +121,33 @@ export default function PriceFinderPage() {
   const [selectedItemCode, setSelectedItemCode] = useState<string | null>(null);
   const [browseDivision, setBrowseDivision] = useState<string | null>(null);
   const [browseCategory, setBrowseCategory] = useState<string | null>(null);
+  const [selectionSequence, setSelectionSequence] = useState(0);
+  const [speechRequested, setSpeechRequested] = useState(false);
+  const [speechAvailable, setSpeechAvailable] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
+
+  const cancelSpeech = useCallback(() => {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.speechSynthesis?.cancel === "function"
+    ) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  useEffect(() => {
+    const available =
+      typeof window !== "undefined" &&
+      typeof window.speechSynthesis?.speak === "function" &&
+      typeof window.SpeechSynthesisUtterance === "function";
+    setSpeechAvailable(available);
+    if (available) {
+      setSpeechEnabled(
+        window.localStorage.getItem("prayag-price-finder-speech-enabled") === "true",
+      );
+    }
+    return cancelSpeech;
+  }, [cancelSpeech]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -120,33 +161,52 @@ export default function PriceFinderPage() {
     params.delete("filter");
     nextFilters.forEach((filter) => params.append("filter", filter));
     const query = params.toString();
-    window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    window.history.pushState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
+    );
   }, []);
 
   useEffect(() => {
     const restoreFiltersFromHistory = () => {
-      setFilters(new URLSearchParams(window.location.search).getAll("filter").filter(Boolean));
+      cancelSpeech();
+      setFilters(
+        new URLSearchParams(window.location.search)
+          .getAll("filter")
+          .filter(Boolean),
+      );
       setSearchInput("");
       setSelectedItemCode(null);
+      setSpeechRequested(false);
     };
     window.addEventListener("popstate", restoreFiltersFromHistory);
     return () => window.removeEventListener("popstate", restoreFiltersFromHistory);
-  }, []);
+  }, [cancelSpeech]);
 
   const addFilter = useCallback((term: string) => {
     const cleaned = term.trim();
     if (!cleaned) return;
+    cancelSpeech();
     setFilters((current) => {
-      if (current.some((filter) => filter.toLowerCase() === cleaned.toLowerCase())) return current;
+      if (
+        current.some(
+          (filter) => filter.toLowerCase() === cleaned.toLowerCase(),
+        )
+      ) {
+        return current;
+      }
       const next = [...current, cleaned];
       writeFiltersToUrl(next);
       return next;
     });
     setSearchInput("");
     setSelectedItemCode(null);
-  }, [writeFiltersToUrl]);
+    setSpeechRequested(false);
+  }, [cancelSpeech, writeFiltersToUrl]);
 
   const removeFilter = useCallback((index: number, edit = false) => {
+    cancelSpeech();
     setFilters((current) => {
       const removed = current[index];
       if (edit && removed) setSearchInput(removed);
@@ -155,15 +215,19 @@ export default function PriceFinderPage() {
       return next;
     });
     setSelectedItemCode(null);
-  }, [writeFiltersToUrl]);
+    setSpeechRequested(false);
+  }, [cancelSpeech, writeFiltersToUrl]);
 
   const handleVoiceResult = useCallback((text: string) => {
     addFilter(text);
   }, [addFilter]);
 
   const handleVoiceTranscript = useCallback((text: string) => {
+    cancelSpeech();
     setSearchInput(text);
-  }, []);
+    setSelectedItemCode(null);
+    setSpeechRequested(false);
+  }, [cancelSpeech]);
 
   const {
     isListening,
@@ -180,7 +244,9 @@ export default function PriceFinderPage() {
 
   useEffect(() => {
     setSelectedItemCode(null);
-  }, [queryKey]);
+    setSpeechRequested(false);
+    cancelSpeech();
+  }, [queryKey, cancelSpeech]);
 
   const { data: searchData, isLoading: isSearchLoading, isError: isSearchError } = useGetPriceFinderSearch(
     { filters: queryFilters, limit: 3000 },
@@ -193,10 +259,15 @@ export default function PriceFinderPage() {
     },
   );
 
-  const results: PriceFinderSearchResult[] = searchData?.results || [];
-  const totalCount = searchData?.totalCount ?? 0;
-  const unmatchedFilter = searchData?.unmatchedFilters?.[0];
+  const { results, totalCount, unmatchedFilter } =
+    getPriceFinderSearchDisplay(searchData);
   const hasSearch = queryFilters.length > 0;
+  const confirmProduct = useCallback((itemCode: string) => {
+    cancelSpeech();
+    setSelectedItemCode(itemCode);
+    setSelectionSequence((value) => value + 1);
+    setSpeechRequested(speechEnabled);
+  }, [cancelSpeech, speechEnabled]);
   const browseParams = {
     division: browseDivision ?? undefined,
     category: browseDivision && browseCategory ? browseCategory : undefined,
@@ -213,7 +284,10 @@ export default function PriceFinderPage() {
   );
 
   return (
-    <div className="max-w-3xl mx-auto p-4 md:p-8 space-y-6">
+    <div
+      className="max-w-3xl mx-auto p-4 md:p-8 space-y-6"
+      onPointerDownCapture={cancelSpeech}
+    >
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Price Finder</h1>
         <p className="text-muted-foreground mt-1 text-sm max-w-lg">
@@ -227,13 +301,45 @@ export default function PriceFinderPage() {
         </p>
       )}
 
+      {speechAvailable && (
+        <div className="flex items-center justify-end gap-2">
+          {speechEnabled ? (
+            <Volume2 aria-hidden="true" className="h-4 w-4 text-primary" />
+          ) : (
+            <VolumeX aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+          )}
+          <Label htmlFor="spoken-output" className="text-sm">
+            Speak confirmed price
+          </Label>
+          <Switch
+            id="spoken-output"
+            checked={speechEnabled}
+            onCheckedChange={(checked) => {
+              cancelSpeech();
+              setSpeechRequested(false);
+              setSpeechEnabled(checked);
+              window.localStorage.setItem(
+                "prayag-price-finder-speech-enabled",
+                String(checked),
+              );
+            }}
+            data-testid="spoken-output-toggle"
+          />
+        </div>
+      )}
+
       {/* Progressive voice and text filters */}
       <div className="space-y-3">
       <div className="relative flex items-center shadow-sm group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
         <Input
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
+          onChange={(e) => {
+            cancelSpeech();
+            setSelectedItemCode(null);
+            setSpeechRequested(false);
+            setSearchInput(e.target.value);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -251,8 +357,10 @@ export default function PriceFinderPage() {
               size="icon"
               className="w-10 h-10 text-muted-foreground hover:text-foreground rounded-lg"
               onClick={() => {
+                cancelSpeech();
                 setSearchInput("");
                 setSelectedItemCode(null);
+                setSpeechRequested(false);
               }}
               title="Clear search"
             >
@@ -267,7 +375,11 @@ export default function PriceFinderPage() {
                 "w-10 h-10 rounded-lg transition-colors",
                 isListening ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
-              onClick={toggleVoice}
+              onClick={() => {
+                cancelSpeech();
+                setSpeechRequested(false);
+                toggleVoice();
+              }}
               title={isListening ? "Stop listening" : "Voice search"}
             >
               {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
@@ -302,10 +414,12 @@ export default function PriceFinderPage() {
             size="sm"
             className="h-8 text-muted-foreground"
             onClick={() => {
+              cancelSpeech();
               setFilters([]);
               writeFiltersToUrl([]);
               setSearchInput("");
               setSelectedItemCode(null);
+              setSpeechRequested(false);
             }}
           >
             Clear filters
@@ -430,15 +544,26 @@ export default function PriceFinderPage() {
                 <button
                   key={item.itemCode}
                   type="button"
-                  onClick={() => setSelectedItemCode(item.itemCode)}
+                  onClick={() => confirmProduct(item.itemCode)}
                   className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
                 >
                   <span>
                     <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
                     <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
                   </span>
-                  <span className="shrink-0 font-mono font-semibold">
-                    {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
+                  <span className="shrink-0 text-right">
+                    <span className="block font-mono font-semibold">
+                      {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
+                    </span>
+                    <PriceWindowDetails
+                      compact
+                      currentPrice={item.currentMrp}
+                      validFrom={item.currentEffectiveDate}
+                      validTo={item.currentValidTo}
+                      upcomingPrice={item.upcomingMrp}
+                      upcomingEffectiveDate={item.upcomingEffectiveDate}
+                      upcomingChangePct={item.upcomingChangePct}
+                    />
                   </span>
                 </button>
               ))}
@@ -471,7 +596,7 @@ export default function PriceFinderPage() {
               {results.map((res) => (
                 <button
                   key={res.itemCode}
-                  onClick={() => setSelectedItemCode(res.itemCode)}
+                  onClick={() => confirmProduct(res.itemCode)}
                   className="w-full text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between group"
                 >
                   <div>
@@ -495,6 +620,16 @@ export default function PriceFinderPage() {
                       ) : (
                         <p className="text-sm font-bold text-amber-600">Pending</p>
                       )}
+                      <PriceWindowDetails
+                        compact
+                        currentPrice={res.currentMrp}
+                        validFrom={res.currentEffectiveDate}
+                        validTo={res.currentValidTo}
+                        upcomingPrice={res.upcomingMrp}
+                        upcomingEffectiveDate={res.upcomingEffectiveDate}
+                        upcomingChangePct={res.upcomingChangePct}
+                        className="mt-1 max-w-[260px]"
+                      />
                     </div>
                     <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
@@ -507,13 +642,25 @@ export default function PriceFinderPage() {
 
       {/* Selected Product View */}
       {selectedItemCode && (
-      <ProductView itemCode={selectedItemCode} />
+        <ProductView
+          itemCode={selectedItemCode}
+          speechEnabled={speechEnabled}
+          speakRequestId={speechRequested ? selectionSequence : 0}
+        />
       )}
     </div>
   );
 }
 
-function ProductView({ itemCode }: { itemCode: string }) {
+function ProductView({
+  itemCode,
+  speechEnabled,
+  speakRequestId,
+}: {
+  itemCode: string;
+  speechEnabled: boolean;
+  speakRequestId: number;
+}) {
   const { data, isLoading, isError } = useGetPriceFinderProduct(itemCode, {
     query: {
       queryKey: ["price-finder-product", itemCode],
@@ -521,6 +668,26 @@ function ProductView({ itemCode }: { itemCode: string }) {
       staleTime: 1000 * 60,
     },
   });
+  const lastSpokenRequest = useRef(0);
+
+  useEffect(() => {
+    if (
+      !speechEnabled ||
+      !data?.product ||
+      speakRequestId <= lastSpokenRequest.current ||
+      typeof window.speechSynthesis?.speak !== "function" ||
+      typeof window.SpeechSynthesisUtterance !== "function"
+    ) {
+      return;
+    }
+    lastSpokenRequest.current = speakRequestId;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(
+      buildSpokenPriceSummary(data.product, data.competitors),
+    );
+    utterance.lang = "en-IN";
+    window.speechSynthesis.speak(utterance);
+  }, [data, speechEnabled, speakRequestId]);
 
   if (isLoading) {
     return (
@@ -570,20 +737,15 @@ function ProductView({ itemCode }: { itemCode: string }) {
             ) : (
               <span className="text-3xl font-bold text-muted-foreground">Price Pending</span>
             )}
-            <p className="text-sm font-medium text-primary/70 mt-3 flex items-center gap-1.5">
-              <Info className="w-4 h-4" />
-              Effective: {product.currentEffectiveDate || "N/A"}
-            </p>
-            
-            {product.upcomingMrp != null && (
-              <div className="mt-6 p-4 bg-amber-100/50 border border-amber-200 rounded-xl">
-                <p className="text-xs font-bold text-amber-800 uppercase tracking-widest mb-1.5">Upcoming Increase</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-black text-amber-900">₹{product.upcomingMrp.toFixed(2)}</p>
-                </div>
-                <p className="text-xs font-medium text-amber-800/80 mt-1">Effective: {product.upcomingEffectiveDate}</p>
-              </div>
-            )}
+            <PriceWindowDetails
+              currentPrice={product.currentMrp}
+              validFrom={product.currentEffectiveDate}
+              validTo={product.currentValidTo}
+              upcomingPrice={product.upcomingMrp}
+              upcomingEffectiveDate={product.upcomingEffectiveDate}
+              upcomingChangePct={product.upcomingChangePct}
+              className="mt-4"
+            />
           </div>
 
           {/* Competitor Data */}
@@ -598,19 +760,29 @@ function ProductView({ itemCode }: { itemCode: string }) {
               </div>
             ) : (
               <div className="space-y-3 flex-1 overflow-y-auto">
-                {competitors.map((comp: PriceFinderCompetitor, i: number) => {
-                  const isPrayagCheaper = comp.gapPct != null && comp.gapPct < 0;
-                  const isCompetitorCheaper = comp.gapPct != null && comp.gapPct > 0;
+                {competitors.map((comp: PriceFinderCompetitor) => {
+                  const isPrayagCheaper = comp.gapPct != null && comp.gapPct > 0;
+                  const isCompetitorCheaper = comp.gapPct != null && comp.gapPct < 0;
 
                   return (
-                    <div key={i} className="flex items-center justify-between p-3.5 bg-muted/20 border border-border/40 rounded-xl hover:bg-muted/40 transition-colors">
-                      <div>
+                    <div key={comp.competitor} className="flex items-start justify-between gap-3 p-3.5 bg-muted/20 border border-border/40 rounded-xl hover:bg-muted/40 transition-colors">
+                      <div className="min-w-0">
                         <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
                           {comp.competitor}
                         </p>
                         <p className="text-xs font-medium text-muted-foreground mt-0.5">
                           ₹{comp.price.toFixed(2)} {comp.priceBasis ? `(${comp.priceBasis})` : ""}
                         </p>
+                        <PriceWindowDetails
+                          compact
+                          currentPrice={comp.price}
+                          validFrom={comp.effectiveDate}
+                          validTo={comp.validTo}
+                          upcomingPrice={comp.upcomingPrice}
+                          upcomingEffectiveDate={comp.upcomingEffectiveDate}
+                          upcomingChangePct={comp.upcomingChangePct}
+                          className="mt-1 max-w-[300px]"
+                        />
                       </div>
                       <div className="text-right flex flex-col items-end">
                         {comp.gapPct != null ? (
@@ -619,13 +791,13 @@ function ProductView({ itemCode }: { itemCode: string }) {
                             isCompetitorCheaper ? "bg-red-100 text-red-800" : 
                             isPrayagCheaper ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"
                           )}>
-                            {isCompetitorCheaper ? "+" : ""}{comp.gapPct.toFixed(1)}%
+                            {comp.gapPct > 0 ? "+" : ""}{comp.gapPct.toFixed(1)}%
                           </div>
                         ) : (
                           <span className="text-xs font-medium text-muted-foreground px-2 py-1 bg-muted rounded-md">{comp.message || "N/A"}</span>
                         )}
                         <p className="text-[10px] text-muted-foreground mt-1 font-medium">
-                           as of {comp.effectiveDate ?? "date unavailable"}
+                          Current vs current gap
                         </p>
                       </div>
                     </div>

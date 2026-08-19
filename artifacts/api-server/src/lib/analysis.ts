@@ -1,4 +1,5 @@
 import { normCode } from "./catalog.js";
+import { priceChangePct } from "./priceWindow.js";
 
 // ---------------------------------------------------------------------------
 // Basis normalization
@@ -34,9 +35,13 @@ export interface PrayagInfo {
   category: string | null;
   productName: string | null;
   effectiveDate: string | null;
+  /** Final calendar day before the next revision, or null when open-ended. */
+  validTo?: string | null;
   /** Next revision after the resolved asOf date, if any already exists in the DB. */
   upcomingMrp?: number | null;
   upcomingMrpDate?: string | null;
+  /** One-decimal current-to-next change; zero is retained for no-change revisions. */
+  upcomingChangePct?: number | null;
 }
 
 // Minimal shape of a competitor_prices row needed for analysis.
@@ -57,6 +62,12 @@ export interface CompInput {
   // legacy rows that only have unit.
   priceBasis?: string | null;
   gstPct?: number | null;
+  effectiveDate?: string | null;
+  validTo?: string | null;
+  upcomingPrice?: number | null;
+  upcomingEffectiveDate?: string | null;
+  upcomingPriceBasis?: string | null;
+  upcomingGstPct?: number | null;
 }
 
 export interface AnalysisRow {
@@ -82,6 +93,14 @@ export interface AnalysisRow {
   /** First Prayag MRP revision dated after the resolved asOf date, or null if none. */
   upcomingPrayagMrp: number | null;
   upcomingPrayagMrpDate: string | null;
+  prayagValidTo: string | null;
+  upcomingPrayagChangePct: number | null;
+  competitorEffectiveDate: string | null;
+  competitorValidTo: string | null;
+  upcomingCompetitorPrice: number | null;
+  upcomingCompetitorEffectivePrice: number | null;
+  upcomingCompetitorPriceDate: string | null;
+  upcomingCompetitorChangePct: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,21 +139,30 @@ export function buildRow(
   // would leak a division/category/MRP onto a row that should not be compared.
   const key = matched && c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
-  // The competitor gap and the displayed "Prayag MRP" use the period-matched
-  // value persisted on the row (prayagMrpAtCompare), NOT a fresh catalog lookup.
-  // The catalog map supplies only descriptive attributes (division/category/
-  // name) for grouping and filtering — never the MRP used for the gap.
-  const prayagMrp = matched ? c.prayagMrpAtCompare ?? null : null;
+  // The displayed price, validity window, and gap must all use the same
+  // date-resolved active catalog revision. prayagMrpAtCompare remains an audit
+  // snapshot only; using it here can pair a current label with a stale gap.
+  const prayagMrp = matched ? (prayag?.mrp ?? null) : null;
   // Use per-row priceBasis/gstPct if available, otherwise fall back to unit string.
   const effPrice =
     c.price != null
       ? effectivePrice(c.unit, c.price, c.priceBasis, c.gstPct)
+      : null;
+  const upcomingEffPrice =
+    c.upcomingPrice != null
+      ? effectivePrice(
+          c.unit,
+          c.upcomingPrice,
+          c.upcomingPriceBasis,
+          c.upcomingGstPct,
+        )
       : null;
 
   // Resolve the two prices that drive the comparison. In MRP mode these are the
   // raw MRP / effective figures; in Net mode they are discounted nets.
   let prayagBasis = prayagMrp;
   let competitorBasis = effPrice;
+  let upcomingCompetitorBasis = upcomingEffPrice;
   if (mode === "net" && prayagMrp != null) {
     const prayagDisc = opts?.prayagDiscount ?? DEFAULT_PRAYAG_DISCOUNT;
     const compDisc = opts?.discountFor
@@ -142,6 +170,8 @@ export function buildRow(
       : DEFAULT_COMPETITOR_DISCOUNT;
     prayagBasis = prayagMrp * (1 - prayagDisc / 100);
     competitorBasis = effPrice != null ? effPrice * (1 - compDisc / 100) : null;
+    upcomingCompetitorBasis =
+      upcomingEffPrice != null ? upcomingEffPrice * (1 - compDisc / 100) : null;
   }
 
   // A price gap is only meaningful for a confirmed match where both prices exist.
@@ -178,11 +208,23 @@ export function buildRow(
     priceDiff,
     priceDiffPct,
     prayagCheaper,
-    // Pass through upcoming revision from the catalog map (informational only —
-    // never affects comparison math which uses prayagMrpAtCompare).
+    // Pass through the next revision from the same date-resolved catalog map.
     prayagEffectiveDate: matched ? (prayag?.effectiveDate ?? null) : null,
     upcomingPrayagMrp: matched ? (prayag?.upcomingMrp ?? null) : null,
     upcomingPrayagMrpDate: matched ? (prayag?.upcomingMrpDate ?? null) : null,
+    prayagValidTo: matched ? (prayag?.validTo ?? null) : null,
+    upcomingPrayagChangePct: matched
+      ? (prayag?.upcomingChangePct ?? null)
+      : null,
+    competitorEffectiveDate: c.effectiveDate ?? null,
+    competitorValidTo: c.validTo ?? null,
+    upcomingCompetitorPrice: c.upcomingPrice ?? null,
+    upcomingCompetitorEffectivePrice: upcomingCompetitorBasis,
+    upcomingCompetitorPriceDate: c.upcomingEffectiveDate ?? null,
+    upcomingCompetitorChangePct: priceChangePct(
+      competitorBasis,
+      upcomingCompetitorBasis,
+    ),
   };
 }
 
@@ -377,5 +419,17 @@ export function toOpportunityItem(r: AnalysisRow) {
     priceDiffPct: round1(r.priceDiffPct!),
     upcomingPrayagMrp: r.upcomingPrayagMrp,
     upcomingPrayagMrpDate: r.upcomingPrayagMrpDate,
+    prayagEffectiveDate: r.prayagEffectiveDate,
+    prayagValidTo: r.prayagValidTo,
+    upcomingPrayagChangePct: r.upcomingPrayagChangePct,
+    competitorEffectiveDate: r.competitorEffectiveDate,
+    competitorValidTo: r.competitorValidTo,
+    upcomingCompetitorPrice: r.upcomingCompetitorPrice,
+    upcomingCompetitorEffectivePrice:
+      r.upcomingCompetitorEffectivePrice == null
+        ? null
+        : round1(r.upcomingCompetitorEffectivePrice),
+    upcomingCompetitorPriceDate: r.upcomingCompetitorPriceDate,
+    upcomingCompetitorChangePct: r.upcomingCompetitorChangePct,
   };
 }
