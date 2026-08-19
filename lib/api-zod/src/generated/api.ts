@@ -353,6 +353,9 @@ export const GetPriceFinderSearchResponse = zod.object({
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
   "hasCompetitorData": zod.boolean(),
+  "bestCompetitorBrand": zod.string().nullish().describe('Brand name of the cheapest matched competitor, or null when none.'),
+  "bestCompetitorPrice": zod.number().nullish().describe('Normalized (incl-GST) price of the cheapest competitor, or null.'),
+  "bestCompetitorGapPct": zod.number().nullish().describe('Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 })),
   "totalCount": zod.number(),
@@ -404,6 +407,9 @@ export const GetPriceFinderBrowseResponse = zod.object({
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
   "hasCompetitorData": zod.boolean(),
+  "bestCompetitorBrand": zod.string().nullish().describe('Brand name of the cheapest matched competitor, or null when none.'),
+  "bestCompetitorPrice": zod.number().nullish().describe('Normalized (incl-GST) price of the cheapest competitor, or null.'),
+  "bestCompetitorGapPct": zod.number().nullish().describe('Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 }))
 })

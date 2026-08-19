@@ -20,16 +20,24 @@ type SearchRow = {
   upcoming_mrp: number | null;
   upcoming_effective_date: string | null;
   has_competitor_data: boolean;
+  best_competitor_brand: string | null;
+  best_competitor_price: number | null;
   discontinued_from: string | null;
 };
 
 function toSearchResult(row: SearchRow) {
+  const mrp = row.current_mrp;
+  const cp = row.best_competitor_price;
+  const gapPct =
+    mrp != null && mrp > 0 && cp != null
+      ? ((cp - mrp) / mrp) * 100
+      : null;
   return {
     itemCode: row.item_code,
     productName: row.product_name,
     division: row.division,
     category: row.category,
-    currentMrp: row.current_mrp,
+    currentMrp: mrp,
     currentEffectiveDate: row.current_effective_date,
     currentValidTo: validToFromNextDateOrDiscontinuation(
       row.upcoming_effective_date,
@@ -37,8 +45,11 @@ function toSearchResult(row: SearchRow) {
     ),
     upcomingMrp: row.upcoming_mrp,
     upcomingEffectiveDate: row.upcoming_effective_date,
-    upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
+    upcomingChangePct: priceChangePct(mrp, row.upcoming_mrp),
     hasCompetitorData: row.has_competitor_data,
+    bestCompetitorBrand: row.best_competitor_brand ?? null,
+    bestCompetitorPrice: cp ?? null,
+    bestCompetitorGapPct: gapPct,
     discontinuedFrom: row.discontinued_from,
   };
 }
@@ -246,7 +257,9 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         WHERE cp.matched_prayag_code = p.item_code
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
-      ) AS has_competitor_data
+      ) AS has_competitor_data,
+      best_comp.competitor AS best_competitor_brand,
+      best_comp.normalized_price AS best_competitor_price
     FROM catalog_products p
     JOIN LATERAL (
       SELECT h.mrp, h.effective_date
@@ -269,6 +282,21 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       ORDER BY h.effective_date ASC, h.id DESC
       LIMIT 1
     ) upcoming_price ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        cp.competitor,
+        CASE
+          WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+            THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+          ELSE cp.price
+        END AS normalized_price
+      FROM competitor_prices cp
+      WHERE cp.matched_prayag_code = p.item_code
+        AND cp.price IS NOT NULL
+        AND cp.effective_date <= CURRENT_DATE
+      ORDER BY normalized_price ASC
+      LIMIT 1
+    ) best_comp ON true
     WHERE p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       AND ${sql.join(filterConditions, sql` AND `)}
@@ -433,7 +461,9 @@ router.get("/price-finder/browse", async (req, res) => {
           WHERE cp.matched_prayag_code = p.item_code
             AND cp.price IS NOT NULL
             AND cp.effective_date <= CURRENT_DATE
-        ) AS has_competitor_data
+        ) AS has_competitor_data,
+        best_comp.competitor AS best_competitor_brand,
+        best_comp.normalized_price AS best_competitor_price
       FROM catalog_products p
       JOIN LATERAL (
         SELECT h.mrp, h.effective_date
@@ -456,6 +486,21 @@ router.get("/price-finder/browse", async (req, res) => {
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
       ) upcoming_price ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          cp.competitor,
+          CASE
+            WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+              THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+            ELSE cp.price
+          END AS normalized_price
+        FROM competitor_prices cp
+        WHERE cp.matched_prayag_code = p.item_code
+          AND cp.price IS NOT NULL
+          AND cp.effective_date <= CURRENT_DATE
+        ORDER BY normalized_price ASC
+        LIMIT 1
+      ) best_comp ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND ${categoryCondition}
         AND p.is_active IS TRUE

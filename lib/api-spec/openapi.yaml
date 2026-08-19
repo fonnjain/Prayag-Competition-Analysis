@@ -1786,6 +1786,15 @@ components:
           description: One-decimal change from current to upcoming MRP; zero is retained.
         hasCompetitorData:
           type: boolean
+        bestCompetitorBrand:
+          type: ["string", "null"]
+          description: Brand name of the cheapest matched competitor, or null when none.
+        bestCompetitorPrice:
+          type: ["number", "null"]
+          description: Normalized (incl-GST) price of the cheapest competitor, or null.
+        bestCompetitorGapPct:
+          type: ["number", "null"]
+          description: 'Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'
         discontinuedFrom:
           type: ["string", "null"]
           format: date

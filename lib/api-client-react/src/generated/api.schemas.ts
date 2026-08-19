@@ -137,6 +137,21 @@ export interface PriceFinderSearchResult {
      */
   upcomingChangePct: number | null;
   hasCompetitorData: boolean;
+  /**
+     * Brand name of the cheapest matched competitor, or null when none.
+     * @nullable
+     */
+  bestCompetitorBrand?: string | null;
+  /**
+     * Normalized (incl-GST) price of the cheapest competitor, or null.
+     * @nullable
+     */
+  bestCompetitorPrice?: number | null;
+  /**
+     * Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.
+     * @nullable
+     */
+  bestCompetitorGapPct?: number | null;
   /** @nullable */
   discontinuedFrom: string | null;
 }

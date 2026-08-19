@@ -10,6 +10,9 @@ import {
   Tag,
   Volume2,
   VolumeX,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,58 @@ import {
   type PriceFinderCompetitor,
   type PriceFinderSearchResult,
 } from "@workspace/api-client-react";
+
+/** Compact one-line competitor price indicator for list rows */
+function CompetitorLine({
+  brand,
+  price,
+  gapPct,
+  className,
+}: {
+  brand: string | null | undefined;
+  price: number | null | undefined;
+  gapPct: number | null | undefined;
+  className?: string;
+}) {
+  if (!brand || price == null) return null;
+
+  const absGap = gapPct != null ? Math.abs(gapPct) : null;
+  const cheaper = gapPct != null && gapPct > 0.05;
+  const costlier = gapPct != null && gapPct < -0.05;
+
+  return (
+    <span
+      className={cn(
+        "mt-1 flex items-center gap-1 text-xs font-medium",
+        cheaper
+          ? "text-emerald-700"
+          : costlier
+            ? "text-amber-700"
+            : "text-muted-foreground",
+        className,
+      )}
+    >
+      {cheaper ? (
+        <TrendingDown className="w-3 h-3 shrink-0" />
+      ) : costlier ? (
+        <TrendingUp className="w-3 h-3 shrink-0" />
+      ) : (
+        <Minus className="w-3 h-3 shrink-0" />
+      )}
+      <span>
+        {brand} ₹{price.toFixed(0)}
+        {absGap != null && absGap >= 0.05 && (
+          <span className="ml-1 opacity-80">
+            · Prayag {absGap.toFixed(1)}% {cheaper ? "cheaper" : "costlier"}
+          </span>
+        )}
+        {absGap != null && absGap < 0.05 && (
+          <span className="ml-1 opacity-70">· parity</span>
+        )}
+      </span>
+    </span>
+  );
+}
 
 function useVoiceSearch(
   onFinalResult: (text: string) => void,
@@ -667,17 +722,17 @@ export default function PriceFinderPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-sm font-bold text-primary">{res.itemCode}</span>
-                      {res.hasCompetitorData && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase tracking-wider">
-                          Mapped
-                        </span>
-                      )}
                     </div>
                     <p className="text-foreground font-semibold text-lg">{res.productName}</p>
                     <DiscontinuationBadge value={res.discontinuedFrom} />
                     <p className="text-xs font-medium text-muted-foreground mt-1">
                       {[res.division, res.category].filter(Boolean).join(" • ")}
                     </p>
+                    <CompetitorLine
+                      brand={res.bestCompetitorBrand}
+                      price={res.bestCompetitorPrice}
+                      gapPct={res.bestCompetitorGapPct}
+                    />
                   </div>
                   <div className="flex items-center gap-4 text-right">
                     <div className="hidden sm:block">
