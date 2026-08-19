@@ -390,10 +390,7 @@ export default function ImportReviewPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/import-competitor")}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
+      <div className="flex items-start">
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">
             Review Import — {batch.competitor}

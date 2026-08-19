@@ -7,6 +7,7 @@ import Dashboard from "@/pages/dashboard";
 import DiscountSettings from "@/pages/discount-settings";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useState } from "react";
+import { AppShell } from "@/components/AppShell";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,11 +92,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/settings/discounts" component={DiscountSettings} />
-      <Route component={NotFound} />
-    </Switch>
+    <AppShell>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/settings/discounts" component={DiscountSettings} />
+        <Route component={NotFound} />
+      </Switch>
+    </AppShell>
   );
 }
 

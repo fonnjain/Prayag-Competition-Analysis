@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,8 +15,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, LogOut, Home, Database, CalendarDays } from "lucide-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, CalendarDays } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +39,6 @@ export type DashboardFilters = {
 };
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<CompareMode>("mrp");
   const [baseFilters, setBaseFilters] = useState<DashboardFilters>({});
@@ -103,64 +101,30 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted/20">
-      <header className="border-b bg-card text-card-foreground px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 pr-4 border-r border-border">
-            <a
-              href="/"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              title="Home"
-            >
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Home</span>
-            </a>
-            <span className="text-border">/</span>
-            <a
-              href="/product-db/"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              title="Product Database"
-            >
-              <Database className="h-4 w-4" />
-              <span className="hidden sm:inline">Product DB</span>
-            </a>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Competition Analysis</h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1">Prayag Pricing Cockpit</p>
-          </div>
+    <div className="flex flex-col min-h-full bg-muted/20">
+      {/* Controls bar — global nav owned by AppShell; only app controls here */}
+      <div className="border-b bg-card px-6 py-3 flex flex-wrap items-center gap-3">
+        <ModeToggle mode={mode} onChange={setMode} />
+        <div className="flex-1" />
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => handleExport("csv")} disabled={exportLoading}>
+            <Download className="h-4 w-4 mr-2" />
+            CSV
+          </Button>
+          <Button size="sm" onClick={() => handleExport("xlsx")} disabled={exportLoading}>
+            <Download className="h-4 w-4 mr-2" />
+            Excel Export
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/settings/discounts">
+              <Settings className="h-4 w-4 mr-2" />
+              Discounts
+            </Link>
+          </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <ModeToggle mode={mode} onChange={setMode} />
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport("csv")} disabled={exportLoading}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
-            </Button>
-            <Button size="sm" onClick={() => handleExport("xlsx")} disabled={exportLoading}>
-              <Download className="h-4 w-4 mr-2" />
-              Excel Export
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/settings/discounts">
-                <Settings className="h-4 w-4 mr-2" />
-                Discounts
-              </Link>
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 pl-2 border-l border-border">
-            {user && (
-              <span className="text-sm text-muted-foreground hidden md:block">{[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User"}</span>
-            )}
-            <Button variant="ghost" size="sm" onClick={logout} title="Log out">
-              <LogOut className="h-4 w-4 mr-2" />
-              Log out
-            </Button>
-          </div>
-        </div>
-      </header>
-      
-      <main className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
+      </div>
+
+      <div className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
         <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} competitorPeriodDate={competitorPeriodDate} />
         
         <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} onCompetitorPeriodDate={handleCompetitorPeriodDate} />
@@ -186,7 +150,7 @@ export default function Dashboard() {
         <div className="min-h-[400px]">
           <OpportunitiesThreats filters={filters} />
         </div>
-      </main>
+      </div>
     </div>
   );
 }
@@ -371,7 +335,7 @@ function FilterBar({
                 {periodsData.periods.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
-                    {periodsData.isFuturePeriod[p] ? " ⏳" : p === periodsData.defaultPeriod ? " ✓" : ""}
+                    {periodsData.isFuturePeriod[p] ? " \u23F3" : p === periodsData.defaultPeriod ? " \u2713" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -412,7 +376,7 @@ function FilterBar({
           )
         )}
 
-        {Object.keys(filters).some(k => (filters as any)[k] !== undefined) && (
+        {Object.keys(filters).some(k => (filters as Record<string, unknown>)[k] !== undefined) && (
           <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-muted-foreground">
             <RefreshCw className="h-3 w-3 mr-2" />
             Clear

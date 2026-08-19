@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
 import {
   useGetDiscountSettings,
   useUpdateDiscountSettings,
@@ -26,7 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Scale } from "lucide-react";
 
 function isValidPct(s: string): boolean {
   if (s.trim() === "") return false;
@@ -90,35 +88,27 @@ export default function DiscountSettings() {
     : "never";
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted/20">
-      <header className="border-b bg-card text-card-foreground px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/" aria-label="Back to dashboard">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <Scale className="h-5 w-5" /> Discount Settings
-            </h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1">
-              Used only by the Net-to-Net comparison
-            </p>
-          </div>
+    <div className="flex flex-col min-h-full bg-muted/20">
+      {/* Controls bar — global nav owned by AppShell; only page controls here */}
+      <div className="border-b bg-card px-6 py-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-base font-semibold text-foreground">Discount Settings</h1>
+          <p className="text-xs text-muted-foreground font-mono">
+            Used only by the Net-to-Net comparison
+          </p>
         </div>
         <Button onClick={handleSave} disabled={update.isPending || hasErrors}>
           {update.isPending ? "Saving…" : "Save Changes"}
         </Button>
-      </header>
+      </div>
 
-      <main className="flex-1 p-6 space-y-6 max-w-3xl mx-auto w-full">
+      <div className="flex-1 p-6 space-y-6 max-w-3xl mx-auto w-full">
         <Card>
           <CardHeader>
             <CardTitle>How Net-to-Net works</CardTitle>
             <CardDescription>
-              Net price = MRP × (1 − discount%). The dashboard compares Prayag's net
-              against each competitor's net. MRP-to-MRP mode ignores these values.
+              Net price = MRP &times; (1 &minus; discount%). The dashboard compares Prayag&apos;s net
+              against each competitor&apos;s net. MRP-to-MRP mode ignores these values.
               Last saved: {lastUpdated}.
             </CardDescription>
           </CardHeader>
@@ -190,7 +180,7 @@ export default function DiscountSettings() {
             </CardContent>
           )}
         </Card>
-      </main>
+      </div>
     </div>
   );
 }

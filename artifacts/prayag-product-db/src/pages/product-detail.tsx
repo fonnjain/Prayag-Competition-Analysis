@@ -1,8 +1,7 @@
 import { useRoute } from "wouter";
 import { useGetCatalogProduct, getGetCatalogProductQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
-import { ArrowLeft, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function ProductDetailPage() {
@@ -28,15 +27,6 @@ export default function ProductDetailPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
-      <div className="flex items-center gap-4 text-muted-foreground mb-4">
-        <Link href="/">
-          <div className="inline-flex items-center hover:text-foreground cursor-pointer transition-colors">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Catalog
-          </div>
-        </Link>
-      </div>
-
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{data.product.productName || data.product.itemCode}</h1>

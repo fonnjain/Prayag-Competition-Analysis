@@ -101,7 +101,9 @@ function useVoiceSearch(
 export default function PriceFinderPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
-  const [filters, setFilters] = useState<string[]>([]);
+  const [filters, setFilters] = useState<string[]>(() =>
+    new URLSearchParams(window.location.search).getAll("filter").filter(Boolean),
+  );
   const [selectedItemCode, setSelectedItemCode] = useState<string | null>(null);
   const [browseDivision, setBrowseDivision] = useState<string | null>(null);
   const [browseCategory, setBrowseCategory] = useState<string | null>(null);
@@ -113,26 +115,47 @@ export default function PriceFinderPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const writeFiltersToUrl = useCallback((nextFilters: string[]) => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("filter");
+    nextFilters.forEach((filter) => params.append("filter", filter));
+    const query = params.toString();
+    window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, []);
+
+  useEffect(() => {
+    const restoreFiltersFromHistory = () => {
+      setFilters(new URLSearchParams(window.location.search).getAll("filter").filter(Boolean));
+      setSearchInput("");
+      setSelectedItemCode(null);
+    };
+    window.addEventListener("popstate", restoreFiltersFromHistory);
+    return () => window.removeEventListener("popstate", restoreFiltersFromHistory);
+  }, []);
+
   const addFilter = useCallback((term: string) => {
     const cleaned = term.trim();
     if (!cleaned) return;
-    setFilters((current) =>
-      current.some((filter) => filter.toLowerCase() === cleaned.toLowerCase())
-        ? current
-        : [...current, cleaned],
-    );
+    setFilters((current) => {
+      if (current.some((filter) => filter.toLowerCase() === cleaned.toLowerCase())) return current;
+      const next = [...current, cleaned];
+      writeFiltersToUrl(next);
+      return next;
+    });
     setSearchInput("");
     setSelectedItemCode(null);
-  }, []);
+  }, [writeFiltersToUrl]);
 
   const removeFilter = useCallback((index: number, edit = false) => {
     setFilters((current) => {
       const removed = current[index];
       if (edit && removed) setSearchInput(removed);
-      return current.filter((_, itemIndex) => itemIndex !== index);
+      const next = current.filter((_, itemIndex) => itemIndex !== index);
+      writeFiltersToUrl(next);
+      return next;
     });
     setSelectedItemCode(null);
-  }, []);
+  }, [writeFiltersToUrl]);
 
   const handleVoiceResult = useCallback((text: string) => {
     addFilter(text);
@@ -280,6 +303,7 @@ export default function PriceFinderPage() {
             className="h-8 text-muted-foreground"
             onClick={() => {
               setFilters([]);
+              writeFiltersToUrl([]);
               setSearchInput("");
               setSelectedItemCode(null);
             }}
