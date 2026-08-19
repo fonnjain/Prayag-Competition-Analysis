@@ -1,0 +1,168 @@
+# Replit Prompt — Sink MRP Repair + Discontinuation Handling (01 Sep 2026)
+
+**Deadline: this must ship before 01 Sep 2026.** Both defects below are inert today and go live automatically on that date, because prices resolve by `effective_date <= CURRENT_DATE`.
+
+---
+
+## 1. Background — what went wrong
+
+The sink products live only in the `SINK` sheet of `NEW PTMT MRP w.e.f. List as on 01st Sep, 2026.xlsx` (they are absent from `MASTER`, `NEW ITEMS` and `NEW PTMT`).
+
+That sheet mixes **two different block layouts in the same columns**:
+
+| Block type | 05 Mar 2026 price | 01 Sep 2026 price | Columns H and K hold |
+|---|---|---|---|
+| Gloss/Matt blocks — all `-D` sinks | `I` (Gloss), `J` (Matt) | **`L` (Gloss), `M` (Matt)** | **status markers, not prices** |
+| Single-price blocks — `SA-`, `P-`, `H-` series | `H` | `K` | prices |
+
+The header label `"01st Sep, 2026"` sits in cell **`K2`**. A loader that locks onto the header-label column reads `K` for every row — correct for the single-price blocks, wrong for the Gloss/Matt blocks.
+
+This produced two separate defects.
+
+**Defect 1 — seven sink prices are stray marker values, not prices.** The loader picked up leftover entries sitting in `K`.
+
+**Defect 2 — nine discontinued sinks will go live.** The 600 series (204 steel) is marked `Removed` in column `K` against the 01 Sep date: introduced 05 Mar 2026, withdrawn 01 Sep 2026. Column `L` still carries a stale calculated figure for those rows, so they look like ordinary priced products. **This is the more dangerous of the two** — a wrong-but-plausible price passes visual review, whereas ₹0.05 does not.
+
+Verified against the source file: 67 Gloss/Matt rows, 105 single-price rows, 172 total, 0 rows without a resolvable September price.
+
+---
+
+## 2. Part A — correct the seven prices
+
+These seven rows exist in `mrp_price_history` with `effective_date = '2026-09-01'` and a wrong `mrp`. Correct the value **in place**. Do not insert new rows: the unique index `mrp_price_history_code_date_idx` on `(item_code, effective_date)` forbids a second row for the same period, and this is a repair of a wrong value within an existing period, not a new price period.
+
+| item_code | Wrong `mrp` | Correct `mrp` | 05 Mar 2026 MRP | Increase |
+|---|---|---|---|---|
+| `911-D` | 0.05 | **3490** | 3240 | +7.7% |
+| `816-D` | 0.06 | **2690** | 2490 | +8.0% |
+| `930-D` | 0.05 | **7440** | 6890 | +8.0% |
+| `932-D` | 0.05 | **9930** | 9190 | +8.1% |
+| `842-D` | 0.06 | **7970** | 7380 | +8.0% |
+| `1232-D` | 0.05 | **11650** | 10790 | +8.0% |
+| `1230-D` | 0 | **8630** | 7990 | +8.0% |
+
+Every one lands at roughly +8%, matching Prayag's stated 01 Sep revision. Treat that as the sanity check.
+
+**Matt variants.** The corresponding `-DM` codes (`911-DM`, `816-DM`, `930-DM`, `932-DM`, `842-DM`, `1232-DM`, `1230-DM`) carry the **same** MRP as their Gloss counterparts. Check whether they exist in `mrp_price_history` at `2026-09-01`; if they do and their value is also below ₹50, correct them to the same figure. If they are absent, leave them absent and report it — do not create them.
+
+Set `notes` on every corrected row to:
+
+```
+Repaired 2026-08-19: value was a stray marker from SINK column K; correct price taken from column L (Gloss).
+```
+
+---
+
+## 3. Part B — stop the nine discontinued products going live
+
+These nine are withdrawn with effect from 01 Sep 2026. They must remain visible and priced **up to 31 Aug 2026**, then disappear.
+
+`616-D`, `618-D`, `620-D`, `622-D`, `623-D`, `624-D`, `624-XD`, `624-SD`, `625-D`
+
+(plus their `-DM` Matt variants, wherever those exist in the catalog.)
+
+Setting `is_active = false` is **wrong** — that removes them today, and they are legitimately on sale until 31 August. A date-effective mechanism is required.
+
+### B1. Schema
+
+In `lib/db/src/schema/catalog.ts`, add to `catalogProductsTable`:
+
+```ts
+discontinuedFrom: date("discontinued_from"),
+```
+
+Nullable; `null` means the product is not scheduled for withdrawal. Then run:
+
+```
+pnpm --filter @workspace/db run push
+```
+
+### B2. Delete the phantom September rows
+
+Delete the `2026-09-01` rows in `mrp_price_history` for those nine codes (and their `-DM` variants). Those prices were never real — column `L` held a carried-over calculation for rows the price list had already marked `Removed`. Their 05 Mar 2026 rows stay untouched.
+
+Set `discontinued_from = '2026-09-01'` on the matching `catalog_products` rows.
+
+### B3. Respect the flag at query time
+
+A product is live at `:asOf` when `discontinued_from IS NULL OR discontinued_from > :asOf`. Apply this at **every** site that resolves a current price. These are the ones present today — verify the list is still complete before you start, and do not assume it is:
+
+- `artifacts/api-server/src/lib/catalog.ts` — `recomputeCurrentFlags()`
+- `artifacts/api-server/src/routes/analysis.ts` (the `DISTINCT ON (item_code)` CTEs, ~line 63 and ~line 69)
+- `artifacts/api-server/src/routes/comparison.ts` (~line 72 and ~line 125)
+- `artifacts/api-server/src/routes/priceFinder.ts` (the `current_price` CTEs)
+- `artifacts/api-server/src/routes/catalogImportExport.ts` (~line 1211)
+
+Follow the existing convention in each file: these queries already thread a resolved `asOf` date rather than hardcoding `CURRENT_DATE` where the caller supplies one. Match that. A discontinued product must still appear when `asOf` is a date before its `discontinued_from`, because historical comparisons must stay reproducible.
+
+### B4. Surface it
+
+Contract-first — edit `lib/api-spec/openapi.yaml` to add `discontinuedFrom` (nullable date) to the product schemas, then:
+
+```
+pnpm --filter @workspace/api-spec run codegen
+```
+
+Never hand-edit `lib/api-hooks` or `lib/api-zod`.
+
+In the Catalog and Price Finder UIs, show a badge on any product with a non-null `discontinuedFrom` in the future: `Discontinued from 01 Sep 2026`. This is the whole point of the exercise — the sales team needs to see the withdrawal coming, not discover it on the day.
+
+---
+
+## 4. Part C — prevent recurrence
+
+The existing loader guard rejects headers matching `/box|pcs|packing|qty|coupon|diff|%age|weight|erp/i`. It did not catch this, because the offending column has the **right header label** and the wrong values.
+
+Add a post-load validation pass to the MRP loader that reports (does **not** silently drop) any row where:
+
+1. MRP is below ₹50 in the PTMT, CP or Sanitaryware divisions.
+2. The period-over-period change is above +60% or below −20%.
+3. MRP is below ₹1 in any division.
+
+Surface the results on the **Load MRP** page as a blocking review step: the load completes, the flagged rows are listed with old value, new value and reason, and the user confirms or cancels before the rows become current. Do not auto-reject — the project deliberately keeps a human in the loop on price data.
+
+Row 1 of the sheet under the "Prayag MRP loader" heading in Data Health should show the count of currently flagged rows so this stays visible after the load screen is closed.
+
+---
+
+## 5. Acceptance tests
+
+Add these to the api-server test suite. All must pass.
+
+```
+1. 911-D resolves to 3490 at asOf = 2026-09-01, and to 3240 at asOf = 2026-08-31.
+2. 1230-D resolves to 8630 at asOf = 2026-09-01. (It was 0, not 0.05 — the "under ₹1" case.)
+3. No item_code in PTMT has an MRP below ₹50 at asOf = 2026-09-01 except the 12 known
+   genuine low-value PTMT items. Assert the count is exactly 12, not "small".
+4. 616-D resolves to 2490 at asOf = 2026-08-31 and returns NO price at asOf = 2026-09-01.
+5. 616-D still appears in a catalog query with asOf = 2026-08-31 — discontinuation is
+   date-effective, not retroactive.
+6. All nine discontinued codes have zero rows in mrp_price_history at effective_date = '2026-09-01'.
+7. discontinued_from is null for every product not in the nine-code list.
+8. The 68 PTMT products dated only from 01 Sep 2026 still resolve correctly on that date —
+   this change must not affect them.
+```
+
+Test 8 matters: those 68 are a separate group from the nine, and an over-broad filter would hide them.
+
+---
+
+## 6. Reporting back
+
+Before committing, report:
+
+- The seven corrected prices, read back from the database, not from this document.
+- Which `-DM` Matt variants were found and corrected, and which were absent.
+- The nine discontinued codes with their `discontinued_from` value and their deleted-row count.
+- The count of PTMT items priced under ₹50 at `asOf = 2026-09-01`. Expected: **12**.
+- Confirmation that all eight acceptance tests pass.
+
+Read the values back with a query. Do not restate the numbers from this prompt — that is not verification.
+
+---
+
+## 7. Cleanup
+
+Follow the established pattern: create the repair as a one-time admin endpoint, run it in dev, verify, run it in production, then **remove the endpoint from the codebase** before the final commit. The schema change, the query changes, the loader validation and the tests all stay.
+
+One clean commit, please — not incremental partial commits.
