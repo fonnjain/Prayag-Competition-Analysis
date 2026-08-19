@@ -26,9 +26,9 @@ export interface CatalogProductListItem {
   uom?: string | null;
   isActive?: boolean;
   /** @nullable */
-  discontinuedFrom?: string | null;
-  /** @nullable */
   dataFlag?: string | null;
+  /** @nullable */
+  discontinuedFrom?: string | null;
   hasPrice: boolean;
   /** @nullable */
   currentMrp?: number | null;
@@ -66,11 +66,11 @@ export interface CatalogProduct {
   kgCost?: number | null;
   isActive?: boolean;
   /** @nullable */
-  discontinuedFrom?: string | null;
-  /** @nullable */
   sourceFiles?: string | null;
   /** @nullable */
   dataFlag?: string | null;
+  /** @nullable */
+  discontinuedFrom?: string | null;
 }
 
 export interface MrpPriceRow {
@@ -90,6 +90,13 @@ export interface MrpPriceRow {
   isCurrent: boolean;
   /** @nullable */
   notes?: string | null;
+  reviewStatus?: string;
+  /** @nullable */
+  reviewReasons?: string | null;
+  /** @nullable */
+  importBatchId?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
 }
 
 export interface CatalogProductDetail {
@@ -129,12 +136,9 @@ export interface PriceFinderSearchResult {
      * @nullable
      */
   upcomingChangePct: number | null;
-  /**
-     * Scheduled withdrawal date, when applicable.
-     * @nullable
-     */
-  discontinuedFrom?: string | null;
   hasCompetitorData: boolean;
+  /** @nullable */
+  discontinuedFrom: string | null;
 }
 
 export type PriceFinderFilterSuggestionValuesItem = {
@@ -203,11 +207,8 @@ export interface PriceFinderProduct {
      * @nullable
      */
   upcomingChangePct: number | null;
-  /**
-     * Scheduled withdrawal date, when applicable.
-     * @nullable
-     */
-  discontinuedFrom?: string | null;
+  /** @nullable */
+  discontinuedFrom: string | null;
 }
 
 export interface PriceFinderCompetitor {
@@ -291,6 +292,7 @@ export interface CatalogDataHealth {
   missingPriceCount: number;
   missingPrices: CatalogMissingPrice[];
   duplicateSources: CatalogDuplicateSource[];
+  flaggedMrpCount: number;
 }
 
 export interface HealthStatus {
@@ -1140,6 +1142,17 @@ category?: string;
 search?: string;
 page?: number;
 pageSize?: number;
+/**
+ * Resolve catalog availability and MRP as of this date (YYYY-MM-DD). Defaults to today.
+ */
+asOf?: string;
+};
+
+export type ExternalGetProductParams = {
+/**
+ * Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.
+ */
+asOf?: string;
 };
 
 export type ExternalGetComparisonParams = {
@@ -1159,6 +1172,17 @@ search?: string;
 priceStatus?: string;
 page?: number;
 pageSize?: number;
+/**
+ * Resolve catalog availability and MRP as of this date (YYYY-MM-DD). Defaults to today.
+ */
+asOf?: string;
+};
+
+export type GetCatalogProductParams = {
+/**
+ * Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.
+ */
+asOf?: string;
 };
 
 export type GetPriceFinderSearchParams = {

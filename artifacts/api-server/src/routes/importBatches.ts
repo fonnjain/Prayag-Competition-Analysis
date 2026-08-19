@@ -14,7 +14,7 @@
 
 import { Router, type IRouter } from "express";
 import multer from "multer";
-import { eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -90,13 +90,19 @@ async function getAliases(competitor: string): Promise<CodeAlias[]> {
 }
 
 async function getCurrentPrayagMrp(): Promise<Map<string, number>> {
-  const rows = await db
-    .select({ itemCode: mrpPriceHistoryTable.itemCode, mrp: mrpPriceHistoryTable.mrp })
-    .from(mrpPriceHistoryTable)
-    .where(eq(mrpPriceHistoryTable.isCurrent, true));
+  const result = await db.execute<{ item_code: string; mrp: number | null }>(sql`
+    SELECT DISTINCT ON (h.item_code) h.item_code, h.mrp
+    FROM mrp_price_history h
+    JOIN catalog_products p ON p.item_code = h.item_code
+    WHERE h.effective_date <= CURRENT_DATE
+      AND h.review_status = 'approved'
+      AND p.is_active IS TRUE
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+    ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+  `);
   const map = new Map<string, number>();
-  for (const r of rows) {
-    if (r.mrp != null) map.set(normCode(r.itemCode), r.mrp);
+  for (const r of result.rows) {
+    if (r.mrp != null) map.set(normCode(r.item_code), r.mrp);
   }
   return map;
 }
@@ -508,11 +514,33 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
       competitorPriceStagingTable.matchedPrayagCode,
     );
 
-  const [products, currentMrpRows] = await Promise.all([
-    db.select().from(catalogProductsTable).orderBy(catalogProductsTable.itemCode),
-    db.select().from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.isCurrent, true)),
+  const [products, currentMrpResult] = await Promise.all([
+    db
+      .select()
+      .from(catalogProductsTable)
+      .where(and(
+        eq(catalogProductsTable.isActive, true),
+        sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > CURRENT_DATE)`,
+      ))
+      .orderBy(catalogProductsTable.itemCode),
+    db.execute<{
+      item_code: string;
+      mrp: number | null;
+      effective_date: string;
+    }>(sql`
+      SELECT DISTINCT ON (h.item_code)
+        h.item_code, h.mrp, h.effective_date
+      FROM mrp_price_history h
+      JOIN catalog_products p ON p.item_code = h.item_code
+      WHERE h.effective_date <= CURRENT_DATE
+        AND h.review_status = 'approved'
+        AND p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+      ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+    `),
   ]);
-  const mrpMap = new Map(currentMrpRows.map((r) => [r.itemCode, r]));
+  const currentMrpRows = currentMrpResult.rows;
+  const mrpMap = new Map(currentMrpRows.map((r) => [r.item_code, r]));
   const stagingByPrayag = new Map<string, typeof stagingRows[number]>();
   for (const r of stagingRows) {
     if (r.matchedPrayagCode && (r.status === "ok" || r.status === "needs_review")) {
@@ -521,7 +549,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
   }
 
   const prayagDate =
-    [...new Set(currentMrpRows.map((r) => r.effectiveDate))].sort().reverse()[0] ?? "Current";
+    [...new Set(currentMrpRows.map((r) => r.effective_date))].sort().reverse()[0] ?? "Current";
 
   const header = [
     "Prayag Code", "Prayag Product", "Division", "Category",
@@ -539,7 +567,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
     const mrpRow = mrpMap.get(p.itemCode);
     body.push([
       p.itemCode, p.productName ?? "", p.division ?? "", p.category ?? "",
-      mrpRow?.mrp ?? null, mrpRow?.effectiveDate ?? null,
+      mrpRow?.mrp ?? null, mrpRow?.effective_date ?? null,
       s.competitorCodeMaster ?? "", s.competitorCodeCatalogue ?? "",
       s.newMrp ?? null, s.oldMrp ?? null,
       s.increasePct != null ? Math.round(s.increasePct * 10) / 10 : null,

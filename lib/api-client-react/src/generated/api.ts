@@ -61,6 +61,7 @@ import type {
   ErrorResponse,
   ExportAnalysisParams,
   ExternalGetComparisonParams,
+  ExternalGetProductParams,
   ExternalListProductsParams,
   GetAnalysisByBrandParams,
   GetAnalysisByCategoryParams,
@@ -69,6 +70,7 @@ import type {
   GetAnalysisOverviewParams,
   GetAnalysisPositioningParams,
   GetAutoAcceptPreviewParams,
+  GetCatalogProductParams,
   GetCatalogProductsParams,
   GetComparisonByProductParams,
   GetComparisonFiltersParams,
@@ -560,20 +562,29 @@ export function useExternalListProducts<TData = Awaited<ReturnType<typeof extern
 
 
 
-export const getExternalGetProductUrl = (itemCode: string,) => {
+export const getExternalGetProductUrl = (itemCode: string,
+    params?: ExternalGetProductParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/v1/products/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/v1/products/${itemCode}?${stringifiedParams}` : `/api/v1/products/${itemCode}`
 }
 
 /**
  * @summary External API: product detail with MRP history (requires X-API-Key header)
  */
-export const externalGetProduct = async (itemCode: string, options?: RequestInit): Promise<CatalogProductDetail> => {
+export const externalGetProduct = async (itemCode: string,
+    params?: ExternalGetProductParams, options?: RequestInit): Promise<CatalogProductDetail> => {
 
-  return customFetch<CatalogProductDetail>(getExternalGetProductUrl(itemCode),
+  return customFetch<CatalogProductDetail>(getExternalGetProductUrl(itemCode,params),
   {
     ...options,
     method: 'GET'
@@ -586,23 +597,25 @@ export const externalGetProduct = async (itemCode: string, options?: RequestInit
 
 
 
-export const getExternalGetProductQueryKey = (itemCode: string,) => {
+export const getExternalGetProductQueryKey = (itemCode: string,
+    params?: ExternalGetProductParams,) => {
     return [
-    `/api/v1/products/${itemCode}`
+    `/api/v1/products/${itemCode}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExternalGetProductQueryOptions = <TData = Awaited<ReturnType<typeof externalGetProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExternalGetProductQueryOptions = <TData = Awaited<ReturnType<typeof externalGetProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string,
+    params?: ExternalGetProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExternalGetProductQueryKey(itemCode);
+  const queryKey =  queryOptions?.queryKey ?? getExternalGetProductQueryKey(itemCode,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetProduct>>> = ({ signal }) => externalGetProduct(itemCode, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetProduct>>> = ({ signal }) => externalGetProduct(itemCode,params, { signal, ...requestOptions });
 
 
 
@@ -620,11 +633,12 @@ export type ExternalGetProductQueryError = ErrorType<ErrorResponse>
  */
 
 export function useExternalGetProduct<TData = Awaited<ReturnType<typeof externalGetProduct>>, TError = ErrorType<ErrorResponse>>(
- itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ itemCode: string,
+    params?: ExternalGetProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExternalGetProductQueryOptions(itemCode,options)
+  const queryOptions = getExternalGetProductQueryOptions(itemCode,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -882,20 +896,29 @@ export function useGetCatalogProducts<TData = Awaited<ReturnType<typeof getCatal
 
 
 
-export const getGetCatalogProductUrl = (itemCode: string,) => {
+export const getGetCatalogProductUrl = (itemCode: string,
+    params?: GetCatalogProductParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/catalog/products/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/catalog/products/${itemCode}?${stringifiedParams}` : `/api/catalog/products/${itemCode}`
 }
 
 /**
  * @summary Get a product with its full MRP price history
  */
-export const getCatalogProduct = async (itemCode: string, options?: RequestInit): Promise<CatalogProductDetail> => {
+export const getCatalogProduct = async (itemCode: string,
+    params?: GetCatalogProductParams, options?: RequestInit): Promise<CatalogProductDetail> => {
 
-  return customFetch<CatalogProductDetail>(getGetCatalogProductUrl(itemCode),
+  return customFetch<CatalogProductDetail>(getGetCatalogProductUrl(itemCode,params),
   {
     ...options,
     method: 'GET'
@@ -908,23 +931,25 @@ export const getCatalogProduct = async (itemCode: string, options?: RequestInit)
 
 
 
-export const getGetCatalogProductQueryKey = (itemCode: string,) => {
+export const getGetCatalogProductQueryKey = (itemCode: string,
+    params?: GetCatalogProductParams,) => {
     return [
-    `/api/catalog/products/${itemCode}`
+    `/api/catalog/products/${itemCode}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetCatalogProductQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCatalogProductQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string,
+    params?: GetCatalogProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductQueryKey(itemCode);
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductQueryKey(itemCode,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProduct>>> = ({ signal }) => getCatalogProduct(itemCode, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProduct>>> = ({ signal }) => getCatalogProduct(itemCode,params, { signal, ...requestOptions });
 
 
 
@@ -942,11 +967,12 @@ export type GetCatalogProductQueryError = ErrorType<ErrorResponse>
  */
 
 export function useGetCatalogProduct<TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(
- itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ itemCode: string,
+    params?: GetCatalogProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCatalogProductQueryOptions(itemCode,options)
+  const queryOptions = getGetCatalogProductQueryOptions(itemCode,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

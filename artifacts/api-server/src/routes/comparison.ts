@@ -17,7 +17,7 @@ import {
   normalizePerMetre,
   type NormResult,
 } from "../lib/priceNormalize";
-import { priceChangePct, validToFromNextDate } from "../lib/priceWindow";
+import { priceChangePct, validToFromNextDateOrDiscontinuation, validToFromNextDate } from "../lib/priceWindow";
 
 const router: IRouter = Router();
 
@@ -62,6 +62,7 @@ interface PrayagInfo {
   upcomingEffectiveDate: string | null;
   upcomingChangePct: number | null;
   productName: string | null;
+  discontinuedFrom: string | null;
 }
 
 // Current MRP + product name, keyed by normalized item code, for live joins.
@@ -78,6 +79,7 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
       FROM mrp_price_history
       WHERE effective_date <= ${todayStr}
         AND mrp IS NOT NULL
+        AND review_status = 'approved'
       ORDER BY item_code, effective_date DESC, id DESC
     `),
     db.execute<PriceRow>(sql`
@@ -85,16 +87,19 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
       FROM mrp_price_history
       WHERE effective_date > ${todayStr}
         AND mrp IS NOT NULL
+        AND review_status = 'approved'
       ORDER BY item_code, effective_date ASC, id DESC
     `),
     db.select({
       itemCode: catalogProductsTable.itemCode,
       productName: catalogProductsTable.productName,
+      discontinuedFrom: catalogProductsTable.discontinuedFrom,
     })
       .from(catalogProductsTable)
-      .where(
-        sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayStr})`,
-      ),
+      .where(and(
+        eq(catalogProductsTable.isActive, true),
+        sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayStr})`,
+      )),
   ]);
 
   const nameMap = new Map<string, string | null>();
@@ -109,15 +114,24 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
   for (const c of currentResult.rows) {
     const key = normCode(c.item_code);
     if (!nameMap.has(key)) continue;
-    const upcoming = upcomingMap.get(key);
+    const scheduled = upcomingMap.get(key);
+    const discontinuedFrom = products.find((p) => normCode(p.itemCode) === key)?.discontinuedFrom ?? null;
+    const upcoming =
+      scheduled && (!discontinuedFrom || scheduled.effective_date! < discontinuedFrom)
+        ? scheduled
+        : undefined;
     map.set(key, {
       mrp: c.mrp,
       effectiveDate: c.effective_date,
-      validTo: validToFromNextDate(upcoming?.effective_date ?? null),
+      validTo: validToFromNextDateOrDiscontinuation(
+        upcoming?.effective_date ?? null,
+        discontinuedFrom,
+      ),
       upcomingMrp: upcoming?.mrp ?? null,
       upcomingEffectiveDate: upcoming?.effective_date ?? null,
       upcomingChangePct: priceChangePct(c.mrp, upcoming?.mrp ?? null),
       productName: nameMap.get(key) ?? null,
+      discontinuedFrom,
     });
   }
   // Include catalog products that have a name but no in-force price.
@@ -132,6 +146,7 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
         upcomingEffectiveDate: null,
         upcomingChangePct: null,
         productName: p.productName,
+        discontinuedFrom: p.discontinuedFrom,
       });
     }
   }
@@ -150,16 +165,20 @@ async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
       division: catalogProductsTable.division,
       category: catalogProductsTable.category,
       size: catalogProductsTable.size,
+      isActive: catalogProductsTable.isActive,
+      discontinuedFrom: catalogProductsTable.discontinuedFrom,
     })
     .from(catalogProductsTable)
-    .where(
-      sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayForCandidates})`,
-    );
+    .where(and(
+      eq(catalogProductsTable.isActive, true),
+      sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayForCandidates})`,
+    ));
   type MrpPriceRow = { item_code: string; mrp: number | null };
   const currentMrps = await db.execute<MrpPriceRow>(sql`
     SELECT DISTINCT ON (item_code) item_code, mrp
     FROM mrp_price_history
     WHERE effective_date <= ${todayForCandidates}
+      AND review_status = 'approved'
     ORDER BY item_code, effective_date DESC, id DESC
   `);
 
@@ -339,6 +358,16 @@ function buildComparisonRow(
   };
 }
 
+function isAvailableComparisonRow(
+  row: CompRow,
+  maps: Map<string, PrayagInfo>,
+): boolean {
+  return (
+    row.matchedPrayagCode == null ||
+    maps.has(normCode(row.matchedPrayagCode))
+  );
+}
+
 function strParam(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
@@ -379,7 +408,9 @@ router.get("/catalog/comparison", async (req, res) => {
   );
 
   const windows = await getAllCompetitorWindows();
-  let rows = all.map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
+  let rows = all
+    .filter((row) => isAvailableComparisonRow(row, maps))
+    .map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
   if (ambiguousOnly) rows = rows.filter((r) => r.unitAmbiguous);
 
@@ -418,7 +449,9 @@ router.get("/catalog/comparison/export", async (req, res) => {
   );
 
   const windows = await getAllCompetitorWindows();
-  let rows = all.map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
+  let rows = all
+    .filter((row) => isAvailableComparisonRow(row, maps))
+    .map((c) => buildComparisonRow(c, maps, windows.get(c.id)));
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
 
   const header = [
@@ -494,6 +527,7 @@ router.get("/catalog/comparison/summary", async (req, res) => {
   const all = await q;
   const windows = await getAllCompetitorWindows();
   const rows = all
+    .filter((row) => isAvailableComparisonRow(row, maps))
     .map((c) => buildComparisonRow(c, maps, windows.get(c.id)))
     .filter((row) => row.competitorPriceIsCurrent);
 
@@ -883,7 +917,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     .where(and(...conditions));
   const competitorWindows = await getAllCompetitorWindows();
   const currentMatchedRows = matchedRows.filter(
-    (row) => competitorWindows.get(row.id)?.isCurrent,
+    (row) =>
+      competitorWindows.get(row.id)?.isCurrent &&
+      isAvailableComparisonRow(row, maps),
   );
 
   // Group competitor rows by the Prayag SKU they map to. A competitor can have
@@ -1287,7 +1323,8 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
     .from(competitorPricesTable)
     .where(eq(competitorPricesTable.matchStatus, "matched"));
 
-  const competitors = [...new Set(all.map((c) => c.competitor))].sort();
+  const available = all.filter((row) => isAvailableComparisonRow(row, maps));
+  const competitors = [...new Set(available.map((c) => c.competitor))].sort();
 
   interface Cell {
     competitor: string;
@@ -1305,7 +1342,7 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
   }
 
   const byCode = new Map<string, MatrixRow>();
-  for (const c of all) {
+  for (const c of available) {
     if (!c.matchedPrayagCode) continue;
     const key = normCode(c.matchedPrayagCode);
     const prayag = maps.get(key);

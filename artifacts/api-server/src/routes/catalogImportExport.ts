@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
+import { randomUUID } from "node:crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import AdmZip from "adm-zip";
-import { eq, asc, desc, inArray, sql } from "drizzle-orm";
+import { and, eq, asc, desc, inArray, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -303,7 +304,39 @@ interface LoadSummary {
   /** Number of rows whose MRP is below ₹50 — near zero is expected for most categories;
    *  a high count almost certainly means a packing-quantity column was imported. */
   lowMrpCount: number;
+  flaggedMrpCount: number;
+  flaggedRows: MrpReviewFinding[];
+  reviewBatchId: string | null;
   message?: string;
+}
+
+interface MrpReviewFinding {
+  itemCode: string;
+  oldMrp: number | null;
+  newMrp: number;
+  reasons: string[];
+}
+
+export function anomalyReasons(
+  price: number,
+  previousMrp: number | null,
+  division: string | null,
+): string[] {
+  const reasons: string[] = [];
+  if (price < 1) reasons.push("MRP is below ₹1");
+  const guardedDivision = /ptmt|cp fittings|faucet|sanitaryware/i.test(division ?? "");
+  if (price < 50 && guardedDivision) {
+    reasons.push(`MRP is below ₹50 for ${division ?? "this guarded division"}`);
+  }
+  if (previousMrp != null && previousMrp > 0) {
+    const changePct = ((price - previousMrp) / previousMrp) * 100;
+    if (changePct > 60) {
+      reasons.push(`MRP increased ${changePct.toFixed(1)}% (limit +60%)`);
+    } else if (changePct < -20) {
+      reasons.push(`MRP decreased ${Math.abs(changePct).toFixed(1)}% (limit -20%)`);
+    }
+  }
+  return reasons;
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +438,7 @@ async function persistParsedRows(
   codeColHeader: string,
   priceColHeader: string,
   skippedUnparseable: number,
+  reviewBatchId: string,
 ): Promise<LoadSummary> {
   // De-duplicate within the uploaded file by item code (keep last occurrence).
   const byCode = new Map<string, { price: number; productName: string | null; category: string | null }>();
@@ -425,6 +459,9 @@ async function persistParsedRows(
       skippedUnparseable,
       unmatchedCodes: [],
       lowMrpCount: 0,
+      flaggedMrpCount: 0,
+      flaggedRows: [],
+      reviewBatchId: null,
       message:
         "No valid code-and-price rows could be read from the file. Check the sheet has a recognisable item-code column and a price/MRP column.",
     };
@@ -448,6 +485,9 @@ async function persistParsedRows(
     skippedUnparseable,
     unmatchedCodes: [],
     lowMrpCount,
+    flaggedMrpCount: 0,
+    flaggedRows: [],
+    reviewBatchId: null,
   };
 
   // Infer division once per file — same for every product in this upload.
@@ -473,6 +513,20 @@ async function persistParsedRows(
       })
       .from(catalogProductsTable);
     const existingMap = new Map(existingRows.map((r) => [r.itemCode, r]));
+    const previousResult = await tx.execute<{
+      item_code: string;
+      mrp: number | null;
+    }>(sql`
+      SELECT DISTINCT ON (item_code) item_code, mrp
+      FROM mrp_price_history
+      WHERE effective_date < ${effectiveDate}
+        AND review_status = 'approved'
+        AND mrp IS NOT NULL
+      ORDER BY item_code, effective_date DESC, id DESC
+    `);
+    const previousMrp = new Map(
+      previousResult.rows.map((row) => [normCode(row.item_code), row.mrp]),
+    );
 
     const newProductValues: (typeof catalogProductsTable.$inferInsert)[] = [];
     const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
@@ -482,6 +536,13 @@ async function persistParsedRows(
     for (const [code, { price, productName, category }] of byCode) {
       const isKnown = knownCodes.has(code);
       const storedCode = canonical.get(code) ?? code;
+      const existing = existingMap.get(storedCode);
+      const division = existing?.division ?? inferredDivision;
+      const reasons = anomalyReasons(
+        price,
+        previousMrp.get(code) ?? null,
+        division,
+      );
 
       if (!isKnown) {
         newProductValues.push({
@@ -501,7 +562,6 @@ async function persistParsedRows(
       } else {
         summary.matchedProducts++;
         // Backfill any null metadata on existing products.
-        const existing = existingMap.get(storedCode);
         if (existing) {
           const patch: Partial<typeof catalogProductsTable.$inferInsert> = {};
           if (!existing.productName && productName) patch.productName = productName;
@@ -525,7 +585,21 @@ async function persistParsedRows(
         loadDate: today,
         sourceFile: filename,
         isCurrent: false,
+        reviewStatus: reasons.length > 0 ? "pending" : "approved",
+        reviewReasons: reasons.length > 0 ? JSON.stringify(reasons) : null,
+        importBatchId: reviewBatchId,
+        reviewedAt: reasons.length > 0 ? null : new Date(),
       });
+      if (reasons.length > 0) {
+        summary.flaggedRows.push({
+          itemCode: storedCode,
+          oldMrp: previousMrp.get(code) ?? null,
+          newMrp: price,
+          reasons,
+        });
+        summary.flaggedMrpCount++;
+        summary.reviewBatchId = reviewBatchId;
+      }
       dupSet.add(code);
       summary.newHistoryRows++;
     }
@@ -597,6 +671,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
   }
 
   try {
+    const reviewBatchId = randomUUID();
     const existingProducts = await db
       .select({ itemCode: catalogProductsTable.itemCode })
       .from(catalogProductsTable);
@@ -644,6 +719,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
           parsed.codeColHeader,
           parsed.priceColHeader,
           parsed.skippedUnparseable,
+          reviewBatchId,
         );
         fileSummaries.push(summary);
       }
@@ -664,6 +740,11 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
         skippedDuplicates: fileSummaries.reduce((s, f) => s + f.skippedDuplicates, 0),
         skippedUnparseable: fileSummaries.reduce((s, f) => s + f.skippedUnparseable, 0),
         unmatchedCodes: fileSummaries.flatMap((f) => f.unmatchedCodes),
+        lowMrpCount: fileSummaries.reduce((s, f) => s + f.lowMrpCount, 0),
+        flaggedMrpCount: fileSummaries.reduce((s, f) => s + f.flaggedMrpCount, 0),
+        flaggedRows: fileSummaries.flatMap((f) => f.flaggedRows),
+        reviewBatchId:
+          fileSummaries.some((f) => f.flaggedMrpCount > 0) ? reviewBatchId : null,
         files: fileSummaries,
       };
 
@@ -685,6 +766,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
       parsed.codeColHeader,
       parsed.priceColHeader,
       parsed.skippedUnparseable,
+      reviewBatchId,
     );
 
     await recomputeCurrentFlags();
@@ -694,6 +776,41 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
     req.log.error({ err, file: name }, "load-mrp failed");
     res.status(500).json({ error: "Failed to parse and load file" });
   }
+});
+
+router.post("/catalog/mrp-review-batches/:batchId/approve", async (req, res) => {
+  const batchId = req.params.batchId;
+  const approved = await db
+    .update(mrpPriceHistoryTable)
+    .set({ reviewStatus: "approved", reviewedAt: new Date() })
+    .where(
+      sql`${mrpPriceHistoryTable.importBatchId} = ${batchId}
+        AND ${mrpPriceHistoryTable.reviewStatus} = 'pending'`,
+    )
+    .returning({ id: mrpPriceHistoryTable.id });
+  if (approved.length === 0) {
+    res.status(404).json({ error: "No pending MRP rows found for this review batch" });
+    return;
+  }
+  await recomputeCurrentFlags();
+  res.json({ ok: true, approved: approved.length });
+});
+
+router.post("/catalog/mrp-review-batches/:batchId/cancel", async (req, res) => {
+  const batchId = req.params.batchId;
+  const removed = await db
+    .delete(mrpPriceHistoryTable)
+    .where(
+      sql`${mrpPriceHistoryTable.importBatchId} = ${batchId}
+        AND ${mrpPriceHistoryTable.reviewStatus} = 'pending'`,
+    )
+    .returning({ id: mrpPriceHistoryTable.id });
+  if (removed.length === 0) {
+    res.status(404).json({ error: "No pending MRP rows found for this review batch" });
+    return;
+  }
+  await recomputeCurrentFlags();
+  res.json({ ok: true, cancelled: removed.length });
 });
 
 // GET /catalog/export — current catalog with current MRP, or full history.
@@ -711,6 +828,7 @@ router.get("/catalog/export", async (req, res) => {
     const rows = await db
       .select()
       .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.reviewStatus, "approved"))
       .orderBy(
         asc(mrpPriceHistoryTable.itemCode),
         desc(mrpPriceHistoryTable.effectiveDate),
@@ -746,22 +864,28 @@ router.get("/catalog/export", async (req, res) => {
     const products = await db
       .select()
       .from(catalogProductsTable)
-      .where(
-        sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`,
-      )
+      .where(and(
+        eq(catalogProductsTable.isActive, true),
+        sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > CURRENT_DATE)`,
+      ))
       .orderBy(asc(catalogProductsTable.itemCode));
-    const current = await db.execute<{
+    const currentResult = await db.execute<{
       item_code: string;
       mrp: number | null;
-      price_basis: string;
+      price_basis: string | null;
       effective_date: string;
     }>(sql`
-      SELECT DISTINCT ON (item_code) item_code, mrp, price_basis, effective_date
-      FROM mrp_price_history
-      WHERE effective_date <= CURRENT_DATE AND mrp IS NOT NULL
-      ORDER BY item_code, effective_date DESC, id DESC
+      SELECT DISTINCT ON (h.item_code)
+        h.item_code, h.mrp, h.price_basis, h.effective_date
+      FROM mrp_price_history h
+      JOIN catalog_products p ON p.item_code = h.item_code
+      WHERE h.effective_date <= CURRENT_DATE
+        AND h.review_status = 'approved'
+        AND p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+      ORDER BY h.item_code, h.effective_date DESC, h.id DESC
     `);
-    const curMap = new Map(current.rows.map((c) => [c.item_code, c]));
+    const curMap = new Map(currentResult.rows.map((row) => [row.item_code, row]));
     const header = [
       "Item Code",
       "Product Name",
@@ -774,8 +898,8 @@ router.get("/catalog/export", async (req, res) => {
       "Basis",
       "Effective Date",
       "Active",
-      "Discontinued From",
       "Data Flag",
+      "Discontinued From",
     ];
     const body = products.map((p) => {
       const cur = curMap.get(p.itemCode);
@@ -791,8 +915,8 @@ router.get("/catalog/export", async (req, res) => {
         cur?.price_basis ?? null,
         cur?.effective_date ?? null,
         p.isActive ? "Yes" : "No",
-        p.discontinuedFrom,
         p.dataFlag,
+        p.discontinuedFrom,
       ];
     });
     aoa = [header, ...body];
@@ -1032,16 +1156,22 @@ router.post(
       );
 
       // Current MRP per normalized code, used by the price-gap guardrail.
-      const currentMrpRows = await db
-        .select({
-          itemCode: mrpPriceHistoryTable.itemCode,
-          mrp: mrpPriceHistoryTable.mrp,
-        })
-        .from(mrpPriceHistoryTable)
-        .where(eq(mrpPriceHistoryTable.isCurrent, true));
+      const currentMrpResult = await db.execute<{
+        item_code: string;
+        mrp: number | null;
+      }>(sql`
+        SELECT DISTINCT ON (h.item_code) h.item_code, h.mrp
+        FROM mrp_price_history h
+        JOIN catalog_products p ON p.item_code = h.item_code
+        WHERE h.effective_date <= CURRENT_DATE
+          AND h.review_status = 'approved'
+          AND p.is_active IS TRUE
+          AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+        ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+      `);
       const currentMrp = new Map<string, number>();
-      for (const r of currentMrpRows) {
-        if (r.mrp != null) currentMrp.set(normCode(r.itemCode), r.mrp);
+      for (const r of currentMrpResult.rows) {
+        if (r.mrp != null) currentMrp.set(normCode(r.item_code), r.mrp);
       }
 
       const wb = XLSX.read(file.buffer, { type: "buffer" });
@@ -1224,6 +1354,7 @@ router.delete("/catalog/mrp-period/:date", async (req, res) => {
           FROM mrp_price_history h
           JOIN catalog_products p ON p.item_code = h.item_code
           WHERE h.effective_date <= CURRENT_DATE
+            AND h.review_status = 'approved'
             AND p.is_active IS TRUE
             AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
           ORDER BY h.item_code, h.effective_date DESC, h.id DESC

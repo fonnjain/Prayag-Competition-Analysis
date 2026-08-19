@@ -17,8 +17,9 @@ const UNCHANGED = `PF-SAME-${RUN}`;
 const OPEN = `PF-OPEN-${RUN}`;
 const FUTURE_ONLY = `PF-FUTURE-${RUN}`;
 const INACTIVE = `PF-INACTIVE-${RUN}`;
+const WITHDRAWING = `PF-WITHDRAWING-${RUN}`;
 const COMPETITOR = `PF Competitor ${RUN}`;
-const ITEM_CODES = [CHANGING, UNCHANGED, OPEN, FUTURE_ONLY, INACTIVE];
+const ITEM_CODES = [CHANGING, UNCHANGED, OPEN, FUTURE_ONLY, INACTIVE, WITHDRAWING];
 const LEGACY_MRP_TABLE = `mrp_price_history_pf_test_${process.pid}_${RUN}`;
 
 function dateOffset(days: number): string {
@@ -69,6 +70,13 @@ beforeAll(async () => {
       division: "Test",
       category: "Price Finder",
       isActive: false,
+    },
+    {
+      itemCode: WITHDRAWING,
+      productName: "Withdrawing Price Fixture",
+      division: "Test",
+      category: "Price Finder",
+      discontinuedFrom: NEXT_DATE,
     },
   ]);
 
@@ -136,6 +144,22 @@ beforeAll(async () => {
       effectiveDate: CURRENT_DATE,
       loadDate: CURRENT_DATE,
       isCurrent: true,
+    },
+    {
+      itemCode: WITHDRAWING,
+      mrp: 600,
+      priceBasis: "MRP",
+      effectiveDate: CURRENT_DATE,
+      loadDate: CURRENT_DATE,
+      isCurrent: true,
+    },
+    {
+      itemCode: WITHDRAWING,
+      mrp: 700,
+      priceBasis: "MRP",
+      effectiveDate: NEXT_DATE,
+      loadDate: NEXT_DATE,
+      isCurrent: false,
     },
   ]);
 
@@ -251,6 +275,21 @@ describe("Price Finder date-driven validity", () => {
       upcomingMrp: null,
       upcomingEffectiveDate: null,
       upcomingChangePct: null,
+    });
+  });
+
+  it("ends the current price at withdrawal and suppresses a phantom next revision", async () => {
+    const response = await request.get(
+      `/price-finder/product/${encodeURIComponent(WITHDRAWING)}`,
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.product).toMatchObject({
+      itemCode: WITHDRAWING,
+      currentMrp: 600,
+      currentValidTo: NEXT_VALID_TO,
+      upcomingMrp: null,
+      upcomingEffectiveDate: null,
+      discontinuedFrom: NEXT_DATE,
     });
   });
 

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -29,7 +29,11 @@ import {
   type CompareMode,
   type BuildRowOpts,
 } from "../lib/analysis";
-import { priceChangePct, validToFromNextDate } from "../lib/priceWindow.js";
+import {
+  priceChangePct,
+  validToFromNextDate,
+  validToFromNextDateOrDiscontinuation,
+} from "../lib/priceWindow.js";
 
 const router: IRouter = Router();
 
@@ -58,16 +62,19 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
         productName: catalogProductsTable.productName,
         division: catalogProductsTable.division,
         category: catalogProductsTable.category,
+        discontinuedFrom: catalogProductsTable.discontinuedFrom,
       })
       .from(catalogProductsTable)
-      .where(
-        sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${resolvedDate})`,
-      ),
+      .where(and(
+        eq(catalogProductsTable.isActive, true),
+        sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${resolvedDate})`,
+      )),
     db.execute<PriceRow>(sql`
       SELECT DISTINCT ON (item_code) item_code, mrp, effective_date
       FROM mrp_price_history
       WHERE effective_date <= ${resolvedDate}
         AND mrp IS NOT NULL
+        AND review_status = 'approved'
       ORDER BY item_code, effective_date DESC, id DESC
     `),
     db.execute<PriceRow>(sql`
@@ -75,6 +82,7 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
       FROM mrp_price_history
       WHERE effective_date > ${resolvedDate}
         AND mrp IS NOT NULL
+        AND review_status = 'approved'
       ORDER BY item_code, effective_date ASC, id DESC
     `),
   ]);
@@ -93,7 +101,11 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
   for (const p of products) {
     const key = normCode(p.itemCode);
     const price = priceMap.get(key);
-    const upcoming = upcomingMap.get(key);
+    const scheduled = upcomingMap.get(key);
+    const upcoming =
+      scheduled && (!p.discontinuedFrom || scheduled.effectiveDate! < p.discontinuedFrom)
+        ? scheduled
+        : undefined;
     map.set(key, {
       mrp: price?.mrp ?? null,
       division: p.division,
@@ -102,7 +114,10 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
       effectiveDate: price?.effectiveDate ?? null,
       upcomingMrp: upcoming?.mrp ?? null,
       upcomingMrpDate: upcoming?.effectiveDate ?? null,
-      validTo: validToFromNextDate(upcoming?.effectiveDate ?? null),
+      validTo: validToFromNextDateOrDiscontinuation(
+        upcoming?.effectiveDate ?? null,
+        p.discontinuedFrom,
+      ),
       upcomingChangePct: priceChangePct(price?.mrp ?? null, upcoming?.mrp ?? null),
     });
   }
@@ -706,6 +721,7 @@ router.get("/analysis/mrp-increases", async (req, res) => {
         LAG(h.effective_date) OVER (PARTITION BY h.item_code ORDER BY h.effective_date ASC, h.id ASC) AS prev_date
       FROM mrp_price_history h
       WHERE h.effective_date <= ${atDate}
+        AND h.review_status = 'approved'
     )
     SELECT
       r.item_code,
@@ -720,6 +736,8 @@ router.get("/analysis/mrp-increases", async (req, res) => {
     FROM all_rows r
     JOIN catalog_products c ON c.item_code = r.item_code
     WHERE r.rn = 1
+      AND c.is_active IS TRUE
+      AND (c.discontinued_from IS NULL OR c.discontinued_from > ${atDate})
       AND r.prev_mrp IS NOT NULL
       AND r.prev_mrp > 0
       AND r.mrp IS NOT NULL
@@ -764,6 +782,7 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
       SELECT effective_date, mrp, price_basis, is_current, notes
       FROM mrp_price_history
       WHERE item_code = ${itemCode}
+        AND review_status = 'approved'
       ORDER BY effective_date ASC, id ASC
     `),
     db.execute<CompRow>(sql`

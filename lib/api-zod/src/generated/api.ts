@@ -83,7 +83,8 @@ export const ExternalListProductsQueryParams = zod.object({
   "category": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional(),
   "page": zod.coerce.number().optional(),
-  "pageSize": zod.coerce.number().optional()
+  "pageSize": zod.coerce.number().optional(),
+  "asOf": zod.date().optional().describe('Resolve catalog availability and MRP as of this date (YYYY-MM-DD). Defaults to today.')
 })
 
 export const ExternalListProductsResponse = zod.object({
@@ -97,8 +98,8 @@ export const ExternalListProductsResponse = zod.object({
   "size": zod.string().nullish(),
   "uom": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
-  "discontinuedFrom": zod.coerce.date().nullish(),
   "dataFlag": zod.string().nullish(),
+  "discontinuedFrom": zod.coerce.date().nullish(),
   "hasPrice": zod.boolean(),
   "currentMrp": zod.number().nullish(),
   "currentNet": zod.number().nullish(),
@@ -118,6 +119,10 @@ export const ExternalGetProductParams = zod.object({
   "itemCode": zod.coerce.string()
 })
 
+export const ExternalGetProductQueryParams = zod.object({
+  "asOf": zod.date().optional().describe('Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.')
+})
+
 export const ExternalGetProductResponse = zod.object({
   "product": zod.object({
   "id": zod.number(),
@@ -130,9 +135,9 @@ export const ExternalGetProductResponse = zod.object({
   "uom": zod.string().nullish(),
   "kgCost": zod.number().nullish(),
   "isActive": zod.boolean().optional(),
-  "discontinuedFrom": zod.coerce.date().nullish(),
   "sourceFiles": zod.string().nullish(),
-  "dataFlag": zod.string().nullish()
+  "dataFlag": zod.string().nullish(),
+  "discontinuedFrom": zod.coerce.date().nullish()
 }),
   "history": zod.array(zod.object({
   "id": zod.number(),
@@ -145,7 +150,11 @@ export const ExternalGetProductResponse = zod.object({
   "loadDate": zod.string(),
   "sourceFile": zod.string().nullish(),
   "isCurrent": zod.boolean(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "reviewStatus": zod.string().optional(),
+  "reviewReasons": zod.string().nullish(),
+  "importBatchId": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish()
 }))
 })
 
@@ -237,7 +246,8 @@ export const GetCatalogProductsQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
   "priceStatus": zod.coerce.string().optional().describe('Filter by price presence. \"priced\" or \"pending\".'),
   "page": zod.coerce.number().optional(),
-  "pageSize": zod.coerce.number().optional()
+  "pageSize": zod.coerce.number().optional(),
+  "asOf": zod.date().optional().describe('Resolve catalog availability and MRP as of this date (YYYY-MM-DD). Defaults to today.')
 })
 
 export const GetCatalogProductsResponse = zod.object({
@@ -251,8 +261,8 @@ export const GetCatalogProductsResponse = zod.object({
   "size": zod.string().nullish(),
   "uom": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
-  "discontinuedFrom": zod.coerce.date().nullish(),
   "dataFlag": zod.string().nullish(),
+  "discontinuedFrom": zod.coerce.date().nullish(),
   "hasPrice": zod.boolean(),
   "currentMrp": zod.number().nullish(),
   "currentNet": zod.number().nullish(),
@@ -272,6 +282,10 @@ export const GetCatalogProductParams = zod.object({
   "itemCode": zod.coerce.string()
 })
 
+export const GetCatalogProductQueryParams = zod.object({
+  "asOf": zod.date().optional().describe('Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.')
+})
+
 export const GetCatalogProductResponse = zod.object({
   "product": zod.object({
   "id": zod.number(),
@@ -284,9 +298,9 @@ export const GetCatalogProductResponse = zod.object({
   "uom": zod.string().nullish(),
   "kgCost": zod.number().nullish(),
   "isActive": zod.boolean().optional(),
-  "discontinuedFrom": zod.coerce.date().nullish(),
   "sourceFiles": zod.string().nullish(),
-  "dataFlag": zod.string().nullish()
+  "dataFlag": zod.string().nullish(),
+  "discontinuedFrom": zod.coerce.date().nullish()
 }),
   "history": zod.array(zod.object({
   "id": zod.number(),
@@ -299,7 +313,11 @@ export const GetCatalogProductResponse = zod.object({
   "loadDate": zod.string(),
   "sourceFile": zod.string().nullish(),
   "isCurrent": zod.boolean(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "reviewStatus": zod.string().optional(),
+  "reviewReasons": zod.string().nullish(),
+  "importBatchId": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish()
 }))
 })
 
@@ -330,8 +348,8 @@ export const GetPriceFinderSearchResponse = zod.object({
   "upcomingMrp": zod.number().nullable().describe('Earliest scheduled MRP after today, or null.'),
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
-  "discontinuedFrom": zod.coerce.date().nullish().describe('Scheduled withdrawal date, when applicable.'),
-  "hasCompetitorData": zod.boolean()
+  "hasCompetitorData": zod.boolean(),
+  "discontinuedFrom": zod.coerce.date().nullable()
 })),
   "totalCount": zod.number(),
   "filterSuggestions": zod.array(zod.object({
@@ -381,8 +399,8 @@ export const GetPriceFinderBrowseResponse = zod.object({
   "upcomingMrp": zod.number().nullable().describe('Earliest scheduled MRP after today, or null.'),
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
-  "discontinuedFrom": zod.coerce.date().nullish().describe('Scheduled withdrawal date, when applicable.'),
-  "hasCompetitorData": zod.boolean()
+  "hasCompetitorData": zod.boolean(),
+  "discontinuedFrom": zod.coerce.date().nullable()
 }))
 })
 
@@ -406,7 +424,7 @@ export const GetPriceFinderProductResponse = zod.object({
   "upcomingMrp": zod.number().nullable(),
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
-  "discontinuedFrom": zod.coerce.date().nullish().describe('Scheduled withdrawal date, when applicable.')
+  "discontinuedFrom": zod.coerce.date().nullable()
 }),
   "competitors": zod.array(zod.object({
   "competitor": zod.string(),
@@ -479,7 +497,8 @@ export const GetCatalogDataHealthResponse = zod.object({
   "duplicateSources": zod.array(zod.object({
   "sourceFiles": zod.string(),
   "count": zod.number()
-}))
+})),
+  "flaggedMrpCount": zod.number()
 })
 
 

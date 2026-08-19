@@ -27,9 +27,9 @@ export const catalogProductsTable = pgTable(
     uom: text("uom").notNull().default("NOS"),
     kgCost: doublePrecision("kg_cost"),
     isActive: boolean("is_active").notNull().default(true),
-    // A scheduled withdrawal is date-effective: the product remains live
-    // through the day before this date so historical price lookups stay valid.
-    discontinuedFrom: date("discontinued_from"),
+    // Product remains live through the previous calendar day. Null means there
+    // is no scheduled withdrawal.
+    discontinuedFrom: date("discontinued_from", { mode: "string" }),
     sourceFiles: text("source_files"),
     dataFlag: text("data_flag"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -63,10 +63,17 @@ export const mrpPriceHistoryTable = pgTable(
     sourceFile: text("source_file"),
     isCurrent: boolean("is_current").notNull().default(false),
     notes: text("notes"),
+    // Imported anomalies stay pending and are ignored by every price resolver
+    // until a reviewer explicitly approves them.
+    reviewStatus: text("review_status").notNull().default("approved"),
+    reviewReasons: text("review_reasons"),
+    importBatchId: text("import_batch_id"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   },
   (t) => [
     index("mrp_price_history_item_code_idx").on(t.itemCode),
     index("mrp_price_history_current_idx").on(t.itemCode, t.isCurrent),
+    index("mrp_price_history_review_idx").on(t.reviewStatus, t.importBatchId),
     // Append-only safety: one price row per (item_code, effective_date).
     // Makes duplicate prevention race-safe at the DB level, not just in app code.
     uniqueIndex("mrp_price_history_code_date_idx").on(

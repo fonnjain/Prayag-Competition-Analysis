@@ -27,7 +27,6 @@ import {
   type PriceFinderSearchResult,
 } from "@workspace/api-client-react";
 
-// Voice search integration using native browser SpeechRecognition API
 function useVoiceSearch(
   onFinalResult: (text: string) => void,
   onTranscript: (text: string) => void,
@@ -550,6 +549,7 @@ export default function PriceFinderPage() {
                   <span>
                     <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
                     <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
+                    <DiscontinuationBadge value={item.discontinuedFrom} />
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block font-mono font-semibold">
@@ -609,6 +609,7 @@ export default function PriceFinderPage() {
                       )}
                     </div>
                     <p className="text-foreground font-semibold text-lg">{res.productName}</p>
+                    <DiscontinuationBadge value={res.discontinuedFrom} />
                     <p className="text-xs font-medium text-muted-foreground mt-1">
                       {[res.division, res.category].filter(Boolean).join(" • ")}
                     </p>
@@ -725,6 +726,9 @@ function ProductView({
                       )}
           </div>
           <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
+          <div className="mt-2">
+            <DiscontinuationBadge value={product.discontinuedFrom} />
+          </div>
         </div>
 
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -814,5 +818,20 @@ function ProductView({
         </div>
       </div>
     </div>
+  );
+}
+
+function DiscontinuationBadge({ value }: { value: string | null | undefined }) {
+  if (!value) return null;
+  const label = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+  return (
+    <span className="inline-flex rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+      Discontinued from {label}
+    </span>
   );
 }

@@ -1,7 +1,11 @@
 import { Router, type IRouter, type Request } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { priceChangePct, validToFromNextDate } from "../lib/priceWindow.js";
+import {
+  priceChangePct,
+  validToFromNextDate,
+  validToFromNextDateOrDiscontinuation,
+} from "../lib/priceWindow.js";
 
 const router: IRouter = Router();
 
@@ -15,21 +19,9 @@ type SearchRow = {
   current_effective_date: string | null;
   upcoming_mrp: number | null;
   upcoming_effective_date: string | null;
-  discontinued_from: string | null;
   has_competitor_data: boolean;
+  discontinued_from: string | null;
 };
-
-function validToForProduct(
-  upcomingEffectiveDate: string | null,
-  discontinuedFrom: string | null,
-): string | null {
-  const nextBoundary =
-    upcomingEffectiveDate &&
-    (!discontinuedFrom || upcomingEffectiveDate < discontinuedFrom)
-      ? upcomingEffectiveDate
-      : discontinuedFrom;
-  return validToFromNextDate(nextBoundary);
-}
 
 function toSearchResult(row: SearchRow) {
   return {
@@ -39,15 +31,15 @@ function toSearchResult(row: SearchRow) {
     category: row.category,
     currentMrp: row.current_mrp,
     currentEffectiveDate: row.current_effective_date,
-    currentValidTo: validToForProduct(
+    currentValidTo: validToFromNextDateOrDiscontinuation(
       row.upcoming_effective_date,
       row.discontinued_from,
     ),
     upcomingMrp: row.upcoming_mrp,
     upcomingEffectiveDate: row.upcoming_effective_date,
     upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
-    discontinuedFrom: row.discontinued_from,
     hasCompetitorData: row.has_competitor_data,
+    discontinuedFrom: row.discontinued_from,
   };
 }
 function normalise(value: string): string {
@@ -262,6 +254,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       WHERE h.item_code = p.item_code
         AND h.effective_date <= CURRENT_DATE
         AND h.mrp IS NOT NULL
+        AND h.review_status = 'approved'
       ORDER BY h.effective_date DESC, h.id DESC
       LIMIT 1
     ) current_price ON true
@@ -271,6 +264,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       WHERE h.item_code = p.item_code
         AND h.effective_date > CURRENT_DATE
         AND h.mrp IS NOT NULL
+        AND h.review_status = 'approved'
         AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
       ORDER BY h.effective_date ASC, h.id DESC
       LIMIT 1
@@ -378,6 +372,7 @@ router.get("/price-finder/browse", async (req, res) => {
         WHERE h.item_code = p.item_code
           AND h.effective_date <= CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND h.review_status = 'approved'
       )
     GROUP BY coalesce(nullif(trim(p.division), ''), 'Uncategorised')
     ORDER BY division
@@ -402,6 +397,7 @@ router.get("/price-finder/browse", async (req, res) => {
           WHERE h.item_code = p.item_code
             AND h.effective_date <= CURRENT_DATE
             AND h.mrp IS NOT NULL
+            AND h.review_status = 'approved'
         )
       GROUP BY nullif(trim(p.category), '')
       ORDER BY category NULLS LAST
@@ -425,6 +421,7 @@ router.get("/price-finder/browse", async (req, res) => {
         p.product_name,
         p.division,
         p.category,
+        p.size,
         p.discontinued_from,
         current_price.mrp AS current_mrp,
         current_price.effective_date AS current_effective_date,
@@ -444,6 +441,7 @@ router.get("/price-finder/browse", async (req, res) => {
         WHERE h.item_code = p.item_code
           AND h.effective_date <= CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND h.review_status = 'approved'
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
@@ -453,6 +451,7 @@ router.get("/price-finder/browse", async (req, res) => {
         WHERE h.item_code = p.item_code
           AND h.effective_date > CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND h.review_status = 'approved'
           AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
@@ -521,6 +520,7 @@ router.get(
         WHERE h.item_code = p.item_code
           AND h.effective_date <= CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND h.review_status = 'approved'
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
@@ -530,6 +530,7 @@ router.get(
         WHERE h.item_code = p.item_code
           AND h.effective_date > CURRENT_DATE
           AND h.mrp IS NOT NULL
+          AND h.review_status = 'approved'
           AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
@@ -633,7 +634,7 @@ router.get(
         category: product.category,
         currentMrp: product.current_mrp,
         currentEffectiveDate: product.current_effective_date,
-        currentValidTo: validToForProduct(
+        currentValidTo: validToFromNextDateOrDiscontinuation(
           product.upcoming_effective_date,
           product.discontinued_from,
         ),

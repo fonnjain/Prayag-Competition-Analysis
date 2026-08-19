@@ -14,7 +14,9 @@ import { validToFromNextDate } from "../lib/priceWindow.js";
 const RUN = Date.now();
 const ITEM_CODE = `CMP-WINDOW-${RUN}`;
 const FUTURE_MRP_ITEM = `CMP-FUTURE-${RUN}`;
+const WITHDRAWN_ITEM = `CMP-WITHDRAWN-${RUN}`;
 const COMPETITOR = `Comparison Window ${RUN}`;
+const WITHDRAWN_COMPETITOR = `Withdrawn Comparison Window ${RUN}`;
 const REVIEW_COMPETITOR = `Review Window ${RUN}`;
 const EDGE_COMPETITOR = `Comparison Edge Window ${RUN}`;
 
@@ -50,6 +52,13 @@ beforeAll(async () => {
       division: "Test",
       category: "Comparison",
     },
+    {
+      itemCode: WITHDRAWN_ITEM,
+      productName: "Withdrawn Comparison Fixture",
+      division: "Test",
+      category: "Comparison",
+      discontinuedFrom: dateOffset(0),
+    },
   ]);
   await db.insert(mrpPriceHistoryTable).values([
     {
@@ -76,6 +85,14 @@ beforeAll(async () => {
       loadDate: NEXT_DATE,
       isCurrent: true,
     },
+    {
+      itemCode: WITHDRAWN_ITEM,
+      mrp: 500,
+      priceBasis: "MRP",
+      effectiveDate: CURRENT_DATE,
+      loadDate: CURRENT_DATE,
+      isCurrent: true,
+    },
   ]);
   const insertedCompetitorRows = await db.insert(competitorPricesTable).values([
     {
@@ -87,6 +104,17 @@ beforeAll(async () => {
       matchStatus: "matched",
       matchConfidence: "High",
       effectiveDate: HISTORICAL_DATE,
+      isCurrent: true,
+    },
+    {
+      competitor: WITHDRAWN_COMPETITOR,
+      description: "Withdrawn Prayag product competitor",
+      category: "Comparison",
+      price: 450,
+      matchedPrayagCode: WITHDRAWN_ITEM,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      effectiveDate: CURRENT_DATE,
       isCurrent: true,
     },
     {
@@ -234,6 +262,9 @@ afterAll(async () => {
     .where(eq(competitorPricesTable.competitor, COMPETITOR));
   await db
     .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, WITHDRAWN_COMPETITOR));
+  await db
+    .delete(competitorPricesTable)
     .where(eq(competitorPricesTable.competitor, REVIEW_COMPETITOR));
   await db
     .delete(competitorPricesTable)
@@ -245,11 +276,17 @@ afterAll(async () => {
     .delete(mrpPriceHistoryTable)
     .where(eq(mrpPriceHistoryTable.itemCode, FUTURE_MRP_ITEM));
   await db
+    .delete(mrpPriceHistoryTable)
+    .where(eq(mrpPriceHistoryTable.itemCode, WITHDRAWN_ITEM));
+  await db
     .delete(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, ITEM_CODE));
   await db
     .delete(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, FUTURE_MRP_ITEM));
+  await db
+    .delete(catalogProductsTable)
+    .where(eq(catalogProductsTable.itemCode, WITHDRAWN_ITEM));
 });
 
 describe("comparison current price windows", () => {
@@ -293,6 +330,36 @@ describe("comparison current price windows", () => {
     expect(response.status).toBe(200);
     expect(response.body.rows).toEqual([]);
   });
+
+  it("does not surface a product on or after its scheduled withdrawal date", async () => {
+    const [byProduct, comparison, summary, matrix, exported] = await Promise.all([
+      request.get(
+        `/catalog/comparison/by-product?search=${encodeURIComponent(WITHDRAWN_ITEM)}`,
+      ),
+      request.get(
+        `/catalog/comparison?competitor=${encodeURIComponent(WITHDRAWN_COMPETITOR)}&pageSize=20`,
+      ),
+      request.get(
+        `/catalog/comparison/summary?competitor=${encodeURIComponent(WITHDRAWN_COMPETITOR)}`,
+      ),
+      request.get(
+        `/catalog/comparison/matrix?search=${encodeURIComponent(WITHDRAWN_ITEM)}`,
+      ),
+      request.get(
+        `/catalog/comparison/export?competitor=${encodeURIComponent(WITHDRAWN_COMPETITOR)}&format=csv`,
+      ),
+    ]);
+    expect(byProduct.status).toBe(200);
+    expect(byProduct.body.rows).toEqual([]);
+    expect(comparison.status).toBe(200);
+    expect(comparison.body).toMatchObject({ rows: [], total: 0 });
+    expect(summary.status).toBe(200);
+    expect(summary.body).toMatchObject({ totalRows: 0, matchedRows: 0 });
+    expect(matrix.status).toBe(200);
+    expect(matrix.body).toMatchObject({ rows: [], total: 0 });
+    expect(exported.status).toBe(200);
+    expect(exported.text).not.toContain(WITHDRAWN_ITEM);
+  }, 15_000);
 
   it("exports explicit current/window/next columns and leaves future-row gaps blank", async () => {
     const response = await request.get(

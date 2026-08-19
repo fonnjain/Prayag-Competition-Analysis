@@ -144,6 +144,13 @@ paths:
           required: false
           schema:
             type: integer
+        - name: asOf
+          in: query
+          required: false
+          description: Resolve catalog availability and MRP as of this date (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Paginated product list
@@ -170,6 +177,13 @@ paths:
           required: true
           schema:
             type: string
+        - name: asOf
+          in: query
+          required: false
+          description: Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Product detail with history
@@ -287,6 +301,13 @@ paths:
           required: false
           schema:
             type: integer
+        - name: asOf
+          in: query
+          required: false
+          description: Resolve catalog availability and MRP as of this date (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Paginated product list
@@ -305,6 +326,13 @@ paths:
           required: true
           schema:
             type: string
+        - name: asOf
+          in: query
+          required: false
+          description: Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Product detail with history
@@ -1441,11 +1469,11 @@ components:
           type: ["string", "null"]
         isActive:
           type: boolean
+        dataFlag:
+          type: ["string", "null"]
         discontinuedFrom:
           type: ["string", "null"]
           format: date
-        dataFlag:
-          type: ["string", "null"]
         hasPrice:
           type: boolean
         currentMrp:
@@ -1494,13 +1522,13 @@ components:
           type: ["number", "null"]
         isActive:
           type: boolean
-        discontinuedFrom:
-          type: ["string", "null"]
-          format: date
         sourceFiles:
           type: ["string", "null"]
         dataFlag:
           type: ["string", "null"]
+        discontinuedFrom:
+          type: ["string", "null"]
+          format: date
     MrpPriceRow:
       type: object
       required: [id, itemCode, effectiveDate, loadDate, priceBasis, isCurrent]
@@ -1527,6 +1555,15 @@ components:
           type: boolean
         notes:
           type: ["string", "null"]
+        reviewStatus:
+          type: string
+        reviewReasons:
+          type: ["string", "null"]
+        importBatchId:
+          type: ["string", "null"]
+        reviewedAt:
+          type: ["string", "null"]
+          format: date-time
     CatalogProductDetail:
       type: object
       required: [product, history]
@@ -1551,6 +1588,7 @@ components:
         - upcomingEffectiveDate
         - upcomingChangePct
         - hasCompetitorData
+        - discontinuedFrom
       properties:
         itemCode:
           type: string
@@ -1576,12 +1614,11 @@ components:
         upcomingChangePct:
           type: ["number", "null"]
           description: One-decimal change from current to upcoming MRP; zero is retained.
+        hasCompetitorData:
+          type: boolean
         discontinuedFrom:
           type: ["string", "null"]
           format: date
-          description: Scheduled withdrawal date, when applicable.
-        hasCompetitorData:
-          type: boolean
     PriceFinderSearchResponse:
       type: object
       required: [results, totalCount, filterSuggestions, unmatchedFilters]
@@ -1666,6 +1703,7 @@ components:
         - upcomingMrp
         - upcomingEffectiveDate
         - upcomingChangePct
+        - discontinuedFrom
       properties:
         itemCode:
           type: string
@@ -1693,7 +1731,6 @@ components:
         discontinuedFrom:
           type: ["string", "null"]
           format: date
-          description: Scheduled withdrawal date, when applicable.
     PriceFinderCompetitor:
       type: object
       required:
@@ -1804,6 +1841,7 @@ components:
           missingPrices,
           missingPriceCount,
           duplicateSources,
+          flaggedMrpCount,
         ]
       properties:
         totalProducts:
@@ -1828,6 +1866,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CatalogDuplicateSource"
+        flaggedMrpCount:
+          type: integer
     HealthStatus:
       type: object
       properties:

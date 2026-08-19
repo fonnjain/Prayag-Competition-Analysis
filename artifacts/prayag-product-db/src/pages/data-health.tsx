@@ -89,6 +89,24 @@ export default function DataHealthPage() {
         </AlertDialog>
       </div>
 
+      <div className="bg-card border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b bg-muted/20 font-semibold">
+          Prayag MRP loader
+        </div>
+        <div className="flex items-center justify-between gap-4 px-4 py-3">
+          <span className="text-sm text-muted-foreground">Flagged rows awaiting review</span>
+          <span
+            className={
+              data.flaggedMrpCount > 0
+                ? "font-mono text-xl font-bold text-amber-600"
+                : "font-mono text-xl font-bold text-green-600"
+            }
+          >
+            {data.flaggedMrpCount}
+          </span>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card border rounded-lg p-6">
           <div className="text-sm text-muted-foreground mb-2 flex items-center gap-2">

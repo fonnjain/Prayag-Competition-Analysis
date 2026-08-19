@@ -7,6 +7,18 @@ export function validToFromNextDate(nextEffectiveDate: string | null): string | 
   return date.toISOString().slice(0, 10);
 }
 
+/** Return the earlier validity boundary from a price revision or withdrawal. */
+export function validToFromNextDateOrDiscontinuation(
+  nextEffectiveDate: string | null,
+  discontinuedFrom: string | null,
+): string | null {
+  const boundary =
+    nextEffectiveDate && discontinuedFrom
+      ? (nextEffectiveDate < discontinuedFrom ? nextEffectiveDate : discontinuedFrom)
+      : nextEffectiveDate ?? discontinuedFrom;
+  return validToFromNextDate(boundary);
+}
+
 /** One-decimal percentage change, including a real 0 for unchanged revisions. */
 export function priceChangePct(
   currentPrice: number | null,

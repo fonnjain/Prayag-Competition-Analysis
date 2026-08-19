@@ -13,6 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const PAGE_SIZE = 50;
 
+function discontinuationLabel(value: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
 interface InlineEditState {
   itemCode: string;
   mrp: string;
@@ -296,7 +304,14 @@ export default function CatalogPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3">{product.productName}</td>
+                    <td className="px-4 py-3">
+                      <div>{product.productName}</div>
+                      {product.discontinuedFrom && (
+                        <span className="mt-1 inline-flex rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          Discontinued from {discontinuationLabel(product.discontinuedFrom)}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">{product.category}</td>
                     <td className="px-4 py-3 text-muted-foreground">{product.size}</td>
                     <td className="px-4 py-2">

@@ -45,7 +45,9 @@ export default function LoadMrpPage() {
   const [file, setFile] = useState<File | null>(null);
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [reviewFeedback, setReviewFeedback] = useState<string | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   // Tracks which low-MRP warnings the user has dismissed. "__single__" is the
   // sentinel key for single-file uploads; ZIP entries use their filename.
@@ -63,6 +65,7 @@ export default function LoadMrpPage() {
 
     setIsUploading(true);
     setResult(null);
+    setReviewFeedback(null);
     setDismissedLowMrp(new Set());
 
     const formData = new FormData();
@@ -83,10 +86,15 @@ export default function LoadMrpPage() {
 
       setResult(data.results);
       toast({
-        title: "Upload Successful",
-        description: `Imported ${data.results.totalRows} rows successfully.`,
+        title:
+          data.results.flaggedMrpCount > 0
+            ? "Review required"
+            : "Upload successful",
+        description:
+          data.results.flaggedMrpCount > 0
+            ? `${data.results.flaggedMrpCount} suspicious price row(s) are blocked until you confirm them.`
+            : `Imported ${data.results.totalRows} rows successfully.`,
       });
-      
       // Invalidate catalog and comparison queries so new prices show immediately.
       queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
@@ -104,6 +112,50 @@ export default function LoadMrpPage() {
       });
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleReview = async (decision: "approve" | "cancel") => {
+    if (!result?.reviewBatchId) return;
+    setIsReviewing(true);
+    try {
+      const res = await fetch(
+        `/api/catalog/mrp-review-batches/${result.reviewBatchId}/${decision}`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not complete review");
+      toast({
+        title: decision === "approve" ? "Flagged prices approved" : "Flagged prices cancelled",
+        description:
+          decision === "approve"
+            ? `${data.approved} reviewed price row(s) can now become current on their effective date.`
+            : `${data.cancelled} flagged price row(s) were removed.`,
+      });
+      setReviewFeedback(
+        decision === "approve"
+          ? `${data.approved} reviewed price row(s) approved.`
+          : `${data.cancelled} flagged price row(s) cancelled and removed.`,
+      );
+      setResult((current: any) => ({
+        ...current,
+        flaggedMrpCount: 0,
+        flaggedRows: [],
+        reviewBatchId: null,
+      }));
+      queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonByProductQueryKey() });
+    } catch (err: any) {
+      toast({
+        title: "Review failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsReviewing(false);
     }
   };
 
@@ -257,6 +309,16 @@ export default function LoadMrpPage() {
         </form>
       </div>
 
+      {reviewFeedback && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
+        >
+          {reviewFeedback}
+        </div>
+      )}
+
       {result && (
         <div className="bg-card border rounded-lg p-6 space-y-4">
           <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -318,6 +380,63 @@ export default function LoadMrpPage() {
               <div className="text-2xl font-mono font-bold text-primary">{result.newHistoryRows}</div>
             </div>
           </div>
+
+          {result.flaggedMrpCount > 0 && result.reviewBatchId && (
+            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 space-y-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <div>
+                  <h4 className="font-semibold">Price review required before these rows can go live</h4>
+                  <p className="mt-1 text-sm">
+                    {result.flaggedMrpCount} suspicious row{result.flaggedMrpCount !== 1 ? "s are" : " is"} blocked from current pricing. Compare the old and new values, then approve or cancel them.
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-md border border-amber-300 bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-amber-100 text-left">
+                    <tr>
+                      <th className="px-3 py-2">Item code</th>
+                      <th className="px-3 py-2 text-right">Old MRP</th>
+                      <th className="px-3 py-2 text-right">New MRP</th>
+                      <th className="px-3 py-2">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(result.flaggedRows ?? []).map((row: any) => (
+                      <tr key={row.itemCode} className="border-t border-amber-200">
+                        <td className="px-3 py-2 font-mono font-semibold">{row.itemCode}</td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {row.oldMrp == null ? "No prior MRP" : `₹${Number(row.oldMrp).toFixed(2)}`}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold">
+                          ₹{Number(row.newMrp).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2">{row.reasons.join("; ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isReviewing}
+                  onClick={() => handleReview("cancel")}
+                >
+                  Cancel flagged rows
+                </Button>
+                <Button
+                  type="button"
+                  disabled={isReviewing}
+                  onClick={() => handleReview("approve")}
+                >
+                  {isReviewing ? "Saving review…" : "Confirm flagged prices"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Per-file breakdown for ZIP uploads */}
           {result.files && result.files.length > 0 && (

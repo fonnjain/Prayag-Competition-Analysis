@@ -8,7 +8,7 @@ export default function ProductDetailPage() {
   const [, params] = useRoute("/product/:itemCode");
   const itemCode = params?.itemCode || "";
   
-  const { data, isLoading } = useGetCatalogProduct(itemCode, {
+  const { data, isLoading } = useGetCatalogProduct(itemCode, undefined, {
     query: { enabled: !!itemCode, queryKey: getGetCatalogProductQueryKey(itemCode) }
   });
 
