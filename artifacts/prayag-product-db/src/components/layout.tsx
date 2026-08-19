@@ -26,7 +26,6 @@ interface LayoutProps {
 
 const navItems = [
   { href: "/", label: "Catalog", icon: Box },
-  { href: "/price-finder", label: "Price Finder", icon: Search },
   { href: "/comparison", label: "Comparison", icon: BarChart2 },
   { href: "/mapping-review", label: "Mapping Review", icon: LinkIcon },
   { href: "/load-mrp", label: "Load MRP", icon: FileSpreadsheet },
@@ -115,6 +114,14 @@ export function Layout({ children }: LayoutProps) {
       >
         <TrendingUp className="h-4 w-4" />
         Competition Analysis
+      </a>
+      <a
+        href="/price-finder/"
+        onClick={() => mobile && setMobileNavOpen(false)}
+        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+      >
+        <Search className="h-4 w-4" />
+        Price Finder
       </a>
     </div>
   );

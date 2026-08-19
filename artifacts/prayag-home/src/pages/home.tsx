@@ -19,7 +19,7 @@ const APP_LINKS = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/product-db/", label: "Product Database", icon: PackageSearch },
   { href: "/analysis/", label: "Competition Analysis", icon: BarChart3 },
-  { href: "/product-db/price-finder", label: "Price Finder", icon: Search },
+  { href: "/price-finder/", label: "Price Finder", icon: Search },
 ] as const;
 
 export default function Home() {
@@ -230,7 +230,7 @@ export default function Home() {
 
             {/* Price Finder Card */}
             <a
-              href="/product-db/price-finder"
+              href="/price-finder/"
               className="group relative bg-card rounded-2xl p-8 border border-border shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col gap-6 hover:border-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               data-testid="link-price-finder"
             >

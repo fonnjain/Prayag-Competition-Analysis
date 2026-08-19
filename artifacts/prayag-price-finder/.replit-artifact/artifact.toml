@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/price-finder/"
+title = "Prayag Price Finder"
+description = "A dedicated Prayag catalog search workspace for quickly finding products, comparing current and upcoming prices, and reviewing competitor price gaps."
+version = "1.0.0"
+id = "artifacts/prayag-price-finder"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/price-finder/" ]
+localPort = 23804
+
+[services.development]
+run = "pnpm --filter @workspace/prayag-price-finder run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/prayag-price-finder", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/prayag-price-finder/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23804"
+BASE_PATH = "/price-finder/"

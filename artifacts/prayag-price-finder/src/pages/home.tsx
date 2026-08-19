@@ -713,38 +713,31 @@ function ProductView({
 
   return (
     <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
-      <div className="bg-card border-2 border-primary/10 rounded-3xl p-6 md:p-8 shadow-sm">
+      <div className="bg-card border rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground font-mono">
-            <span className="bg-primary text-primary-foreground px-2 py-0.5 rounded font-bold tracking-wider">{product.itemCode}</span>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-medium text-muted-foreground uppercase tracking-widest">
+            <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{product.itemCode}</span>
             {product.division && <span>• {product.division}</span>}
             {product.category && <span>• {product.category}</span>}
-                      {product.discontinuedFrom && (
-                        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                          Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
-                        </span>
-                      )}
+            {product.discontinuedFrom && (
+              <span className="rounded bg-destructive/10 px-2 py-0.5 text-destructive font-semibold">
+                Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+              </span>
+            )}
           </div>
-          <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
-          <div className="mt-2">
-            <DiscontinuationBadge value={product.discontinuedFrom} />
-          </div>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Prayag MRP Card */}
-          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6 flex flex-col justify-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-              <Tag className="w-24 h-24" />
-            </div>
-            
-            <p className="text-sm font-bold text-primary mb-2 uppercase tracking-widest">Current MRP</p>
+          <div className="border bg-muted/20 rounded-lg p-5 flex flex-col justify-center relative">
+            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-widest">Current MRP</p>
             {product.currentMrp != null ? (
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl md:text-7xl font-black tracking-tighter text-primary">₹{product.currentMrp.toFixed(2)}</span>
+                <span className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">₹{product.currentMrp.toFixed(2)}</span>
               </div>
             ) : (
-              <span className="text-3xl font-bold text-muted-foreground">Price Pending</span>
+              <span className="text-2xl font-bold text-muted-foreground">Price Pending</span>
             )}
             <PriceWindowDetails
               currentPrice={product.currentMrp}
@@ -758,28 +751,28 @@ function ProductView({
           </div>
 
           {/* Competitor Data */}
-          <div className="border border-border/60 rounded-2xl p-6 bg-background flex flex-col">
-            <p className="text-sm font-bold text-muted-foreground mb-4 uppercase tracking-widest">Market Context</p>
+          <div className="border rounded-lg p-5 bg-card flex flex-col">
+            <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-widest">Market Context</p>
             
             {!competitors || competitors.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-muted/20 rounded-xl border border-dashed border-border/60">
-                <Info className="w-10 h-10 text-muted-foreground/40 mb-3" />
-                <p className="text-base font-semibold text-foreground">No competitor data</p>
-                <p className="text-sm text-muted-foreground mt-1 max-w-[200px]">This product has no mapped rivals in the current period.</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                <Info className="w-8 h-8 text-muted-foreground/40 mb-2" />
+                <p className="text-sm font-semibold text-foreground">No competitor data</p>
+                <p className="text-xs text-muted-foreground mt-1">This product has no mapped rivals.</p>
               </div>
             ) : (
-              <div className="space-y-3 flex-1 overflow-y-auto">
+              <div className="space-y-2 flex-1 overflow-y-auto">
                 {competitors.map((comp: PriceFinderCompetitor) => {
                   const isPrayagCheaper = comp.gapPct != null && comp.gapPct > 0;
                   const isCompetitorCheaper = comp.gapPct != null && comp.gapPct < 0;
 
                   return (
-                    <div key={comp.competitor} className="flex items-start justify-between gap-3 p-3.5 bg-muted/20 border border-border/40 rounded-xl hover:bg-muted/40 transition-colors">
+                    <div key={comp.competitor} className="flex items-start justify-between gap-3 p-3 bg-muted/30 border-b last:border-b-0 rounded-md">
                       <div className="min-w-0">
                         <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
                           {comp.competitor}
                         </p>
-                        <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                        <p className="text-xs font-mono text-muted-foreground mt-0.5">
                           ₹{comp.price.toFixed(2)} {comp.priceBasis ? `(${comp.priceBasis})` : ""}
                         </p>
                         <PriceWindowDetails
@@ -796,17 +789,17 @@ function ProductView({
                       <div className="text-right flex flex-col items-end">
                         {comp.gapPct != null ? (
                           <div className={cn(
-                            "inline-flex items-center px-2 py-1 rounded-md text-xs font-black tracking-wide",
-                            isCompetitorCheaper ? "bg-red-100 text-red-800" : 
-                            isPrayagCheaper ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"
+                            "inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold font-mono",
+                            isCompetitorCheaper ? "bg-destructive/10 text-destructive" : 
+                            isPrayagCheaper ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
                           )}>
                             {comp.gapPct > 0 ? "+" : ""}{comp.gapPct.toFixed(1)}%
                           </div>
                         ) : (
-                          <span className="text-xs font-medium text-muted-foreground px-2 py-1 bg-muted rounded-md">{comp.message || "N/A"}</span>
+                          <span className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{comp.message || "N/A"}</span>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-medium">
-                          Current vs current gap
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Current gap
                         </p>
                       </div>
                     </div>
@@ -830,7 +823,7 @@ function DiscontinuationBadge({ value }: { value: string | null | undefined }) {
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00Z`));
   return (
-    <span className="inline-flex rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+    <span className="inline-flex rounded bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive mt-1">
       Discontinued from {label}
     </span>
   );
