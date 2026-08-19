@@ -31,6 +31,8 @@ interface MrpSourceHealth {
   downloadedAt: string | null;
   loadedAt: string | null;
   rowCount: number | null;
+  liveLinkedRows: number | null;
+  rowsRemovedAfterLoad: number | null;
   snapshotAgeDays: number | null;
   isStale: boolean;
   freshnessMessage: string;
@@ -142,8 +144,8 @@ export default function DataHealthPage() {
       <div className="bg-card border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b bg-muted/20">
           <h2 className="font-semibold">MRP source snapshots</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            These are the downloaded copies used for price history. A snapshot can be correct and still become stale after its source sheet changes.
+            <p className="text-sm text-muted-foreground mt-1">
+             These are the downloaded copies used for price history. “Recorded” never changes; “linked now” reflects documented corrections made after a load.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -155,7 +157,7 @@ export default function DataHealthPage() {
                 <th className="px-4 py-2.5 font-medium">Downloaded</th>
                 <th className="px-4 py-2.5 font-medium">Loaded</th>
                 <th className="px-4 py-2.5 font-medium">Snapshot age</th>
-                <th className="px-4 py-2.5 font-medium text-right">Price rows</th>
+                <th className="px-4 py-2.5 font-medium text-right">Recorded / linked now</th>
               </tr>
             </thead>
             <tbody>
@@ -190,7 +192,12 @@ export default function DataHealthPage() {
                       : `${source.snapshotAgeDays} day${source.snapshotAgeDays === 1 ? "" : "s"}`}
                   </td>
                   <td className="px-4 py-3 align-top text-right font-mono">
-                    {source.rowCount?.toLocaleString() ?? "—"}
+                    <div>{source.rowCount?.toLocaleString() ?? "—"} / {source.liveLinkedRows?.toLocaleString() ?? "—"}</div>
+                    {(source.rowsRemovedAfterLoad ?? 0) > 0 && (
+                      <p className="mt-1 text-xs font-sans text-amber-800">
+                        {source.rowsRemovedAfterLoad} removed after load
+                      </p>
+                    )}
                   </td>
                 </tr>
               ))}

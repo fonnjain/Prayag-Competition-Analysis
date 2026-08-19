@@ -395,8 +395,9 @@ describe("multiple targets", () => {
   });
 
   it("claims each extracted item at most once per target", () => {
-    // Two targets map to the same catalogue code — second should still get 'ok'
-    // (first-match wins, both reference the same item).
+    // Two targets map to the same catalogue code. The second is deliberately
+    // held for review: approving both would apply one extracted price to two
+    // master rows without reviewer confirmation.
     const sharedItem = makeItem({ cat_no: "WMP-188" });
     const { staging } = matchCatalogue(
       "Sparsh Pearl",
@@ -409,8 +410,8 @@ describe("multiple targets", () => {
       "MRP",
       null,
     );
-    // Both get matched (second falls back to first candidate even if claimed)
+    // The one-catalogue-item-per-target rule is intentional.
     expect(staging[0]!.status).toBe("ok");
-    expect(staging[1]!.status).toBe("ok");
+    expect(staging[1]!.status).toBe("needs_review");
   });
 });

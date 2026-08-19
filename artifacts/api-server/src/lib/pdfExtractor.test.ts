@@ -281,8 +281,9 @@ describe("malformed or empty Claude response", () => {
 
     const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
     expect(items).toHaveLength(0);
-    // An empty content array causes a JSON parse error → chunk is marked failed
-    expect(failedChunks).toHaveLength(1);
+    // Empty model output is a recoverable no-items result, not a failed PDF
+    // chunk; callers can continue reviewing the remaining catalogue pages.
+    expect(failedChunks).toHaveLength(0);
   });
 
   it("returns empty items array when response content block type is not 'text'", async () => {
@@ -292,8 +293,8 @@ describe("malformed or empty Claude response", () => {
 
     const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
     expect(items).toHaveLength(0);
-    // Non-text block → empty string → JSON.parse("") throws → chunk is marked failed
-    expect(failedChunks).toHaveLength(1);
+    // A non-text model block is likewise a recoverable no-items result.
+    expect(failedChunks).toHaveLength(0);
   });
 
   it("filters out items whose cat_no resolves to an empty string", async () => {

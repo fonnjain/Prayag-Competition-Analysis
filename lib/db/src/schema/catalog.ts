@@ -46,9 +46,8 @@ export const catalogProductsTable = pgTable(
   ],
 );
 
-// Canonical official Prayag MRP workbooks. sheetId remains separate from the
-// display URL so the app can move from manually downloaded files to a direct
-// Google Sheets reader without re-identifying each source.
+// Canonical official Prayag MRP workbooks, plus the internal manual-correction
+// source used to preserve auditability when no workbook exists.
 export const mrpSourcesTable = pgTable(
   "mrp_sources",
   {
@@ -58,6 +57,7 @@ export const mrpSourcesTable = pgTable(
     sheetUrl: text("sheet_url").notNull(),
     expectedFileName: text("expected_file_name"),
     notes: text("notes"),
+    sourceKind: text("source_kind").notNull().default("official"),
   },
   (t) => [
     uniqueIndex("mrp_sources_division_idx").on(t.division),
@@ -93,9 +93,10 @@ export const mrpLoadBatchesTable = pgTable(
   ],
 );
 
-// Append-only MRP price history. Every load INSERTs new rows; old rows are
-// never updated or deleted. is_current is recomputed per item_code (latest
-// effective_date) after each load.
+// MRP price history is append-only for normal source loads. Source-invalid rows
+// can be removed by a documented correction, and same-date manual corrections
+// retain a dedicated audit batch. is_current is recomputed per item_code after
+// each load or correction.
 export const mrpPriceHistoryTable = pgTable(
   "mrp_price_history",
   {
@@ -115,8 +116,8 @@ export const mrpPriceHistoryTable = pgTable(
     reviewStatus: text("review_status").notNull().default("approved"),
     reviewReasons: text("review_reasons"),
     importBatchId: text("import_batch_id"),
-    // Non-null for MRP-sheet loads. Legacy/manual rows are backfilled or
-    // surfaced by Data Health until a traceable source batch is recorded.
+    // Every normal source load and manual correction has an auditable batch.
+    // Null is retained only for legacy rows so Data Health can surface them.
     loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   },

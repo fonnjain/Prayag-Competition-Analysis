@@ -11,7 +11,11 @@ import {
   mrpLoadBatchesTable,
 } from "@workspace/db";
 import { loadCatalogSeed } from "../lib/catalogSeed";
-import { ensureOfficialMrpSources } from "../lib/mrpProvenance";
+import {
+  ensureManualMrpSource,
+  ensureOfficialMrpSources,
+  sha256ForManualCorrection,
+} from "../lib/mrpProvenance";
 
 const router: IRouter = Router();
 
@@ -42,6 +46,7 @@ type MrpSourceHealthRow = {
   downloadedAt: string | null;
   loadedAt: Date | null;
   rowCount: number | null;
+  liveLinkedRows: number | null;
   snapshotAgeDays: number | null;
 };
 
@@ -62,6 +67,11 @@ export async function getMrpSourceHealth() {
       b.downloaded_at AS "downloadedAt",
       b.loaded_at AS "loadedAt",
       b.row_count AS "rowCount",
+      COALESCE((
+        SELECT COUNT(*)::int
+        FROM mrp_price_history h
+        WHERE h.load_batch_id = b.id
+      ), 0) AS "liveLinkedRows",
       CASE
         WHEN b.downloaded_at IS NULL THEN NULL
         ELSE (CURRENT_DATE - b.downloaded_at)::int
@@ -74,6 +84,7 @@ export async function getMrpSourceHealth() {
       ORDER BY b.loaded_at DESC, b.id DESC
       LIMIT 1
     ) b ON TRUE
+    WHERE s.source_kind = 'official'
     ORDER BY
       CASE WHEN b.downloaded_at IS NULL THEN 1 ELSE 0 END,
       b.downloaded_at ASC,
@@ -83,6 +94,10 @@ export async function getMrpSourceHealth() {
   return result.rows.map((row) => ({
     ...row,
     fileHashPrefix: row.fileSha256?.slice(0, 12) ?? null,
+    rowsRemovedAfterLoad:
+      row.rowCount != null && row.liveLinkedRows != null
+        ? row.rowCount - row.liveLinkedRows
+        : null,
     isStale: row.snapshotAgeDays != null && row.snapshotAgeDays > 30,
     freshnessMessage:
       row.snapshotAgeDays == null
@@ -385,12 +400,12 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
   });
 });
 
-// PATCH /catalog/products/:itemCode/mrp — set a new current MRP inline
-// (without uploading a file). Inserts a new mrp_price_history row with
-// priceBasis="MRP", marks it current, and returns the updated row.
+// PATCH /catalog/products/:itemCode/mrp — apply a reviewed MRP correction
+// without uploading a workbook. It requires a reason and creates a dedicated
+// manual provenance batch before updating the period's visible MRP.
 router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: string }>, res) => {
   const { itemCode } = req.params;
-  const body = req.body as { mrp?: unknown; effectiveDate?: unknown; notes?: unknown };
+  const body = req.body as { mrp?: unknown; effectiveDate?: unknown; reason?: unknown };
 
   const mrp = Number(body.mrp);
   if (isNaN(mrp) || mrp <= 0) {
@@ -403,10 +418,16 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
     typeof body.effectiveDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.effectiveDate.trim())
       ? body.effectiveDate.trim()
       : today;
-  const notes =
-    typeof body.notes === "string" && body.notes.trim()
-      ? body.notes.trim()
-      : "Manual edit";
+  const reason =
+    typeof body.reason === "string" && body.reason.trim()
+      ? body.reason.trim()
+      : null;
+  if (!reason) {
+    res.status(400).json({
+      error: "A correction reason is required for a manual MRP edit.",
+    });
+    return;
+  }
 
   const product = await db
     .select({ itemCode: catalogProductsTable.itemCode })
@@ -418,8 +439,30 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
     return;
   }
 
-  // Upsert: if the same (itemCode, effectiveDate) already exists, overwrite the
-  // price. This keeps the history clean when the user corrects a typo.
+  const manualSourceId = await ensureManualMrpSource();
+  const manualChecksum = sha256ForManualCorrection({
+    itemCode,
+    effectiveDate,
+    mrp,
+    reason,
+  });
+  const createdBatch = await db
+    .insert(mrpLoadBatchesTable)
+    .values({
+      sourceId: manualSourceId,
+      fileName: `manual-correction:${itemCode}:${effectiveDate}`,
+      fileSha256: manualChecksum,
+      fileSizeBytes: 0,
+      downloadedAt: today,
+      loadedBy: req.user?.email ?? req.user?.id ?? null,
+      rowCount: 1,
+      notes: reason,
+    })
+    .returning({ id: mrpLoadBatchesTable.id });
+  const loadBatchId = createdBatch[0]!.id;
+
+  // Same-date corrections replace the visible price, but move it into an
+  // explicit manual audit batch instead of silently retaining workbook provenance.
   await db
     .insert(mrpPriceHistoryTable)
     .values({
@@ -432,11 +475,19 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
       loadDate: today,
       sourceFile: "manual-edit",
       isCurrent: false,
-      notes,
+      notes: `Manual correction: ${reason}`,
+      loadBatchId,
     })
     .onConflictDoUpdate({
       target: [mrpPriceHistoryTable.itemCode, mrpPriceHistoryTable.effectiveDate],
-      set: { mrp, priceBasis: "MRP", loadDate: today, notes },
+      set: {
+        mrp,
+        priceBasis: "MRP",
+        loadDate: today,
+        sourceFile: "manual-edit",
+        notes: `Manual correction: ${reason}`,
+        loadBatchId,
+      },
     });
 
   await recomputeCurrentFlags();
@@ -480,6 +531,7 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
     mrp: actualCurrentMrp,
     effectiveDate: currentRow?.effectiveDate ?? effectiveDate,
     current: currentRow ?? null,
+    provenanceBatchId: loadBatchId,
     competitorRowsRefreshed: refreshed.length,
   });
 });
