@@ -1,0 +1,1802 @@
+[
+  {
+    "itemCode": "4010",
+    "mrp": 2350.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4010",
+    "mrp": 2580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4011",
+    "mrp": 1660.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4011",
+    "mrp": 1730.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4011",
+    "mrp": 1790.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4011",
+    "mrp": 1860.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4012",
+    "mrp": 2140.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4012",
+    "mrp": 2230.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4012",
+    "mrp": 2349.803921568628,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4012",
+    "mrp": 2450.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4016",
+    "mrp": 2980.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4016",
+    "mrp": 3290.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4018",
+    "mrp": 2490.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4018",
+    "mrp": 2950.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4018",
+    "mrp": 2730.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4018",
+    "mrp": 3230.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4019",
+    "mrp": 2490.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4019",
+    "mrp": 2950.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4019",
+    "mrp": 2730.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4019",
+    "mrp": 3230.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4020",
+    "mrp": 4240.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4020",
+    "mrp": 4570.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4020-P",
+    "mrp": 4240.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4020-P",
+    "mrp": 4570.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4021",
+    "mrp": 9580.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4021",
+    "mrp": 10530.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4022",
+    "mrp": 3750.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4022",
+    "mrp": 3990.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4023",
+    "mrp": 8920.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4023",
+    "mrp": 9790.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4030",
+    "mrp": 11130.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4030",
+    "mrp": 11990.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4031",
+    "mrp": 5785.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4031",
+    "mrp": 6290.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4032",
+    "mrp": 5785.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4032",
+    "mrp": 6290.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4051",
+    "mrp": 2240.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4051",
+    "mrp": 2570.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4051",
+    "mrp": 2420.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4051",
+    "mrp": 2780.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4052",
+    "mrp": 2610.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4052",
+    "mrp": 2850.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4053",
+    "mrp": 2100.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4053",
+    "mrp": 2420.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4053",
+    "mrp": 2310.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4053",
+    "mrp": 2660.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4054",
+    "mrp": 2520.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4054",
+    "mrp": 2890.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4054",
+    "mrp": 2740.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4054",
+    "mrp": 3140.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4055",
+    "mrp": 3040.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4055",
+    "mrp": 3360.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4056",
+    "mrp": 2430.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4056",
+    "mrp": 2660.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4057",
+    "mrp": 2480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4057",
+    "mrp": 2690.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4230",
+    "mrp": 12320.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4230",
+    "mrp": 13550.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4240",
+    "mrp": 12760.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4240",
+    "mrp": 13570.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4252",
+    "mrp": 15180.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4252",
+    "mrp": 16460.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4253",
+    "mrp": 15180.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4253",
+    "mrp": 16460.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4254",
+    "mrp": 15180.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4254",
+    "mrp": 16460.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4257",
+    "mrp": 19850.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4257",
+    "mrp": 21840.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4260",
+    "mrp": 13110.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4260",
+    "mrp": 14410.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4270",
+    "mrp": 15840.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4270",
+    "mrp": 13800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4270",
+    "mrp": 17330.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4270",
+    "mrp": 15200.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4271",
+    "mrp": 15840.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4271",
+    "mrp": 13800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4271",
+    "mrp": 17330.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4271",
+    "mrp": 15200.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4281",
+    "mrp": 14950.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4281",
+    "mrp": 13800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4281",
+    "mrp": 16390.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4281",
+    "mrp": 14470.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4282",
+    "mrp": 12990.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4282",
+    "mrp": 14280.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4291",
+    "mrp": 15800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4291",
+    "mrp": 17310.47040971168,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4292",
+    "mrp": 15800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4292",
+    "mrp": 17310.47040971168,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4302",
+    "mrp": 12500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4302",
+    "mrp": 10480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4302",
+    "mrp": 13640.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4302",
+    "mrp": 11580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4303",
+    "mrp": 12500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4303",
+    "mrp": 10480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4303",
+    "mrp": 13640.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4303",
+    "mrp": 11580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4304",
+    "mrp": 12500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4304",
+    "mrp": 10480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4304",
+    "mrp": 13640.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4304",
+    "mrp": 11580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4305",
+    "mrp": 11500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4305",
+    "mrp": 12700.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4330",
+    "mrp": 12320.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4330",
+    "mrp": 13550.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4351",
+    "mrp": 15870.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4351",
+    "mrp": 17190.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4352",
+    "mrp": 15870.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4352",
+    "mrp": 17190.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4353",
+    "mrp": 17380.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4353",
+    "mrp": 19120.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4357",
+    "mrp": 19850.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4357",
+    "mrp": 21840.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4361",
+    "mrp": 14080.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4361",
+    "mrp": 13400.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4361",
+    "mrp": 15360.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4361",
+    "mrp": 14760.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4362",
+    "mrp": 14080.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4362",
+    "mrp": 13400.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4362",
+    "mrp": 15360.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4362",
+    "mrp": 14760.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4363",
+    "mrp": 19060.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4364",
+    "mrp": 14080.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4364",
+    "mrp": 15360.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4365",
+    "mrp": 14080.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4365",
+    "mrp": 15360.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4375",
+    "mrp": 14080.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4375",
+    "mrp": 15360.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4376",
+    "mrp": 13340.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4376",
+    "mrp": 14670.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4377",
+    "mrp": 13340.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4377",
+    "mrp": 14670.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4380",
+    "mrp": 13340.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4380",
+    "mrp": 14670.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4381",
+    "mrp": 14950.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4381",
+    "mrp": 13800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4381",
+    "mrp": 16390.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4381",
+    "mrp": 14470.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4390",
+    "mrp": 11800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4390",
+    "mrp": 13120.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4402",
+    "mrp": 12500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4402",
+    "mrp": 10480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4402",
+    "mrp": 13640.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4402",
+    "mrp": 11580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4403",
+    "mrp": 12500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4403",
+    "mrp": 10480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4403",
+    "mrp": 13640.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4403",
+    "mrp": 11580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4404",
+    "mrp": 12500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4404",
+    "mrp": 10480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4404",
+    "mrp": 13640.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4404",
+    "mrp": 11580.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4405",
+    "mrp": 11500.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4405",
+    "mrp": 12700.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4430",
+    "mrp": 12320.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4430",
+    "mrp": 13550.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4440",
+    "mrp": 12760.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4440",
+    "mrp": 13570.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4460",
+    "mrp": 13110.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4460",
+    "mrp": 14410.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4463",
+    "mrp": 19060.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4470",
+    "mrp": 15840.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4470",
+    "mrp": 13800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4470",
+    "mrp": 17330.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4470",
+    "mrp": 15200.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4480",
+    "mrp": 14950.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4480",
+    "mrp": 13800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4480",
+    "mrp": 16390.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4480",
+    "mrp": 14470.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4482",
+    "mrp": 12990.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4482",
+    "mrp": 14280.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "White with Jet"
+  },
+  {
+    "itemCode": "4490",
+    "mrp": 15800.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4490",
+    "mrp": 17310.47040971168,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4505",
+    "mrp": 9080.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4505",
+    "mrp": 9990.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4521",
+    "mrp": 11200.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4521",
+    "mrp": 11940.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4522",
+    "mrp": 11600.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4522",
+    "mrp": 12320.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4523",
+    "mrp": 11100.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4523",
+    "mrp": 11940.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4535",
+    "mrp": 6070.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4535",
+    "mrp": 6650.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4545",
+    "mrp": 12078.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4545",
+    "mrp": 13160.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4550",
+    "mrp": 6578.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4550",
+    "mrp": 7120.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4555",
+    "mrp": 12078.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4555",
+    "mrp": 13070.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4561",
+    "mrp": 2120.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4561",
+    "mrp": 2290.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4565",
+    "mrp": 8150.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4565",
+    "mrp": 8890.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4570",
+    "mrp": 10439.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4570",
+    "mrp": 10980.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4575",
+    "mrp": 10626.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4575",
+    "mrp": 11530.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4580",
+    "mrp": 5480.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4580",
+    "mrp": 6009.579831932773,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4585",
+    "mrp": 9779.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4585",
+    "mrp": 10650.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4601",
+    "mrp": 5470.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4601",
+    "mrp": 5980.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4602",
+    "mrp": 4830.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4602",
+    "mrp": 5270.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4603",
+    "mrp": 5380.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4603",
+    "mrp": 5750.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4604",
+    "mrp": 4370.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4604",
+    "mrp": 4570.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4605",
+    "mrp": 4440.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4605",
+    "mrp": 4980.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4606",
+    "mrp": 5841.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4606",
+    "mrp": 6140.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4607",
+    "mrp": 5400.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4607",
+    "mrp": 5940.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4611",
+    "mrp": 4220.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4611",
+    "mrp": 4570.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4612",
+    "mrp": 4740.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4612",
+    "mrp": 5250.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4613",
+    "mrp": 4850.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4613",
+    "mrp": 5240.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4614",
+    "mrp": 4670.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4614",
+    "mrp": 5130.098522167487,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4641",
+    "mrp": 2760.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4641",
+    "mrp": 2980.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4642",
+    "mrp": 1990.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4642",
+    "mrp": 2410.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4642",
+    "mrp": 2170.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4642",
+    "mrp": 2630.426829268293,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4643",
+    "mrp": 2100.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4643",
+    "mrp": 2410.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4643",
+    "mrp": 2280.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4643",
+    "mrp": 2620.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4644",
+    "mrp": 3560.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4644",
+    "mrp": 3790.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4645",
+    "mrp": 2230.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4645",
+    "mrp": 2480.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4646",
+    "mrp": 1750.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4646",
+    "mrp": 1950.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4647",
+    "mrp": 3730.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4647",
+    "mrp": 4080.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4649",
+    "mrp": 4650.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4649",
+    "mrp": 5120.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4651",
+    "mrp": 1620.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4651",
+    "mrp": 1860.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4651",
+    "mrp": 1770.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4651",
+    "mrp": 2040.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4652",
+    "mrp": 1150.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4652",
+    "mrp": 1320.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4652",
+    "mrp": 1280.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4652",
+    "mrp": 1470.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4653",
+    "mrp": 1890.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4653",
+    "mrp": 2140.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4653",
+    "mrp": 2050.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4653",
+    "mrp": 2320.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4654",
+    "mrp": 2980.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4654",
+    "mrp": 3190.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4655",
+    "mrp": 1780.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4655",
+    "mrp": 2050.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4655",
+    "mrp": 1970.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4655",
+    "mrp": 2270.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Pink / Green / Blue"
+  },
+  {
+    "itemCode": "4656",
+    "mrp": 2490.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4656",
+    "mrp": 2730.152284263959,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4657",
+    "mrp": 2560.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4657",
+    "mrp": 2760.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4658",
+    "mrp": 2280.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4658",
+    "mrp": 2490.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4659",
+    "mrp": 1660.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4659",
+    "mrp": 1820.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4660",
+    "mrp": 1880.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4660",
+    "mrp": 1990.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4661",
+    "mrp": 2120.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4661",
+    "mrp": 2290.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4663",
+    "mrp": 2410.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4663",
+    "mrp": 2410.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4663",
+    "mrp": 2620.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4663",
+    "mrp": 2620.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4664",
+    "mrp": 2410.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4664",
+    "mrp": 2550.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4666",
+    "mrp": 1290.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4666",
+    "mrp": 1430.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4704",
+    "mrp": 3130.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4704",
+    "mrp": 3390.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4706",
+    "mrp": 3260.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4706",
+    "mrp": 3589.662921348315,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4719",
+    "mrp": 5320.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4719",
+    "mrp": 5610.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4790",
+    "mrp": 3230.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4790",
+    "mrp": 3540.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4793",
+    "mrp": 3230.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4793",
+    "mrp": 3540.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4795",
+    "mrp": 3230.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4795",
+    "mrp": 3540.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4996",
+    "mrp": 3280.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4996",
+    "mrp": 3590.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4997",
+    "mrp": 6560.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4997",
+    "mrp": 7220.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4998",
+    "mrp": 6250.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4998",
+    "mrp": 6870.0,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4999",
+    "mrp": 2030.0,
+    "effectiveDate": "2026-01-15",
+    "variant": "Ivory"
+  },
+  {
+    "itemCode": "4999",
+    "mrp": 2230.493827160494,
+    "effectiveDate": "2026-05-01",
+    "variant": "Ivory"
+  }
+]

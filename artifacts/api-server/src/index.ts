@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { seedCatalogIfEmpty, backfillCatalogSizes } from "./lib/catalogSeed";
+import { seedCatalogIfEmpty, backfillCatalogSizes, seedVariantPricesIfEmpty } from "./lib/catalogSeed";
 import { seedAdminUser } from "./lib/adminSeed";
 
 const rawPort = process.env["PORT"];
@@ -36,5 +36,11 @@ app.listen(port, async (err) => {
     await backfillCatalogSizes();
   } catch (seedErr) {
     logger.error({ err: seedErr }, "Failed to seed product catalog");
+  }
+
+  try {
+    await seedVariantPricesIfEmpty();
+  } catch (seedErr) {
+    logger.error({ err: seedErr }, "Failed to seed sanitaryware variant prices");
   }
 });
