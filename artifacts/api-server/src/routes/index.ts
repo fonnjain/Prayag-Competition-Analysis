@@ -20,10 +20,6 @@ router.use(authRouter);
 // External API: authenticated with X-API-Key (no session needed)
 router.use(externalV1Router);
 
-// Public read-only product lookup. Price Finder is intentionally available
-// without a workspace session; its router only exposes GET endpoints.
-router.use(priceFinderRouter);
-
 // Internal routes: require a valid session
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
@@ -35,6 +31,7 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 router.use(requireAuth);
 router.use(apiKeysRouter);
+router.use(priceFinderRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
 router.use(catalogSyncRouter);
