@@ -22,6 +22,7 @@ export const usersTable = pgTable('users', {
   lastName: varchar('last_name'),
   profileImageUrl: varchar('profile_image_url'),
   passwordHash: varchar('password_hash'),
+  role: varchar('role').notNull().default('user'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

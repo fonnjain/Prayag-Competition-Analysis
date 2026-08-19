@@ -10,6 +10,8 @@ import {
   Home as HomeIcon,
   Menu,
   X,
+  Users,
+  ShieldCheck,
 } from "lucide-react";
 import React, { useState } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -25,6 +27,7 @@ const APP_LINKS = [
 export default function Home() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const isAdmin = (user as any)?.role === "admin";
 
   const userName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
@@ -262,6 +265,34 @@ export default function Home() {
               </div>
             </a>
           </div>
+
+          {/* Admin card — only for admin users */}
+          {isAdmin && (
+            <div className="mt-8 max-w-5xl mx-auto">
+              <a
+                href="/admin"
+                className="group flex items-center gap-4 rounded-xl border border-primary/20 bg-primary/5 px-6 py-4 hover:bg-primary/10 hover:border-primary/40 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                      User Management
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      <ShieldCheck className="w-3 h-3" />
+                      Admin only
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Add or remove users, reset passwords, and manage roles.
+                  </p>
+                </div>
+              </a>
+            </div>
+          )}
 
           {/* Footer */}
           <footer className="mt-20 text-center text-sm text-muted-foreground">

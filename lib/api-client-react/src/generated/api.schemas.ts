@@ -1041,6 +1041,73 @@ export interface AuthUser {
   lastName?: string | null;
   /** @nullable */
   profileImageUrl?: string | null;
+  /**
+     * User role: "admin" has access to user management; "user" is a normal workspace member.
+     * @nullable
+     */
+  role?: string | null;
+}
+
+export type AdminUserRole = typeof AdminUserRole[keyof typeof AdminUserRole];
+
+
+export const AdminUserRole = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  role: AdminUserRole;
+  createdAt: string;
+}
+
+export interface AdminUserList {
+  users: AdminUser[];
+}
+
+export type CreateAdminUserBodyRole = typeof CreateAdminUserBodyRole[keyof typeof CreateAdminUserBodyRole];
+
+
+export const CreateAdminUserBodyRole = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface CreateAdminUserBody {
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /**
+     * Initial password. If omitted, account is created without a password.
+     * @minLength 8
+     */
+  password?: string;
+  role: CreateAdminUserBodyRole;
+}
+
+export interface ResetUserPasswordBody {
+  /** @minLength 8 */
+  password: string;
+}
+
+export type UpdateUserRoleBodyRole = typeof UpdateUserRoleBodyRole[keyof typeof UpdateUserRoleBodyRole];
+
+
+export const UpdateUserRoleBodyRole = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface UpdateUserRoleBody {
+  role: UpdateUserRoleBodyRole;
 }
 
 export interface AuthUserEnvelope {
