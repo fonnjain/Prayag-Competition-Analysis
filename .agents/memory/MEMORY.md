@@ -12,3 +12,4 @@
 - [MRP history rebuild safety](mrp-history-rebuild-safety.md) — preserve verified history backups; source-period rebuilds supersede row-by-row price repairs.
 - [MRP source provenance](mrp-source-provenance.md) — trace MRP rows to official snapshots by server-side SHA-256 and supplied download date; preserve known hash limitations honestly.
 - [Non-interactive Drizzle push conflicts](drizzle-push-conflicts.md) — verify additive tables exist after merges; never force an ambiguous non-TTY schema prompt.
+- [Cross-app browser regression setup](cross-app-browser-regression.md) — path-routed app-switch tests need Chromium explicitly, proxy workflows, and Nix browser libraries.
