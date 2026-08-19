@@ -9,3 +9,4 @@
 - [PDF catalogue import](pdf-catalogue-import.md) — Claude vision extraction, staging tables, alias-based matching, price_basis/gst_pct per row, approve wires to competitor_prices.
 - [Category backfill workbook boundary](category-backfill-workbook.md) — supplied workbooks may be older than the live catalog; compare item codes before treating them as complete.
 - [MRP history rebuild safety](mrp-history-rebuild-safety.md) — preserve verified history backups; source-period rebuilds supersede row-by-row price repairs.
+- [MRP source provenance](mrp-source-provenance.md) — trace MRP rows to official snapshots by server-side SHA-256 and supplied download date; preserve known hash limitations honestly.
