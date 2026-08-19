@@ -318,6 +318,88 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /price-finder/search:
+    get:
+      operationId: getPriceFinderSearch
+      tags: [catalog]
+      summary: Search products for the read-only Price Finder
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 20
+      responses:
+        "200":
+          description: Ranked Price Finder search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceFinderSearchResponse"
+  /price-finder/browse:
+    get:
+      operationId: getPriceFinderBrowse
+      tags: [catalog]
+      summary: Browse the catalogue by division and category
+      parameters:
+        - name: division
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          description: Use "__uncategorised__" for blank categories.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+            default: 200
+      responses:
+        "200":
+          description: Browse options and, when selected, products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceFinderBrowseResponse"
+  /price-finder/product/{itemCode}:
+    get:
+      operationId: getPriceFinderProduct
+      tags: [catalog]
+      summary: Get current Prayag and competitor prices for one product
+      parameters:
+        - name: itemCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Price Finder product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceFinderProductResponse"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/products/{itemCode}/mrp:
     patch:
       operationId: patchCatalogProductMrp
@@ -1438,6 +1520,133 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MrpPriceRow"
+    PriceFinderSearchResult:
+      type: object
+      required:
+        - itemCode
+        - productName
+        - division
+        - category
+        - currentMrp
+        - currentEffectiveDate
+        - hasCompetitorData
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        currentMrp:
+          type: ["number", "null"]
+        currentEffectiveDate:
+          type: ["string", "null"]
+        hasCompetitorData:
+          type: boolean
+    PriceFinderSearchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderSearchResult"
+    PriceFinderBrowseDivision:
+      type: object
+      required: [division, count]
+      properties:
+        division:
+          type: string
+        count:
+          type: integer
+    PriceFinderBrowseCategory:
+      type: object
+      required: [category, label, count]
+      properties:
+        category:
+          type: ["string", "null"]
+        label:
+          type: string
+        count:
+          type: integer
+    PriceFinderBrowseResponse:
+      type: object
+      required: [divisions, categories, products]
+      properties:
+        divisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderBrowseDivision"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderBrowseCategory"
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderSearchResult"
+    PriceFinderProduct:
+      type: object
+      required:
+        - itemCode
+        - productName
+        - division
+        - category
+        - currentMrp
+        - currentEffectiveDate
+        - upcomingMrp
+        - upcomingEffectiveDate
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        currentMrp:
+          type: ["number", "null"]
+        currentEffectiveDate:
+          type: ["string", "null"]
+        upcomingMrp:
+          type: ["number", "null"]
+        upcomingEffectiveDate:
+          type: ["string", "null"]
+    PriceFinderCompetitor:
+      type: object
+      required:
+        - competitor
+        - price
+        - effectiveDate
+        - priceBasis
+        - gapPct
+        - message
+      properties:
+        competitor:
+          type: string
+        price:
+          type: number
+        effectiveDate:
+          type: ["string", "null"]
+        priceBasis:
+          type: ["string", "null"]
+        gapPct:
+          type: ["number", "null"]
+        message:
+          type: ["string", "null"]
+    PriceFinderProductResponse:
+      type: object
+      required: [product, competitors]
+      properties:
+        product:
+          $ref: "#/components/schemas/PriceFinderProduct"
+        competitors:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderCompetitor"
     CatalogFilters:
       type: object
       required: [divisions, categories]
@@ -2102,6 +2311,8 @@ components:
         - medianPriceDiffPct
         - competitorCount
         - matchQuality
+        - prayagMrpDate
+        - competitorPeriodDate
       properties:
         totalSkus:
           type: integer
@@ -2129,6 +2340,12 @@ components:
           type: integer
         matchQuality:
           $ref: "#/components/schemas/ConfidenceCounts"
+        prayagMrpDate:
+          type: string
+          description: Effective date of the Prayag MRP used for this overview.
+        competitorPeriodDate:
+          type: ["string", "null"]
+          description: Effective date of the competitor period used for this overview.
     AnalysisBrandStat:
       type: object
       required:

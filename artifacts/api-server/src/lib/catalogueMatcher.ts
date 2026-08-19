@@ -15,6 +15,7 @@
  */
 
 import type { ExtractedItem } from "./pdfExtractor.js";
+export type { ExtractedItem } from "./pdfExtractor.js";
 
 export interface MatchTarget {
   competitorCode: string | null; // code in competitor_prices

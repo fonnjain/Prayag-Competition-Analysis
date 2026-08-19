@@ -8,6 +8,7 @@ import analysisRouter from "./analysis";
 import apiKeysRouter from "./apiKeys";
 import externalV1Router from "./externalV1";
 import importBatchesRouter from "./importBatches";
+import priceFinderRouter from "./priceFinder";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,7 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 router.use(requireAuth);
 router.use(apiKeysRouter);
+router.use(priceFinderRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
 router.use(importBatchesRouter);

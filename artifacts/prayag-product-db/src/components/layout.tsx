@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key, LogOut, Home, TrendingUp } from "lucide-react";
+import { Box, Database, FileSpreadsheet, LayoutGrid, BarChart2, Link as LinkIcon, FileUp, Key, LogOut, Home, TrendingUp, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@workspace/replit-auth-web";
 
@@ -13,6 +13,7 @@ export function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { href: "/", label: "Catalog", icon: Box },
+    { href: "/price-finder", label: "Price Finder", icon: Search },
     { href: "/comparison", label: "Comparison", icon: BarChart2 },
     { href: "/mapping-review", label: "Mapping Review", icon: LinkIcon },
     { href: "/load-mrp", label: "Load MRP", icon: FileSpreadsheet },

@@ -35,8 +35,8 @@ export interface PrayagInfo {
   productName: string | null;
   effectiveDate: string | null;
   /** Next revision after the resolved asOf date, if any already exists in the DB. */
-  upcomingMrp: number | null;
-  upcomingMrpDate: string | null;
+  upcomingMrp?: number | null;
+  upcomingMrpDate?: string | null;
 }
 
 // Minimal shape of a competitor_prices row needed for analysis.

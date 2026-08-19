@@ -77,6 +77,8 @@ import type {
   GetComparisonSummaryParams,
   GetMappingReviewParams,
   GetMrpIncreasesParams,
+  GetPriceFinderBrowseParams,
+  GetPriceFinderSearchParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
   LogoutBrowserSessionParams,
@@ -88,6 +90,9 @@ import type {
   OkResponse,
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
+  PriceFinderBrowseResponse,
+  PriceFinderProductResponse,
+  PriceFinderSearchResponse,
   PriceHistory,
   ProductComparisonList,
   RecordAcceptBatch
@@ -104,7 +109,10 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
 export const getHealthCheckUrl = () => {
+
+
 
 
   return `/api/healthz`
@@ -126,6 +134,9 @@ export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus>
 );}
 
 
+
+
+
 export const getHealthCheckQueryKey = () => {
     return [
     `/api/healthz`
@@ -141,7 +152,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
@@ -168,7 +183,14 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 }
 
 
+
+
+
+
+
 export const getGetApiKeysUrl = () => {
+
+
 
 
   return `/api/keys`
@@ -189,6 +211,9 @@ export const getApiKeys = async ( options?: RequestInit): Promise<ApiKeyList> =>
 );}
 
 
+
+
+
 export const getGetApiKeysQueryKey = () => {
     return [
     `/api/keys`
@@ -204,7 +229,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetApiKeysQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getApiKeys>>> = ({ signal }) => getApiKeys({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getApiKeys>>, TError, TData> & { queryKey: QueryKey }
@@ -231,7 +260,14 @@ export function useGetApiKeys<TData = Awaited<ReturnType<typeof getApiKeys>>, TE
 }
 
 
+
+
+
+
+
 export const getCreateApiKeyUrl = () => {
+
+
 
 
   return `/api/keys`
@@ -253,6 +289,8 @@ export const createApiKey = async (apiKeyCreate: ApiKeyCreate, options?: Request
 );}
 
 
+
+
 export const getCreateApiKeyMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApiKey>>, TError,{data: BodyType<ApiKeyCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createApiKey>>, TError,{data: BodyType<ApiKeyCreate>}, TContext> => {
@@ -265,11 +303,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createApiKey>>, {data: BodyType<ApiKeyCreate>}> = (props) => {
           const {data} = props ?? {};
 
           return  createApiKey(data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -295,6 +339,8 @@ export const useCreateApiKey = <TError = ErrorType<ErrorResponse>,
 export const getRevokeApiKeyUrl = (id: number,) => {
 
 
+
+
   return `/api/keys/${id}/revoke`
 }
 
@@ -313,6 +359,8 @@ export const revokeApiKey = async (id: number, options?: RequestInit): Promise<A
 );}
 
 
+
+
 export const getRevokeApiKeyMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeApiKey>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof revokeApiKey>>, TError,{id: number}, TContext> => {
@@ -325,11 +373,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeApiKey>>, {id: number}> = (props) => {
           const {id} = props ?? {};
 
           return  revokeApiKey(id,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -355,6 +409,8 @@ export const useRevokeApiKey = <TError = ErrorType<ErrorResponse>,
 export const getDeleteApiKeyUrl = (id: number,) => {
 
 
+
+
   return `/api/keys/${id}`
 }
 
@@ -373,6 +429,8 @@ export const deleteApiKey = async (id: number, options?: RequestInit): Promise<O
 );}
 
 
+
+
 export const getDeleteApiKeyMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteApiKey>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteApiKey>>, TError,{id: number}, TContext> => {
@@ -385,11 +443,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteApiKey>>, {id: number}> = (props) => {
           const {id} = props ?? {};
 
           return  deleteApiKey(id,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -442,6 +506,9 @@ export const externalListProducts = async (params?: ExternalListProductsParams, 
 );}
 
 
+
+
+
 export const getExternalListProductsQueryKey = (params?: ExternalListProductsParams,) => {
     return [
     `/api/v1/products`, ...(params ? [params] : [])
@@ -457,7 +524,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getExternalListProductsQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof externalListProducts>>> = ({ signal }) => externalListProducts(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof externalListProducts>>, TError, TData> & { queryKey: QueryKey }
@@ -484,7 +555,14 @@ export function useExternalListProducts<TData = Awaited<ReturnType<typeof extern
 }
 
 
+
+
+
+
+
 export const getExternalGetProductUrl = (itemCode: string,) => {
+
+
 
 
   return `/api/v1/products/${itemCode}`
@@ -505,6 +583,9 @@ export const externalGetProduct = async (itemCode: string, options?: RequestInit
 );}
 
 
+
+
+
 export const getExternalGetProductQueryKey = (itemCode: string,) => {
     return [
     `/api/v1/products/${itemCode}`
@@ -520,7 +601,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getExternalGetProductQueryKey(itemCode);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetProduct>>> = ({ signal }) => externalGetProduct(itemCode, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData> & { queryKey: QueryKey }
@@ -545,6 +630,11 @@ export function useExternalGetProduct<TData = Awaited<ReturnType<typeof external
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getExternalGetComparisonUrl = (params?: ExternalGetComparisonParams,) => {
@@ -577,6 +667,9 @@ export const externalGetComparison = async (params?: ExternalGetComparisonParams
 );}
 
 
+
+
+
 export const getExternalGetComparisonQueryKey = (params?: ExternalGetComparisonParams,) => {
     return [
     `/api/v1/comparison`, ...(params ? [params] : [])
@@ -592,7 +685,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getExternalGetComparisonQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetComparison>>> = ({ signal }) => externalGetComparison(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof externalGetComparison>>, TError, TData> & { queryKey: QueryKey }
@@ -619,7 +716,14 @@ export function useExternalGetComparison<TData = Awaited<ReturnType<typeof exter
 }
 
 
+
+
+
+
+
 export const getExternalGetAnalysisOverviewUrl = () => {
+
+
 
 
   return `/api/v1/analysis/overview`
@@ -640,6 +744,9 @@ export const externalGetAnalysisOverview = async ( options?: RequestInit): Promi
 );}
 
 
+
+
+
 export const getExternalGetAnalysisOverviewQueryKey = () => {
     return [
     `/api/v1/analysis/overview`
@@ -655,7 +762,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getExternalGetAnalysisOverviewQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetAnalysisOverview>>> = ({ signal }) => externalGetAnalysisOverview({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof externalGetAnalysisOverview>>, TError, TData> & { queryKey: QueryKey }
@@ -680,6 +791,11 @@ export function useExternalGetAnalysisOverview<TData = Awaited<ReturnType<typeof
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetCatalogProductsUrl = (params?: GetCatalogProductsParams,) => {
@@ -712,6 +828,9 @@ export const getCatalogProducts = async (params?: GetCatalogProductsParams, opti
 );}
 
 
+
+
+
 export const getGetCatalogProductsQueryKey = (params?: GetCatalogProductsParams,) => {
     return [
     `/api/catalog/products`, ...(params ? [params] : [])
@@ -727,7 +846,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductsQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProducts>>> = ({ signal }) => getCatalogProducts(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogProducts>>, TError, TData> & { queryKey: QueryKey }
@@ -754,7 +877,14 @@ export function useGetCatalogProducts<TData = Awaited<ReturnType<typeof getCatal
 }
 
 
+
+
+
+
+
 export const getGetCatalogProductUrl = (itemCode: string,) => {
+
+
 
 
   return `/api/catalog/products/${itemCode}`
@@ -775,6 +905,9 @@ export const getCatalogProduct = async (itemCode: string, options?: RequestInit)
 );}
 
 
+
+
+
 export const getGetCatalogProductQueryKey = (itemCode: string,) => {
     return [
     `/api/catalog/products/${itemCode}`
@@ -790,7 +923,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductQueryKey(itemCode);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProduct>>> = ({ signal }) => getCatalogProduct(itemCode, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData> & { queryKey: QueryKey }
@@ -817,7 +954,259 @@ export function useGetCatalogProduct<TData = Awaited<ReturnType<typeof getCatalo
 }
 
 
+
+
+
+
+
+export const getGetPriceFinderSearchUrl = (params: GetPriceFinderSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/search?${stringifiedParams}` : `/api/price-finder/search`
+}
+
+/**
+ * @summary Search products for the read-only Price Finder
+ */
+export const getPriceFinderSearch = async (params: GetPriceFinderSearchParams, options?: RequestInit): Promise<PriceFinderSearchResponse> => {
+
+  return customFetch<PriceFinderSearchResponse>(getGetPriceFinderSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderSearchQueryKey = (params?: GetPriceFinderSearchParams,) => {
+    return [
+    `/api/price-finder/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceFinderSearchQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderSearch>>, TError = ErrorType<unknown>>(params: GetPriceFinderSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderSearch>>> = ({ signal }) => getPriceFinderSearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderSearchQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderSearch>>>
+export type GetPriceFinderSearchQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search products for the read-only Price Finder
+ */
+
+export function useGetPriceFinderSearch<TData = Awaited<ReturnType<typeof getPriceFinderSearch>>, TError = ErrorType<unknown>>(
+ params: GetPriceFinderSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPriceFinderBrowseUrl = (params?: GetPriceFinderBrowseParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/browse?${stringifiedParams}` : `/api/price-finder/browse`
+}
+
+/**
+ * @summary Browse the catalogue by division and category
+ */
+export const getPriceFinderBrowse = async (params?: GetPriceFinderBrowseParams, options?: RequestInit): Promise<PriceFinderBrowseResponse> => {
+
+  return customFetch<PriceFinderBrowseResponse>(getGetPriceFinderBrowseUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderBrowseQueryKey = (params?: GetPriceFinderBrowseParams,) => {
+    return [
+    `/api/price-finder/browse`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceFinderBrowseQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderBrowse>>, TError = ErrorType<unknown>>(params?: GetPriceFinderBrowseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderBrowse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderBrowseQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderBrowse>>> = ({ signal }) => getPriceFinderBrowse(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderBrowse>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderBrowseQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderBrowse>>>
+export type GetPriceFinderBrowseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Browse the catalogue by division and category
+ */
+
+export function useGetPriceFinderBrowse<TData = Awaited<ReturnType<typeof getPriceFinderBrowse>>, TError = ErrorType<unknown>>(
+ params?: GetPriceFinderBrowseParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderBrowse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderBrowseQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPriceFinderProductUrl = (itemCode: string,) => {
+
+
+
+
+  return `/api/price-finder/product/${itemCode}`
+}
+
+/**
+ * @summary Get current Prayag and competitor prices for one product
+ */
+export const getPriceFinderProduct = async (itemCode: string, options?: RequestInit): Promise<PriceFinderProductResponse> => {
+
+  return customFetch<PriceFinderProductResponse>(getGetPriceFinderProductUrl(itemCode),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderProductQueryKey = (itemCode: string,) => {
+    return [
+    `/api/price-finder/product/${itemCode}`
+    ] as const;
+    }
+
+
+export const getGetPriceFinderProductQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderProductQueryKey(itemCode);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderProduct>>> = ({ signal }) => getPriceFinderProduct(itemCode, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderProductQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderProduct>>>
+export type GetPriceFinderProductQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get current Prayag and competitor prices for one product
+ */
+
+export function useGetPriceFinderProduct<TData = Awaited<ReturnType<typeof getPriceFinderProduct>>, TError = ErrorType<ErrorResponse>>(
+ itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderProductQueryOptions(itemCode,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getPatchCatalogProductMrpUrl = (itemCode: string,) => {
+
+
 
 
   return `/api/catalog/products/${itemCode}/mrp`
@@ -840,6 +1229,8 @@ export const patchCatalogProductMrp = async (itemCode: string,
 );}
 
 
+
+
 export const getPatchCatalogProductMrpMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}, TContext> => {
@@ -852,11 +1243,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCatalogProductMrp>>, {itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}> = (props) => {
           const {itemCode,data} = props ?? {};
 
           return  patchCatalogProductMrp(itemCode,data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -882,6 +1279,8 @@ export const usePatchCatalogProductMrp = <TError = ErrorType<ErrorResponse>,
 export const getGetCatalogFiltersUrl = () => {
 
 
+
+
   return `/api/catalog/filters`
 }
 
@@ -900,6 +1299,9 @@ export const getCatalogFilters = async ( options?: RequestInit): Promise<Catalog
 );}
 
 
+
+
+
 export const getGetCatalogFiltersQueryKey = () => {
     return [
     `/api/catalog/filters`
@@ -915,7 +1317,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetCatalogFiltersQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogFilters>>> = ({ signal }) => getCatalogFilters({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogFilters>>, TError, TData> & { queryKey: QueryKey }
@@ -942,7 +1348,14 @@ export function useGetCatalogFilters<TData = Awaited<ReturnType<typeof getCatalo
 }
 
 
+
+
+
+
+
 export const getGetCatalogDataHealthUrl = () => {
+
+
 
 
   return `/api/catalog/data-health`
@@ -963,6 +1376,9 @@ export const getCatalogDataHealth = async ( options?: RequestInit): Promise<Cata
 );}
 
 
+
+
+
 export const getGetCatalogDataHealthQueryKey = () => {
     return [
     `/api/catalog/data-health`
@@ -978,7 +1394,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetCatalogDataHealthQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogDataHealth>>> = ({ signal }) => getCatalogDataHealth({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogDataHealth>>, TError, TData> & { queryKey: QueryKey }
@@ -1005,7 +1425,14 @@ export function useGetCatalogDataHealth<TData = Awaited<ReturnType<typeof getCat
 }
 
 
+
+
+
+
+
 export const getResetCatalogUrl = () => {
+
+
 
 
   return `/api/catalog/reset`
@@ -1026,6 +1453,8 @@ export const resetCatalog = async ( options?: RequestInit): Promise<OkResponse> 
 );}
 
 
+
+
 export const getResetCatalogMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext> => {
@@ -1038,11 +1467,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetCatalog>>, void> = () => {
 
 
           return  resetCatalog(requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1095,6 +1530,9 @@ export const getComparison = async (params?: GetComparisonParams, options?: Requ
 );}
 
 
+
+
+
 export const getGetComparisonQueryKey = (params?: GetComparisonParams,) => {
     return [
     `/api/catalog/comparison`, ...(params ? [params] : [])
@@ -1110,7 +1548,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetComparisonQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparison>>> = ({ signal }) => getComparison(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparison>>, TError, TData> & { queryKey: QueryKey }
@@ -1135,6 +1577,11 @@ export function useGetComparison<TData = Awaited<ReturnType<typeof getComparison
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetComparisonSummaryUrl = (params?: GetComparisonSummaryParams,) => {
@@ -1167,6 +1614,9 @@ export const getComparisonSummary = async (params?: GetComparisonSummaryParams, 
 );}
 
 
+
+
+
 export const getGetComparisonSummaryQueryKey = (params?: GetComparisonSummaryParams,) => {
     return [
     `/api/catalog/comparison/summary`, ...(params ? [params] : [])
@@ -1182,7 +1632,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetComparisonSummaryQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonSummary>>> = ({ signal }) => getComparisonSummary(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonSummary>>, TError, TData> & { queryKey: QueryKey }
@@ -1207,6 +1661,11 @@ export function useGetComparisonSummary<TData = Awaited<ReturnType<typeof getCom
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetComparisonByProductUrl = (params?: GetComparisonByProductParams,) => {
@@ -1239,6 +1698,9 @@ export const getComparisonByProduct = async (params?: GetComparisonByProductPara
 );}
 
 
+
+
+
 export const getGetComparisonByProductQueryKey = (params?: GetComparisonByProductParams,) => {
     return [
     `/api/catalog/comparison/by-product`, ...(params ? [params] : [])
@@ -1254,7 +1716,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetComparisonByProductQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonByProduct>>> = ({ signal }) => getComparisonByProduct(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonByProduct>>, TError, TData> & { queryKey: QueryKey }
@@ -1279,6 +1745,11 @@ export function useGetComparisonByProduct<TData = Awaited<ReturnType<typeof getC
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetComparisonFiltersUrl = (params?: GetComparisonFiltersParams,) => {
@@ -1311,6 +1782,9 @@ export const getComparisonFilters = async (params?: GetComparisonFiltersParams, 
 );}
 
 
+
+
+
 export const getGetComparisonFiltersQueryKey = (params?: GetComparisonFiltersParams,) => {
     return [
     `/api/catalog/comparison/filters`, ...(params ? [params] : [])
@@ -1326,7 +1800,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetComparisonFiltersQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonFilters>>> = ({ signal }) => getComparisonFilters(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonFilters>>, TError, TData> & { queryKey: QueryKey }
@@ -1351,6 +1829,11 @@ export function useGetComparisonFilters<TData = Awaited<ReturnType<typeof getCom
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetComparisonMatrixUrl = (params?: GetComparisonMatrixParams,) => {
@@ -1383,6 +1866,9 @@ export const getComparisonMatrix = async (params?: GetComparisonMatrixParams, op
 );}
 
 
+
+
+
 export const getGetComparisonMatrixQueryKey = (params?: GetComparisonMatrixParams,) => {
     return [
     `/api/catalog/comparison/matrix`, ...(params ? [params] : [])
@@ -1398,7 +1884,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetComparisonMatrixQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getComparisonMatrix>>> = ({ signal }) => getComparisonMatrix(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComparisonMatrix>>, TError, TData> & { queryKey: QueryKey }
@@ -1423,6 +1913,11 @@ export function useGetComparisonMatrix<TData = Awaited<ReturnType<typeof getComp
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetMappingReviewUrl = (params?: GetMappingReviewParams,) => {
@@ -1455,6 +1950,9 @@ export const getMappingReview = async (params?: GetMappingReviewParams, options?
 );}
 
 
+
+
+
 export const getGetMappingReviewQueryKey = (params?: GetMappingReviewParams,) => {
     return [
     `/api/catalog/mapping-review`, ...(params ? [params] : [])
@@ -1470,7 +1968,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetMappingReviewQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getMappingReview>>> = ({ signal }) => getMappingReview(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMappingReview>>, TError, TData> & { queryKey: QueryKey }
@@ -1497,7 +1999,14 @@ export function useGetMappingReview<TData = Awaited<ReturnType<typeof getMapping
 }
 
 
+
+
+
+
+
 export const getBulkUpdateCompetitorMappingsUrl = () => {
+
+
 
 
   return `/api/catalog/competitor-prices/bulk`
@@ -1519,6 +2028,8 @@ export const bulkUpdateCompetitorMappings = async (bulkMappingUpdate: BulkMappin
 );}
 
 
+
+
 export const getBulkUpdateCompetitorMappingsMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, TError,{data: BodyType<BulkMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, TError,{data: BodyType<BulkMappingUpdate>}, TContext> => {
@@ -1531,11 +2042,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkUpdateCompetitorMappings>>, {data: BodyType<BulkMappingUpdate>}> = (props) => {
           const {data} = props ?? {};
 
           return  bulkUpdateCompetitorMappings(data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1561,6 +2078,8 @@ export const useBulkUpdateCompetitorMappings = <TError = ErrorType<unknown>,
 export const getAutoAcceptMappingsUrl = () => {
 
 
+
+
   return `/api/catalog/mapping-review/auto-accept`
 }
 
@@ -1580,6 +2099,8 @@ export const autoAcceptMappings = async (autoAcceptRequest: AutoAcceptRequest, o
 );}
 
 
+
+
 export const getAutoAcceptMappingsMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof autoAcceptMappings>>, TError,{data: BodyType<AutoAcceptRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof autoAcceptMappings>>, TError,{data: BodyType<AutoAcceptRequest>}, TContext> => {
@@ -1592,11 +2113,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof autoAcceptMappings>>, {data: BodyType<AutoAcceptRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  autoAcceptMappings(data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1649,6 +2176,9 @@ export const getAutoAcceptPreview = async (params?: GetAutoAcceptPreviewParams, 
 );}
 
 
+
+
+
 export const getGetAutoAcceptPreviewQueryKey = (params?: GetAutoAcceptPreviewParams,) => {
     return [
     `/api/catalog/mapping-review/auto-accept-preview`, ...(params ? [params] : [])
@@ -1664,7 +2194,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAutoAcceptPreviewQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAutoAcceptPreview>>> = ({ signal }) => getAutoAcceptPreview(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAutoAcceptPreview>>, TError, TData> & { queryKey: QueryKey }
@@ -1691,7 +2225,14 @@ export function useGetAutoAcceptPreview<TData = Awaited<ReturnType<typeof getAut
 }
 
 
+
+
+
+
+
 export const getGetAcceptBatchesUrl = () => {
+
+
 
 
   return `/api/catalog/mapping-review/accept-batches`
@@ -1712,6 +2253,9 @@ export const getAcceptBatches = async ( options?: RequestInit): Promise<AcceptBa
 );}
 
 
+
+
+
 export const getGetAcceptBatchesQueryKey = () => {
     return [
     `/api/catalog/mapping-review/accept-batches`
@@ -1727,7 +2271,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAcceptBatchesQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAcceptBatches>>> = ({ signal }) => getAcceptBatches({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAcceptBatches>>, TError, TData> & { queryKey: QueryKey }
@@ -1754,7 +2302,14 @@ export function useGetAcceptBatches<TData = Awaited<ReturnType<typeof getAcceptB
 }
 
 
+
+
+
+
+
 export const getRecordAcceptBatchUrl = () => {
+
+
 
 
   return `/api/catalog/mapping-review/accept-batches`
@@ -1776,6 +2331,8 @@ export const recordAcceptBatch = async (recordAcceptBatch: RecordAcceptBatch, op
 );}
 
 
+
+
 export const getRecordAcceptBatchMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordAcceptBatch>>, TError,{data: BodyType<RecordAcceptBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof recordAcceptBatch>>, TError,{data: BodyType<RecordAcceptBatch>}, TContext> => {
@@ -1788,11 +2345,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordAcceptBatch>>, {data: BodyType<RecordAcceptBatch>}> = (props) => {
           const {data} = props ?? {};
 
           return  recordAcceptBatch(data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1818,6 +2381,8 @@ export const useRecordAcceptBatch = <TError = ErrorType<unknown>,
 export const getDeleteAcceptBatchUrl = (id: number,) => {
 
 
+
+
   return `/api/catalog/mapping-review/accept-batches/${id}`
 }
 
@@ -1836,6 +2401,8 @@ export const deleteAcceptBatch = async (id: number, options?: RequestInit): Prom
 );}
 
 
+
+
 export const getDeleteAcceptBatchMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAcceptBatch>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteAcceptBatch>>, TError,{id: number}, TContext> => {
@@ -1848,11 +2415,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAcceptBatch>>, {id: number}> = (props) => {
           const {id} = props ?? {};
 
           return  deleteAcceptBatch(id,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1878,6 +2451,8 @@ export const useDeleteAcceptBatch = <TError = ErrorType<unknown>,
 export const getUpdateCompetitorMappingUrl = (id: number,) => {
 
 
+
+
   return `/api/catalog/competitor-prices/${id}`
 }
 
@@ -1898,6 +2473,8 @@ export const updateCompetitorMapping = async (id: number,
 );}
 
 
+
+
 export const getUpdateCompetitorMappingMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCompetitorMapping>>, TError,{id: number;data: BodyType<CompetitorMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateCompetitorMapping>>, TError,{id: number;data: BodyType<CompetitorMappingUpdate>}, TContext> => {
@@ -1910,11 +2487,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCompetitorMapping>>, {id: number;data: BodyType<CompetitorMappingUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateCompetitorMapping(id,data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -1940,6 +2523,8 @@ export const useUpdateCompetitorMapping = <TError = ErrorType<ErrorResponse>,
 export const getGetCompetitorBrandsUrl = () => {
 
 
+
+
   return `/api/catalog/competitor-brands`
 }
 
@@ -1959,6 +2544,9 @@ export const getCompetitorBrands = async ( options?: RequestInit): Promise<Compe
 );}
 
 
+
+
+
 export const getGetCompetitorBrandsQueryKey = () => {
     return [
     `/api/catalog/competitor-brands`
@@ -1974,7 +2562,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetCompetitorBrandsQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompetitorBrands>>> = ({ signal }) => getCompetitorBrands({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompetitorBrands>>, TError, TData> & { queryKey: QueryKey }
@@ -2001,10 +2593,17 @@ export function useGetCompetitorBrands<TData = Awaited<ReturnType<typeof getComp
 }
 
 
+
+
+
+
+
 export const getDeleteCatalogCompetitorUrl = (competitor: string,) => {
 
 
-  return `/api/catalog/competitors/${encodeURIComponent(competitor)}`
+
+
+  return `/api/catalog/competitors/${competitor}`
 }
 
 /**
@@ -2022,6 +2621,8 @@ export const deleteCatalogCompetitor = async (competitor: string, options?: Requ
 );}
 
 
+
+
 export const getDeleteCatalogCompetitorMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, TError,{competitor: string}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, TError,{competitor: string}, TContext> => {
@@ -2034,11 +2635,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCatalogCompetitor>>, {competitor: string}> = (props) => {
           const {competitor} = props ?? {};
 
           return  deleteCatalogCompetitor(competitor,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -2065,9 +2672,77 @@ export const getDeleteCompetitorPeriodUrl = (competitor: string,
     effectiveDate: string,) => {
 
 
-  return `/api/catalog/competitors/${encodeURIComponent(competitor)}/periods/${encodeURIComponent(effectiveDate)}`
+
+
+  return `/api/catalog/competitors/${competitor}/periods/${effectiveDate}`
 }
+
+/**
+ * @summary Delete price rows for a single (brand, effectiveDate) period
+ */
+export const deleteCompetitorPeriod = async (competitor: string,
+    effectiveDate: string, options?: RequestInit): Promise<DeleteCompetitorPeriodResult> => {
+
+  return customFetch<DeleteCompetitorPeriodResult>(getDeleteCompetitorPeriodUrl(competitor,effectiveDate),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCompetitorPeriodMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext> => {
+
+const mutationKey = ['deleteCompetitorPeriod'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, {competitor: string;effectiveDate: string}> = (props) => {
+          const {competitor,effectiveDate} = props ?? {};
+
+          return  deleteCompetitorPeriod(competitor,effectiveDate,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCompetitorPeriodMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompetitorPeriod>>>
+
+    export type DeleteCompetitorPeriodMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete price rows for a single (brand, effectiveDate) period
+ */
+export const useDeleteCompetitorPeriod = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCompetitorPeriod>>,
+        TError,
+        {competitor: string;effectiveDate: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCompetitorPeriodMutationOptions(options));
+    }
+
 export const getGetAnalysisFiltersUrl = () => {
+
+
 
 
   return `/api/analysis/filters`
@@ -2089,6 +2764,9 @@ export const getAnalysisFilters = async ( options?: RequestInit): Promise<Analys
 );}
 
 
+
+
+
 export const getGetAnalysisFiltersQueryKey = () => {
     return [
     `/api/analysis/filters`
@@ -2104,7 +2782,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisFiltersQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisFilters>>> = ({ signal }) => getAnalysisFilters({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisFilters>>, TError, TData> & { queryKey: QueryKey }
@@ -2129,6 +2811,11 @@ export function useGetAnalysisFilters<TData = Awaited<ReturnType<typeof getAnaly
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetAnalysisOverviewUrl = (params?: GetAnalysisOverviewParams,) => {
@@ -2170,6 +2857,9 @@ export const getAnalysisOverview = async (params?: GetAnalysisOverviewParams, op
 );}
 
 
+
+
+
 export const getGetAnalysisOverviewQueryKey = (params?: GetAnalysisOverviewParams,) => {
     return [
     `/api/analysis/overview`, ...(params ? [params] : [])
@@ -2185,7 +2875,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisOverviewQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisOverview>>> = ({ signal }) => getAnalysisOverview(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisOverview>>, TError, TData> & { queryKey: QueryKey }
@@ -2210,6 +2904,11 @@ export function useGetAnalysisOverview<TData = Awaited<ReturnType<typeof getAnal
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetAnalysisByBrandUrl = (params?: GetAnalysisByBrandParams,) => {
@@ -2251,6 +2950,9 @@ export const getAnalysisByBrand = async (params?: GetAnalysisByBrandParams, opti
 );}
 
 
+
+
+
 export const getGetAnalysisByBrandQueryKey = (params?: GetAnalysisByBrandParams,) => {
     return [
     `/api/analysis/by-brand`, ...(params ? [params] : [])
@@ -2266,7 +2968,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisByBrandQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisByBrand>>> = ({ signal }) => getAnalysisByBrand(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisByBrand>>, TError, TData> & { queryKey: QueryKey }
@@ -2291,6 +2997,11 @@ export function useGetAnalysisByBrand<TData = Awaited<ReturnType<typeof getAnaly
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetAnalysisByCategoryUrl = (params?: GetAnalysisByCategoryParams,) => {
@@ -2332,6 +3043,9 @@ export const getAnalysisByCategory = async (params?: GetAnalysisByCategoryParams
 );}
 
 
+
+
+
 export const getGetAnalysisByCategoryQueryKey = (params?: GetAnalysisByCategoryParams,) => {
     return [
     `/api/analysis/by-category`, ...(params ? [params] : [])
@@ -2347,7 +3061,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisByCategoryQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisByCategory>>> = ({ signal }) => getAnalysisByCategory(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisByCategory>>, TError, TData> & { queryKey: QueryKey }
@@ -2372,6 +3090,11 @@ export function useGetAnalysisByCategory<TData = Awaited<ReturnType<typeof getAn
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetAnalysisPositioningUrl = (params?: GetAnalysisPositioningParams,) => {
@@ -2413,6 +3136,9 @@ export const getAnalysisPositioning = async (params?: GetAnalysisPositioningPara
 );}
 
 
+
+
+
 export const getGetAnalysisPositioningQueryKey = (params?: GetAnalysisPositioningParams,) => {
     return [
     `/api/analysis/positioning`, ...(params ? [params] : [])
@@ -2428,7 +3154,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisPositioningQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisPositioning>>> = ({ signal }) => getAnalysisPositioning(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisPositioning>>, TError, TData> & { queryKey: QueryKey }
@@ -2453,6 +3183,11 @@ export function useGetAnalysisPositioning<TData = Awaited<ReturnType<typeof getA
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetAnalysisCoverageMatrixUrl = (params?: GetAnalysisCoverageMatrixParams,) => {
@@ -2494,6 +3229,9 @@ export const getAnalysisCoverageMatrix = async (params?: GetAnalysisCoverageMatr
 );}
 
 
+
+
+
 export const getGetAnalysisCoverageMatrixQueryKey = (params?: GetAnalysisCoverageMatrixParams,) => {
     return [
     `/api/analysis/coverage-matrix`, ...(params ? [params] : [])
@@ -2509,7 +3247,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisCoverageMatrixQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisCoverageMatrix>>> = ({ signal }) => getAnalysisCoverageMatrix(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisCoverageMatrix>>, TError, TData> & { queryKey: QueryKey }
@@ -2534,6 +3276,11 @@ export function useGetAnalysisCoverageMatrix<TData = Awaited<ReturnType<typeof g
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getGetAnalysisOpportunitiesUrl = (params?: GetAnalysisOpportunitiesParams,) => {
@@ -2575,6 +3322,9 @@ export const getAnalysisOpportunities = async (params?: GetAnalysisOpportunities
 );}
 
 
+
+
+
 export const getGetAnalysisOpportunitiesQueryKey = (params?: GetAnalysisOpportunitiesParams,) => {
     return [
     `/api/analysis/opportunities`, ...(params ? [params] : [])
@@ -2590,7 +3340,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisOpportunitiesQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisOpportunities>>> = ({ signal }) => getAnalysisOpportunities(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisOpportunities>>, TError, TData> & { queryKey: QueryKey }
@@ -2615,6 +3369,11 @@ export function useGetAnalysisOpportunities<TData = Awaited<ReturnType<typeof ge
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getExportAnalysisUrl = (params?: ExportAnalysisParams,) => {
@@ -2656,6 +3415,9 @@ export const exportAnalysis = async (params?: ExportAnalysisParams, options?: Re
 );}
 
 
+
+
+
 export const getExportAnalysisQueryKey = (params?: ExportAnalysisParams,) => {
     return [
     `/api/analysis/export`, ...(params ? [params] : [])
@@ -2671,7 +3433,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getExportAnalysisQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAnalysis>>> = ({ signal }) => exportAnalysis(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportAnalysis>>, TError, TData> & { queryKey: QueryKey }
@@ -2698,7 +3464,14 @@ export function useExportAnalysis<TData = Awaited<ReturnType<typeof exportAnalys
 }
 
 
+
+
+
+
+
 export const getGetAnalysisPeriodsUrl = () => {
+
+
 
 
   return `/api/analysis/periods`
@@ -2720,6 +3493,9 @@ export const getAnalysisPeriods = async ( options?: RequestInit): Promise<Analys
 );}
 
 
+
+
+
 export const getGetAnalysisPeriodsQueryKey = () => {
     return [
     `/api/analysis/periods`
@@ -2735,7 +3511,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetAnalysisPeriodsQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisPeriods>>> = ({ signal }) => getAnalysisPeriods({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAnalysisPeriods>>, TError, TData> & { queryKey: QueryKey }
@@ -2761,6 +3541,12 @@ export function useGetAnalysisPeriods<TData = Awaited<ReturnType<typeof getAnaly
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+
+
+
+
+
+
 export const getGetMrpIncreasesUrl = (params?: GetMrpIncreasesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2775,7 +3561,80 @@ export const getGetMrpIncreasesUrl = (params?: GetMrpIncreasesParams,) => {
 
   return stringifiedParams.length > 0 ? `/api/analysis/mrp-increases?${stringifiedParams}` : `/api/analysis/mrp-increases`
 }
+
+/**
+ * Returns products whose current-period MRP is higher than the preceding period, ranked by % increase descending.
+ * @summary Products with the biggest MRP increase this period vs the previous
+ */
+export const getMrpIncreases = async (params?: GetMrpIncreasesParams, options?: RequestInit): Promise<MrpIncreaseList> => {
+
+  return customFetch<MrpIncreaseList>(getGetMrpIncreasesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpIncreasesQueryKey = (params?: GetMrpIncreasesParams,) => {
+    return [
+    `/api/analysis/mrp-increases`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMrpIncreasesQueryOptions = <TData = Awaited<ReturnType<typeof getMrpIncreases>>, TError = ErrorType<unknown>>(params?: GetMrpIncreasesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpIncreasesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpIncreases>>> = ({ signal }) => getMrpIncreases(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpIncreasesQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpIncreases>>>
+export type GetMrpIncreasesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Products with the biggest MRP increase this period vs the previous
+ */
+
+export function useGetMrpIncreases<TData = Awaited<ReturnType<typeof getMrpIncreases>>, TError = ErrorType<unknown>>(
+ params?: GetMrpIncreasesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpIncreasesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetPriceHistoryUrl = (itemCode: string,) => {
+
+
 
 
   return `/api/analysis/price-history/${itemCode}`
@@ -2797,6 +3656,9 @@ export const getPriceHistory = async (itemCode: string, options?: RequestInit): 
 );}
 
 
+
+
+
 export const getGetPriceHistoryQueryKey = (itemCode: string,) => {
     return [
     `/api/analysis/price-history/${itemCode}`
@@ -2812,7 +3674,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetPriceHistoryQueryKey(itemCode);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceHistory>>> = ({ signal }) => getPriceHistory(itemCode, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData> & { queryKey: QueryKey }
@@ -2839,7 +3705,14 @@ export function useGetPriceHistory<TData = Awaited<ReturnType<typeof getPriceHis
 }
 
 
+
+
+
+
+
 export const getGetDiscountSettingsUrl = () => {
+
+
 
 
   return `/api/analysis/discount-settings`
@@ -2861,6 +3734,9 @@ export const getDiscountSettings = async ( options?: RequestInit): Promise<Disco
 );}
 
 
+
+
+
 export const getGetDiscountSettingsQueryKey = () => {
     return [
     `/api/analysis/discount-settings`
@@ -2876,7 +3752,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetDiscountSettingsQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiscountSettings>>> = ({ signal }) => getDiscountSettings({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiscountSettings>>, TError, TData> & { queryKey: QueryKey }
@@ -2903,7 +3783,14 @@ export function useGetDiscountSettings<TData = Awaited<ReturnType<typeof getDisc
 }
 
 
+
+
+
+
+
 export const getUpdateDiscountSettingsUrl = () => {
+
+
 
 
   return `/api/analysis/discount-settings`
@@ -2926,6 +3813,8 @@ export const updateDiscountSettings = async (discountSettingsUpdate: DiscountSet
 );}
 
 
+
+
 export const getUpdateDiscountSettingsMutationOptions = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDiscountSettings>>, TError,{data: BodyType<DiscountSettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateDiscountSettings>>, TError,{data: BodyType<DiscountSettingsUpdate>}, TContext> => {
@@ -2938,11 +3827,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDiscountSettings>>, {data: BodyType<DiscountSettingsUpdate>}> = (props) => {
           const {data} = props ?? {};
 
           return  updateDiscountSettings(data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -2968,6 +3863,8 @@ export const useUpdateDiscountSettings = <TError = ErrorType<ErrorResponse>,
 export const getGetCurrentAuthUserUrl = () => {
 
 
+
+
   return `/api/auth/user`
 }
 
@@ -2986,6 +3883,9 @@ export const getCurrentAuthUser = async ( options?: RequestInit): Promise<AuthUs
 );}
 
 
+
+
+
 export const getGetCurrentAuthUserQueryKey = () => {
     return [
     `/api/auth/user`
@@ -3001,7 +3901,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getGetCurrentAuthUserQueryKey();
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentAuthUser>>> = ({ signal }) => getCurrentAuthUser({ signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData> & { queryKey: QueryKey }
@@ -3026,6 +3930,11 @@ export function useGetCurrentAuthUser<TData = Awaited<ReturnType<typeof getCurre
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getBeginBrowserLoginUrl = (params?: BeginBrowserLoginParams,) => {
@@ -3058,6 +3967,9 @@ export const beginBrowserLogin = async (params?: BeginBrowserLoginParams, option
 );}
 
 
+
+
+
 export const getBeginBrowserLoginQueryKey = (params?: BeginBrowserLoginParams,) => {
     return [
     `/api/login`, ...(params ? [params] : [])
@@ -3073,7 +3985,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getBeginBrowserLoginQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof beginBrowserLogin>>> = ({ signal }) => beginBrowserLogin(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData> & { queryKey: QueryKey }
@@ -3098,6 +4014,11 @@ export function useBeginBrowserLogin<TData = Awaited<ReturnType<typeof beginBrow
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getHandleBrowserLoginCallbackUrl = (params?: HandleBrowserLoginCallbackParams,) => {
@@ -3130,6 +4051,9 @@ export const handleBrowserLoginCallback = async (params?: HandleBrowserLoginCall
 );}
 
 
+
+
+
 export const getHandleBrowserLoginCallbackQueryKey = (params?: HandleBrowserLoginCallbackParams,) => {
     return [
     `/api/callback`, ...(params ? [params] : [])
@@ -3145,7 +4069,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getHandleBrowserLoginCallbackQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof handleBrowserLoginCallback>>> = ({ signal }) => handleBrowserLoginCallback(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData> & { queryKey: QueryKey }
@@ -3170,6 +4098,11 @@ export function useHandleBrowserLoginCallback<TData = Awaited<ReturnType<typeof 
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
 
 
 export const getLogoutBrowserSessionUrl = (params?: LogoutBrowserSessionParams,) => {
@@ -3202,6 +4135,9 @@ export const logoutBrowserSession = async (params?: LogoutBrowserSessionParams, 
 );}
 
 
+
+
+
 export const getLogoutBrowserSessionQueryKey = (params?: LogoutBrowserSessionParams,) => {
     return [
     `/api/logout`, ...(params ? [params] : [])
@@ -3217,7 +4153,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
   const queryKey =  queryOptions?.queryKey ?? getLogoutBrowserSessionQueryKey(params);
 
 
+
     const queryFn: QueryFunction<Awaited<ReturnType<typeof logoutBrowserSession>>> = ({ signal }) => logoutBrowserSession(params, { signal, ...requestOptions });
+
+
+
 
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError, TData> & { queryKey: QueryKey }
@@ -3244,7 +4184,14 @@ export function useLogoutBrowserSession<TData = Awaited<ReturnType<typeof logout
 }
 
 
+
+
+
+
+
 export const getExchangeMobileAuthorizationCodeUrl = () => {
+
+
 
 
   return `/api/mobile-auth/token-exchange`
@@ -3266,6 +4213,8 @@ export const exchangeMobileAuthorizationCode = async (mobileTokenExchangeRequest
 );}
 
 
+
+
 export const getExchangeMobileAuthorizationCodeMutationOptions = <TError = ErrorType<ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exchangeMobileAuthorizationCode>>, TError,{data: BodyType<MobileTokenExchangeRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof exchangeMobileAuthorizationCode>>, TError,{data: BodyType<MobileTokenExchangeRequest>}, TContext> => {
@@ -3278,11 +4227,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof exchangeMobileAuthorizationCode>>, {data: BodyType<MobileTokenExchangeRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  exchangeMobileAuthorizationCode(data,requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -3308,6 +4263,8 @@ export const useExchangeMobileAuthorizationCode = <TError = ErrorType<ErrorEnvel
 export const getLogoutMobileSessionUrl = () => {
 
 
+
+
   return `/api/mobile-auth/logout`
 }
 
@@ -3326,6 +4283,8 @@ export const logoutMobileSession = async ( options?: RequestInit): Promise<Logou
 );}
 
 
+
+
 export const getLogoutMobileSessionMutationOptions = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutMobileSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof logoutMobileSession>>, TError,void, TContext> => {
@@ -3338,11 +4297,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {mutation: { mutationKey, }, request: undefined};
 
 
+
+
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutMobileSession>>, void> = () => {
 
 
           return  logoutMobileSession(requestOptions)
         }
+
+
+
+
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -3365,112 +4330,3 @@ export const useLogoutMobileSession = <TError = ErrorType<unknown>,
       return useMutation(getLogoutMobileSessionMutationOptions(options));
     }
 
-    export type DeleteCompetitorPeriodMutationError = ErrorType<ErrorResponse>
-
-
-export type GetMrpIncreasesQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpIncreases>>>
-
-/**
- * @summary Products with the biggest MRP increase this period vs the previous
- */
-
-export function useGetMrpIncreases<TData = Awaited<ReturnType<typeof getMrpIncreases>>, TError = ErrorType<unknown>>(
- params?: GetMrpIncreasesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetMrpIncreasesQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-export type GetMrpIncreasesQueryError = ErrorType<unknown>
-
-/**
- * Returns products whose current-period MRP is higher than the preceding period, ranked by % increase descending.
- * @summary Products with the biggest MRP increase this period vs the previous
- */
-export const getMrpIncreases = async (params?: GetMrpIncreasesParams, options?: RequestInit): Promise<MrpIncreaseList> => {
-
-  return customFetch<MrpIncreaseList>(getGetMrpIncreasesUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-export const getGetMrpIncreasesQueryKey = (params?: GetMrpIncreasesParams,) => {
-    return [
-    `/api/analysis/mrp-increases`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-export const getGetMrpIncreasesQueryOptions = <TData = Awaited<ReturnType<typeof getMrpIncreases>>, TError = ErrorType<unknown>>(params?: GetMrpIncreasesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetMrpIncreasesQueryKey(params);
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpIncreases>>> = ({ signal }) => getMrpIncreases(params, { signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpIncreases>>, TError, TData> & { queryKey: QueryKey }
-}
-
-/**
- * @summary Delete price rows for a single (brand, effectiveDate) period
- */
-export const deleteCompetitorPeriod = async (competitor: string,
-    effectiveDate: string, options?: RequestInit): Promise<DeleteCompetitorPeriodResult> => {
-
-  return customFetch<DeleteCompetitorPeriodResult>(getDeleteCompetitorPeriodUrl(competitor,effectiveDate),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-    /**
- * @summary Delete price rows for a single (brand, effectiveDate) period
- */
-export const useDeleteCompetitorPeriod = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof deleteCompetitorPeriod>>,
-        TError,
-        {competitor: string;effectiveDate: string},
-        TContext
-      > => {
-      return useMutation(getDeleteCompetitorPeriodMutationOptions(options));
-    }
-
-export const getDeleteCompetitorPeriodMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, TError,{competitor: string;effectiveDate: string}, TContext> => {
-
-const mutationKey = ['deleteCompetitorPeriod'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompetitorPeriod>>, {competitor: string;effectiveDate: string}> = (props) => {
-          const {competitor,effectiveDate} = props ?? {};
-
-          return  deleteCompetitorPeriod(competitor,effectiveDate,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type DeleteCompetitorPeriodMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompetitorPeriod>>>

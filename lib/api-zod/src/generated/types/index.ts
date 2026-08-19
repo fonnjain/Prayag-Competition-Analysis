@@ -3,6 +3,3 @@
  * Barrel patched by patch-zod-index.mjs — only exports types that exist on disk.
  * Do not edit manually.
  */
-export * from './competitorBrandPeriod';
-export * from './competitorBrands';
-export * from './deleteCompetitorPeriodResult';

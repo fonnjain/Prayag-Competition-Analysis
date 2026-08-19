@@ -93,6 +93,79 @@ export interface CatalogProductDetail {
   history: MrpPriceRow[];
 }
 
+export interface PriceFinderSearchResult {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentEffectiveDate: string | null;
+  hasCompetitorData: boolean;
+}
+
+export interface PriceFinderSearchResponse {
+  results: PriceFinderSearchResult[];
+}
+
+export interface PriceFinderBrowseDivision {
+  division: string;
+  count: number;
+}
+
+export interface PriceFinderBrowseCategory {
+  /** @nullable */
+  category: string | null;
+  label: string;
+  count: number;
+}
+
+export interface PriceFinderBrowseResponse {
+  divisions: PriceFinderBrowseDivision[];
+  categories: PriceFinderBrowseCategory[];
+  products: PriceFinderSearchResult[];
+}
+
+export interface PriceFinderProduct {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentEffectiveDate: string | null;
+  /** @nullable */
+  upcomingMrp: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+}
+
+export interface PriceFinderCompetitor {
+  competitor: string;
+  price: number;
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  priceBasis: string | null;
+  /** @nullable */
+  gapPct: number | null;
+  /** @nullable */
+  message: string | null;
+}
+
+export interface PriceFinderProductResponse {
+  product: PriceFinderProduct;
+  competitors: PriceFinderCompetitor[];
+}
+
 export interface CatalogCategoryOption {
   category: string;
   /** @nullable */
@@ -160,6 +233,7 @@ export interface DeleteCompetitorPeriodResult {
   /** Number of competitor price rows removed for this period. */
   deleted: number;
 }
+
 export interface ComparisonRow {
   id: number;
   competitor: string;
@@ -551,13 +625,12 @@ export interface AnalysisOverview {
   medianPriceDiffPct: number | null;
   competitorCount: number;
   matchQuality: ConfidenceCounts;
-  /** Resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison — always ≤ today. */
+  /** Effective date of the Prayag MRP used for this overview. */
   prayagMrpDate: string;
   /**
-   * The latest competitor effective_date (YYYY-MM-DD) that contributed to this
-   * view, or null when no competitor rows with a known date exist.
-   * @nullable
-   */
+     * Effective date of the competitor period used for this overview.
+     * @nullable
+     */
   competitorPeriodDate: string | null;
 }
 
@@ -645,9 +718,15 @@ export interface AnalysisOpportunityItem {
   unit: string | null;
   priceDiff: number;
   priceDiffPct: number;
-  /** Next Prayag MRP revision after the resolved asOf date, null if none. @nullable */
+  /**
+     * Next Prayag MRP revision after the resolved asOf date, or null if none.
+     * @nullable
+     */
   upcomingPrayagMrp?: number | null;
-  /** Effective date (YYYY-MM-DD) of the upcoming revision. @nullable */
+  /**
+     * Effective date (YYYY-MM-DD) of the upcoming revision, or null.
+     * @nullable
+     */
   upcomingPrayagMrpDate?: string | null;
 }
 
@@ -655,7 +734,8 @@ export interface AnalysisOpportunities {
   thresholdPct: number;
   marginHeadroom: AnalysisOpportunityItem[];
   priceThreats: AnalysisOpportunityItem[];
-  /** Resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison — always ≤ today. */
+  /** The resolved Prayag MRP date (YYYY-MM-DD) actually used for comparison. Always ≤ today — future-dated competitor periods still use the most recent in-effect Prayag MRP.
+   */
   prayagMrpDate: string;
 }
 
@@ -824,6 +904,11 @@ export interface MrpIncreaseItem {
   prevDate: string;
   changePct: number;
 }
+
+export interface MrpIncreaseList {
+  items: MrpIncreaseItem[];
+}
+
 export interface PriceHistory {
   itemCode: string;
   /** @nullable */
@@ -837,6 +922,7 @@ export interface CompetitorBrandPeriod {
   /** Sorted list of effective dates (YYYY-MM-DD) for this brand (oldest first). */
   effectiveDates: string[];
 }
+
 export interface CompetitorBrands {
   brands: string[];
   brandPeriods: CompetitorBrandPeriod[];
@@ -910,6 +996,28 @@ search?: string;
 priceStatus?: string;
 page?: number;
 pageSize?: number;
+};
+
+export type GetPriceFinderSearchParams = {
+q: string;
+/**
+ * @minimum 1
+ * @maximum 20
+ */
+limit?: number;
+};
+
+export type GetPriceFinderBrowseParams = {
+division?: string;
+/**
+ * Use "__uncategorised__" for blank categories.
+ */
+category?: string;
+/**
+ * @minimum 1
+ * @maximum 300
+ */
+limit?: number;
 };
 
 export type PatchCatalogProductMrpBody = {
@@ -1239,10 +1347,13 @@ export const ExportAnalysisFormat = {
 export type GetMrpIncreasesParams = {
 division?: string;
 category?: string;
-/** ISO date (YYYY-MM-DD). Show increases as of this date — the latest MRP ≤ this date is treated as the current period. Defaults to today. */
+/**
+ * ISO date (YYYY-MM-DD). Show increases as of this date — the latest MRP ≤ this date is treated as the current period. Defaults to today.
+ */
 effectivePeriod?: string;
 limit?: number;
 };
+
 export type BeginBrowserLoginParams = {
 /**
  * Relative path to redirect to after login (must start with `/`). Defaults to `/`.
@@ -1260,7 +1371,3 @@ export type LogoutBrowserSessionParams = {
 returnTo?: string;
 };
 
-
-export interface MrpIncreaseList {
-  items: MrpIncreaseItem[];
-}
