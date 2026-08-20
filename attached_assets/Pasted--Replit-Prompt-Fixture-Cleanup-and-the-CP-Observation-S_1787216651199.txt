@@ -1,0 +1,134 @@
+# Replit Prompt — Fixture Cleanup and the CP Observation Set
+
+Two fixes from the diagnostic. They are separable and must be done in order: Part A is small and safe, Part B changes what the withdrawal rule sees and needs care.
+
+**Do not remove the manifest reassertion until Part C proves it is no longer needed.** It is the only thing holding the correct 69/90 split right now.
+
+---
+
+## Part A — Clean the leaked test fixtures, and stop them recurring
+
+The diagnostic found 11 `mrp_price_history` rows and 3 product-only records that are leftover automated-test data. Every one has `source_file` NULL and `load_batch_id` NULL — inserted outside the audited loader path.
+
+**Delete these 11 history rows:**
+
+```
+MKT-GAP-A-1787152046141              2026-08-01
+MKT-GAP-B-1787152046141              2026-08-01
+MKT-GAP-C-1787152046141              2026-08-01
+MKT-GAP-C-1787152046141              2026-09-01
+MKT-GAP-D-1787152046141              2026-08-01
+MKT-GAP-E-1787152046141              2026-08-01
+MKT-GAP-LENGTH-1787152046141         2026-08-01
+MKT-GAP-STATUS-1787152046141         2026-08-01
+__MRP_REVIEW_CANCELLED_1787152046908__   2026-07-01
+__MRP_REVIEW_CLEAN_1787152046908__       2026-07-01
+__MRP_REVIEW_FLAGGED_1787152046908__     2026-07-01
+```
+
+**And these 3 product-only fixtures:**
+
+```
+__MRP_REVIEW_CANCELLED_1787212570502__
+__MRP_REVIEW_CLEAN_1787212570502__
+__MRP_REVIEW_FLAGGED_1787212570502__
+```
+
+That restores **13,048** rows and **6,213** products live at 2026-09-01.
+
+### The guard matters more than the deletion
+
+Deleting 14 records without changing anything else means the next test run recreates them. The load path already requires provenance; the fixture path bypasses it entirely.
+
+Make `mrp_price_history.load_batch_id` **NOT NULL** once the cleanup leaves zero nulls. Manual corrections already create their own provenance batch with a synthetic checksum, so that path is unaffected. Tests that need price rows must then create a batch — give them a dedicated fixture batch and tear it down, or reuse one clearly marked as test provenance.
+
+If a NOT NULL constraint turns out to break something you cannot cleanly fix, do not force it. Instead add a Data Health check that counts rows with a null `load_batch_id` and reports non-zero as a defect, and say why the constraint was not viable.
+
+---
+
+## Part B — The CP observation set is incomplete
+
+The diagnostic established the real defect precisely. For the 30 EMERALD 61 codes, the caller builds a single row — `markerPeriod: 2026-08-01`, `latestPricedPeriod: 2026-05-01`, `isRemoved: true` — and the policy correctly concludes withdrawal from it.
+
+The values are not malformed. **A required row is missing.** The loader processes the CP `MASTER` sheet exclusively, so live occurrences of the same codes on the Lagoon, Body-and-Handle and other CP sheets never enter the observation set.
+
+This makes part two of the rule — *every occurrence must be marked* — silently mean *every occurrence the loader happened to read*. A completeness rule is only as good as its input coverage, and that dependency was never stated.
+
+### The change
+
+Widen the CP observation set so every sheet carrying a code contributes a row, not just `MASTER`. A live occurrence on any CP sheet must produce a `SourceRemovalRow` with `isRemoved: false` and its `latestPricedPeriod` populated.
+
+**Check both directions before trusting it.** Widening the set can move codes either way:
+
+- A code among the **30** should now stay live, because a live occurrence appears.
+- A code among the **90** could wrongly become live if a stale or non-price occurrence is read as live.
+
+Report any of the 90 that the widened set would un-discontinue, **before** applying anything. If the widened set disagrees with the manifest in that direction, stop and report rather than proceeding — one of the two is wrong, and it is not obvious which.
+
+### Two codes that cannot be traced
+
+`DB-61-3IN-N` and `DB-61-3IN-ON-OFF-N` appear in no supplied workbook, and the imported observations are not persisted. They may still need manual handling after this fix. Report where they land once the observation set is widened; if they still resolve wrongly, say so rather than special-casing them.
+
+---
+
+## Part C — Retire the manifest, but only on proof
+
+Once Part B is in, run the loader with the manifest reassertion **disabled** — in a test or a dry run, not against the live database — and report:
+
+- How many of the 69 restored codes get re-marked. Required: **zero**.
+- How many of the 90 confirmed stay discontinued. Required: **all 90**.
+
+Only if both hold, remove the reassertion and keep the versioned manifest as a test fixture — a regression check that the policy still derives the same 69/90 split from source.
+
+If either fails, leave the reassertion in place and report what disagreed. A stopgap that is honestly labelled is better than a fix that quietly does not work.
+
+---
+
+## Part D — Persist the observation set
+
+The diagnostic could not trace two codes because the imported observations are not retained. That made a straightforward question unanswerable after the fact.
+
+Persist the `SourceRemovalRow[]` built during each load, keyed to its `load_batch_id` — code, sheet, marker period, latest priced period, removal flag. It is small relative to the price rows, and it makes this whole class of defect diagnosable instead of archaeological.
+
+---
+
+## Part E — One outstanding provenance item
+
+PTMT idempotency remains unverified. The reload used `PTMT MRP w.e.f. List as on 05th March, 2026.xlsx` (`f662fcf9…`), not the registered September snapshot `5da96e39cac40ede…`.
+
+Re-run PTMT with the correct workbook when it is available and report the row delta. Expected: **0 new rows**. If the correct file is not to hand, say so — do not substitute another and record it as verified.
+
+---
+
+## Acceptance tests
+
+```
+1.  mrp_price_history holds 13,048 rows: 12,750 Standard + 298 colour.
+2.  Zero rows have a null load_batch_id.
+3.  Products live at asOf = 2026-09-01 total 6,213.
+4.  With the manifest disabled, none of the 69 restored codes is re-marked.
+5.  With the manifest disabled, all 90 confirmed codes remain discontinued.
+6.  616-D resolves to 2,490 at 2026-08-31 and nothing at 2026-09-01.
+7.  WT-3LH-50 resolves to 1,00,000 today with discontinued_from NULL.
+8.  6102 (EMERALD 61) resolves to a live price today.
+9.  Re-running all six loaders changes no row count and re-marks nothing.
+10. A test that inserts a price row without a batch fails, or is reported by
+    the Data Health null-batch check.
+```
+
+Tests 4 and 5 together are the point of Part B. Test 4 alone would pass with an over-broad fix that un-discontinues everything; test 5 is what stops that.
+
+---
+
+## Report
+
+Read every figure from the database:
+
+- Rows and products before and after the cleanup.
+- Null `load_batch_id` count after. Expected zero. Whether the NOT NULL constraint was applied, and if not, why.
+- The manifest-disabled run: how many of the 69 re-marked, how many of the 90 held.
+- Where `DB-61-3IN-N` and `DB-61-3IN-ON-OFF-N` landed.
+- Whether the reassertion was removed, and on what evidence.
+- PTMT reload result, or a statement that the correct workbook was unavailable.
+
+One clean commit.
