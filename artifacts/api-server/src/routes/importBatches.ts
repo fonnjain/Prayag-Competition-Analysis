@@ -26,6 +26,7 @@ import {
   mrpPriceHistoryTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog.js";
+import { requireAdmin } from "../middlewares/authMiddleware";
 import { extractFromPdf, EXTRACTION_MODEL } from "../lib/pdfExtractor.js";
 import {
   matchCatalogue,
@@ -172,6 +173,7 @@ async function recomputeCurrentFlags(competitor: string): Promise<void> {
 // ---------------------------------------------------------------------------
 router.post(
   "/catalog/import-batches",
+  requireAdmin,
   upload.single("file"),
   async (req, res) => {
     const file = req.file;
@@ -405,7 +407,7 @@ router.get("/catalog/import-batches", async (_req, res) => {
 // GET /catalog/import-batches/:id
 // ---------------------------------------------------------------------------
 router.get("/catalog/import-batches/:id", async (req, res) => {
-  const batchId = parseInt(req.params.id ?? "", 10);
+  const batchId = parseInt(String(req.params.id ?? ""), 10);
   if (isNaN(batchId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [batch] = await db.select().from(importBatchesTable).where(eq(importBatchesTable.id, batchId));
@@ -425,8 +427,8 @@ router.get("/catalog/import-batches/:id", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /catalog/import-batches/:id/approve
 // ---------------------------------------------------------------------------
-router.post("/catalog/import-batches/:id/approve", async (req, res) => {
-  const batchId = parseInt(req.params.id ?? "", 10);
+router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res) => {
+  const batchId = parseInt(String(req.params.id ?? ""), 10);
   if (isNaN(batchId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [batch] = await db.select().from(importBatchesTable).where(eq(importBatchesTable.id, batchId));
@@ -498,8 +500,8 @@ router.post("/catalog/import-batches/:id/approve", async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /catalog/import-batches/:id — discard
 // ---------------------------------------------------------------------------
-router.delete("/catalog/import-batches/:id", async (req, res) => {
-  const batchId = parseInt(req.params.id ?? "", 10);
+router.delete("/catalog/import-batches/:id", requireAdmin, async (req, res) => {
+  const batchId = parseInt(String(req.params.id ?? ""), 10);
   if (isNaN(batchId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [batch] = await db.select().from(importBatchesTable).where(eq(importBatchesTable.id, batchId));

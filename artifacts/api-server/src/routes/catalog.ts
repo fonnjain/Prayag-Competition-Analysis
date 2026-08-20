@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { sql, eq, asc, desc, and } from "drizzle-orm";
 import { recomputeCurrentFlags } from "../lib/catalog";
+import { requireAdmin } from "../middlewares/authMiddleware";
 import {
   db,
   catalogProductsTable,
@@ -448,7 +449,7 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
 // PATCH /catalog/products/:itemCode/mrp — apply a reviewed MRP correction
 // without uploading a workbook. It requires a reason and creates a dedicated
 // manual provenance batch before updating the period's visible MRP.
-router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: string }>, res) => {
+router.patch("/catalog/products/:itemCode/mrp", requireAdmin, async (req: Request<{ itemCode: string }>, res) => {
   const { itemCode } = req.params;
   const body = req.body as { mrp?: unknown; effectiveDate?: unknown; reason?: unknown };
 
@@ -621,7 +622,7 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
 // POST /catalog/seed-variant-prices — idempotent one-time load of sanitaryware
 // colour-variant prices (Ivory / White with Jet / Pink-Green-Blue).
 // Safe to call multiple times; ON CONFLICT DO NOTHING skips existing rows.
-router.post("/catalog/seed-variant-prices", async (req, res) => {
+router.post("/catalog/seed-variant-prices", requireAdmin, async (req, res) => {
   try {
     // Inline seed data — 300 rows across 123 sanitaryware items, two periods.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -670,7 +671,7 @@ router.post("/catalog/seed-variant-prices", async (req, res) => {
 });
 
 // POST /catalog/reset — restore catalog to the original clean import.
-router.post("/catalog/reset", async (req, res) => {
+router.post("/catalog/reset", requireAdmin, async (req, res) => {
   try {
     await loadCatalogSeed();
     res.json({ ok: true });

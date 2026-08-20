@@ -14,6 +14,7 @@ import {
   mrpHistoryProvenanceEventsTable,
 } from "@workspace/db";
 import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
+import { requireAdmin } from "../middlewares/authMiddleware";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
 import { discontinuationCorrectionV2 } from "../data/discontinuationCorrectionV2";
@@ -1166,7 +1167,7 @@ async function persistParsedRows(
   return summary;
 }
 
-router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
+router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req, res) => {
   const file = req.file;
   if (!file) {
     res.status(400).json({ error: "No file uploaded" });
@@ -1459,7 +1460,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
   }
 });
 
-router.post("/catalog/mrp-review-batches/:batchId/approve", async (req, res) => {
+router.post("/catalog/mrp-review-batches/:batchId/approve", requireAdmin, async (req, res) => {
   const batchId = req.params.batchId;
   const approved = await db.transaction(async (tx) => {
     const pending = await tx
@@ -1502,7 +1503,7 @@ router.post("/catalog/mrp-review-batches/:batchId/approve", async (req, res) => 
   res.json({ ok: true, approved: approved.length });
 });
 
-router.post("/catalog/mrp-review-batches/:batchId/cancel", async (req, res) => {
+router.post("/catalog/mrp-review-batches/:batchId/cancel", requireAdmin, async (req, res) => {
   const batchId = req.params.batchId;
   const removed = await db.transaction(async (tx) => {
     const pending = await tx
@@ -1843,6 +1844,7 @@ router.get("/catalog/competitor-brands", async (_req, res) => {
 // POST /catalog/load-competitor — upload a competitor workbook (any brand).
 router.post(
   "/catalog/load-competitor",
+  requireAdmin,
   upload.single("file"),
   async (req, res) => {
     const file = req.file;
@@ -2036,8 +2038,8 @@ router.get("/catalog/mrp-periods", async (_req, res) => {
 // inside a single serializable transaction with an exclusive table lock so
 // that concurrent deletions or uploads cannot race past the single-period
 // guard and leave zero periods behind.
-router.delete("/catalog/mrp-period/:date", async (req, res) => {
-  const { date } = req.params;
+router.delete("/catalog/mrp-period/:date", requireAdmin, async (req, res) => {
+  const date = String(req.params.date ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.status(400).json({ error: "date param must be YYYY-MM-DD" });
     return;

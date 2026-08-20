@@ -4,8 +4,10 @@ import { desc, eq } from "drizzle-orm";
 import { CreateApiKeyBody } from "@workspace/api-zod";
 import { db, apiKeysTable, type ApiKeyRow } from "@workspace/db";
 import { hashApiKey } from "../middlewares/apiKeyAuth";
+import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
+router.use(requireAdmin);
 
 function serializeKey(k: ApiKeyRow) {
   return {

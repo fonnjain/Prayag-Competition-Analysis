@@ -1,18 +1,10 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
-
-/** Guard: only admin-role users can call these routes */
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (!req.isAuthenticated() || req.user.role !== "admin") {
-    res.status(403).json({ error: "Admin access required." });
-    return;
-  }
-  next();
-}
 
 router.use("/admin/users", requireAdmin);
 

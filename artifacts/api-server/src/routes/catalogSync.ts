@@ -14,6 +14,7 @@ import {
   summarizeCatalogSyncBundle,
   verifyCatalogSyncPreflightToken,
 } from "../lib/catalogSync";
+import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 const upload = multer({
@@ -28,16 +29,7 @@ function isProduction(req: Request): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-function requireCatalogAdmin(req: Request, res: Response, next: NextFunction): void {
-  const isAdmin = req.user?.role === "admin" || req.user?.email?.toLowerCase() === CATALOG_ADMIN_EMAIL;
-  if (!isAdmin) {
-    res.status(403).json({ error: "Catalog administrator access is required." });
-    return;
-  }
-  next();
-}
-
-router.use("/catalog/sync", requireCatalogAdmin);
+router.use("/catalog/sync", requireAdmin);
 
 router.get("/catalog/sync/status", async (req, res) => {
   const recentAudits = await db
