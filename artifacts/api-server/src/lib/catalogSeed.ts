@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import catalogSeedData from "../seed/catalog-seed.json";
 import competitorSeedData from "../seed/competitor-seed.json";
+import sanitarywareVariantSeedData from "../data/sanitaryware-variant-seed.json";
 import { logger } from "./logger";
 import { recomputeCurrentFlags, normCode } from "./catalog";
 import { parseSizeFromName } from "./suggest";
@@ -262,4 +263,54 @@ export async function backfillCatalogSizes(): Promise<void> {
     `);
   }
   logger.info({ updated: updates.length }, "Backfilled catalog sizes from product names");
+}
+
+/**
+ * One-time idempotent seed for sanitaryware colour-variant prices
+ * (Ivory / White with Jet / Pink-Green-Blue across 123 items, two periods).
+ * Skips gracefully if any non-Standard rows already exist.
+ */
+export async function seedVariantPricesIfEmpty(): Promise<void> {
+  const existing = await db.execute<{ cnt: string }>(sql`
+    SELECT COUNT(*) AS cnt
+    FROM mrp_price_history
+    WHERE variant != 'Standard'
+  `);
+  const count = Number(existing.rows[0]?.cnt ?? 0);
+  if (count > 0) {
+    logger.info({ count }, "Variant prices already seeded — skipping");
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = (sanitarywareVariantSeedData as Array<{ itemCode: string; mrp: number; effectiveDate: string; variant: string }>);
+
+  let inserted = 0;
+  const BATCH = 50;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const result = await db
+      .insert(mrpPriceHistoryTable)
+      .values(
+        batch.map((r) => ({
+          itemCode: r.itemCode,
+          mrp: r.mrp,
+          priceBasis: "MRP" as const,
+          effectiveDate: r.effectiveDate,
+          loadDate: today,
+          sourceFile: "Prayag_Sanitaryware_Variant_Prices.xlsx",
+          isCurrent: false,
+          reviewStatus: "approved" as const,
+          variant: r.variant,
+        })),
+      )
+      .onConflictDoNothing()
+      .returning({ id: mrpPriceHistoryTable.id });
+    inserted += result.length;
+  }
+
+  if (inserted > 0) {
+    await recomputeCurrentFlags();
+  }
+  logger.info({ inserted, total: rows.length }, "Sanitaryware variant prices seeded");
 }

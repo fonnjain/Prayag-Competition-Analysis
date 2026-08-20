@@ -26,7 +26,7 @@ type AppSwitcherEntry = {
 const APP_SWITCHER: AppSwitcherEntry[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/product-db/", label: "Product Database", icon: Database },
-  { href: "/product-db/price-finder", label: "Price Finder", icon: Search },
+  { href: "/price-finder/", label: "Price Finder", icon: Search },
   { href: "/analysis/", label: "Competition Analysis", icon: BarChart3, active: true },
 ];
 

@@ -75,6 +75,7 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
       WHERE effective_date <= ${resolvedDate}
         AND mrp IS NOT NULL
         AND review_status = 'approved'
+        AND variant = 'Standard'
       ORDER BY item_code, effective_date DESC, id DESC
     `),
     db.execute<PriceRow>(sql`
@@ -83,6 +84,7 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
       WHERE effective_date > ${resolvedDate}
         AND mrp IS NOT NULL
         AND review_status = 'approved'
+        AND variant = 'Standard'
       ORDER BY item_code, effective_date ASC, id DESC
     `),
   ]);
@@ -753,6 +755,7 @@ router.get("/analysis/mrp-increases", async (req, res) => {
       FROM mrp_price_history h
       WHERE h.effective_date <= ${atDate}
         AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
     )
     SELECT
       r.item_code,
@@ -814,6 +817,7 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
       FROM mrp_price_history
       WHERE item_code = ${itemCode}
         AND review_status = 'approved'
+        AND variant = 'Standard'
       ORDER BY effective_date ASC, id ASC
     `),
     db.execute<CompRow>(sql`

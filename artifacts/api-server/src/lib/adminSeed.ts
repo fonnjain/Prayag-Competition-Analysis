@@ -3,30 +3,37 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
-const ADMIN_EMAIL = "ceo@prayagindia.com";
 const ADMIN_PASSWORD = "pRAYAG@2026";
-const ADMIN_FIRST_NAME = "CEO";
-const ADMIN_LAST_NAME = "Prayag";
+
+const ADMIN_USERS = [
+  { email: "ceo@prayagindia.com",            firstName: "CEO",    lastName: "Prayag" },
+  { email: "preeti.chauhan@prayagindia.com",  firstName: "Preeti", lastName: "Chauhan" },
+  { email: "deepakj@prayagindia.com",         firstName: "Deepak", lastName: "J" },
+];
 
 /**
- * Idempotent: inserts the admin user if they don't exist yet.
- * Safe to run on every startup — does nothing if the row is already present.
+ * Idempotent: inserts each admin user if they don't exist yet.
+ * Safe to run on every startup — skips rows that are already present.
  */
 export async function seedAdminUser(): Promise<void> {
-  const [existing] = await db
-    .select({ id: usersTable.id })
-    .from(usersTable)
-    .where(eq(usersTable.email, ADMIN_EMAIL));
-
-  if (existing) return; // already seeded
-
   const hash = await bcrypt.hash(ADMIN_PASSWORD, 12);
-  await db.insert(usersTable).values({
-    email: ADMIN_EMAIL,
-    firstName: ADMIN_FIRST_NAME,
-    lastName: ADMIN_LAST_NAME,
-    passwordHash: hash,
-  });
 
-  logger.info({ email: ADMIN_EMAIL }, "Admin user seeded");
+  for (const admin of ADMIN_USERS) {
+    const [existing] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, admin.email));
+
+    if (existing) continue; // already seeded
+
+    await db.insert(usersTable).values({
+      email: admin.email,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      passwordHash: hash,
+      role: "admin",
+    });
+
+    logger.info({ email: admin.email }, "Admin user seeded");
+  }
 }

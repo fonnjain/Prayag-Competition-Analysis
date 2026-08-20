@@ -137,6 +137,23 @@ export interface PriceFinderSearchResult {
      */
   upcomingChangePct: number | null;
   hasCompetitorData: boolean;
+  /**
+     * Brand name of the cheapest matched competitor, or null when none.
+     * @nullable
+     */
+  bestCompetitorBrand?: string | null;
+  /**
+     * Normalized (incl-GST) price of the cheapest competitor, or null.
+     * @nullable
+     */
+  bestCompetitorPrice?: number | null;
+  /**
+     * Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.
+     * @nullable
+     */
+  bestCompetitorGapPct?: number | null;
+  /** Number of non-Standard colour variants with a current price. 0 when no colour options exist. */
+  colourVariantCount?: number;
   /** @nullable */
   discontinuedFrom: string | null;
 }
@@ -244,9 +261,26 @@ export interface PriceFinderCompetitor {
   message: string | null;
 }
 
+export interface PriceFinderVariant {
+  /** Colour name, e.g. "Ivory", "White with Jet", "Pink / Green / Blue". */
+  variant: string;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentEffectiveDate: string | null;
+  /** @nullable */
+  upcomingMrp: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+  /** @nullable */
+  upcomingChangePct: number | null;
+}
+
 export interface PriceFinderProductResponse {
   product: PriceFinderProduct;
   competitors: PriceFinderCompetitor[];
+  /** Colour variants beyond Standard. Empty array when no colour options exist. */
+  variants: PriceFinderVariant[];
 }
 
 export interface CatalogCategoryOption {
@@ -1041,6 +1075,73 @@ export interface AuthUser {
   lastName?: string | null;
   /** @nullable */
   profileImageUrl?: string | null;
+  /**
+     * User role: "admin" has access to user management; "user" is a normal workspace member.
+     * @nullable
+     */
+  role?: string | null;
+}
+
+export type AdminUserRole = typeof AdminUserRole[keyof typeof AdminUserRole];
+
+
+export const AdminUserRole = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  role: AdminUserRole;
+  createdAt: string;
+}
+
+export interface AdminUserList {
+  users: AdminUser[];
+}
+
+export type CreateAdminUserBodyRole = typeof CreateAdminUserBodyRole[keyof typeof CreateAdminUserBodyRole];
+
+
+export const CreateAdminUserBodyRole = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface CreateAdminUserBody {
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  /**
+     * Initial password. If omitted, account is created without a password.
+     * @minLength 8
+     */
+  password?: string;
+  role: CreateAdminUserBodyRole;
+}
+
+export interface ResetUserPasswordBody {
+  /** @minLength 8 */
+  password: string;
+}
+
+export type UpdateUserRoleBodyRole = typeof UpdateUserRoleBodyRole[keyof typeof UpdateUserRoleBodyRole];
+
+
+export const UpdateUserRoleBodyRole = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface UpdateUserRoleBody {
+  role: UpdateUserRoleBodyRole;
 }
 
 export interface AuthUserEnvelope {

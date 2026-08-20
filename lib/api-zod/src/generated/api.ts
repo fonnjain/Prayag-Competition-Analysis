@@ -353,6 +353,10 @@ export const GetPriceFinderSearchResponse = zod.object({
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
   "hasCompetitorData": zod.boolean(),
+  "bestCompetitorBrand": zod.string().nullish().describe('Brand name of the cheapest matched competitor, or null when none.'),
+  "bestCompetitorPrice": zod.number().nullish().describe('Normalized (incl-GST) price of the cheapest competitor, or null.'),
+  "bestCompetitorGapPct": zod.number().nullish().describe('Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'),
+  "colourVariantCount": zod.number().optional().describe('Number of non-Standard colour variants with a current price. 0 when no colour options exist.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 })),
   "totalCount": zod.number(),
@@ -404,6 +408,10 @@ export const GetPriceFinderBrowseResponse = zod.object({
   "upcomingEffectiveDate": zod.string().nullable(),
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming MRP; zero is retained.'),
   "hasCompetitorData": zod.boolean(),
+  "bestCompetitorBrand": zod.string().nullish().describe('Brand name of the cheapest matched competitor, or null when none.'),
+  "bestCompetitorPrice": zod.number().nullish().describe('Normalized (incl-GST) price of the cheapest competitor, or null.'),
+  "bestCompetitorGapPct": zod.number().nullish().describe('Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'),
+  "colourVariantCount": zod.number().optional().describe('Number of non-Standard colour variants with a current price. 0 when no colour options exist.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 }))
 })
@@ -441,7 +449,15 @@ export const GetPriceFinderProductResponse = zod.object({
   "upcomingChangePct": zod.number().nullable().describe('One-decimal change from current to upcoming price; zero is retained.'),
   "gapPct": zod.number().nullable(),
   "message": zod.string().nullable()
-}))
+})),
+  "variants": zod.array(zod.object({
+  "variant": zod.string().describe('Colour name, e.g. \"Ivory\", \"White with Jet\", \"Pink \/ Green \/ Blue\".'),
+  "currentMrp": zod.number().nullable(),
+  "currentEffectiveDate": zod.string().nullable(),
+  "upcomingMrp": zod.number().nullable(),
+  "upcomingEffectiveDate": zod.string().nullable(),
+  "upcomingChangePct": zod.number().nullable()
+})).describe('Colour variants beyond Standard. Empty array when no colour options exist.')
 })
 
 
@@ -1385,6 +1401,90 @@ export const UpdateDiscountSettingsResponse = zod.object({
 
 
 /**
+ * @summary List all workspace users
+ */
+export const ListAdminUsersResponse = zod.object({
+  "users": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "role": zod.enum(['admin', 'user']),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Create a new workspace user
+ */
+export const createAdminUserBodyPasswordMin = 8;
+
+
+
+export const CreateAdminUserBody = zod.object({
+  "email": zod.string().email(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "password": zod.string().min(createAdminUserBodyPasswordMin).optional().describe('Initial password. If omitted, account is created without a password.'),
+  "role": zod.enum(['admin', 'user'])
+})
+
+
+/**
+ * @summary Remove a user from the workspace
+ */
+export const DeleteAdminUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteAdminUserResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Reset a user password
+ */
+export const ResetAdminUserPasswordParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const resetAdminUserPasswordBodyPasswordMin = 8;
+
+
+
+export const ResetAdminUserPasswordBody = zod.object({
+  "password": zod.string().min(resetAdminUserPasswordBodyPasswordMin)
+})
+
+export const ResetAdminUserPasswordResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Update a user role
+ */
+export const UpdateAdminUserRoleParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateAdminUserRoleBody = zod.object({
+  "role": zod.enum(['admin', 'user'])
+})
+
+export const UpdateAdminUserRoleResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "role": zod.enum(['admin', 'user']),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Get the currently authenticated user
  */
 export const GetCurrentAuthUserHeader = zod.object({
@@ -1397,7 +1497,8 @@ export const GetCurrentAuthUserResponse = zod.object({
   "email": zod.string().nullish(),
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
-  "profileImageUrl": zod.string().nullish()
+  "profileImageUrl": zod.string().nullish(),
+  "role": zod.string().nullish().describe('User role: \"admin\" has access to user management; \"user\" is a normal workspace member.')
 }),zod.null()])
 })
 

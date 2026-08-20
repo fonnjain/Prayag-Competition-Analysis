@@ -1,0 +1,1218 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Search,
+  Mic,
+  MicOff,
+  ChevronRight,
+  Info,
+  AlertCircle,
+  X,
+  Tag,
+  Volume2,
+  VolumeX,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Palette,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { PriceWindowDetails } from "@/components/price-window";
+import { buildSpokenPriceSummary } from "@/lib/priceSpeech";
+import { getPriceFinderSearchDisplay } from "@/lib/priceFinderSearchState";
+import {
+  useGetPriceFinderBrowse,
+  useGetPriceFinderProduct,
+  useGetPriceFinderSearch,
+  type PriceFinderCompetitor,
+  type PriceFinderSearchResult,
+} from "@workspace/api-client-react";
+
+/** Compact one-line competitor price indicator for list rows */
+function CompetitorLine({
+  brand,
+  price,
+  gapPct,
+  className,
+}: {
+  brand: string | null | undefined;
+  price: number | null | undefined;
+  gapPct: number | null | undefined;
+  className?: string;
+}) {
+  if (!brand || price == null) return null;
+
+  const absGap = gapPct != null ? Math.abs(gapPct) : null;
+  const cheaper = gapPct != null && gapPct > 0.05;
+  const costlier = gapPct != null && gapPct < -0.05;
+
+  return (
+    <span
+      className={cn(
+        "mt-1 flex items-center gap-1 text-xs font-medium",
+        cheaper
+          ? "text-emerald-700"
+          : costlier
+            ? "text-amber-700"
+            : "text-muted-foreground",
+        className,
+      )}
+    >
+      {cheaper ? (
+        <TrendingDown className="w-3 h-3 shrink-0" />
+      ) : costlier ? (
+        <TrendingUp className="w-3 h-3 shrink-0" />
+      ) : (
+        <Minus className="w-3 h-3 shrink-0" />
+      )}
+      <span>
+        {brand} ₹{price.toFixed(0)}
+        {absGap != null && absGap >= 0.05 && (
+          <span className="ml-1 opacity-80">
+            · Prayag {absGap.toFixed(1)}% {cheaper ? "cheaper" : "costlier"}
+          </span>
+        )}
+        {absGap != null && absGap < 0.05 && (
+          <span className="ml-1 opacity-70">· parity</span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+function useVoiceSearch(
+  onFinalResult: (text: string) => void,
+  onTranscript: (text: string) => void,
+) {
+  const [isListening, setIsListening] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const [supportChecked, setSupportChecked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const listeningRef = useRef(false);
+  const startPendingRef = useRef(false);
+  const callbacksRef = useRef({ onFinalResult, onTranscript });
+
+  useEffect(() => {
+    callbacksRef.current = { onFinalResult, onTranscript };
+  }, [onFinalResult, onTranscript]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSupported(false);
+      setSupportChecked(true);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN";
+
+    recognition.onstart = () => {
+      startPendingRef.current = false;
+      listeningRef.current = true;
+      setIsStarting(false);
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      if (interimTranscript) {
+        callbacksRef.current.onTranscript(interimTranscript);
+      }
+
+      if (finalTranscript) {
+        callbacksRef.current.onFinalResult(finalTranscript.trim());
+        setError(null);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      startPendingRef.current = false;
+      setIsStarting(false);
+      if (event.error === "aborted") return;
+
+      const messages: Record<string, string> = {
+        "not-allowed":
+          "Microphone permission is blocked. Allow microphone access in your browser settings, then try again.",
+        "audio-capture":
+          "No microphone was found. Check that a microphone is connected and available to your browser.",
+        "no-speech": "No speech detected. Try again or type the product.",
+        network:
+          "Voice recognition needs a network connection. Check your connection and try again.",
+        "service-not-allowed":
+          "This browser does not allow voice recognition. You can continue with text search.",
+        "language-not-supported":
+          "English (India) voice recognition is not supported here. You can continue with text search.",
+      };
+      setError(
+        messages[event.error] ??
+          "Voice search stopped unexpectedly. Try again or use text search.",
+      );
+      setIsListening(false);
+      listeningRef.current = false;
+    };
+
+    recognition.onend = () => {
+      startPendingRef.current = false;
+      listeningRef.current = false;
+      setIsStarting(false);
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    setSupported(true);
+    setSupportChecked(true);
+
+    return () => {
+      startPendingRef.current = false;
+      listeningRef.current = false;
+      setIsStarting(false);
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.onstart = null;
+      recognition.abort();
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  const toggle = useCallback(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setError("Voice search is not supported in this browser.");
+      return;
+    }
+
+    if (listeningRef.current || startPendingRef.current) {
+      startPendingRef.current = false;
+      listeningRef.current = false;
+      setIsStarting(false);
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      setError(null);
+      startPendingRef.current = true;
+      setIsStarting(true);
+      recognition.start();
+    } catch (error: any) {
+      startPendingRef.current = false;
+      setIsStarting(false);
+      setIsListening(false);
+      setError(
+        error?.name === "InvalidStateError"
+          ? "Voice search is already starting. Try again in a moment."
+          : "Voice search could not start. Check microphone permission and try again.",
+      );
+    }
+  }, []);
+
+  return { isListening, isStarting, supported, supportChecked, error, toggle };
+}
+
+export default function PriceFinderPage() {
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [filters, setFilters] = useState<string[]>(() =>
+    new URLSearchParams(window.location.search).getAll("filter").filter(Boolean),
+  );
+  const [selectedItemCode, setSelectedItemCode] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  // When a suggestion is selected from the dropdown, we clear searchInput which
+  // triggers the debounce → queryKey change → the effect below would normally
+  // reset selectedItemCode.  This ref suppresses that single reset.
+  const suppressSelectionResetRef = useRef(false);
+  const [browseDivision, setBrowseDivision] = useState<string | null>(null);
+  const [browseCategory, setBrowseCategory] = useState<string | null>(null);
+  const [selectionSequence, setSelectionSequence] = useState(0);
+  const [speechRequested, setSpeechRequested] = useState(false);
+  const [speechAvailable, setSpeechAvailable] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
+
+  const cancelSpeech = useCallback(() => {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.speechSynthesis?.cancel === "function"
+    ) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  useEffect(() => {
+    const available =
+      typeof window !== "undefined" &&
+      typeof window.speechSynthesis?.speak === "function" &&
+      typeof window.SpeechSynthesisUtterance === "function";
+    setSpeechAvailable(available);
+    if (available) {
+      setSpeechEnabled(
+        window.localStorage.getItem("prayag-price-finder-speech-enabled") === "true",
+      );
+    }
+    return cancelSpeech;
+  }, [cancelSpeech]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQ(searchInput.trim());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Reset keyboard cursor whenever the query changes
+  useEffect(() => {
+    setActiveSuggestion(-1);
+  }, [debouncedQ]);
+
+  // True while the user has typed but the debounce hasn't settled yet.
+  // During this window show a loading indicator and block stale-result selection.
+  const isDebouncing = searchInput.trim() !== debouncedQ;
+
+  const writeFiltersToUrl = useCallback((nextFilters: string[]) => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("filter");
+    nextFilters.forEach((filter) => params.append("filter", filter));
+    const query = params.toString();
+    window.history.pushState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
+    );
+  }, []);
+
+  useEffect(() => {
+    const restoreFiltersFromHistory = () => {
+      cancelSpeech();
+      setFilters(
+        new URLSearchParams(window.location.search)
+          .getAll("filter")
+          .filter(Boolean),
+      );
+      setSearchInput("");
+      setSelectedItemCode(null);
+      setSpeechRequested(false);
+    };
+    window.addEventListener("popstate", restoreFiltersFromHistory);
+    return () => window.removeEventListener("popstate", restoreFiltersFromHistory);
+  }, [cancelSpeech]);
+
+  const addFilter = useCallback((term: string) => {
+    const cleaned = term.trim();
+    if (!cleaned) return;
+    cancelSpeech();
+    setFilters((current) => {
+      if (
+        current.some(
+          (filter) => filter.toLowerCase() === cleaned.toLowerCase(),
+        )
+      ) {
+        return current;
+      }
+      const next = [...current, cleaned];
+      writeFiltersToUrl(next);
+      return next;
+    });
+    setSearchInput("");
+    setSelectedItemCode(null);
+    setSpeechRequested(false);
+  }, [cancelSpeech, writeFiltersToUrl]);
+
+  const removeFilter = useCallback((index: number, edit = false) => {
+    cancelSpeech();
+    setFilters((current) => {
+      const removed = current[index];
+      if (edit && removed) setSearchInput(removed);
+      const next = current.filter((_, itemIndex) => itemIndex !== index);
+      writeFiltersToUrl(next);
+      return next;
+    });
+    setSelectedItemCode(null);
+    setSpeechRequested(false);
+  }, [cancelSpeech, writeFiltersToUrl]);
+
+  const handleVoiceResult = useCallback((text: string) => {
+    addFilter(text);
+  }, [addFilter]);
+
+  const handleVoiceTranscript = useCallback((text: string) => {
+    cancelSpeech();
+    setSearchInput(text);
+    setSelectedItemCode(null);
+    setSpeechRequested(false);
+  }, [cancelSpeech]);
+
+  const {
+    isListening,
+    isStarting: isVoiceStarting,
+    supported: voiceSupported,
+    supportChecked: voiceSupportChecked,
+    error: voiceError,
+    toggle: toggleVoice,
+  } = useVoiceSearch(handleVoiceResult, handleVoiceTranscript);
+  const voiceActive = isListening || isVoiceStarting;
+
+  const queryFilters = [
+    ...filters,
+    ...(debouncedQ ? [debouncedQ] : []),
+  ];
+  const queryKey = queryFilters.join("\u0001");
+
+  useEffect(() => {
+    if (suppressSelectionResetRef.current) {
+      suppressSelectionResetRef.current = false;
+      return;
+    }
+    setSelectedItemCode(null);
+    setSpeechRequested(false);
+    cancelSpeech();
+  }, [queryKey, cancelSpeech]);
+
+  const { data: searchData, isLoading: isSearchLoading, isError: isSearchError } = useGetPriceFinderSearch(
+    { filters: queryFilters, limit: 3000 },
+    {
+      query: {
+        queryKey: ["price-finder-search", queryFilters],
+        enabled: queryFilters.length > 0,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  const { results, totalCount, unmatchedFilter } =
+    getPriceFinderSearchDisplay(searchData);
+  const hasSearch = queryFilters.length > 0;
+  const confirmProduct = useCallback((itemCode: string) => {
+    cancelSpeech();
+    setSelectedItemCode(itemCode);
+    setSelectionSequence((value) => value + 1);
+    setSpeechRequested(speechEnabled);
+  }, [cancelSpeech, speechEnabled]);
+  // Query 1: divisions list (no division selected)
+  const { data: divisionsData, isLoading: isDivisionsLoading } = useGetPriceFinderBrowse(
+    { limit: 300 },
+    {
+      query: {
+        queryKey: ["price-finder-browse-divisions"],
+        enabled: !browseDivision,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  // Query 2: categories for selected division (tab list)
+  const { data: categoriesData, isLoading: isCategoriesLoading } = useGetPriceFinderBrowse(
+    { division: browseDivision ?? undefined, limit: 300 },
+    {
+      query: {
+        queryKey: ["price-finder-browse-categories", browseDivision],
+        enabled: !!browseDivision,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  // Query 3: products for selected division + category
+  const { data: productsData, isLoading: isProductsLoading } = useGetPriceFinderBrowse(
+    { division: browseDivision ?? undefined, category: browseCategory ?? undefined, limit: 300 },
+    {
+      query: {
+        queryKey: ["price-finder-browse-products", browseDivision, browseCategory],
+        enabled: !!browseDivision && !!browseCategory,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  // Auto-select first category when categories load
+  useEffect(() => {
+    if (browseDivision && !browseCategory && categoriesData?.categories?.length) {
+      const first = categoriesData.categories[0];
+      setBrowseCategory(first.category ?? "__uncategorised__");
+    }
+  }, [browseDivision, browseCategory, categoriesData]);
+
+  return (
+    <div
+      className="max-w-3xl mx-auto p-4 md:p-8 space-y-6"
+      onPointerDownCapture={cancelSpeech}
+    >
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Price Finder</h1>
+        <p className="text-muted-foreground mt-1 text-sm max-w-lg">
+          Fast counter-side lookup for Prayag prices and market position.
+        </p>
+      </div>
+
+      {voiceError && (
+        <p className="text-sm text-amber-700" role="status">
+          {voiceError}
+        </p>
+      )}
+      {voiceSupportChecked && !voiceSupported && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Voice search is available in Chrome or Edge when microphone access is allowed.
+        </p>
+      )}
+
+      {speechAvailable && (
+        <div className="flex items-center justify-end gap-2">
+          {speechEnabled ? (
+            <Volume2 aria-hidden="true" className="h-4 w-4 text-primary" />
+          ) : (
+            <VolumeX aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+          )}
+          <Label htmlFor="spoken-output" className="text-sm">
+            Speak confirmed price
+          </Label>
+          <Switch
+            id="spoken-output"
+            checked={speechEnabled}
+            onCheckedChange={(checked) => {
+              cancelSpeech();
+              setSpeechRequested(false);
+              setSpeechEnabled(checked);
+              window.localStorage.setItem(
+                "prayag-price-finder-speech-enabled",
+                String(checked),
+              );
+            }}
+            data-testid="spoken-output-toggle"
+          />
+        </div>
+      )}
+
+      {/* Progressive voice and text filters */}
+      <div className="space-y-3">
+      <div className="relative flex items-center shadow-sm group">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+        <Input
+          value={searchInput}
+          onChange={(e) => {
+            cancelSpeech();
+            setSelectedItemCode(null);
+            setSpeechRequested(false);
+            setSearchInput(e.target.value);
+          }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => {
+            // Delay so click on a suggestion registers first
+            setTimeout(() => setIsFocused(false), 150);
+          }}
+          onKeyDown={(event) => {
+            const suggestionList = results.slice(0, 8);
+            const dropdownOpen = isFocused && debouncedQ.length >= 2 && suggestionList.length > 0;
+
+            if (event.key === "ArrowDown") {
+              // Block navigation while debounce is unsettled — results are stale
+              if (!dropdownOpen || isDebouncing) return;
+              event.preventDefault();
+              setActiveSuggestion((i) => Math.min(i + 1, suggestionList.length - 1));
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              if (!dropdownOpen || isDebouncing) return;
+              event.preventDefault();
+              setActiveSuggestion((i) => Math.max(i - 1, -1));
+              return;
+            }
+            if (event.key === "Escape") {
+              setIsFocused(false);
+              setActiveSuggestion(-1);
+              return;
+            }
+            if (event.key === "Enter") {
+              event.preventDefault();
+              // Only select a suggestion when the debounce has settled and a row is highlighted
+              if (dropdownOpen && !isDebouncing && activeSuggestion >= 0) {
+                const chosen = suggestionList[activeSuggestion];
+                if (chosen) {
+                  suppressSelectionResetRef.current = true;
+                  confirmProduct(chosen.itemCode);
+                  setSearchInput("");
+                  setIsFocused(false);
+                  setActiveSuggestion(-1);
+                }
+              } else {
+                addFilter(searchInput);
+              }
+            }
+          }}
+          placeholder={filters.length ? "Say or type the next narrowing term…" : "Say or type a product term…"}
+          className="pl-12 pr-24 h-14 text-lg bg-card border-2 border-primary/20 focus-visible:ring-primary focus-visible:border-primary rounded-xl"
+          autoFocus
+        />
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {searchInput && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-10 h-10 text-muted-foreground hover:text-foreground rounded-lg"
+              onClick={() => {
+                cancelSpeech();
+                setSearchInput("");
+                setSelectedItemCode(null);
+                setSpeechRequested(false);
+                setIsFocused(false);
+              }}
+              title="Clear search"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          )}
+          {voiceSupported && (
+            <Button
+              variant={voiceActive ? "default" : "ghost"}
+              size="icon"
+              className={cn(
+                "w-10 h-10 rounded-lg transition-colors",
+                voiceActive ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              )}
+              aria-label={voiceActive ? "Stop voice search" : "Start voice search"}
+              aria-pressed={voiceActive}
+              data-testid="voice-search-toggle"
+              onClick={() => {
+                cancelSpeech();
+                setSpeechRequested(false);
+                toggleVoice();
+              }}
+              title={
+                isVoiceStarting
+                  ? "Starting voice search…"
+                  : isListening
+                    ? "Stop listening"
+                    : "Voice search"
+              }
+            >
+              {voiceActive ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </Button>
+          )}
+        </div>
+
+        {/* ── Predictive suggestions dropdown ── */}
+        {isFocused && (isDebouncing || debouncedQ.length >= 2) && searchInput.trim().length >= 2 && (
+          <div className="absolute top-full left-0 right-0 z-50 mt-1.5 rounded-xl border bg-card shadow-xl overflow-hidden">
+            {/* Show loading while debounce is pending OR request is in flight */}
+            {isDebouncing || isSearchLoading ? (
+              <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground animate-pulse">
+                <Search className="w-4 h-4 shrink-0" />
+                Searching…
+              </div>
+            ) : results.length === 0 ? null : (
+              <>
+                {results.slice(0, 8).map((res, idx) => {
+                  const isActive = idx === activeSuggestion;
+                  return (
+                    <button
+                      key={res.itemCode}
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors border-b last:border-b-0",
+                        isActive ? "bg-primary/10" : "hover:bg-muted/50",
+                      )}
+                      onMouseEnter={() => setActiveSuggestion(idx)}
+                      onMouseLeave={() => setActiveSuggestion(-1)}
+                      onClick={() => {
+                        suppressSelectionResetRef.current = true;
+                        confirmProduct(res.itemCode);
+                        setSearchInput("");
+                        setIsFocused(false);
+                        setActiveSuggestion(-1);
+                      }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-mono text-xs font-bold text-primary shrink-0">{res.itemCode}</span>
+                          {res.division && (
+                            <span className="text-[11px] text-muted-foreground truncate">
+                              {res.division}{res.category ? ` · ${res.category}` : ""}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-sm text-foreground leading-snug truncate">{res.productName}</p>
+                        <CompetitorLine
+                          brand={res.bestCompetitorBrand}
+                          price={res.bestCompetitorPrice}
+                          gapPct={res.bestCompetitorGapPct}
+                        />
+                      </div>
+                      <div className="shrink-0 text-right ml-2">
+                        {res.currentMrp != null ? (
+                          <span className="font-mono font-bold text-sm text-foreground">₹{res.currentMrp.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-xs font-medium text-amber-600">Pending</span>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-muted-foreground mt-0.5 ml-auto" />
+                      </div>
+                    </button>
+                  );
+                })}
+                {results.length > 8 && (
+                  <div className="px-4 py-2.5 text-xs text-muted-foreground bg-muted/30 flex items-center gap-1">
+                    <Tag className="w-3 h-3 shrink-0" />
+                    {results.length - 8} more — press Enter or add a filter to narrow
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+        {filters.map((filter, index) => (
+          <span key={`${filter}-${index}`} className="inline-flex items-center overflow-hidden rounded-full border border-primary/20 bg-primary/5 text-sm text-primary">
+            <button
+              type="button"
+              className="px-3 py-1.5 font-medium hover:bg-primary/10"
+              onClick={() => removeFilter(index, true)}
+              title={`Edit ${filter}`}
+            >
+              {filter}
+            </button>
+            <button
+              type="button"
+              className="border-l border-primary/15 px-2 py-1.5 hover:bg-primary/10"
+              onClick={() => removeFilter(index)}
+              aria-label={`Remove ${filter} filter`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        ))}
+        {filters.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-muted-foreground"
+            onClick={() => {
+              cancelSpeech();
+              setFilters([]);
+              writeFiltersToUrl([]);
+              setSearchInput("");
+              setSelectedItemCode(null);
+              setSpeechRequested(false);
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+      {hasSearch && (
+        <p className="text-sm font-semibold text-foreground" aria-live="polite">
+          {isSearchLoading ? "Narrowing products…" : `${totalCount.toLocaleString("en-IN")} products`}
+          {filters.length > 0 && " · keep narrowing or choose a product"}
+        </p>
+      )}
+      {unmatchedFilter && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+          Nothing matched “{unmatchedFilter}”. Your earlier filters are still active—edit or remove this term to continue.
+        </div>
+      )}
+      {!unmatchedFilter && totalCount > 25 && (searchData?.filterSuggestions?.length ?? 0) > 0 && (
+        <div className="rounded-xl border border-dashed bg-muted/20 p-3">
+          <p className="mb-2 text-sm font-medium text-muted-foreground">Narrow further by</p>
+          <div className="flex flex-wrap gap-2">
+            {searchData!.filterSuggestions.flatMap((suggestion) =>
+              suggestion.values.slice(0, 3).map((option) => (
+                <Button
+                  key={`${suggestion.field}-${option.value}`}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addFilter(option.value)}
+                >
+                  {suggestion.field}: {option.value} <span className="ml-1 text-muted-foreground">({option.count})</span>
+                </Button>
+              )),
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+
+      <section className="rounded-xl border bg-card p-4 md:p-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            {browseDivision ? (
+              <>
+                <h2 className="font-semibold">{browseDivision}</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {isCategoriesLoading
+                    ? "Loading categories…"
+                    : `${categoriesData?.categories?.length ?? 0} categories`}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="font-semibold">Browse the catalogue</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Search is fastest. Use division and category when you want to explore.
+                </p>
+              </>
+            )}
+          </div>
+          {browseDivision && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                setBrowseDivision(null);
+                setBrowseCategory(null);
+                setSelectedItemCode(null);
+              }}
+            >
+              ← All divisions
+            </Button>
+          )}
+        </div>
+
+        {!browseDivision ? (
+          /* Division grid */
+          isDivisionsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading catalogue…</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(divisionsData?.divisions ?? []).map((item) => (
+                <button
+                  key={item.division}
+                  type="button"
+                  onClick={() => {
+                    setBrowseDivision(item.division);
+                    setBrowseCategory(null);
+                    setSelectedItemCode(null);
+                  }}
+                  className="flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <span className="font-medium">{item.division}</span>
+                  <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          /* Category tabs + product list */
+          <div>
+            {/* Scrollable category tab pills */}
+            {isCategoriesLoading ? (
+              <p className="text-sm text-muted-foreground mb-4">Loading categories…</p>
+            ) : (
+              <div className="relative mb-4">
+                <div className="flex gap-2 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {(categoriesData?.categories ?? []).map((item) => {
+                    const key = item.category ?? "__uncategorised__";
+                    const isActive = browseCategory === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setBrowseCategory(key);
+                          setSelectedItemCode(null);
+                        }}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary",
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                        )}
+                      >
+                        {item.label}
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 font-mono text-[11px]",
+                            isActive
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-background text-muted-foreground",
+                          )}
+                        >
+                          {item.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* fade-out gradient on the right to hint scroll */}
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent" />
+              </div>
+            )}
+
+            {/* Product list for selected category */}
+            {browseCategory && (
+              isProductsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading products…</p>
+              ) : (productsData?.products ?? []).length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No products in this category.</p>
+              ) : (
+                <div className="divide-y rounded-lg border">
+                  {(productsData?.products ?? []).map((item) => (
+                    <button
+                      key={item.itemCode}
+                      type="button"
+                      onClick={() => confirmProduct(item.itemCode)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                    >
+                      <span>
+                        <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
+                        <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
+                        <DiscontinuationBadge value={item.discontinuedFrom} />
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-mono font-semibold">
+                          {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
+                        </span>
+                        <PriceWindowDetails
+                          compact
+                          currentPrice={item.currentMrp}
+                          validFrom={item.currentEffectiveDate}
+                          validTo={item.currentValidTo}
+                          upcomingPrice={item.upcomingMrp}
+                          upcomingEffectiveDate={item.upcomingEffectiveDate}
+                          upcomingChangePct={item.upcomingChangePct}
+                        />
+                        {item.colourVariantCount != null && item.colourVariantCount > 0 && (
+                          <span className="mt-1 flex items-center justify-end gap-1 text-xs text-indigo-600 font-medium">
+                            <Palette className="w-3 h-3 shrink-0" />
+                            +{item.colourVariantCount} colour option{item.colourVariantCount > 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Results Picker */}
+      {!selectedItemCode && hasSearch && (
+        <div className="bg-card border rounded-xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none">
+          {isSearchLoading ? (
+            <div className="p-6 text-center text-muted-foreground font-medium">Searching...</div>
+          ) : isSearchError ? (
+            <div className="p-6 text-center text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Failed to load search results.
+            </div>
+          ) : results.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No products match the active filters. Remove or edit a chip to widen the list.
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {totalCount > results.length && (
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  Showing the first {results.length.toLocaleString("en-IN")} of {totalCount.toLocaleString("en-IN")} matching products. Add another filter to narrow the list.
+                </p>
+              )}
+              {results.map((res) => (
+                <button
+                  key={res.itemCode}
+                  onClick={() => confirmProduct(res.itemCode)}
+                  className="w-full text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between group"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-sm font-bold text-primary">{res.itemCode}</span>
+                    </div>
+                    <p className="text-foreground font-semibold text-lg">{res.productName}</p>
+                    <DiscontinuationBadge value={res.discontinuedFrom} />
+                    <p className="text-xs font-medium text-muted-foreground mt-1">
+                      {[res.division, res.category].filter(Boolean).join(" • ")}
+                    </p>
+                    <CompetitorLine
+                      brand={res.bestCompetitorBrand}
+                      price={res.bestCompetitorPrice}
+                      gapPct={res.bestCompetitorGapPct}
+                    />
+                    {res.colourVariantCount != null && res.colourVariantCount > 0 && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-indigo-600 font-medium">
+                        <Palette className="w-3 h-3 shrink-0" />
+                        +{res.colourVariantCount} colour option{res.colourVariantCount > 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-right">
+                    <div className="hidden sm:block">
+                      {res.currentMrp != null ? (
+                        <p className="font-black text-xl text-foreground">₹{res.currentMrp.toFixed(2)}</p>
+                      ) : (
+                        <p className="text-sm font-bold text-amber-600">Pending</p>
+                      )}
+                      <PriceWindowDetails
+                        compact
+                        currentPrice={res.currentMrp}
+                        validFrom={res.currentEffectiveDate}
+                        validTo={res.currentValidTo}
+                        upcomingPrice={res.upcomingMrp}
+                        upcomingEffectiveDate={res.upcomingEffectiveDate}
+                        upcomingChangePct={res.upcomingChangePct}
+                        className="mt-1 max-w-[260px]"
+                      />
+                    </div>
+                    <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selected Product View */}
+      {selectedItemCode && (
+        <ProductView
+          itemCode={selectedItemCode}
+          speechEnabled={speechEnabled}
+          speakRequestId={speechRequested ? selectionSequence : 0}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProductView({
+  itemCode,
+  speechEnabled,
+  speakRequestId,
+}: {
+  itemCode: string;
+  speechEnabled: boolean;
+  speakRequestId: number;
+}) {
+  const { data, isLoading, isError } = useGetPriceFinderProduct(itemCode, {
+    query: {
+      queryKey: ["price-finder-product", itemCode],
+      enabled: !!itemCode,
+      staleTime: 1000 * 60,
+    },
+  });
+  const lastSpokenRequest = useRef(0);
+
+  useEffect(() => {
+    if (
+      !speechEnabled ||
+      !data?.product ||
+      speakRequestId <= lastSpokenRequest.current ||
+      typeof window.speechSynthesis?.speak !== "function" ||
+      typeof window.SpeechSynthesisUtterance !== "function"
+    ) {
+      return;
+    }
+    lastSpokenRequest.current = speakRequestId;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(
+      buildSpokenPriceSummary(data.product, data.competitors),
+    );
+    utterance.lang = "en-IN";
+    window.speechSynthesis.speak(utterance);
+  }, [data, speechEnabled, speakRequestId]);
+
+  if (isLoading) {
+    return (
+      <div className="mt-6 bg-card border rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center min-h-[300px] animate-pulse">
+        <div className="w-12 h-12 rounded-full bg-muted mb-4" />
+        <div className="h-6 w-1/3 bg-muted rounded mb-2" />
+        <div className="h-4 w-1/4 bg-muted rounded" />
+      </div>
+    );
+  }
+  
+  if (isError || !data?.product) {
+    return (
+      <div className="mt-6 bg-destructive/5 border border-destructive/20 rounded-2xl p-8 flex items-center justify-center gap-2 text-destructive">
+        <AlertCircle className="w-5 h-5" />
+        <span className="font-medium">Failed to load product details for {itemCode}.</span>
+      </div>
+    );
+  }
+
+  const { product, competitors, variants } = data;
+
+  return (
+    <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
+      <div className="bg-card border rounded-xl p-6 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-medium text-muted-foreground uppercase tracking-widest">
+            <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{product.itemCode}</span>
+            {product.division && <span>• {product.division}</span>}
+            {product.category && <span>• {product.category}</span>}
+            {product.discontinuedFrom && (
+              <span className="rounded bg-destructive/10 px-2 py-0.5 text-destructive font-semibold">
+                Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+              </span>
+            )}
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Prayag MRP Card */}
+          <div className="border bg-muted/20 rounded-lg p-5 flex flex-col justify-center relative">
+            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-widest">Current MRP</p>
+            {product.currentMrp != null ? (
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">₹{product.currentMrp.toFixed(2)}</span>
+              </div>
+            ) : (
+              <span className="text-2xl font-bold text-muted-foreground">Price Pending</span>
+            )}
+            <PriceWindowDetails
+              currentPrice={product.currentMrp}
+              validFrom={product.currentEffectiveDate}
+              validTo={product.currentValidTo}
+              upcomingPrice={product.upcomingMrp}
+              upcomingEffectiveDate={product.upcomingEffectiveDate}
+              upcomingChangePct={product.upcomingChangePct}
+              className="mt-4"
+            />
+          </div>
+
+          {/* Competitor Data */}
+          <div className="border rounded-lg p-5 bg-card flex flex-col">
+            <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-widest">Market Context</p>
+            
+            {!competitors || competitors.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                <Info className="w-8 h-8 text-muted-foreground/40 mb-2" />
+                <p className="text-sm font-semibold text-foreground">No competitor data</p>
+                <p className="text-xs text-muted-foreground mt-1">This product has no mapped rivals.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 flex-1 overflow-y-auto">
+                {competitors.map((comp: PriceFinderCompetitor) => {
+                  const isPrayagCheaper = comp.gapPct != null && comp.gapPct > 0;
+                  const isCompetitorCheaper = comp.gapPct != null && comp.gapPct < 0;
+
+                  return (
+                    <div key={comp.competitor} className="flex items-start justify-between gap-3 p-3 bg-muted/30 border-b last:border-b-0 rounded-md">
+                      <div className="min-w-0">
+                        <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                          {comp.competitor}
+                        </p>
+                        <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                          ₹{comp.price.toFixed(2)} {comp.priceBasis ? `(${comp.priceBasis})` : ""}
+                        </p>
+                        <PriceWindowDetails
+                          compact
+                          currentPrice={comp.price}
+                          validFrom={comp.effectiveDate}
+                          validTo={comp.validTo}
+                          upcomingPrice={comp.upcomingPrice}
+                          upcomingEffectiveDate={comp.upcomingEffectiveDate}
+                          upcomingChangePct={comp.upcomingChangePct}
+                          className="mt-1 max-w-[300px]"
+                        />
+                      </div>
+                      <div className="text-right flex flex-col items-end">
+                        {comp.gapPct != null ? (
+                          <div className={cn(
+                            "inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold font-mono",
+                            isCompetitorCheaper ? "bg-destructive/10 text-destructive" : 
+                            isPrayagCheaper ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
+                          )}>
+                            {comp.gapPct > 0 ? "+" : ""}{comp.gapPct.toFixed(1)}%
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{comp.message || "N/A"}</span>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Current gap
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Colour variant pricing table */}
+        {variants && variants.length > 0 && (
+          <div className="border-t pt-5">
+            <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-widest flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5 text-indigo-500" />
+              Colour Variant Pricing
+            </p>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Variant</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Current MRP</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Upcoming</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {variants.map((v) => (
+                    <tr key={v.variant} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-3 py-2.5 font-medium text-foreground flex items-center gap-1.5">
+                        <Palette className="w-3 h-3 text-indigo-400 shrink-0" />
+                        {v.variant}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono font-semibold">
+                        {v.currentMrp != null ? `₹${v.currentMrp.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        {v.upcomingMrp != null ? (
+                          <span className="text-amber-700 dark:text-amber-400">
+                            ₹{v.upcomingMrp.toFixed(2)}
+                            {v.upcomingChangePct != null && (
+                              <span className="ml-1 text-[10px]">({v.upcomingChangePct > 0 ? "+" : ""}{v.upcomingChangePct.toFixed(1)}%)</span>
+                            )}
+                          </span>
+                        ) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DiscontinuationBadge({ value }: { value: string | null | undefined }) {
+  if (!value) return null;
+  const label = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+  return (
+    <span className="inline-flex rounded bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive mt-1">
+      Discontinued from {label}
+    </span>
+  );
+}

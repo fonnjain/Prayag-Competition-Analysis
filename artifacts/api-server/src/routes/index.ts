@@ -10,6 +10,7 @@ import externalV1Router from "./externalV1";
 import importBatchesRouter from "./importBatches";
 import priceFinderRouter from "./priceFinder";
 import catalogSyncRouter from "./catalogSync";
+import adminUsersRouter from "./adminUsers";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,7 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 router.use(requireAuth);
+router.use(adminUsersRouter);
 router.use(apiKeysRouter);
 router.use(priceFinderRouter);
 router.use(catalogRouter);

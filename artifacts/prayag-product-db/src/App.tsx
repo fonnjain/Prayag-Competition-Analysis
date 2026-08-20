@@ -6,7 +6,6 @@ import { Layout } from "@/components/layout";
 import NotFound from "@/pages/not-found";
 import CatalogPage from "@/pages/catalog";
 import ProductDetailPage from "@/pages/product-detail";
-import PriceFinderPage from "@/pages/price-finder";
 import LoadMrpPage from "@/pages/load-mrp";
 import DataHealthPage from "@/pages/data-health";
 import ComparisonPage from "@/pages/comparison";
@@ -15,7 +14,7 @@ import ImportCompetitorPage from "@/pages/import-competitor";
 import ImportReviewPage from "@/pages/import-review";
 import ApiKeysPage from "@/pages/api-keys";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient();
 
@@ -96,7 +95,6 @@ function Router() {
     <Switch>
       <Route path="/" component={CatalogPage} />
       <Route path="/product/:itemCode" component={ProductDetailPage} />
-      <Route path="/price-finder" component={PriceFinderPage} />
       <Route path="/load-mrp" component={LoadMrpPage} />
       <Route path="/data-health" component={DataHealthPage} />
       <Route path="/comparison" component={ComparisonPage} />
@@ -109,7 +107,27 @@ function Router() {
   );
 }
 
+function PriceFinderRedirect() {
+  useEffect(() => {
+    window.location.replace(
+      `/price-finder/${window.location.search}${window.location.hash}`,
+    );
+  }, []);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p className="text-muted-foreground">Opening Price Finder…</p>
+    </div>
+  );
+}
+
 function App() {
+  const isLegacyPriceFinderUrl =
+    window.location.pathname.replace(/\/+$/, "") ===
+    "/product-db/price-finder";
+
+  if (isLegacyPriceFinderUrl) return <PriceFinderRedirect />;
+
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>

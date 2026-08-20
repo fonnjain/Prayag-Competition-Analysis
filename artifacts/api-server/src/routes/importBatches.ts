@@ -96,6 +96,7 @@ async function getCurrentPrayagMrp(): Promise<Map<string, number>> {
     JOIN catalog_products p ON p.item_code = h.item_code
     WHERE h.effective_date <= CURRENT_DATE
       AND h.review_status = 'approved'
+      AND h.variant = 'Standard'
       AND p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
     ORDER BY h.item_code, h.effective_date DESC, h.id DESC
@@ -201,6 +202,7 @@ router.post(
 
     // Helper to send SSE events
     const sendSse = (event: string, data: unknown) => {
+      if (res.writableEnded || res.destroyed) return;
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       // Flush if available (compression middleware may buffer)
       if (typeof (res as any).flush === "function") (res as any).flush();
@@ -212,6 +214,18 @@ router.post(
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
     res.flushHeaders();
+    // A vision request can take more than a minute. Send an SSE comment every
+    // 15 seconds so reverse proxies and browser fetch keep the stream open
+    // while Claude is processing a PDF chunk.
+    const heartbeat = setInterval(() => {
+      if (res.writableEnded || res.destroyed) return;
+      res.write(": keep-alive\n\n");
+      if (typeof (res as any).flush === "function") (res as any).flush();
+    }, 15_000);
+    const closeSse = () => {
+      clearInterval(heartbeat);
+      if (!res.writableEnded && !res.destroyed) res.end();
+    };
 
     try {
       await seedAliasesIfNeeded(competitor);
@@ -230,6 +244,9 @@ router.post(
         return;
       }
       const batchId = batch.id;
+      // Let the browser recover the import even if an intermediate SSE
+      // connection drops while extraction continues safely on the server.
+      sendSse("batch", { batchId });
 
       // Extract + match (may take 30–90 s for a 100-page catalogue)
       const prayagMrpMap = await getCurrentPrayagMrp();
@@ -362,11 +379,11 @@ router.post(
         failedChunks: failedChunksSummary,
         coverageWarning,
       });
-      res.end();
+      closeSse();
     } catch (err) {
       req.log.error({ err }, "import-batches POST failed");
       sendSse("error", { error: err instanceof Error ? err.message : "Failed to process file" });
-      res.end();
+      closeSse();
     }
   },
 );
@@ -534,6 +551,7 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
       JOIN catalog_products p ON p.item_code = h.item_code
       WHERE h.effective_date <= CURRENT_DATE
         AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
         AND p.is_active IS TRUE
         AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       ORDER BY h.item_code, h.effective_date DESC, h.id DESC

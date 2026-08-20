@@ -20,16 +20,25 @@ type SearchRow = {
   upcoming_mrp: number | null;
   upcoming_effective_date: string | null;
   has_competitor_data: boolean;
+  best_competitor_brand: string | null;
+  best_competitor_price: number | null;
+  colour_variant_count: number;
   discontinued_from: string | null;
 };
 
 function toSearchResult(row: SearchRow) {
+  const mrp = row.current_mrp;
+  const cp = row.best_competitor_price;
+  const gapPct =
+    mrp != null && mrp > 0 && cp != null
+      ? ((cp - mrp) / mrp) * 100
+      : null;
   return {
     itemCode: row.item_code,
     productName: row.product_name,
     division: row.division,
     category: row.category,
-    currentMrp: row.current_mrp,
+    currentMrp: mrp,
     currentEffectiveDate: row.current_effective_date,
     currentValidTo: validToFromNextDateOrDiscontinuation(
       row.upcoming_effective_date,
@@ -37,8 +46,12 @@ function toSearchResult(row: SearchRow) {
     ),
     upcomingMrp: row.upcoming_mrp,
     upcomingEffectiveDate: row.upcoming_effective_date,
-    upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
+    upcomingChangePct: priceChangePct(mrp, row.upcoming_mrp),
     hasCompetitorData: row.has_competitor_data,
+    bestCompetitorBrand: row.best_competitor_brand ?? null,
+    bestCompetitorPrice: cp ?? null,
+    bestCompetitorGapPct: gapPct,
+    colourVariantCount: row.colour_variant_count ?? 0,
     discontinuedFrom: row.discontinued_from,
   };
 }
@@ -246,7 +259,18 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         WHERE cp.matched_prayag_code = p.item_code
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
-      ) AS has_competitor_data
+      ) AS has_competitor_data,
+      best_comp.competitor AS best_competitor_brand,
+      best_comp.normalized_price AS best_competitor_price,
+      (
+        SELECT COUNT(DISTINCT h2.variant)::int
+        FROM mrp_price_history h2
+        WHERE h2.item_code = p.item_code
+          AND h2.variant != 'Standard'
+          AND h2.mrp IS NOT NULL
+          AND h2.effective_date <= CURRENT_DATE
+          AND h2.review_status = 'approved'
+      ) AS colour_variant_count
     FROM catalog_products p
     JOIN LATERAL (
       SELECT h.mrp, h.effective_date
@@ -255,6 +279,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         AND h.effective_date <= CURRENT_DATE
         AND h.mrp IS NOT NULL
         AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
       ORDER BY h.effective_date DESC, h.id DESC
       LIMIT 1
     ) current_price ON true
@@ -265,10 +290,26 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         AND h.effective_date > CURRENT_DATE
         AND h.mrp IS NOT NULL
         AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
         AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
       ORDER BY h.effective_date ASC, h.id DESC
       LIMIT 1
     ) upcoming_price ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        cp.competitor,
+        CASE
+          WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+            THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+          ELSE cp.price
+        END AS normalized_price
+      FROM competitor_prices cp
+      WHERE cp.matched_prayag_code = p.item_code
+        AND cp.price IS NOT NULL
+        AND cp.effective_date <= CURRENT_DATE
+      ORDER BY normalized_price ASC
+      LIMIT 1
+    ) best_comp ON true
     WHERE p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       AND ${sql.join(filterConditions, sql` AND `)}
@@ -433,7 +474,18 @@ router.get("/price-finder/browse", async (req, res) => {
           WHERE cp.matched_prayag_code = p.item_code
             AND cp.price IS NOT NULL
             AND cp.effective_date <= CURRENT_DATE
-        ) AS has_competitor_data
+        ) AS has_competitor_data,
+        best_comp.competitor AS best_competitor_brand,
+        best_comp.normalized_price AS best_competitor_price,
+        (
+          SELECT COUNT(DISTINCT h2.variant)::int
+          FROM mrp_price_history h2
+          WHERE h2.item_code = p.item_code
+            AND h2.variant != 'Standard'
+            AND h2.mrp IS NOT NULL
+            AND h2.effective_date <= CURRENT_DATE
+            AND h2.review_status = 'approved'
+        ) AS colour_variant_count
       FROM catalog_products p
       JOIN LATERAL (
         SELECT h.mrp, h.effective_date
@@ -442,6 +494,7 @@ router.get("/price-finder/browse", async (req, res) => {
           AND h.effective_date <= CURRENT_DATE
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
+          AND h.variant = 'Standard'
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
@@ -452,10 +505,26 @@ router.get("/price-finder/browse", async (req, res) => {
           AND h.effective_date > CURRENT_DATE
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
+          AND h.variant = 'Standard'
           AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
       ) upcoming_price ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          cp.competitor,
+          CASE
+            WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+              THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+            ELSE cp.price
+          END AS normalized_price
+        FROM competitor_prices cp
+        WHERE cp.matched_prayag_code = p.item_code
+          AND cp.price IS NOT NULL
+          AND cp.effective_date <= CURRENT_DATE
+        ORDER BY normalized_price ASC
+        LIMIT 1
+      ) best_comp ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND ${categoryCondition}
         AND p.is_active IS TRUE
@@ -521,6 +590,7 @@ router.get(
           AND h.effective_date <= CURRENT_DATE
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
+          AND h.variant = 'Standard'
         ORDER BY h.effective_date DESC, h.id DESC
         LIMIT 1
       ) current_price ON true
@@ -531,6 +601,7 @@ router.get(
           AND h.effective_date > CURRENT_DATE
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
+          AND h.variant = 'Standard'
           AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
         ORDER BY h.effective_date ASC, h.id DESC
         LIMIT 1
@@ -546,6 +617,62 @@ router.get(
       res.status(404).json({ error: "Product not found" });
       return;
     }
+
+    type VariantRow = {
+      variant: string;
+      current_mrp: number | null;
+      current_effective_date: string | null;
+      upcoming_mrp: number | null;
+      upcoming_effective_date: string | null;
+    };
+    const variantRows = await db.execute<VariantRow>(sql`
+      SELECT
+        v.variant,
+        cur.mrp AS current_mrp,
+        cur.effective_date AS current_effective_date,
+        upc.mrp AS upcoming_mrp,
+        upc.effective_date AS upcoming_effective_date
+      FROM (
+        SELECT DISTINCT variant
+        FROM mrp_price_history
+        WHERE item_code = ${product.item_code}
+          AND variant != 'Standard'
+          AND mrp IS NOT NULL
+          AND review_status = 'approved'
+      ) v
+      JOIN LATERAL (
+        SELECT mrp, effective_date
+        FROM mrp_price_history
+        WHERE item_code = ${product.item_code}
+          AND variant = v.variant
+          AND effective_date <= CURRENT_DATE
+          AND mrp IS NOT NULL
+          AND review_status = 'approved'
+        ORDER BY effective_date DESC, id DESC
+        LIMIT 1
+      ) cur ON true
+      LEFT JOIN LATERAL (
+        SELECT mrp, effective_date
+        FROM mrp_price_history
+        WHERE item_code = ${product.item_code}
+          AND variant = v.variant
+          AND effective_date > CURRENT_DATE
+          AND mrp IS NOT NULL
+          AND review_status = 'approved'
+        ORDER BY effective_date ASC, id DESC
+        LIMIT 1
+      ) upc ON true
+      ORDER BY v.variant
+    `);
+
+    const variantItems = variantRows.rows.map((row) => ({
+      variant: row.variant,
+      currentMrp: row.current_mrp,
+      currentEffectiveDate: row.current_effective_date,
+      upcomingMrp: row.upcoming_mrp,
+      upcomingEffectiveDate: row.upcoming_effective_date,
+      upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
+    }));
 
     const competitors = await db.execute<CompetitorRow>(sql`
       SELECT
@@ -644,6 +771,7 @@ router.get(
         discontinuedFrom: product.discontinued_from,
       },
       competitors: competitorItems,
+      variants: variantItems,
     });
   },
 );

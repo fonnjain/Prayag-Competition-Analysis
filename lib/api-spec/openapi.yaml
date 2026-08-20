@@ -14,6 +14,8 @@ tags:
     description: Competition analysis dashboard (live-computed, basis-normalized)
   - name: Auth
     description: Browser and mobile authentication endpoints.
+  - name: admin
+    description: Workspace user management (admin only).
 paths:
   /healthz:
     get:
@@ -1244,6 +1246,173 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /admin/users:
+    get:
+      tags: [admin]
+      operationId: listAdminUsers
+      summary: List all workspace users
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [admin]
+      operationId: createAdminUser
+      summary: Create a new workspace user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminUserBody'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/{id}:
+    delete:
+      tags: [admin]
+      operationId: deleteAdminUser
+      summary: Remove a user from the workspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/{id}/password:
+    put:
+      tags: [admin]
+      operationId: resetAdminUserPassword
+      summary: Reset a user password
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetUserPasswordBody'
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/{id}/role:
+    patch:
+      tags: [admin]
+      operationId: updateAdminUserRole
+      summary: Update a user role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleBody'
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /auth/user:
     get:
       tags: [Auth]
@@ -1617,6 +1786,18 @@ components:
           description: One-decimal change from current to upcoming MRP; zero is retained.
         hasCompetitorData:
           type: boolean
+        bestCompetitorBrand:
+          type: ["string", "null"]
+          description: Brand name of the cheapest matched competitor, or null when none.
+        bestCompetitorPrice:
+          type: ["number", "null"]
+          description: Normalized (incl-GST) price of the cheapest competitor, or null.
+        bestCompetitorGapPct:
+          type: ["number", "null"]
+          description: 'Gap vs Prayag MRP: positive = Prayag cheaper, negative = competitor cheaper.'
+        colourVariantCount:
+          type: integer
+          description: Number of non-Standard colour variants with a current price. 0 when no colour options exist.
         discontinuedFrom:
           type: ["string", "null"]
           format: date
@@ -1770,9 +1951,26 @@ components:
           type: ["number", "null"]
         message:
           type: ["string", "null"]
+    PriceFinderVariant:
+      type: object
+      required: [variant, currentMrp, currentEffectiveDate, upcomingMrp, upcomingEffectiveDate, upcomingChangePct]
+      properties:
+        variant:
+          type: string
+          description: Colour name, e.g. "Ivory", "White with Jet", "Pink / Green / Blue".
+        currentMrp:
+          type: ["number", "null"]
+        currentEffectiveDate:
+          type: ["string", "null"]
+        upcomingMrp:
+          type: ["number", "null"]
+        upcomingEffectiveDate:
+          type: ["string", "null"]
+        upcomingChangePct:
+          type: ["number", "null"]
     PriceFinderProductResponse:
       type: object
-      required: [product, competitors]
+      required: [product, competitors, variants]
       properties:
         product:
           $ref: "#/components/schemas/PriceFinderProduct"
@@ -1780,6 +1978,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PriceFinderCompetitor"
+        variants:
+          type: array
+          description: Colour variants beyond Standard. Empty array when no colour options exist.
+          items:
+            $ref: "#/components/schemas/PriceFinderVariant"
     CatalogFilters:
       type: object
       required: [divisions, categories]
@@ -2938,6 +3141,67 @@ components:
           type: ["string", "null"]
         profileImageUrl:
           type: ["string", "null"]
+        role:
+          type: ["string", "null"]
+          description: 'User role: "admin" has access to user management; "user" is a normal workspace member.'
+    AdminUser:
+      type: object
+      required: [id, email, role, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [admin, user]
+        createdAt:
+          type: string
+          format: date-time
+    AdminUserList:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+    CreateAdminUserBody:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        password:
+          type: string
+          minLength: 8
+          description: 'Initial password. If omitted, account is created without a password.'
+        role:
+          type: string
+          enum: [admin, user]
+    ResetUserPasswordBody:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+    UpdateUserRoleBody:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, user]
     AuthUserEnvelope:
       type: object
       required: [user]

@@ -1,13 +1,17 @@
 - [Orval zod coerce.boolean trap](orval-zod-boolean.md) — z.coerce.boolean() turns any non-empty query string (incl. "false") into true; read raw query value for booleans.
 - [Prayag suggestion scorer](prayag-suggestion-scorer.md) — catalog size lives in product names (parse last `<num> mm`); keep category out of the text channel; words beat numbers.
 - [Prayag Product Database app](prayag-product-db.md) — append-only MRP history rules, unique-index backstop, invalidate via generated query-key helpers, dedupe category filters.
+- [Sanitaryware colour-variant pricing](variant-pricing.md) — mrp_price_history carries variant col; unique index is (item_code, effective_date, variant); every Standard-only query needs AND variant='Standard'; manual correction upsert must include variant='Standard' in both values and conflict target.
 - [Competitor import price-gap guardrail](competitor-import-guardrail.md) — auto-matched imports reject gap vs Prayag MRP outside ~-80%..+100%; verified manual reuploads bypass it.
 - [Prayag Competition Analysis dashboard](prayag-analysis-dashboard.md) — /analysis live-compute over existing tables; ex-GST×1.18 basis, comparability gate, green=Prayag-cheaper sign convention.
 - [Prayag external API keys](prayag-external-api-keys.md) — /api/v1 is a GET-only allowlist behind X-API-Key (hash-only storage); never mount internal routers under /v1.
-- [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 3 web apps (home/, product-db/, analysis/) behind one proxy; console app deleted; cross-app links use raw absolute <a href>, never BASE_URL/wouter.
+- [Public Price Finder access](public-price-finder-access.md) — Price Finder is deliberately anonymous and read-only; the rest of the workspace remains session-protected.
+- [Prayag multi-artifact routing](prayag-multi-artifact-routing.md) — 4 web apps behind one proxy; console app deleted; cross-app links use raw absolute <a href>, never BASE_URL/wouter.
 - [Period-aware pricing](period-aware-pricing.md) — is_current flags on both tables; recomputeCurrentFlags excludes future dates; load-competitor requires effectiveDate; analysis uses period-aware helpers not raw table scans.
 - [PDF catalogue import](pdf-catalogue-import.md) — Claude vision extraction, staging tables, alias-based matching, price_basis/gst_pct per row, approve wires to competitor_prices.
+- [Long-running PDF upload recovery](pdf-upload-stream-recovery.md) — extraction can outlast proxy idle windows; heartbeat the stream and recover a completed server batch by ID.
 - [Category backfill workbook boundary](category-backfill-workbook.md) — supplied workbooks may be older than the live catalog; compare item codes before treating them as complete.
 - [MRP history rebuild safety](mrp-history-rebuild-safety.md) — preserve verified history backups; source-period rebuilds supersede row-by-row price repairs.
 - [MRP source provenance](mrp-source-provenance.md) — trace MRP rows to official snapshots by server-side SHA-256 and supplied download date; preserve known hash limitations honestly.
 - [Non-interactive Drizzle push conflicts](drizzle-push-conflicts.md) — verify additive tables exist after merges; never force an ambiguous non-TTY schema prompt.
+- [Cross-app browser regression setup](cross-app-browser-regression.md) — path-routed app-switch tests need Chromium explicitly, proxy workflows, and Nix browser libraries.

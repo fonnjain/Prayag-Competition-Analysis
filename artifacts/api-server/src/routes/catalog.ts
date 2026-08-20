@@ -123,6 +123,7 @@ async function getCurrentPriceMap(asOf: string): Promise<Map<string, CurrentPric
     JOIN catalog_products p ON p.item_code = h.item_code
     WHERE h.effective_date <= ${asOf}
       AND h.review_status = 'approved'
+      AND h.variant = 'Standard'
       AND p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
     ORDER BY h.item_code, h.effective_date DESC, h.id DESC
@@ -525,9 +526,14 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
         reviewReasons: null,
         importBatchId: null,
         reviewedAt: new Date(),
+        variant: "Standard",
       })
       .onConflictDoUpdate({
-        target: [mrpPriceHistoryTable.itemCode, mrpPriceHistoryTable.effectiveDate],
+        target: [
+          mrpPriceHistoryTable.itemCode,
+          mrpPriceHistoryTable.effectiveDate,
+          mrpPriceHistoryTable.variant,
+        ],
         set: {
           mrp,
           netPrice: null,
@@ -571,6 +577,7 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
       and(
         eq(mrpPriceHistoryTable.itemCode, itemCode),
         eq(mrpPriceHistoryTable.isCurrent, true),
+        eq(mrpPriceHistoryTable.variant, "Standard"),
       ),
     )
     .limit(1);
@@ -602,6 +609,57 @@ router.patch("/catalog/products/:itemCode/mrp", async (req: Request<{ itemCode: 
     provenanceBatchId: loadBatchId,
     competitorRowsRefreshed: refreshed.length,
   });
+});
+
+// POST /catalog/seed-variant-prices — idempotent one-time load of sanitaryware
+// colour-variant prices (Ivory / White with Jet / Pink-Green-Blue).
+// Safe to call multiple times; ON CONFLICT DO NOTHING skips existing rows.
+router.post("/catalog/seed-variant-prices", async (req, res) => {
+  try {
+    // Inline seed data — 300 rows across 123 sanitaryware items, two periods.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const seedRows: Array<{ itemCode: string; mrp: number; effectiveDate: string; variant: string }> =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../data/sanitaryware-variant-seed.json");
+
+    const today = new Date().toISOString().slice(0, 10);
+    let inserted = 0;
+    let skipped = 0;
+
+    // Insert in batches of 50 to avoid oversized statements
+    const BATCH = 50;
+    for (let i = 0; i < seedRows.length; i += BATCH) {
+      const batch = seedRows.slice(i, i + BATCH);
+      const values = batch.map((r) => ({
+        itemCode: r.itemCode,
+        mrp: r.mrp,
+        priceBasis: "MRP" as const,
+        effectiveDate: r.effectiveDate,
+        loadDate: today,
+        sourceFile: "Prayag_Sanitaryware_Variant_Prices.xlsx",
+        isCurrent: false,
+        reviewStatus: "approved" as const,
+        variant: r.variant,
+      }));
+      const result = await db
+        .insert(mrpPriceHistoryTable)
+        .values(values)
+        .onConflictDoNothing()
+        .returning({ id: mrpPriceHistoryTable.id });
+      inserted += result.length;
+      skipped += batch.length - result.length;
+    }
+
+    if (inserted > 0) {
+      await recomputeCurrentFlags();
+    }
+
+    req.log.info({ inserted, skipped }, "sanitaryware variant seed complete");
+    res.json({ ok: true, inserted, skipped, total: seedRows.length });
+  } catch (err) {
+    req.log.error({ err }, "variant seed failed");
+    res.status(500).json({ error: "Seed failed" });
+  }
 });
 
 // POST /catalog/reset — restore catalog to the original clean import.

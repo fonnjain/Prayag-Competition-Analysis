@@ -29,7 +29,8 @@ function isProduction(req: Request): boolean {
 }
 
 function requireCatalogAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (req.user?.email?.toLowerCase() !== CATALOG_ADMIN_EMAIL) {
+  const isAdmin = req.user?.role === "admin" || req.user?.email?.toLowerCase() === CATALOG_ADMIN_EMAIL;
+  if (!isAdmin) {
     res.status(403).json({ error: "Catalog administrator access is required." });
     return;
   }

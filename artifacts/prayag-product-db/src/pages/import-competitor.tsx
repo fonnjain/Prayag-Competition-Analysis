@@ -114,6 +114,50 @@ export default function ImportCompetitorPage() {
     queryClient.invalidateQueries({ queryKey: getGetCompetitorBrandsQueryKey() });
   };
 
+  const recoverCompletedPdfBatch = async (batchId: number): Promise<boolean> => {
+    setExtractionProgress((previous) => ({
+      ...(previous ?? {
+        stage: "extracting",
+        chunk: 0,
+        totalChunks: 0,
+        startPage: 0,
+        endPage: 0,
+        totalItemsFound: 0,
+      }),
+      statusMessage:
+        "Connection interrupted. Checking whether the server finished the extraction…",
+    }));
+
+    // The server keeps processing after a client stream drops. Poll the known
+    // batch briefly so a completed import still lands on its review page rather
+    // than making the reviewer upload the same PDF again.
+    for (let attempt = 0; attempt < 24; attempt++) {
+      try {
+        const response = await fetch(`/api/catalog/import-batches/${batchId}`, {
+          headers: getAuthHeaders(),
+        });
+        if (response.status === 401 || response.status === 403) return false;
+        if (response.ok) {
+          const batch = await response.json();
+          if (batch.rowCounts) {
+            toast({
+              title: "Extraction Complete",
+              description:
+                "The connection was restored after extraction finished. Review the staged products before approving.",
+            });
+            navigate(`/import-review/${batchId}`);
+            return true;
+          }
+        }
+      } catch {
+        // A transient retry failure should not discard a server-side batch.
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 5_000));
+    }
+
+    return false;
+  };
+
   const deleteMutation = useDeleteCatalogCompetitor({
     mutation: {
       onSuccess: (data) => {
@@ -206,6 +250,8 @@ export default function ImportCompetitorPage() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let batchId: number | null = null;
+        let serverReportedFailure = false;
 
         setExtractionProgress({
           stage: "preparing",
@@ -217,67 +263,82 @@ export default function ImportCompetitorPage() {
           statusMessage: "Preparing extraction…",
         });
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
+            buffer += decoder.decode(value, { stream: true });
 
-          // SSE events are separated by double newline
-          const parts = buffer.split("\n\n");
-          buffer = parts.pop() ?? "";
+            // SSE events are separated by double newline
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() ?? "";
 
-          for (const part of parts) {
-            const eventLine = part.split("\n").find((l) => l.startsWith("event: "));
-            const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
-            if (!dataLine) continue;
+            for (const part of parts) {
+              const eventLine = part.split("\n").find((l) => l.startsWith("event: "));
+              const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
+              if (!dataLine) continue;
 
-            const eventName = eventLine ? eventLine.slice(7).trim() : "message";
-            let payload: any;
-            try {
-              payload = JSON.parse(dataLine.slice(6));
-            } catch {
-              continue;
-            }
-
-            if (eventName === "progress") {
-              setExtractionProgress({
-                stage: "extracting",
-                chunk: payload.chunk,
-                totalChunks: payload.totalChunks,
-                startPage: payload.startPage,
-                endPage: payload.endPage,
-                totalItemsFound: payload.totalItemsFound,
-                statusMessage: `Processing pages ${payload.startPage}–${payload.endPage} of chunk ${payload.chunk}/${payload.totalChunks}…`,
-              });
-            } else if (eventName === "status") {
-              setExtractionProgress((prev) => ({
-                ...(prev ?? {
-                  chunk: 0, totalChunks: 0, startPage: 0, endPage: 0, totalItemsFound: 0,
-                }),
-                stage: payload.stage ?? prev?.stage ?? "preparing",
-                statusMessage: payload.message ?? prev?.statusMessage ?? "",
-              }));
-            } else if (eventName === "done") {
-              const data = payload;
-              // Persist failedChunks so the review page can show the warning
-              if (Array.isArray(data.failedChunks) && data.failedChunks.length > 0) {
-                sessionStorage.setItem(
-                  `importBatch_${data.batchId}_failedChunks`,
-                  JSON.stringify(data.failedChunks),
-                );
+              const eventName = eventLine ? eventLine.slice(7).trim() : "message";
+              let payload: any;
+              try {
+                payload = JSON.parse(dataLine.slice(6));
+              } catch {
+                continue;
               }
-              toast({
-                title: "Extraction Complete",
-                description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,
-              });
-              navigate(`/import-review/${data.batchId}`);
-              return;
-            } else if (eventName === "error") {
-              throw new Error(payload.error || "Extraction failed");
+
+              if (eventName === "batch" && typeof payload.batchId === "number") {
+                batchId = payload.batchId;
+              } else if (eventName === "progress") {
+                setExtractionProgress({
+                  stage: "extracting",
+                  chunk: payload.chunk,
+                  totalChunks: payload.totalChunks,
+                  startPage: payload.startPage,
+                  endPage: payload.endPage,
+                  totalItemsFound: payload.totalItemsFound,
+                  statusMessage: `Processing pages ${payload.startPage}–${payload.endPage} of chunk ${payload.chunk}/${payload.totalChunks}…`,
+                });
+              } else if (eventName === "status") {
+                setExtractionProgress((prev) => ({
+                  ...(prev ?? {
+                    chunk: 0, totalChunks: 0, startPage: 0, endPage: 0, totalItemsFound: 0,
+                  }),
+                  stage: payload.stage ?? prev?.stage ?? "preparing",
+                  statusMessage: payload.message ?? prev?.statusMessage ?? "",
+                }));
+              } else if (eventName === "done") {
+                const data = payload;
+                // Persist failedChunks so the review page can show the warning
+                if (Array.isArray(data.failedChunks) && data.failedChunks.length > 0) {
+                  sessionStorage.setItem(
+                    `importBatch_${data.batchId}_failedChunks`,
+                    JSON.stringify(data.failedChunks),
+                  );
+                }
+                toast({
+                  title: "Extraction Complete",
+                  description: `Found ${(data.rowCounts?.ok ?? 0) + (data.rowCounts?.needs_review ?? 0)} matched products. Review before approving.`,
+                });
+                navigate(`/import-review/${data.batchId}`);
+                return;
+              } else if (eventName === "error") {
+                serverReportedFailure = true;
+                throw new Error(payload.error || "Extraction failed");
+              }
             }
           }
+        } catch (streamError) {
+          if (!serverReportedFailure && batchId && await recoverCompletedPdfBatch(batchId)) return;
+          throw streamError;
         }
+
+        // A proxy can end the response without surfacing a reader error. Recover
+        // from the persisted batch in that case as well.
+        if (batchId && await recoverCompletedPdfBatch(batchId)) return;
+        throw new Error(
+          "The extraction connection closed before the result arrived. The server may still be processing this batch; please try again in a moment.",
+        );
       } else {
         // Excel/CSV → existing direct-import route
         const res = await fetch(`/api/catalog/load-competitor`, {

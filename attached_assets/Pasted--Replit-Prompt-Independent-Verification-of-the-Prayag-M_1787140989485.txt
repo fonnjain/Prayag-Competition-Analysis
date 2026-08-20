@@ -1,0 +1,212 @@
+# Replit Prompt — Independent Verification of the Prayag MRP Work
+
+## 1. What this is, and what it is not
+
+Several rounds of MRP work are now committed: the full history rebuild, the discontinuation rule, the phantom-row deletions, and source provenance. This task **verifies** that work. It does not extend it.
+
+**This is a read-only exercise.** Do not fix anything you find. Do not adjust a figure to match an expectation. Do not update a test so it passes. If a check fails, record what the database actually contains and move on to the next check. A verification pass that quietly repairs its own failures verifies nothing.
+
+Two rules for the report:
+
+- **Every figure must be read from the database at the time of writing**, not restated from this prompt, not carried over from an earlier report, and not inferred from code.
+- **State each result as pass or fail against the stated expectation.** "Looks correct" is not a result. If a number differs by one, that is a fail and should be reported as one.
+
+The expected values below were computed independently from the six official workbooks. Where the database disagrees, the disagreement is the finding.
+
+---
+
+## 2. Shape of the price history
+
+```sql
+SELECT COUNT(*) FROM mrp_price_history;
+SELECT COUNT(DISTINCT item_code) FROM mrp_price_history;
+SELECT effective_date, COUNT(*) FROM mrp_price_history GROUP BY 1 ORDER BY 1;
+```
+
+| Expectation | Value |
+|---|---:|
+| Total price rows | **12,750** |
+| Distinct item codes | **6,303** |
+
+Period counts, all sixteen:
+
+| Effective date | Rows | | Effective date | Rows |
+|---|---:|---|---|---:|
+| 2017-12-01 | 49 | | 2026-01-01 | 292 |
+| 2022-01-01 | 106 | | 2026-01-15 | 555 |
+| 2024-02-15 | 161 | | 2026-02-01 | 2,244 |
+| 2024-05-01 | 1,284 | | 2026-03-01 | 277 |
+| 2024-06-01 | 277 | | 2026-03-05 | 2,167 |
+| 2025-01-15 | 292 | | 2026-05-01 | 1,704 |
+| 2025-04-01 | 67 | | 2026-08-01 | 1,071 |
+| 2025-07-01 | 56 | | 2026-09-01 | **2,148** |
+
+**No other effective_date may appear.** In particular these four must return zero rows, because none exists in any official workbook:
+
+```
+2026-04-20    2025-06-01    2026-01-20    2024-01-01
+```
+
+`2026-04-20` is the one that matters most. It held 930 rows of September prices under an April date — the September revision recorded four months early. If it has returned, current prices for roughly half of PTMT are wrong again.
+
+---
+
+## 3. Date resolution
+
+The real test is not what is stored but what resolves. For each pair below, resolve the price **as the application does** — the latest revision dated on or before the given date, honouring `discontinued_from` — and report the value and the date it took effect.
+
+| Code | As at | Expected | In force since |
+|---|---|---:|---|
+| `148-LS` | 2026-08-19 | 385.56 | 2026-03-05 |
+| `148-LS` | 2026-09-01 | 416.00 | 2026-09-01 |
+| `148-LSB` | 2026-08-19 | 410.00 | 2026-03-05 |
+| `123-Q` | 2026-08-19 | 375.52 | 2026-03-05 |
+| `123-Q` | 2026-09-01 | 406.00 | 2026-09-01 |
+| `911-D` | 2026-08-19 | 3,240.00 | 2026-03-05 |
+| `911-D` | 2026-09-01 | 3,490.00 | 2026-09-01 |
+| `1242-D` | 2026-08-19 | 10,690.00 | 2026-03-05 |
+| `1242-D` | 2026-09-01 | 11,550.00 | 2026-09-01 |
+| `1232-D` | 2026-09-01 | 11,650.00 | 2026-09-01 |
+| `BD-40` | 2026-08-19 | 3,990.00 | 2026-08-01 |
+| `BD-40` | 2026-07-31 | 3,680.00 | 2026-05-01 |
+| `616-D` | 2026-08-31 | 2,490.00 | 2026-03-05 |
+| `616-D` | 2026-09-01 | **no price** | withdrawn |
+| `U21` | 2026-08-19 | 78.00 | 2026-02-01 |
+| `C854` | 2026-08-19 | 44.40 | 2026-02-01 |
+| `C121` | 2026-08-19 | 36.00 | 2024-05-01 |
+| `TTS-01` | 2026-08-19 | 36.00 | 2026-08-01 |
+
+Three of these carry more weight than the rest.
+
+**`148-LS` against `148-LSB` on 2026-08-19.** Plain Erosa at 385.56 must be **cheaper** than Erosa Blue at 410.00. Before the rebuild the app showed 416.40 and 410.00, making the plain variant look dearer than the coloured one. If that inversion has returned, the phantom April period is back.
+
+**`C121` at 36.00.** This code exists only in the "Without Brass" sheet and not in `MASTER`. It proves the loader still reads non-MASTER sheets. If it is missing, roughly 264 items have been lost.
+
+**`616-D` across the boundary.** It must return 2,490 on 31 August and nothing at all on 1 September. A price on 1 September means the withdrawal is not being honoured; nothing on 31 August means the withdrawal has been applied retroactively, which breaks every historical comparison.
+
+---
+
+## 4. Discontinuation
+
+```sql
+SELECT COUNT(*) FROM catalog_products WHERE discontinued_from IS NOT NULL;
+```
+
+Expected: **98**. The set must match sheet `2_Confirmed_discontinued` of `Prayag_Discontinued_Correction.xlsx` exactly — report any code in one and not the other, in both directions.
+
+Then confirm the 61 restored codes:
+
+- `BD-40` has `discontinued_from = NULL` and resolves to 3,990 today.
+- All 61 codes from sheet `1_UNMARK_not_discontinued` have `discontinued_from = NULL`.
+- None of the 61 appears in the 98.
+
+**The eighteen deleted rows.** These must have no row at `2026-09-01`, while retaining their `2026-03-05` row:
+
+```
+616-D  618-D  620-D  622-D  623-D  624-D  624-XD  624-SD  625-D
+616-DM 618-DM 620-DM 622-DM 623-DM 624-DM 624-XDM 624-SDM 625-DM
+```
+
+**Products live on 01 Sep 2026** — codes resolving to a price at `asOf = 2026-09-01` — expected: **6,205**.
+
+---
+
+## 5. The rule, not just the rows
+
+Correcting 61 rows without correcting the rule leaves the defect in place. Verify the rule itself.
+
+`deriveConfirmedDiscontinuations()` in `lib/discontinuationPolicy.ts` groups by code and requires every occurrence to be removed. Confirm by behaviour rather than by reading it:
+
+1. **Idempotency.** Re-run the loader against the same six workbooks. Afterwards: row count still 12,750, discontinued count still 98, and none of the 61 re-marked. Report all three.
+2. **Unit behaviour.** Feed `deriveConfirmedDiscontinuations` a code with one removed row and one live row for the same period. It must return nothing. Feed it a code whose every row is removed. It must return that code with the earliest withdrawal date.
+3. **Price and marker together.** A code carrying both a withdrawal marker and a price for the same period must keep the price in history and still be withdrawn from that date. `616-D` is the case in the data; confirm it holds as a rule and not as a one-off correction.
+
+---
+
+## 6. Provenance
+
+```sql
+SELECT COUNT(*) FROM mrp_price_history WHERE load_batch_id IS NULL;
+```
+
+Expected: **0**.
+
+For each of the six official sources report: division, file name, full SHA-256, download date, load date, stored `row_count`, live linked rows, and the difference.
+
+Verify the six digests against the source workbooks:
+
+```
+5da96e39cac40ede1480be4013554753cbdf4589ff0b5f77a7be43bfe13c8db0    918578   NEW PTMT MRP w.e.f. List as on 01st Sep, 2026.xlsx
+03afec64dd7fa66d5108c1099054e74ee86fca39bee0a1f0134c283ec97528c9   2168993   MRP w.e.f. 01st Feb, 2026 Pipe & Fitting.xlsx
+82f7f52c5a83ca9f050c65099725bf30dfca8c921cd08d14c2e4b5dfadb7edbf    872767   New CP MRP w.e.f. 01st Aug, 2026.xlsx
+ca729a94d1714c663ec0107c1d30e7e39ad56b4944fc72a241cd993a3a833758    202052   SANITARYWARE NEW MRP w.e.f. 01st May, 2026.xlsx
+d5a80e00f732af17f21ae7cdda61581354ad537045d939cecbe36338d08cc9e7    114001   NEW HARDWARE Price List as on 01st Mar, 2026.xlsx
+b867beecfce9f079d8f75a0785fa3058da81dea38c3bd6ae09256779a4c30796    152291   MRP w.e.f. 15th Feb, 2024 QUAA & FERN.xlsx
+```
+
+**The PTMT batch is the interesting one.** Its stored `row_count` records what the load wrote; its live linked count is 18 lower after the deletions. `getMrpSourceHealth()` exposes this as `rowsRemovedAfterLoad`. Confirm that:
+
+- the stored `row_count` was **not** silently reduced to match,
+- `rowsRemovedAfterLoad` reports **18** for PTMT and **0** for the other five,
+- Data Health renders both figures with a reason, not just the current one.
+
+If `row_count` has been reconciled, the audit trail has lost the only thing it was built to preserve.
+
+Also confirm the duplicate-upload guard: re-uploading a byte-identical workbook must warn before creating a second batch, and altering a single cell must produce a different hash and be treated as a new file.
+
+---
+
+## 7. What must not have broken
+
+These are the places where this class of change tends to do collateral damage.
+
+- **Competitor mappings.** All **150** Sparsh Pearl rows still resolve to a `catalog_products` row. Report the count and any that fail.
+- **The 68 formerly "new" PTMT products.** 67 have both a 05 Mar and a 01 Sep price; only `1323-C` is new, at 668 from 01 Sep. Report how many of the 68 have a March price.
+- **Low prices.** Count PTMT items resolving below Rs 50 at `asOf = 2026-09-01`. No `-D` or `-DM` sink code may appear. List any that do.
+- **Inactive codes.** 556 were inactivated as absent from the source. Report the count grouped by division. Do not delete any of them.
+- **Variant conflicts.** 79 source conflicts were recorded as Data Health flags. Report the current count.
+
+---
+
+## 8. The gap calculation
+
+Still outstanding from the previous round, and the one thing a dataset-wide median will not settle. Trace a single row: Prayag `134-V` ↔ Sparsh Pearl `RPS-2285`.
+
+| Value | Amount |
+|---|---:|
+| Prayag MRP w.e.f. 05 Mar 2026 | 1,262.35 |
+| Prayag MRP w.e.f. 01 Sep 2026 | 1,364.00 |
+| Sparsh Pearl Vol 6.2 MRP | 1,388.00 |
+
+Under the documented convention — positive means Prayag is cheaper — today's gap is `(1388.00 − 1262.35) ÷ 1262.35 = +9.95%`.
+
+Report three things and change nothing:
+
+1. What the dashboard displays as this row's gap today.
+2. The exact two numbers the code divides, and the table each comes from.
+3. Whether the Prayag side is read live from `mrp_price_history` or from the stored `competitor_prices.prayag_mrp_at_compare` snapshot.
+
+Point 3 decides it. The schema comment on `prayag_mrp_at_compare` says the gap is computed only against that persisted value; the project notes say analysis is live-computed and gaps are never stored. Both cannot be true for the same view. If the dashboard reads a pre-rebuild snapshot, it shows old prices no matter what the history now contains.
+
+---
+
+## 9. Test triage
+
+Run the full suite. For **each** failing test report: file, test name, expected value, actual value, and which of two cases it is —
+
+- **Stale expectation** — encodes a value deliberately corrected since. Name the specific correction that justifies the new value.
+- **Real regression** — the code produces something the source does not support.
+
+`sinkRepair.acceptance.integration.test.ts` covers the exact sheet and codes changed twice this week and must not be written off as unrelated without this analysis. A stale expectation and a real regression are indistinguishable in a summary line.
+
+**Do not update any expectation in this task.** Report the classification; fixes come afterwards.
+
+---
+
+## 10. The report
+
+Structure it as one line per check: the check, the expected value, the actual value read from the database, and pass or fail. Then a short section listing every failure with what was found.
+
+If everything passes, say so plainly and give the figures. If something fails, that is a useful result and not a problem with the task — report it exactly as found.
+
+**Make no commits.** This task produces a report, not a change.
