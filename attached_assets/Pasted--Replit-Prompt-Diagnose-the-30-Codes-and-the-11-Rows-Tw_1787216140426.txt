@@ -1,0 +1,69 @@
+# Replit Prompt — Diagnose the 30 Codes and the 11 Rows
+
+Two unexplained results from the close-out audit. Both are diagnostics: **find the cause, report it, change nothing.** No commits, no fixes, no adjusting counts to match expectations.
+
+If either investigation reaches a dead end, say where it stopped and what you would need. A partial answer with its limits stated is worth more than a confident guess.
+
+---
+
+## Part A — Why did the policy miss 30 of the 69?
+
+The audit reported: *"The first loader run exposed 30 re-marked restored codes."*
+
+`deriveConfirmedDiscontinuations()` now implements all three parts of the withdrawal rule, and its unit test passes. So the pure function is right. But on a real load it produced the wrong answer for **30 of the 69 restored codes** — which means the **caller** is not populating `markerPeriod` or `latestPricedPeriod` correctly for every sheet.
+
+The manifest reassertion currently in place forces the 69/90 split back after each load. That works today and hides the defect. It also freezes those 159 codes permanently: if Prayag genuinely withdraws one of the 69, or reintroduces one of the 90, or a future workbook moves a marker, the manifest overrides the source and nothing surfaces it.
+
+### Report
+
+1. **Which 30 codes** were re-marked on that first run. List them with division and the sheet each came from.
+2. **Group them.** Are they one division, one sheet, one workbook? The 69 split into 61 shared-component cases (CP `MASTER`, keyed by range+code) and 8 water tanks (marker in the 01 May 2024 column). Do the 30 fall into one of those groups, or cut across both?
+3. **For three representative codes**, dump the exact `SourceRemovalRow[]` the caller built — every row, with `markerPeriod`, `latestPricedPeriod` and `isRemoved` as populated. Then state which field was wrong and what it should have been.
+4. **Name the mechanism.** Likely candidates, in rough order: `markerPeriod` left null because the sheet's marker column has no date header; `latestPricedPeriod` computed per-row instead of per-code; a sheet whose layout the caller reads through a different path than CP `MASTER`. Say which it is, or that it is none of these.
+
+Include `WT-3LH-50` in the three if it was among the 30 — its shape is fully understood from the source, so it is the cleanest specimen.
+
+**Do not remove the manifest reassertion.** It is the only thing holding the correct state right now. The question is whether it is a stopgap over a small caller bug or a permanent crutch, and that depends on what the 30 turn out to be.
+
+---
+
+## Part B — Where did 11 rows and 13 live products come from?
+
+The audit found `mrp_price_history` at **13,059** against an expected **13,048**, with Standard rows at **12,761** against **12,750**, and products live at 2026-09-01 at **6,226** against **6,213**. Colour rows matched at 298.
+
+The six-workbook reload wrote **0 new rows**, so these did not arrive from it. They appeared between the 19 August baseline and now.
+
+### Report
+
+1. **Identify the 11 rows.** For each: `item_code`, `effective_date`, `mrp`, `variant`, `source_file`, `load_batch_id`, `load_date`, `review_status`. Compare against the 12,750 Standard baseline recorded in `variant-pricing.md`.
+2. **Which batch wrote them.** If `load_batch_id` points at a batch, give its file name, SHA-256 and download date. If null, say so — an unattributed row is itself the finding, since every row was supposed to trace to a batch.
+3. **The 13 versus 11 gap.** Eleven new rows cannot make thirteen more products live unless something else changed. Two rows could be new periods for products already live, and two products could have become live for another reason — a cleared `discontinued_from`, an `is_active` flip. Explain the arithmetic; do not round it off.
+
+### The specific thing to look for
+
+Commit `74187e0` in the other repository is titled *"Merge feed codes missing from dated asOf snapshot (new -D/-DM sink variants)"*. If a similar merge ran here, it may have reinstated some of the **18 September rows deleted from the 600-series sinks**:
+
+```
+616-D  618-D  620-D  622-D  623-D  624-D  624-XD  624-SD  625-D
+616-DM 618-DM 620-DM 622-DM 623-DM 624-DM 624-XDM 624-SDM 625-DM
+```
+
+Check those 18 codes at `effective_date = '2026-09-01'` first. Expected: zero rows. If any exist, that is the source of the drift and it means the deletion was partially undone — report it and stop, rather than deleting again.
+
+**Do not delete anything to make the count reach 13,048.** An unexplained row that gets deleted is an unexplained row you can no longer investigate.
+
+---
+
+## Part C — One provenance item
+
+The PTMT reload used *"a March 2026 file"* that did not match the registered September 2026 snapshot hash. The provenance system caught it, which is the system working — but it means the PTMT idempotency result is not valid. Five of six divisions were tested, not six.
+
+Report the hash and filename of what was actually submitted, alongside the registered `5da96e39cac40ede…`. Then state plainly that PTMT idempotency is unverified pending a reload with the correct workbook.
+
+---
+
+## Report format
+
+One section per part. Findings only. Where you are uncertain, say so and give the evidence that made you uncertain.
+
+**No commits. No data changes. No count adjustments.**
