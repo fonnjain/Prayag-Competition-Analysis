@@ -59,6 +59,8 @@ interface ParsedRow {
   price: number;
   productName: string | null;
   category: string | null;
+  /** Required when the source sheet carries a dated price column. */
+  effectiveDate?: string;
   /** 'Standard' for the base article; colour name for sanitaryware colour variants. */
   variant?: string;
 }
@@ -66,6 +68,7 @@ interface ParsedRow {
 interface SourcePriceObservation {
   itemCode: string;
   isRemoved: boolean;
+  effectiveDate?: string;
 }
 
 export interface SkippedRow {
@@ -85,6 +88,7 @@ interface ParseResult {
   codeColHeader: string;
   priceColHeader: string;
   skippedRows: SkippedRow[];
+  hasHeaderPeriods: boolean;
 }
 
 interface DiscontinuationCorrectionManifest {
@@ -204,7 +208,34 @@ async function reassertVersionedDiscontinuationCorrection(): Promise<void> {
   });
 }
 
-function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
+function parsePeriodHeader(value: unknown): string | null {
+  const text = norm(value)
+    .replace(/(\d{1,2})(st|nd|rd|th)\b/gi, "$1")
+    .replace(/\s+/g, " ");
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const match = text.match(
+    /^(\d{1,2})\s*[-,/ ]\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*,?\s*(\d{4})$/i,
+  );
+  if (!match) return null;
+  const months: Record<string, string> = {
+    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  };
+  const month = months[match[2].slice(0, 3).toLowerCase()];
+  if (!month) return null;
+  return `${match[3]}-${month}-${match[1].padStart(2, "0")}`;
+}
+
+function hasResolvablePeriodHeader(grid: unknown[][]): boolean {
+  return grid.slice(0, 15).some((row) => row.some((cell) => !!parsePeriodHeader(cell)));
+}
+
+function parseSheet(
+  grid: unknown[][],
+  knownCodes: Set<string>,
+  requireHeaderPeriod: boolean,
+): ParseResult {
   const maxCols = Math.max(0, ...grid.map((r) => r.length));
 
   // Detect header row: first row with several non-numeric string cells.
@@ -306,6 +337,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       codeColHeader: "",
       priceColHeader: "",
       skippedRows: [],
+      hasHeaderPeriods: false,
     };
   }
 
@@ -369,6 +401,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       codeColHeader: rawHeaders[codeCol] ?? String(codeCol),
       priceColHeader: "",
       skippedRows: [],
+      hasHeaderPeriods: false,
     };
   }
 
@@ -408,6 +441,55 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
   }
 
   const codeColHeader = rawHeaders[codeCol] ?? String(codeCol);
+  const datedPriceCols = rawHeaders
+    .map((header, col) => ({ col, effectiveDate: parsePeriodHeader(header) }))
+    .filter(
+      (entry): entry is { col: number; effectiveDate: string } =>
+        entry.col !== codeCol && entry.effectiveDate !== null,
+    );
+
+  if (datedPriceCols.length > 0) {
+    const datedRows: ParsedRow[] = [];
+    const datedSkipped: SkippedRow[] = [];
+    const sourcePriceObservations: SourcePriceObservation[] = [];
+    for (let r = 0; r < grid.length; r++) {
+      if (r === headerRow) continue;
+      const row = grid[r] ?? [];
+      const code = normCode(row[codeCol]);
+      if (!code) continue;
+      const productName = nameCol !== -1 ? (norm(row[nameCol]) || null) : null;
+      const category = categoryCol !== -1 ? (norm(row[categoryCol]) || null) : null;
+      for (const { col, effectiveDate } of datedPriceCols) {
+        const rawPrice = norm(row[col]);
+        if (!rawPrice || rawPrice === "-") continue;
+        if (/^removed$/i.test(rawPrice)) {
+          sourcePriceObservations.push({ itemCode: code, isRemoved: true, effectiveDate });
+          datedSkipped.push({ rawCode: code, rawPrice, reason: "Marked REMOVED in source" });
+          continue;
+        }
+        const price = Number(String(row[col]).replace(/,/g, ""));
+        if (isNaN(price) || price <= 0) {
+          datedSkipped.push({ rawCode: code, rawPrice, reason: "Price is not a positive number" });
+          continue;
+        }
+        sourcePriceObservations.push({ itemCode: code, isRemoved: false, effectiveDate });
+        datedRows.push({ itemCode: code, price, productName, category, effectiveDate });
+      }
+    }
+    return {
+      rows: datedRows,
+      sourcePriceObservations,
+      basis: "MRP",
+      codeCol,
+      priceCol: datedPriceCols[0]?.col ?? -1,
+      nameCol,
+      categoryCol,
+      codeColHeader,
+      priceColHeader: datedPriceCols.map(({ col }) => rawHeaders[col]).join(", "),
+      skippedRows: datedSkipped,
+      hasHeaderPeriods: true,
+    };
+  }
 
   // Sanitaryware variant detection: look for colour sub-headers before falling
   // back to the single-price-column path. 'White' maps to 'Standard' (the base
@@ -445,7 +527,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
         const rawPrice = row[col];
         if (rawPrice == null || rawPrice === "") continue; // not offered for this variant
         if (/^removed$/i.test(norm(rawPrice))) {
-          sourcePriceObservations.push({ itemCode: code, isRemoved: true });
+        sourcePriceObservations.push({ itemCode: code, isRemoved: true });
           variantSkipped.push({
             rawCode: code,
             rawPrice: norm(rawPrice),
@@ -473,6 +555,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       codeColHeader,
       priceColHeader: "Variant MRP",
       skippedRows: variantSkipped,
+      hasHeaderPeriods: false,
     };
   }
 
@@ -515,6 +598,14 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       skippedRows.push({ rawCode: rawCodeVal, rawPrice: rawPriceVal, reason: price <= 0 ? "Price is zero or negative" : "Price is not a number" });
       continue;
     }
+    if (requireHeaderPeriod) {
+      skippedRows.push({
+        rawCode: rawCodeVal,
+        rawPrice: rawPriceVal,
+        reason: "No resolvable dated price column in source sheet",
+      });
+      continue;
+    }
     sourcePriceObservations.push({ itemCode: code, isRemoved: false });
     const productName = nameCol !== -1 ? (norm(row[nameCol]) || null) : null;
     const category = categoryCol !== -1 ? (norm(row[categoryCol]) || null) : null;
@@ -532,6 +623,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     codeColHeader,
     priceColHeader,
     skippedRows,
+    hasHeaderPeriods: false,
   };
 }
 
@@ -598,7 +690,7 @@ export function anomalyReasons(
 // Mutates knownCodes/canonical in place so successive files in a zip see
 // products inserted by earlier files.
 // ---------------------------------------------------------------------------
-function parseWorkbookBuffer(
+export function parseWorkbookBuffer(
   buffer: Buffer,
   knownCodes: Set<string>,
 ): {
@@ -611,6 +703,7 @@ function parseWorkbookBuffer(
   hasCategoryCol: boolean;
   skippedUnparseable: number;
   skippedRows: SkippedRow[];
+  hasHeaderPeriods: boolean;
 } {
   const wb = XLSX.read(buffer, { type: "buffer" });
   let rows: ParsedRow[] = [];
@@ -622,6 +715,13 @@ function parseWorkbookBuffer(
   let skippedUnparseable = 0;
   const skippedRows: SkippedRow[] = [];
   const sourcePriceObservations: SourcePriceObservation[] = [];
+  const workbookHasHeaderPeriods = wb.SheetNames
+    .filter((name) => !PACKING_SHEET_RE.test(name))
+    .some((name) =>
+      hasResolvablePeriodHeader(
+        XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, defval: null }),
+      ),
+    );
 
   // Sheet selection strategy:
   // 1. If any sheet is named "MASTER" (case-insensitive), use it exclusively —
@@ -629,7 +729,7 @@ function parseWorkbookBuffer(
   //    MRP columns alongside a PACKING sheet whose values are pcs-per-box.
   // 2. Otherwise, skip any sheet whose name contains "packing" and process the rest.
   const masterSheet = wb.SheetNames.find((n) => MASTER_SHEET_RE.test(n));
-  const sheetsToProcess = masterSheet
+  const sheetsToProcess = masterSheet && !workbookHasHeaderPeriods
     ? [masterSheet]
     : wb.SheetNames.filter((n) => !PACKING_SHEET_RE.test(n));
 
@@ -640,7 +740,7 @@ function parseWorkbookBuffer(
       header: 1,
       defval: null,
     });
-    const parsed = parseSheet(grid, knownCodes);
+    const parsed = parseSheet(grid, knownCodes, workbookHasHeaderPeriods);
     skippedUnparseable += parsed.skippedRows.length;
     skippedRows.push(...parsed.skippedRows);
     sourcePriceObservations.push(...parsed.sourcePriceObservations);
@@ -668,6 +768,7 @@ function parseWorkbookBuffer(
     hasCategoryCol,
     skippedUnparseable,
     skippedRows,
+    hasHeaderPeriods: workbookHasHeaderPeriods,
   };
 }
 
@@ -1075,9 +1176,9 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
   const effectiveDate =
     typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
       ? req.body.effectiveDate.trim()
-      : new Date().toISOString().slice(0, 10);
+      : null;
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+  if (effectiveDate && !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
     res.status(400).json({ error: "effectiveDate must be YYYY-MM-DD" });
     return;
   }
@@ -1139,27 +1240,29 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
     }
 
     const fileSha256 = sha256ForBuffer(file.buffer);
-    const latestBatches = await db
+    const duplicateBatches = await db
       .select()
       .from(mrpLoadBatchesTable)
-      .where(eq(mrpLoadBatchesTable.sourceId, source.id))
+      .where(
+        and(
+          eq(mrpLoadBatchesTable.sourceId, source.id),
+          eq(mrpLoadBatchesTable.fileSha256, fileSha256),
+        ),
+      )
       .orderBy(desc(mrpLoadBatchesTable.loadedAt))
-      .limit(1);
-    const latestBatch = latestBatches[0];
     const confirmDuplicate = req.body.confirmDuplicate === "true";
-    if (
-      latestBatch &&
-      latestBatch.fileSha256 === fileSha256 &&
-      !confirmDuplicate
-    ) {
+    if (duplicateBatches.length > 0 && !confirmDuplicate) {
       res.status(409).json({
-        error: `This is byte-for-byte the file loaded on ${latestBatch.loadedAt.toISOString().slice(0, 10)}. Load anyway?`,
+        error: `This file matches ${duplicateBatches.length} prior load${duplicateBatches.length === 1 ? "" : "s"} for this source. Load anyway?`,
         duplicate: {
           sourceDivision: source.division,
-          loadedAt: latestBatch.loadedAt,
-          downloadedAt: latestBatch.downloadedAt,
           fileSha256,
-          loadBatchId: latestBatch.id,
+          matches: duplicateBatches.map((batch) => ({
+            loadBatchId: batch.id,
+            fileName: batch.fileName,
+            loadedAt: batch.loadedAt,
+            downloadedAt: batch.downloadedAt,
+          })),
         },
       });
       return;
@@ -1202,6 +1305,13 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
     // iterations so later files see products created by earlier ones.
     // ------------------------------------------------------------------
     if (ext === "zip") {
+      if (!effectiveDate) {
+        await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
+        res.status(400).json({
+          error: "effectiveDate is required for ZIP imports until each entry carries a resolvable dated price column.",
+        });
+        return;
+      }
       const zip = new AdmZip(file.buffer);
       const entries = zip
         .getEntries()
@@ -1280,20 +1390,60 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
     // Single spreadsheet file (existing behaviour)
     // ------------------------------------------------------------------
     const parsed = parseWorkbookBuffer(file.buffer, knownCodes);
-    const summary = await persistParsedRows(
-      parsed.rows,
-      parsed.sourcePriceObservations,
-      name,
-      effectiveDate,
-      knownCodes,
-      canonical,
-      parsed.basis,
-      parsed.codeColHeader,
-      parsed.priceColHeader,
-      parsed.skippedUnparseable,
-      reviewBatchId,
-      loadBatchId,
-    );
+    if (!parsed.hasHeaderPeriods && !effectiveDate) {
+      await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
+      res.status(400).json({
+        error: "No dated price column was found. Supply an explicit effectiveDate; the loader will never default it to the load date.",
+      });
+      return;
+    }
+    const periods = parsed.hasHeaderPeriods
+      ? [...new Set(parsed.rows.map((row) => row.effectiveDate).filter((date): date is string => !!date))]
+      : [effectiveDate!];
+    if (periods.length === 0) {
+      await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
+      res.status(400).json({
+        error: "No price rows with a resolvable source period were found.",
+      });
+      return;
+    }
+    const summaries: LoadSummary[] = [];
+    for (const period of periods) {
+      summaries.push(
+        await persistParsedRows(
+          parsed.rows.filter((row) => !parsed.hasHeaderPeriods || row.effectiveDate === period),
+          parsed.sourcePriceObservations.filter(
+            (row) => !parsed.hasHeaderPeriods || row.effectiveDate === period,
+          ),
+          name,
+          period,
+          knownCodes,
+          canonical,
+          parsed.basis,
+          parsed.codeColHeader,
+          parsed.priceColHeader,
+          parsed.skippedUnparseable,
+          reviewBatchId,
+          loadBatchId,
+        ),
+      );
+    }
+    const summary: LoadSummary = summaries.length === 1
+      ? summaries[0]!
+      : {
+          ...summaries[0]!,
+          effectiveDate: periods.join(", "),
+          totalRows: summaries.reduce((total, row) => total + row.totalRows, 0),
+          matchedProducts: summaries.reduce((total, row) => total + row.matchedProducts, 0),
+          newProducts: summaries.reduce((total, row) => total + row.newProducts, 0),
+          newHistoryRows: summaries.reduce((total, row) => total + row.newHistoryRows, 0),
+          skippedDuplicates: summaries.reduce((total, row) => total + row.skippedDuplicates, 0),
+          skippedUnparseable: summaries.reduce((total, row) => total + row.skippedUnparseable, 0),
+          unmatchedCodes: summaries.flatMap((row) => row.unmatchedCodes),
+          lowMrpCount: summaries.reduce((total, row) => total + row.lowMrpCount, 0),
+          flaggedMrpCount: summaries.reduce((total, row) => total + row.flaggedMrpCount, 0),
+          flaggedRows: summaries.flatMap((row) => row.flaggedRows),
+        };
 
     await reassertVersionedDiscontinuationCorrection();
     await recomputeCurrentFlags();
