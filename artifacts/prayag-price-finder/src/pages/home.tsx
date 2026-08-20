@@ -88,25 +88,44 @@ function useVoiceSearch(
   onTranscript: (text: string) => void,
 ) {
   const [isListening, setIsListening] = useState(false);
-  const [supported, setSupported] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const [supportChecked, setSupportChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const listeningRef = useRef(false);
+  const startPendingRef = useRef(false);
+  const callbacksRef = useRef({ onFinalResult, onTranscript });
 
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    callbacksRef.current = { onFinalResult, onTranscript };
+  }, [onFinalResult, onTranscript]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setSupported(false);
+      setSupportChecked(true);
       return;
     }
-    
+
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = "en-IN";
 
+    recognition.onstart = () => {
+      startPendingRef.current = false;
+      listeningRef.current = true;
+      setIsStarting(false);
+      setIsListening(true);
+    };
+
     recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
+      let finalTranscript = "";
+      let interimTranscript = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript;
@@ -114,57 +133,105 @@ function useVoiceSearch(
           interimTranscript += event.results[i][0].transcript;
         }
       }
-      
-      if (interimTranscript) onTranscript(interimTranscript);
-      
+
+      if (interimTranscript) {
+        callbacksRef.current.onTranscript(interimTranscript);
+      }
+
       if (finalTranscript) {
-        onFinalResult(finalTranscript);
+        callbacksRef.current.onFinalResult(finalTranscript.trim());
         setError(null);
-        setIsListening(false);
-        recognition.stop();
       }
     };
 
     recognition.onerror = (event: any) => {
+      startPendingRef.current = false;
+      setIsStarting(false);
+      if (event.error === "aborted") return;
+
+      const messages: Record<string, string> = {
+        "not-allowed":
+          "Microphone permission is blocked. Allow microphone access in your browser settings, then try again.",
+        "audio-capture":
+          "No microphone was found. Check that a microphone is connected and available to your browser.",
+        "no-speech": "No speech detected. Try again or type the product.",
+        network:
+          "Voice recognition needs a network connection. Check your connection and try again.",
+        "service-not-allowed":
+          "This browser does not allow voice recognition. You can continue with text search.",
+        "language-not-supported":
+          "English (India) voice recognition is not supported here. You can continue with text search.",
+      };
       setError(
-        event.error === "not-allowed"
-          ? "Microphone permission is blocked. You can continue with text search."
-          : event.error === "no-speech"
-            ? "No speech detected. Try again or type the product."
-            : "Voice search is unavailable right now. You can continue with text search.",
+        messages[event.error] ??
+          "Voice search stopped unexpectedly. Try again or use text search.",
       );
       setIsListening(false);
+      listeningRef.current = false;
     };
 
     recognition.onend = () => {
+      startPendingRef.current = false;
+      listeningRef.current = false;
+      setIsStarting(false);
       setIsListening(false);
     };
 
     recognitionRef.current = recognition;
-    
+    setSupported(true);
+    setSupportChecked(true);
+
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-      }
+      startPendingRef.current = false;
+      listeningRef.current = false;
+      setIsStarting(false);
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.onstart = null;
+      recognition.abort();
+      recognitionRef.current = null;
     };
-  }, [onFinalResult, onTranscript]);
+  }, []);
 
   const toggle = useCallback(() => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-    } else {
-      try {
-        setError(null);
-        recognitionRef.current?.start();
-        setIsListening(true);
-      } catch (e) {
-        setError("Voice search could not start. You can continue with text search.");
-      }
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setError("Voice search is not supported in this browser.");
+      return;
     }
-  }, [isListening]);
 
-  return { isListening, supported, error, toggle };
+    if (listeningRef.current || startPendingRef.current) {
+      startPendingRef.current = false;
+      listeningRef.current = false;
+      setIsStarting(false);
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      setError(null);
+      startPendingRef.current = true;
+      setIsStarting(true);
+      recognition.start();
+    } catch (error: any) {
+      startPendingRef.current = false;
+      setIsStarting(false);
+      setIsListening(false);
+      setError(
+        error?.name === "InvalidStateError"
+          ? "Voice search is already starting. Try again in a moment."
+          : "Voice search could not start. Check microphone permission and try again.",
+      );
+    }
+  }, []);
+
+  return { isListening, isStarting, supported, supportChecked, error, toggle };
 }
 
 export default function PriceFinderPage() {
@@ -301,10 +368,13 @@ export default function PriceFinderPage() {
 
   const {
     isListening,
+    isStarting: isVoiceStarting,
     supported: voiceSupported,
+    supportChecked: voiceSupportChecked,
     error: voiceError,
     toggle: toggleVoice,
   } = useVoiceSearch(handleVoiceResult, handleVoiceTranscript);
+  const voiceActive = isListening || isVoiceStarting;
 
   const queryFilters = [
     ...filters,
@@ -401,6 +471,11 @@ export default function PriceFinderPage() {
       {voiceError && (
         <p className="text-sm text-amber-700" role="status">
           {voiceError}
+        </p>
+      )}
+      {voiceSupportChecked && !voiceSupported && (
+        <p className="text-sm text-muted-foreground" role="status">
+          Voice search is available in Chrome or Edge when microphone access is allowed.
         </p>
       )}
 
@@ -511,20 +586,29 @@ export default function PriceFinderPage() {
           )}
           {voiceSupported && (
             <Button
-              variant={isListening ? "default" : "ghost"}
+              variant={voiceActive ? "default" : "ghost"}
               size="icon"
               className={cn(
                 "w-10 h-10 rounded-lg transition-colors",
-                isListening ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                voiceActive ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
+              aria-label={voiceActive ? "Stop voice search" : "Start voice search"}
+              aria-pressed={voiceActive}
+              data-testid="voice-search-toggle"
               onClick={() => {
                 cancelSpeech();
                 setSpeechRequested(false);
                 toggleVoice();
               }}
-              title={isListening ? "Stop listening" : "Voice search"}
+              title={
+                isVoiceStarting
+                  ? "Starting voice search…"
+                  : isListening
+                    ? "Stop listening"
+                    : "Voice search"
+              }
             >
-              {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              {voiceActive ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </Button>
           )}
         </div>
