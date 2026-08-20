@@ -1,0 +1,87 @@
+# Replit Prompt — PTMT Idempotency Reload
+
+One outstanding item. Five of six divisions were verified idempotent on reload; PTMT was not, because the file submitted was a March 2026 snapshot rather than the registered September one. This closes that gap.
+
+I have uploaded the correct workbook to the workspace.
+
+---
+
+## 1. Verify the file before loading it
+
+**Do not load anything until the hash matches.**
+
+| | |
+|---|---|
+| Expected filename | `NEW PTMT MRP w.e.f. List as on 01st Sep, 2026.xlsx` |
+| Expected SHA-256 | `5da96e39cac40ede1480be4013554753cbdf4589ff0b5f77a7be43bfe13c8db0` |
+| Expected size | 918,578 bytes |
+| Download date to record | **2026-08-19** |
+
+Compute the SHA-256 of the uploaded file and compare. If it does not match, **stop and report the actual hash**. Do not load it, and do not treat a near-match on filename or size as sufficient.
+
+A mismatch would mean one of two things, and they are not the same:
+
+- **A different snapshot.** The 600-series September MRP cells were cleared in the source sheet after 19 August, so any fresh export from Google Sheets is a legitimately newer file — but loading it tests a change, not idempotency. Report it and stop.
+- **The March file again.** `f662fcf9f0c2dafc3b1cb00d748c1ee76f2d05963037c31623d8f08373963559` is the one submitted last time. If that reappears, say so plainly.
+
+The previous attempt failed precisely because a file that looked right by name was not right by content. The hash is the check that catches that.
+
+---
+
+## 2. Load it
+
+Submit through the normal `/catalog/load-mrp` path, exactly as a user would — source **PTMT & Plastic Fittings**, download date **2026-08-19**.
+
+The duplicate-content guard will fire, because this is byte-identical to the registered batch. **That is the expected behaviour and confirms the guard works.** Confirm through it and record that it fired.
+
+---
+
+## 3. Report
+
+Read every figure from the database:
+
+| Check | Expected |
+|---|---|
+| Rows added by this load | **0** |
+| `mrp_price_history` total | **13,048** |
+| Standard rows | 12,750 |
+| Colour rows | 298 |
+| Rows with null `load_batch_id` | **0** |
+| Codes with non-null `discontinued_from` | **90** |
+| Of the 69 restored codes, how many re-marked | **0** |
+| Products live at `asOf = 2026-09-01` | **6,213** |
+| Duplicate-content guard fired | yes |
+
+Plus four spot checks, since PTMT is where every hard defect in this project lived:
+
+```
+911-D    → 3,240 at asOf 2026-08-31, 3,490 at asOf 2026-09-01
+616-D    → 2,490 at asOf 2026-08-31, no price at asOf 2026-09-01
+148-LS   → 385.56 today, and CHEAPER than 148-LSB at 410.00
+1242-D   → 10,690 today, 11,550 at asOf 2026-09-01
+```
+
+The 18 sink codes must still return **zero rows** at `2026-09-01`:
+
+```
+616-D  618-D  620-D  622-D  623-D  624-D  624-XD  624-SD  625-D
+616-DM 618-DM 620-DM 622-DM 623-DM 624-DM 624-XDM 624-SDM 625-DM
+```
+
+---
+
+## 4. If anything moves
+
+Report it and stop. **Do not delete rows to restore 13,048, and do not re-apply the manifest to restore 90.** Either action erases the evidence of what the reload did.
+
+A non-zero row delta on a byte-identical file means the loader is not idempotent, which is the single most useful thing this check could find. Treat it as a result, not a problem to tidy away.
+
+---
+
+## 5. Scope
+
+This task is the PTMT reload and its verification. Nothing else.
+
+Do not activate the widened CP observation set, do not remove the manifest reassertion, and do not revisit the eight EMERALD 61 removal-only codes — those are waiting on a lifecycle answer from the price-list owner.
+
+**Make no commits.** This is a verification run.
