@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Dashboard from "./dashboard";
 
 // Hoist mockToastFn so it is in scope inside the vi.mock factory (which is
@@ -57,6 +58,17 @@ import {
 
 const NOOP_LOADING = { data: undefined, isLoading: true, queryKey: [] };
 const NOOP_EMPTY = { data: undefined, isLoading: false, queryKey: [] };
+
+function renderDashboard() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Dashboard />
+    </QueryClientProvider>,
+  );
+}
 
 function overviewResult(competitorPeriodDate: string | null, prayagMrpDate = "2026-08-18") {
   return {
@@ -116,7 +128,7 @@ describe("Dashboard — competitor period date chip", () => {
 
   it('shows the chip with the correct date in "Latest (auto)" mode', async () => {
     (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
-    render(<Dashboard />);
+    renderDashboard();
 
     await waitFor(() =>
       expect(screen.getByText(/Competitor prices as of 2026-07-31/i)).toBeInTheDocument(),
@@ -125,11 +137,11 @@ describe("Dashboard — competitor period date chip", () => {
 
   it("hides the chip when competitorPeriodDate is null (no competitor data for the period)", async () => {
     (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult(null));
-    render(<Dashboard />);
+    renderDashboard();
 
-    // Prayag chip confirms the filter bar is fully loaded.
+    // Prayag revision chip confirms the filter bar is fully loaded.
     await waitFor(() =>
-      expect(screen.getByText(/Prayag MRP as of/i)).toBeInTheDocument(),
+      expect(screen.getByText(/MRP revision as of/i)).toBeInTheDocument(),
     );
     expect(screen.queryByText(/Competitor prices as of/i)).not.toBeInTheDocument();
   });
@@ -139,7 +151,7 @@ describe("Dashboard — competitor period date chip", () => {
 
     // Start in Latest (auto) mode — July competitor data.
     (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
-    render(<Dashboard />);
+    renderDashboard();
 
     await waitFor(() =>
       expect(screen.getByText(/Competitor prices as of 2026-07-31/i)).toBeInTheDocument(),
@@ -165,7 +177,7 @@ describe("Dashboard — competitor period date chip", () => {
 
     // Start in Latest (auto) with July data, switch to March, then back.
     (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
-    render(<Dashboard />);
+    renderDashboard();
 
     await waitFor(() =>
       expect(screen.getByText(/Competitor prices as of 2026-07-31/i)).toBeInTheDocument(),
@@ -200,7 +212,7 @@ describe("Dashboard — competitor period date chip", () => {
 
     // Start in Latest (auto) mode — July competitor data.
     (useGetAnalysisOverview as Mock).mockReturnValue(overviewResult("2026-07-31"));
-    render(<Dashboard />);
+    renderDashboard();
 
     await waitFor(() =>
       expect(screen.getByText(/Competitor prices as of 2026-07-31/i)).toBeInTheDocument(),
@@ -303,7 +315,7 @@ describe("Dashboard — export button: zero-row warning and download", () => {
     );
 
     const user = userEvent.setup();
-    render(<Dashboard />);
+    renderDashboard();
 
     await waitFor(() => screen.getByRole("button", { name: /csv/i }));
     await user.click(screen.getByRole("button", { name: /csv/i }));
@@ -332,7 +344,7 @@ describe("Dashboard — export button: zero-row warning and download", () => {
     );
 
     const user = userEvent.setup();
-    render(<Dashboard />);
+    renderDashboard();
 
     await waitFor(() => screen.getByRole("button", { name: /csv/i }));
     await user.click(screen.getByRole("button", { name: /csv/i }));

@@ -62,6 +62,11 @@ interface ParsedRow {
   variant?: string;
 }
 
+interface SourcePriceObservation {
+  itemCode: string;
+  isRemoved: boolean;
+}
+
 export interface SkippedRow {
   rawCode: string;
   rawPrice: string;
@@ -70,6 +75,7 @@ export interface SkippedRow {
 
 interface ParseResult {
   rows: ParsedRow[];
+  sourcePriceObservations: SourcePriceObservation[];
   basis: string;
   codeCol: number;
   priceCol: number;
@@ -120,11 +126,14 @@ function parseDiscontinuationCorrectionWorkbook(
   const confirmed = deriveConfirmedDiscontinuations([
     ...unmarkedCodes.map((itemCode) => ({
       itemCode,
-      discontinuedFrom: null,
+      markerPeriod: null,
+      latestPricedPeriod: null,
       isRemoved: false,
     })),
     ...confirmedRows.map((row) => ({
-      ...row,
+      itemCode: row.itemCode,
+      markerPeriod: row.discontinuedFrom,
+      latestPricedPeriod: null,
       isRemoved: true,
     })),
   ]);
@@ -253,7 +262,18 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     }
   }
   if (codeCol === -1) {
-    return { rows: [], basis: "Verify", codeCol: -1, priceCol: -1, nameCol: -1, categoryCol: -1, codeColHeader: "", priceColHeader: "", skippedRows: [] };
+    return {
+      rows: [],
+      sourcePriceObservations: [],
+      basis: "Verify",
+      codeCol: -1,
+      priceCol: -1,
+      nameCol: -1,
+      categoryCol: -1,
+      codeColHeader: "",
+      priceColHeader: "",
+      skippedRows: [],
+    };
   }
 
   // Price column: header keyword, else first mostly-numeric column.
@@ -305,7 +325,18 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     }
   }
   if (priceCol === -1) {
-    return { rows: [], basis: "Verify", codeCol, priceCol: -1, nameCol: -1, categoryCol: -1, codeColHeader: rawHeaders[codeCol] ?? String(codeCol), priceColHeader: "", skippedRows: [] };
+    return {
+      rows: [],
+      sourcePriceObservations: [],
+      basis: "Verify",
+      codeCol,
+      priceCol: -1,
+      nameCol: -1,
+      categoryCol: -1,
+      codeColHeader: rawHeaders[codeCol] ?? String(codeCol),
+      priceColHeader: "",
+      skippedRows: [],
+    };
   }
 
   // Name column: look for description/product-name keywords.
@@ -369,6 +400,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
     // non-empty price cell. Empty cells mean the variant is not offered — no row.
     const variantRows: ParsedRow[] = [];
     const variantSkipped: SkippedRow[] = [];
+    const sourcePriceObservations: SourcePriceObservation[] = [];
     for (let r = 0; r < grid.length; r++) {
       if (r === headerRow) continue;
       const row = grid[r] ?? [];
@@ -379,16 +411,27 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       for (const { col, variant } of variantCols) {
         const rawPrice = row[col];
         if (rawPrice == null || rawPrice === "") continue; // not offered for this variant
+        if (/^removed$/i.test(norm(rawPrice))) {
+          sourcePriceObservations.push({ itemCode: code, isRemoved: true });
+          variantSkipped.push({
+            rawCode: code,
+            rawPrice: norm(rawPrice),
+            reason: "Marked REMOVED in source",
+          });
+          continue;
+        }
         const price = Number(rawPrice);
         if (isNaN(price) || price <= 0) {
           variantSkipped.push({ rawCode: code, rawPrice: norm(rawPrice), reason: "Price is zero or negative" });
           continue;
         }
+        sourcePriceObservations.push({ itemCode: code, isRemoved: false });
         variantRows.push({ itemCode: code, price, productName, category, variant });
       }
     }
     return {
       rows: variantRows,
+      sourcePriceObservations,
       basis: "MRP",
       codeCol,
       priceCol: variantCols[0]?.col ?? -1,
@@ -404,6 +447,7 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
 
   const rows: ParsedRow[] = [];
   const skippedRows: SkippedRow[] = [];
+  const sourcePriceObservations: SourcePriceObservation[] = [];
   for (let r = 0; r < grid.length; r++) {
     if (r === headerRow) continue;
     const row = grid[r] ?? [];
@@ -424,17 +468,38 @@ function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
       }
       continue;
     }
+    if (/^removed$/i.test(rawPriceVal)) {
+      sourcePriceObservations.push({ itemCode: code, isRemoved: true });
+      skippedRows.push({
+        rawCode: rawCodeVal,
+        rawPrice: rawPriceVal,
+        reason: "Marked REMOVED in source",
+      });
+      continue;
+    }
     const price = Number(row[priceCol]);
     if (isNaN(price) || price <= 0) {
       skippedRows.push({ rawCode: rawCodeVal, rawPrice: rawPriceVal, reason: price <= 0 ? "Price is zero or negative" : "Price is not a number" });
       continue;
     }
+    sourcePriceObservations.push({ itemCode: code, isRemoved: false });
     const productName = nameCol !== -1 ? (norm(row[nameCol]) || null) : null;
     const category = categoryCol !== -1 ? (norm(row[categoryCol]) || null) : null;
     rows.push({ itemCode: code, price, productName, category });
   }
 
-  return { rows, basis, codeCol, priceCol, nameCol, categoryCol, codeColHeader, priceColHeader, skippedRows };
+  return {
+    rows,
+    sourcePriceObservations,
+    basis,
+    codeCol,
+    priceCol,
+    nameCol,
+    categoryCol,
+    codeColHeader,
+    priceColHeader,
+    skippedRows,
+  };
 }
 
 interface LoadSummary {
@@ -505,6 +570,7 @@ function parseWorkbookBuffer(
   knownCodes: Set<string>,
 ): {
   rows: ParsedRow[];
+  sourcePriceObservations: SourcePriceObservation[];
   basis: string;
   codeColHeader: string;
   priceColHeader: string;
@@ -522,6 +588,7 @@ function parseWorkbookBuffer(
   let hasCategoryCol = false;
   let skippedUnparseable = 0;
   const skippedRows: SkippedRow[] = [];
+  const sourcePriceObservations: SourcePriceObservation[] = [];
 
   // Sheet selection strategy:
   // 1. If any sheet is named "MASTER" (case-insensitive), use it exclusively —
@@ -543,6 +610,7 @@ function parseWorkbookBuffer(
     const parsed = parseSheet(grid, knownCodes);
     skippedUnparseable += parsed.skippedRows.length;
     skippedRows.push(...parsed.skippedRows);
+    sourcePriceObservations.push(...parsed.sourcePriceObservations);
     if (parsed.nameCol !== -1) hasNameCol = true;
     if (parsed.categoryCol !== -1) hasCategoryCol = true;
     if (parsed.rows.length > 0) {
@@ -557,7 +625,17 @@ function parseWorkbookBuffer(
     }
   }
 
-  return { rows, basis, codeColHeader, priceColHeader, hasNameCol, hasCategoryCol, skippedUnparseable, skippedRows };
+  return {
+    rows,
+    sourcePriceObservations,
+    basis,
+    codeColHeader,
+    priceColHeader,
+    hasNameCol,
+    hasCategoryCol,
+    skippedUnparseable,
+    skippedRows,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -584,8 +662,101 @@ function divisionFromFilename(filename: string): string | null {
 // Helper: persist a set of already-parsed rows to DB inside a transaction and
 // return a filled-in LoadSummary.  Mutates knownCodes/canonical in place.
 // ---------------------------------------------------------------------------
+async function reconcileSourceDiscontinuations(
+  tx: any,
+  observations: SourcePriceObservation[],
+  effectiveDate: string,
+  canonical: Map<string, string>,
+): Promise<void> {
+  if (observations.length === 0) return;
+
+  const normalizedObservations = observations.map((observation) => ({
+    ...observation,
+    itemCode: canonical.get(normCode(observation.itemCode)) ?? observation.itemCode,
+  }));
+  const itemCodes = [...new Set(normalizedObservations.map((row) => row.itemCode))];
+  const products = await tx
+    .select({
+      itemCode: catalogProductsTable.itemCode,
+      discontinuedFrom: catalogProductsTable.discontinuedFrom,
+    })
+    .from(catalogProductsTable)
+    .where(inArray(catalogProductsTable.itemCode, itemCodes));
+  if (products.length === 0) return;
+
+  const history = await tx
+    .select({
+      itemCode: mrpPriceHistoryTable.itemCode,
+      effectiveDate: mrpPriceHistoryTable.effectiveDate,
+    })
+    .from(mrpPriceHistoryTable)
+    .where(
+      and(
+        inArray(mrpPriceHistoryTable.itemCode, itemCodes),
+        eq(mrpPriceHistoryTable.reviewStatus, "approved"),
+        eq(mrpPriceHistoryTable.variant, "Standard"),
+      ),
+    )
+    .orderBy(
+      asc(mrpPriceHistoryTable.itemCode),
+      desc(mrpPriceHistoryTable.effectiveDate),
+      desc(mrpPriceHistoryTable.id),
+    );
+  const latestPriceByCode = new Map<string, string>();
+  for (const row of history) {
+    if (!latestPriceByCode.has(row.itemCode)) {
+      latestPriceByCode.set(row.itemCode, String(row.effectiveDate));
+    }
+  }
+
+  const confirmed = deriveConfirmedDiscontinuations(
+    normalizedObservations.map((row) => ({
+      itemCode: row.itemCode,
+      markerPeriod: row.isRemoved ? effectiveDate : null,
+      latestPricedPeriod: latestPriceByCode.get(row.itemCode) ?? null,
+      isRemoved: row.isRemoved,
+    })),
+  );
+  const confirmedByCode = new Map(
+    confirmed.map((row) => [normCode(row.itemCode), row.discontinuedFrom]),
+  );
+  const liveInSource = new Set(
+    normalizedObservations
+      .filter((row) => !row.isRemoved)
+      .map((row) => normCode(row.itemCode)),
+  );
+
+  for (const product of products) {
+    const productKey = normCode(product.itemCode);
+    const confirmedFrom = confirmedByCode.get(productKey);
+    if (confirmedFrom) {
+      if (product.discontinuedFrom !== confirmedFrom) {
+        await tx
+          .update(catalogProductsTable)
+          .set({ discontinuedFrom: confirmedFrom, updatedAt: new Date() })
+          .where(eq(catalogProductsTable.itemCode, product.itemCode));
+      }
+      continue;
+    }
+
+    if (!product.discontinuedFrom) continue;
+    const latestPrice = latestPriceByCode.get(product.itemCode);
+    const hasLaterPrice =
+      Boolean(latestPrice) && latestPrice! > product.discontinuedFrom;
+    const hasLiveSourceOccurrence =
+      liveInSource.has(productKey) && effectiveDate >= product.discontinuedFrom;
+    if (hasLaterPrice || hasLiveSourceOccurrence) {
+      await tx
+        .update(catalogProductsTable)
+        .set({ discontinuedFrom: null, updatedAt: new Date() })
+        .where(eq(catalogProductsTable.itemCode, product.itemCode));
+    }
+  }
+}
+
 async function persistParsedRows(
   parsedRows: ParsedRow[],
+  sourcePriceObservations: SourcePriceObservation[],
   filename: string,
   effectiveDate: string,
   knownCodes: Set<string>,
@@ -611,6 +782,16 @@ async function persistParsedRows(
   }
 
   if (byCodeVariant.size === 0) {
+    if (sourcePriceObservations.length > 0) {
+      await db.transaction(async (tx) => {
+        await reconcileSourceDiscontinuations(
+          tx,
+          sourcePriceObservations,
+          effectiveDate,
+          canonical,
+        );
+      });
+    }
     return {
       file: filename,
       effectiveDate,
@@ -835,6 +1016,13 @@ async function persistParsedRows(
         }
       }
     }
+
+    await reconcileSourceDiscontinuations(
+      tx,
+      sourcePriceObservations,
+      effectiveDate,
+      canonical,
+    );
   });
 
   if (summary.newHistoryRows === 0 && summary.skippedDuplicates > 0) {
@@ -1006,6 +1194,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
         const parsed = parseWorkbookBuffer(buf, knownCodes);
         const summary = await persistParsedRows(
           parsed.rows,
+          parsed.sourcePriceObservations,
           entry.name,
           effectiveDate,
           knownCodes,
@@ -1059,6 +1248,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
     const parsed = parseWorkbookBuffer(file.buffer, knownCodes);
     const summary = await persistParsedRows(
       parsed.rows,
+      parsed.sourcePriceObservations,
       name,
       effectiveDate,
       knownCodes,

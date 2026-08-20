@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
+import * as XLSX from "xlsx";
 import { eq, inArray } from "drizzle-orm";
 import {
   catalogProductsTable,
@@ -11,17 +12,28 @@ import {
 } from "@workspace/db";
 import router from "./catalogImportExport";
 import catalogRouter from "./catalog";
+import { discontinuationCorrectionV2 } from "../data/discontinuationCorrectionV2";
 
 const RUN = Date.now();
 const FLAGGED = `__MRP_REVIEW_FLAGGED_${RUN}__`;
 const CLEAN = `__MRP_REVIEW_CLEAN_${RUN}__`;
 const CANCELLED = `__MRP_REVIEW_CANCELLED_${RUN}__`;
-const CODES = [FLAGGED, CLEAN, CANCELLED];
+const REINTRODUCED = `__MRP_REMOVAL_REINTRODUCED_${RUN}__`;
+const WITHDRAWN = `__MRP_REMOVAL_WITHDRAWN_${RUN}__`;
+const CODES = [FLAGGED, CLEAN, CANCELLED, REINTRODUCED, WITHDRAWN];
 const OLD_DATE = "2026-07-01";
 const LOAD_DATE = "2026-08-19";
+const REVIEW_FILE = `review-test-${RUN}.csv`;
+const REVIEW_CANCEL_FILE = `review-cancel-test-${RUN}.csv`;
+const REINTRO_MARKER_FILE = `removal-marker-${RUN}.xlsx`;
+const REINTRO_PRICE_FILE = `removal-reintroduction-${RUN}.xlsx`;
+const WITHDRAWAL_MARKER_FILE = `removal-withdrawal-${RUN}.xlsx`;
 const TEST_FILES = [
-  "review-test.csv",
-  "review-cancel-test.csv",
+  REVIEW_FILE,
+  REVIEW_CANCEL_FILE,
+  REINTRO_MARKER_FILE,
+  REINTRO_PRICE_FILE,
+  WITHDRAWAL_MARKER_FILE,
 ];
 
 const app = express();
@@ -30,6 +42,35 @@ app.use(catalogRouter);
 app.use(router);
 const request = supertest(app);
 let ptmtSourceId = 0;
+
+function workbookBuffer(rows: Array<[string, string | number]>): Buffer {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([["Item Code", "MRP"], ...rows]);
+  XLSX.utils.book_append_sheet(workbook, sheet, "MASTER");
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
+function correctionWorkbookBuffer(): Buffer {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(
+      discontinuationCorrectionV2.unmarkedCodes.map((item_code) => ({ item_code })),
+    ),
+    "1_UNMARK_not_discontinued",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(
+      discontinuationCorrectionV2.confirmed.map((row) => ({
+        item_code: row.itemCode,
+        discontinued_from: row.discontinuedFrom,
+      })),
+    ),
+    "2_Confirmed_discontinued",
+  );
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
 
 beforeAll(async () => {
   const sources = await request.get("/catalog/mrp-sources");
@@ -58,6 +99,18 @@ beforeAll(async () => {
       productName: "Cancelled MRP review fixture",
       division: "PTMT & Plastic Fittings",
       category: "Review test",
+    },
+    {
+      itemCode: REINTRODUCED,
+      productName: "Reintroduced removal fixture",
+      division: "PTMT & Plastic Fittings",
+      category: "Removal test",
+    },
+    {
+      itemCode: WITHDRAWN,
+      productName: "Withdrawn removal fixture",
+      division: "PTMT & Plastic Fittings",
+      category: "Removal test",
     },
   ]);
   await db.insert(mrpPriceHistoryTable).values([
@@ -88,16 +141,45 @@ beforeAll(async () => {
       reviewStatus: "approved",
       isCurrent: true,
     },
+    {
+      itemCode: REINTRODUCED,
+      mrp: 100,
+      priceBasis: "MRP",
+      effectiveDate: "2024-05-01",
+      loadDate: "2024-05-01",
+      reviewStatus: "approved",
+      isCurrent: false,
+    },
+    {
+      itemCode: WITHDRAWN,
+      mrp: 2490,
+      priceBasis: "MRP",
+      effectiveDate: "2026-03-05",
+      loadDate: "2026-03-05",
+      reviewStatus: "approved",
+      isCurrent: false,
+    },
   ]);
 });
 
 afterAll(async () => {
+  const testBatches = await db
+    .select({ id: mrpLoadBatchesTable.id })
+    .from(mrpLoadBatchesTable)
+    .where(inArray(mrpLoadBatchesTable.fileName, TEST_FILES));
+  const testBatchIds = testBatches.map((batch) => batch.id);
+
   await db
     .delete(mrpHistoryProvenanceEventsTable)
     .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, CODES));
   await db
     .delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, CODES));
+  if (testBatchIds.length > 0) {
+    await db
+      .delete(mrpPriceHistoryTable)
+      .where(inArray(mrpPriceHistoryTable.loadBatchId, testBatchIds));
+  }
   await db
     .delete(mrpLoadBatchesTable)
     .where(inArray(mrpLoadBatchesTable.fileName, TEST_FILES));
@@ -138,7 +220,7 @@ describe("MRP import blocking review", () => {
       .field("sourceId", String(ptmtSourceId))
       .field("downloadedAt", LOAD_DATE)
       .attach("file", Buffer.from(csv), {
-        filename: "review-test.csv",
+        filename: REVIEW_FILE,
         contentType: "text/csv",
       });
 
@@ -224,7 +306,7 @@ describe("MRP import blocking review", () => {
       .field("sourceId", String(ptmtSourceId))
       .field("downloadedAt", LOAD_DATE)
       .attach("file", Buffer.from(csv), {
-        filename: "review-test.csv",
+        filename: REVIEW_FILE,
         contentType: "text/csv",
       });
     expect(duplicate.status).toBe(409);
@@ -240,7 +322,7 @@ describe("MRP import blocking review", () => {
       .field("downloadedAt", LOAD_DATE)
       .field("confirmDuplicate", "true")
       .attach("file", Buffer.from(csv), {
-        filename: "review-test.csv",
+        filename: REVIEW_FILE,
         contentType: "text/csv",
       });
     expect(confirmed.status).toBe(200);
@@ -254,7 +336,7 @@ describe("MRP import blocking review", () => {
       .field("sourceId", String(ptmtSourceId))
       .field("downloadedAt", LOAD_DATE)
       .attach("file", Buffer.from(`Item Code,MRP\n${CANCELLED},10\n`), {
-        filename: "review-cancel-test.csv",
+        filename: REVIEW_CANCEL_FILE,
         contentType: "text/csv",
       });
     expect(upload.status).toBe(200);
@@ -284,5 +366,121 @@ describe("MRP import blocking review", () => {
         expect.objectContaining({ itemCode: CANCELLED, effectiveDate: LOAD_DATE }),
       ]),
     );
+  });
+
+  it("reconciles real REMOVED markers and later source prices through workbook uploads", async () => {
+    const firstMarker = await request
+      .post("/catalog/load-mrp")
+      .field("effectiveDate", "2025-01-01")
+      .field("sourceId", String(ptmtSourceId))
+      .field("downloadedAt", "2025-01-01")
+      .attach("file", workbookBuffer([[REINTRODUCED, "REMOVED"]]), {
+        filename: REINTRO_MARKER_FILE,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    expect(firstMarker.status).toBe(200);
+
+    const [scheduled] = await db
+      .select({ discontinuedFrom: catalogProductsTable.discontinuedFrom })
+      .from(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, REINTRODUCED));
+    expect(scheduled?.discontinuedFrom).toBe("2025-01-01");
+
+    const reintroduced = await request
+      .post("/catalog/load-mrp")
+      .field("effectiveDate", "2026-02-01")
+      .field("sourceId", String(ptmtSourceId))
+      .field("downloadedAt", "2026-02-01")
+      .attach("file", workbookBuffer([[REINTRODUCED, 250]]), {
+        filename: REINTRO_PRICE_FILE,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    expect(reintroduced.status).toBe(200);
+
+    const [liveAgain] = await db
+      .select({ discontinuedFrom: catalogProductsTable.discontinuedFrom })
+      .from(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, REINTRODUCED));
+    expect(liveAgain?.discontinuedFrom).toBeNull();
+
+    const withdrawalMarker = await request
+      .post("/catalog/load-mrp")
+      .field("effectiveDate", "2026-09-01")
+      .field("sourceId", String(ptmtSourceId))
+      .field("downloadedAt", "2026-09-01")
+      .attach("file", workbookBuffer([[WITHDRAWN, "REMOVED"]]), {
+        filename: WITHDRAWAL_MARKER_FILE,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    expect(withdrawalMarker.status).toBe(200);
+
+    const [withdrawn] = await db
+      .select({ discontinuedFrom: catalogProductsTable.discontinuedFrom })
+      .from(catalogProductsTable)
+      .where(eq(catalogProductsTable.itemCode, WITHDRAWN));
+    expect(withdrawn?.discontinuedFrom).toBe("2026-09-01");
+  });
+
+  it("applies the versioned 69/90 correction manifest through the correction upload route", async () => {
+    expect(discontinuationCorrectionV2.unmarkedCodes).toHaveLength(69);
+    expect(discontinuationCorrectionV2.confirmed).toHaveLength(90);
+
+    const uploaded = await request
+      .post("/catalog/load-mrp")
+      .attach("file", correctionWorkbookBuffer(), {
+        filename: "Prayag_Discontinued_Correction_v2.xlsx",
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+    expect(uploaded.status).toBe(200);
+    expect(uploaded.body.results).toMatchObject({
+      kind: "discontinuation-correction",
+      unmarkedCodes: 69,
+      confirmedDiscontinuations: 90,
+    });
+
+    const [restored, confirmed] = await Promise.all([
+      db
+        .select({
+          itemCode: catalogProductsTable.itemCode,
+          discontinuedFrom: catalogProductsTable.discontinuedFrom,
+        })
+        .from(catalogProductsTable)
+        .where(
+          inArray(
+            catalogProductsTable.itemCode,
+            [...discontinuationCorrectionV2.unmarkedCodes],
+          ),
+        ),
+      db
+        .select({
+          itemCode: catalogProductsTable.itemCode,
+          discontinuedFrom: catalogProductsTable.discontinuedFrom,
+        })
+        .from(catalogProductsTable)
+        .where(
+          inArray(
+            catalogProductsTable.itemCode,
+            discontinuationCorrectionV2.confirmed.map((row) => row.itemCode),
+          ),
+        ),
+    ]);
+    expect(restored).toHaveLength(69);
+    expect(confirmed).toHaveLength(90);
+    expect(restored.every((product) => product.discontinuedFrom === null)).toBe(true);
+    expect(
+      restored.find((product) => product.itemCode === "WT-3LH-50"),
+    ).toMatchObject({ discontinuedFrom: null });
+    expect(
+      confirmed.every((product) =>
+        discontinuationCorrectionV2.confirmed.some(
+          (row) =>
+            row.itemCode === product.itemCode &&
+            row.discontinuedFrom === product.discontinuedFrom,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      confirmed.find((product) => product.itemCode === "616-D"),
+    ).toMatchObject({ discontinuedFrom: "2026-09-01" });
   });
 });

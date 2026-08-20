@@ -15,3 +15,5 @@
 - [MRP source provenance](mrp-source-provenance.md) — trace MRP rows to official snapshots by server-side SHA-256 and supplied download date; preserve known hash limitations honestly.
 - [Non-interactive Drizzle push conflicts](drizzle-push-conflicts.md) — verify additive tables exist after merges; never force an ambiguous non-TTY schema prompt.
 - [Cross-app browser regression setup](cross-app-browser-regression.md) — path-routed app-switch tests need Chromium explicitly, proxy workflows, and Nix browser libraries.
+- [Catalog baseline audits](catalog-baseline-audits.md) — never force an MRP count target; reconcile documented invalid keys before deleting history.
+- [Source removal period semantics](source-removal-period-semantics.md) — same-period MRP does not negate REMOVED; only later prices prove reintroduction.

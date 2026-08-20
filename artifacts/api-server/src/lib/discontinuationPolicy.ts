@@ -5,7 +5,10 @@
  */
 export interface SourceRemovalRow {
   itemCode: string;
-  discontinuedFrom: string | null;
+  /** The effective date of the workbook column that contains REMOVED. */
+  markerPeriod: string | null;
+  /** The most recent workbook period containing a real numeric price for this code. */
+  latestPricedPeriod: string | null;
   isRemoved: boolean;
 }
 
@@ -19,7 +22,12 @@ export function deriveConfirmedDiscontinuations(
 ): ConfirmedDiscontinuation[] {
   const byCode = new Map<
     string,
-    { itemCode: string; allRemoved: boolean; dates: Set<string> }
+    {
+      itemCode: string;
+      allRemoved: boolean;
+      markerPeriods: Set<string>;
+      latestPricedPeriod: string | null;
+    }
   >();
 
   for (const row of rows) {
@@ -29,20 +37,34 @@ export function deriveConfirmedDiscontinuations(
     const group = byCode.get(key) ?? {
       itemCode,
       allRemoved: true,
-      dates: new Set<string>(),
+      markerPeriods: new Set<string>(),
+      latestPricedPeriod: null,
     };
     group.allRemoved &&= row.isRemoved;
-    if (row.discontinuedFrom) group.dates.add(row.discontinuedFrom);
+    if (row.markerPeriod) group.markerPeriods.add(row.markerPeriod);
+    if (
+      row.latestPricedPeriod &&
+      (!group.latestPricedPeriod ||
+        row.latestPricedPeriod > group.latestPricedPeriod)
+    ) {
+      group.latestPricedPeriod = row.latestPricedPeriod;
+    }
     byCode.set(key, group);
   }
 
   return [...byCode.values()]
-    .filter((group) => group.allRemoved && group.dates.size > 0)
-    .map((group) => ({
-      itemCode: group.itemCode,
-      // A source code can be present in multiple ranges. If all are removed at
-      // different revisions, the first withdrawal is the effective stop date.
-      discontinuedFrom: [...group.dates].sort()[0]!,
-    }))
+    .flatMap((group) => {
+      if (!group.allRemoved || group.markerPeriods.size === 0) return [];
+      // A removal marker can coexist with the final historical price for its
+      // own revision. Only a strictly later price proves the code returned.
+      const discontinuedFrom = [...group.markerPeriods].sort()[0]!;
+      if (
+        group.latestPricedPeriod &&
+        group.latestPricedPeriod > discontinuedFrom
+      ) {
+        return [];
+      }
+      return [{ itemCode: group.itemCode, discontinuedFrom }];
+    })
     .sort((a, b) => a.itemCode.localeCompare(b.itemCode));
 }

@@ -118,9 +118,9 @@ describe("SINK September repair acceptance", () => {
       // v4 confirms all nine standard SINK codes and their nine Matt twins
       // are withdrawn from 01 Sep 2026.
       scheduled_count: 18,
-      // The grouped withdrawal correction confirms 98 total codes; 80 are
+      // The signed-off correction workbook confirms 90 total codes; 72 are
       // outside this SINK subset and are therefore expected, not unexpected.
-      other_confirmed_count: 80,
+      other_confirmed_count: 72,
     });
   });
 
