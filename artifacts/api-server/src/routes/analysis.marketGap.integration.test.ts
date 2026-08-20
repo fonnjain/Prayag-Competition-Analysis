@@ -11,7 +11,9 @@ import {
   catalogProductsTable,
   competitorPricesTable,
   db,
+  mrpLoadBatchesTable,
   mrpPriceHistoryTable,
+  mrpSourcesTable,
 } from "@workspace/db";
 import analysisRouter from "./analysis.js";
 import comparisonRouter from "./comparison.js";
@@ -28,6 +30,8 @@ const ITEM_D = `MKT-GAP-D-${RUN}`;
 const ITEM_E = `MKT-GAP-E-${RUN}`;
 const ITEM_F = `MKT-GAP-STATUS-${RUN}`;
 const ITEM_G = `MKT-GAP-LENGTH-${RUN}`;
+const ITEM_CODES = [ITEM_A, ITEM_B, ITEM_C, ITEM_D, ITEM_E, ITEM_F, ITEM_G];
+let fixtureBatchId = 0;
 
 const app = express();
 app.use(express.json());
@@ -36,6 +40,31 @@ app.use(comparisonRouter);
 const request = supertest(app);
 
 beforeAll(async () => {
+  // Remove stale data from a force-stopped earlier run before setting up this
+  // suite's isolated batch-backed fixtures.
+  await db.execute(sql`DELETE FROM mrp_price_history WHERE item_code LIKE 'MKT-GAP-%'`);
+  await db.execute(sql`DELETE FROM catalog_products WHERE item_code LIKE 'MKT-GAP-%'`);
+  const source = await db
+    .select({ id: mrpSourcesTable.id })
+    .from(mrpSourcesTable)
+    .where(sql`${mrpSourcesTable.division} = 'PTMT & Plastic Fittings'`)
+    .limit(1);
+  const sourceId = source[0]?.id;
+  if (!sourceId) throw new Error("PTMT fixture source is unavailable");
+  const fixtureBatch = await db
+    .insert(mrpLoadBatchesTable)
+    .values({
+      sourceId,
+      fileName: `fixture-market-gap-${RUN}.xlsx`,
+      fileSha256: `fixture-market-gap-${RUN}`,
+      fileSizeBytes: 0,
+      downloadedAt: MRP_DATE,
+      rowCount: 8,
+      notes: "Integration-test fixture batch",
+    })
+    .returning({ id: mrpLoadBatchesTable.id });
+  fixtureBatchId = fixtureBatch[0]?.id ?? 0;
+  if (!fixtureBatchId) throw new Error("Unable to create market-gap fixture batch");
   await db.insert(catalogProductsTable).values([
     { itemCode: ITEM_A, productName: "Market gap MRP", division: "Test", category: "Gap" },
     { itemCode: ITEM_B, productName: "Market gap ex-GST", division: "Test", category: "Gap" },
@@ -46,15 +75,15 @@ beforeAll(async () => {
     { itemCode: ITEM_G, productName: "Market gap pipe 3 Mtr", division: "Test", category: "Gap" },
   ]);
   await db.insert(mrpPriceHistoryTable).values([
-    { itemCode: ITEM_A, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
-    { itemCode: ITEM_B, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
-    { itemCode: ITEM_C, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
+    { itemCode: ITEM_A, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
+    { itemCode: ITEM_B, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
+    { itemCode: ITEM_C, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
     // Must be excluded as a future revision when the report is run as of Aug 19.
-    { itemCode: ITEM_C, mrp: 120, priceBasis: "MRP", effectiveDate: NEXT_DATE, loadDate: NEXT_DATE },
-    { itemCode: ITEM_D, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
-    { itemCode: ITEM_E, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
-    { itemCode: ITEM_F, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
-    { itemCode: ITEM_G, mrp: 300, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE },
+    { itemCode: ITEM_C, mrp: 120, priceBasis: "MRP", effectiveDate: NEXT_DATE, loadDate: NEXT_DATE, loadBatchId: fixtureBatchId },
+    { itemCode: ITEM_D, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
+    { itemCode: ITEM_E, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
+    { itemCode: ITEM_F, mrp: 100, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
+    { itemCode: ITEM_G, mrp: 300, priceBasis: "MRP", effectiveDate: MRP_DATE, loadDate: MRP_DATE, loadBatchId: fixtureBatchId },
   ]);
   await db.insert(competitorPricesTable).values([
     // +10%: MRP basis.
@@ -84,6 +113,9 @@ afterAll(async () => {
   await db.delete(catalogProductsTable).where(
     sql`${catalogProductsTable.itemCode} IN (${ITEM_A}, ${ITEM_B}, ${ITEM_C}, ${ITEM_D}, ${ITEM_E}, ${ITEM_F}, ${ITEM_G})`,
   );
+  if (fixtureBatchId) {
+    await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, fixtureBatchId));
+  }
 });
 
 describe("market-gap report and analysis dashboard", () => {

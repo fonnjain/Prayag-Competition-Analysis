@@ -44,6 +44,7 @@ app.use(catalogRouter);
 app.use(router);
 const request = supertest(app);
 let ptmtSourceId = 0;
+let fixtureBatchId = 0;
 
 function workbookBuffer(rows: Array<[string, string | number]>): Buffer {
   const workbook = XLSX.utils.book_new();
@@ -82,6 +83,33 @@ beforeAll(async () => {
   );
   ptmtSourceId = ptmtSource?.id ?? 0;
   if (!ptmtSourceId) throw new Error("PTMT MRP source fixture was not seeded");
+
+  // A force-stopped test process can skip afterAll. Clear only this suite's
+  // uniquely named remnants before creating a fresh fixture batch.
+  await db.execute(sql`
+    DELETE FROM mrp_price_history
+    WHERE item_code LIKE '__MRP_REVIEW_%'
+       OR item_code LIKE '__MRP_REMOVAL_%'
+  `);
+  await db.execute(sql`
+    DELETE FROM catalog_products
+    WHERE item_code LIKE '__MRP_REVIEW_%'
+       OR item_code LIKE '__MRP_REMOVAL_%'
+  `);
+  const fixtureBatch = await db
+    .insert(mrpLoadBatchesTable)
+    .values({
+      sourceId: ptmtSourceId,
+      fileName: `fixture-review-${RUN}.xlsx`,
+      fileSha256: `fixture-review-${RUN}`,
+      fileSizeBytes: 0,
+      downloadedAt: LOAD_DATE,
+      rowCount: 5,
+      notes: "Integration-test fixture batch",
+    })
+    .returning({ id: mrpLoadBatchesTable.id });
+  fixtureBatchId = fixtureBatch[0]?.id ?? 0;
+  if (!fixtureBatchId) throw new Error("Unable to create review fixture batch");
 
   await db.insert(catalogProductsTable).values([
     {
@@ -124,6 +152,7 @@ beforeAll(async () => {
       loadDate: OLD_DATE,
       reviewStatus: "approved",
       isCurrent: true,
+      loadBatchId: fixtureBatchId,
     },
     {
       itemCode: CLEAN,
@@ -133,6 +162,7 @@ beforeAll(async () => {
       loadDate: OLD_DATE,
       reviewStatus: "approved",
       isCurrent: true,
+      loadBatchId: fixtureBatchId,
     },
     {
       itemCode: CANCELLED,
@@ -142,6 +172,7 @@ beforeAll(async () => {
       loadDate: OLD_DATE,
       reviewStatus: "approved",
       isCurrent: true,
+      loadBatchId: fixtureBatchId,
     },
     {
       itemCode: REINTRODUCED,
@@ -151,6 +182,7 @@ beforeAll(async () => {
       loadDate: "2024-05-01",
       reviewStatus: "approved",
       isCurrent: false,
+      loadBatchId: fixtureBatchId,
     },
     {
       itemCode: WITHDRAWN,
@@ -160,6 +192,7 @@ beforeAll(async () => {
       loadDate: "2026-03-05",
       reviewStatus: "approved",
       isCurrent: false,
+      loadBatchId: fixtureBatchId,
     },
   ]);
 });
@@ -184,7 +217,12 @@ afterAll(async () => {
   }
   await db
     .delete(mrpLoadBatchesTable)
-    .where(inArray(mrpLoadBatchesTable.fileName, TEST_FILES));
+    .where(
+      sql`${mrpLoadBatchesTable.fileName} IN (${sql.join(
+        TEST_FILES.map((file) => sql`${file}`),
+        sql`, `,
+      )}) OR ${mrpLoadBatchesTable.id} = ${fixtureBatchId}`,
+    );
   await db
     .delete(catalogProductsTable)
     .where(inArray(catalogProductsTable.itemCode, CODES));
@@ -242,6 +280,7 @@ describe("MRP import blocking review", () => {
     const health = await request.get("/catalog/data-health");
     expect(health.status).toBe(200);
     expect(health.body.flaggedMrpCount).toBeGreaterThanOrEqual(1);
+    expect(health.body.nullLoadBatchCount).toBe(0);
 
     const staged = await db
       .select()

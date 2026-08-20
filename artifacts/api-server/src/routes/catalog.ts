@@ -308,6 +308,11 @@ router.get("/catalog/data-health", async (_req, res) => {
           AND e.action = 'manual_correction'
       )
   `);
+  const nullBatchCountRows = await db.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count
+    FROM mrp_price_history
+    WHERE load_batch_id IS NULL
+  `);
   const untracedMrpRows = await db.execute<{
     itemCode: string;
     productName: string | null;
@@ -334,6 +339,7 @@ router.get("/catalog/data-health", async (_req, res) => {
     LIMIT 500
   `);
   const untracedMrpCount = untracedMrpCountRows.rows[0]?.count ?? 0;
+  const nullLoadBatchCount = nullBatchCountRows.rows[0]?.count ?? 0;
   const conflictRows = await db
     .select()
     .from(codeConflictsTable)
@@ -374,6 +380,7 @@ router.get("/catalog/data-health", async (_req, res) => {
     pricedProducts,
     pendingProducts,
     flaggedMrpCount,
+    nullLoadBatchCount,
     untracedMrpCount,
     untracedMrpRows: untracedMrpRows.rows,
     conflictCount: conflictRows.length,

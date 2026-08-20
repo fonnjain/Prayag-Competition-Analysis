@@ -1,9 +1,12 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import {
   catalogProductsTable,
   mrpPriceHistoryTable,
   mrpHistoryProvenanceEventsTable,
+  mrpLoadBatchesTable,
+  mrpSourcesTable,
   codeConflictsTable,
   competitorPricesTable,
 } from "@workspace/db";
@@ -284,6 +287,32 @@ export async function seedVariantPricesIfEmpty(): Promise<void> {
 
   const today = new Date().toISOString().slice(0, 10);
   const rows = (sanitarywareVariantSeedData as Array<{ itemCode: string; mrp: number; effectiveDate: string; variant: string }>);
+  const source = await db
+    .select({ id: mrpSourcesTable.id })
+    .from(mrpSourcesTable)
+    .where(eq(mrpSourcesTable.division, "Ceramic Sanitaryware"))
+    .limit(1);
+  const sourceId = source[0]?.id;
+  if (!sourceId) {
+    throw new Error("Ceramic Sanitaryware source must exist before variant seed data is loaded.");
+  }
+  const seedPayload = JSON.stringify(rows);
+  const batch = await db
+    .insert(mrpLoadBatchesTable)
+    .values({
+      sourceId,
+      fileName: "Prayag_Sanitaryware_Variant_Prices.xlsx",
+      fileSha256: createHash("sha256").update(seedPayload).digest("hex"),
+      fileSizeBytes: Buffer.byteLength(seedPayload),
+      downloadedAt: today,
+      rowCount: rows.length,
+      notes: "Application seed: sanitaryware colour-variant prices",
+    })
+    .returning({ id: mrpLoadBatchesTable.id });
+  const loadBatchId = batch[0]?.id;
+  if (!loadBatchId) {
+    throw new Error("Unable to create provenance batch for sanitaryware variant seed.");
+  }
 
   let inserted = 0;
   const BATCH = 50;
@@ -301,6 +330,7 @@ export async function seedVariantPricesIfEmpty(): Promise<void> {
           sourceFile: "Prayag_Sanitaryware_Variant_Prices.xlsx",
           isCurrent: false,
           reviewStatus: "approved" as const,
+          loadBatchId,
           variant: r.variant,
         })),
       )

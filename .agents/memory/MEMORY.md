@@ -17,3 +17,4 @@
 - [Cross-app browser regression setup](cross-app-browser-regression.md) — path-routed app-switch tests need Chromium explicitly, proxy workflows, and Nix browser libraries.
 - [Catalog baseline audits](catalog-baseline-audits.md) — never force an MRP count target; reconcile documented invalid keys before deleting history.
 - [Source removal period semantics](source-removal-period-semantics.md) — same-period MRP does not negate REMOVED; only later prices prove reintroduction.
+- [CP observation preflight](cp-observation-preflight.md) — scanning every CP sheet still leaves eight restored codes with removal-only evidence; retain the manifest until resolved.
