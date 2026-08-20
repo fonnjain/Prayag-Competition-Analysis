@@ -1,0 +1,135 @@
+# Replit Prompt — Remove Batch 154, Fix Two Loader Bugs, Then Reload
+
+The PTMT idempotency check found two real defects. This prompt removes the damage, fixes both causes, and only then repeats the load.
+
+**Do the parts in order.** Part A is urgent because prices are currently wrong in the app. Parts B and C must both be proven before Part D.
+
+---
+
+## Part A — Remove batch 154 now
+
+Batch 154 inserted **1,828 Standard rows at effective date 2026-08-20**. Because that date is today, those rows resolve as current and override the correct 05 March prices.
+
+This is already visible:
+
+```
+148-LS    should be ₹385.56 today  —  showing ₹416
+148-LSB   should be ₹410.00 today  —  showing ₹442
+```
+
+Plain Erosa now appears dearer than Erosa Blue. It is not. That inversion is the same symptom as the phantom `2026-04-20` period, and it means **live prices are wrong right now**.
+
+### Why deleting is correct here
+
+This is not tidying a count. These rows are provably invalid on three independent grounds:
+
+1. Their effective date is the **load date**, not any period in the workbook. The file's columns are `5th Mar, 2026` and `01st Sep, 2026`. There is no 20 August period.
+2. They came from a file **already loaded as batch 2** — same SHA-256, `5da96e39cac40ede…`.
+3. They are displacing correct prices in the running application.
+
+The diagnosis is complete, so nothing is lost by removing them.
+
+### Do
+
+- Delete the 1,828 rows belonging to `load_batch_id = 154`, then delete the batch record.
+- Run `recomputeCurrentFlags()`.
+- Confirm: **13,048** total, **12,750** Standard, **298** colour, **0** rows at effective date 2026-08-20, **0** null `load_batch_id`.
+- Confirm `148-LS` resolves to **385.56** today and is **cheaper** than `148-LSB` at **410.00**.
+
+### Then state which database this was
+
+Say plainly whether the reload ran against **development or production**. If production:
+
+- The public analysis app has been serving wrong PTMT prices since the load.
+- `Prayag-ECommerce-Hub` consumes `/api/v1/products` using `currentMrp`, so it may already have pulled them. Report when the Hub last synced, if you can determine it from this side. Change nothing in that repository.
+
+---
+
+## Part B — The duplicate guard checks only the latest batch
+
+Your diagnosis: the guard compares the incoming hash against the **most recent** batch for the source. Batch 113 (the March file) sat between batch 2 and this reload, so the matching September checksum in batch 2 was never reached.
+
+Compare the incoming SHA-256 against **every** batch for that source, not just the latest. Report all matches, with batch id, filename and load date, so the user sees the full history rather than one prior load.
+
+The March file was itself a mistake, but the guard must not depend on nobody ever loading the wrong file. Anything that only inspects the most recent record has this failure mode by construction.
+
+---
+
+## Part C — Effective dates must come from the workbook, never the load date
+
+A file whose only periods are `5th Mar, 2026` and `01st Sep, 2026` produced 1,828 rows dated `2026-08-20`. The loader used the load date as the effective date.
+
+**This is the more dangerous of the two bugs.** The guard failure allowed a duplicate load; this one means *any* load can silently create a "today" period that outranks every real revision. It would have corrupted prices even with a legitimately new file.
+
+Find where the effective date is assigned and make it read from the column header. Then add a hard rule:
+
+> A price row's effective date must correspond to a dated column in the source workbook. If a period cannot be resolved from the sheet, reject the row and report it. Never substitute the load date, today's date, or any default.
+
+`load_date` and `effective_date` answer different questions and must never fall back to one another — the same distinction as `downloaded_at` versus `loaded_at` in the provenance work.
+
+Report which periods this loader now resolves for the PTMT workbook. Expected: **2026-03-05** and **2026-09-01**, nothing else.
+
+---
+
+## Part D — Repeat the reload, only after B and C are proven
+
+Do not attempt this until Parts B and C are complete and their tests pass.
+
+Load `NEW PTMT MRP w.e.f. List as on 01st Sep, 2026.xlsx` — SHA-256 `5da96e39cac40ede1480be4013554753cbdf4589ff0b5f77a7be43bfe13c8db0`, 918,578 bytes — as source **PTMT & Plastic Fittings**, download date **2026-08-19**.
+
+| Check | Expected |
+|---|---|
+| Duplicate guard fires, naming batch 2 | yes |
+| Rows added | **0** |
+| `mrp_price_history` total | **13,048** |
+| Rows at effective date 2026-08-20 | **0** |
+| Discontinued products | **90** |
+| Of the 69 restored codes, re-marked | **0** |
+| Live products at `asOf = 2026-09-01` | **6,213** |
+
+Spot checks:
+
+```
+148-LS   → 385.56 today, and CHEAPER than 148-LSB at 410.00
+911-D    → 3,240 at 2026-08-31, 3,490 at 2026-09-01
+616-D    → 2,490 at 2026-08-31, no price at 2026-09-01
+1242-D   → 10,690 today, 11,550 at 2026-09-01
+```
+
+The 18 sink codes must still return zero rows at 2026-09-01.
+
+**If anything moves again, stop and report.** Do not delete a second time without reporting first — a second failure after both fixes would mean a third cause, and that is worth seeing intact.
+
+---
+
+## Acceptance tests
+
+```
+1.  Loading a file whose hash matches ANY prior batch for that source triggers
+    the duplicate guard — including when a different file was loaded in between.
+    Reproduce the exact batch 2 / 113 / 154 sequence.
+2.  Every price row's effective date matches a dated column in its source sheet.
+3.  A sheet with no resolvable period produces a rejected row and a report entry,
+    not a row dated today.
+4.  mrp_price_history holds 13,048 rows with zero at effective date 2026-08-20.
+5.  148-LS resolves to 385.56 today and is cheaper than 148-LSB.
+6.  Reloading the September PTMT workbook adds zero rows.
+7.  616-D still returns no price at 2026-09-01 — the deletion must not disturb
+    the discontinuation state.
+```
+
+Test 1 must reproduce the actual sequence. A guard tested only against the immediately preceding batch would pass while still carrying the bug.
+
+---
+
+## Report
+
+Read every figure from the database:
+
+- Rows and products before and after the batch 154 removal.
+- Which database this ran against, and the Hub sync position if determinable.
+- All batches now matching hash `5da96e39cac40ede…`, with ids and dates.
+- Periods the loader resolves for the PTMT workbook.
+- Part D results in full, or a statement that B and C were not both proven.
+
+One clean commit covering Parts B and C. Part A is a data repair — record it in the batch audit log with a reason, do not commit it as code.
