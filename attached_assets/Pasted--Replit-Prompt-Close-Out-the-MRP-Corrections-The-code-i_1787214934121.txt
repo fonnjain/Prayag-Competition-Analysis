@@ -1,0 +1,79 @@
+# Replit Prompt — Close Out the MRP Corrections
+
+The code is done. `deriveConfirmedDiscontinuations()` now carries all three parts of the withdrawal rule, `discontinuationCorrectionV2.ts` holds the 69 codes, and `source-removal-period-semantics.md` records the reasoning. This task proves the **database** matches the fixed rule and closes four loose ends.
+
+Mostly read-only. Only section 2 writes, and only by re-running loaders that should change nothing.
+
+**Read every figure from the database. Do not restate expected values from this prompt as if they were results.**
+
+---
+
+## 1. Confirm the discontinuation data
+
+| Check | Expected |
+|---|---|
+| `catalog_products` rows with non-null `discontinued_from` | **90** |
+| That set matches sheet `2_Confirmed_discontinued` | exact, both directions |
+| `WT-3LH-50` — resolved price today, and `discontinued_from` | **1,00,000** and **NULL** |
+| All 8 water tanks appear in a catalogue query as of today | 8 of 8 |
+| `BD-40` — resolved price today, and `discontinued_from` | 3,990 and NULL |
+| `616-D` at `asOf = 2026-08-31` | 2,490 |
+| `616-D` at `asOf = 2026-09-01` | **no price** |
+| Products live at `asOf = 2026-09-01` | **6,213** |
+| `mrp_price_history` rows, split by variant | 12,750 Standard + 298 other |
+
+**The `616-D` pair is the one that matters most.** Part three could over-correct: a rule that treats any marker-plus-price as reintroduction would resurrect the genuine withdrawals. `616-D` must still go dark on 01 September. If the count comes back below 90, that is what happened.
+
+---
+
+## 2. Loader idempotency
+
+Re-run all six official MRP loaders against the same source workbooks. Then report:
+
+- Row count. Expected **13,048**, unchanged.
+- `discontinued_from` count. Expected **90**, unchanged.
+- How many of the 69 corrected codes were re-marked. Expected **zero**.
+
+This is the only check that distinguishes a fixed rule from patched rows. If any of the 69 come back, the correction lives in the data but not in the loader, and it will be undone by the next quarterly load.
+
+---
+
+## 3. The two missing colour prices
+
+`variant-pricing.md` records **298** colour rows. The source holds **300**: 236 Ivory, 38 White with Jet, 26 Pink / Green / Blue.
+
+Identify the two and explain them — most likely a duplicate `(item_code, effective_date, variant)` hitting `DO NOTHING`, or a source cell that failed the numeric test. **Do not insert rows to reach 300.** If they are genuine duplicates in the source, say so and leave the count at 298.
+
+---
+
+## 4. The 556 inactivated codes
+
+Report the count grouped by division and the 20 most recently updated. Pay particular attention to CP and Hardware — CP has the most complex sheet structure, and Hardware's 277 codes sit in only two sheets, so a miss there would be systematic rather than scattered.
+
+Do not delete any of them.
+
+---
+
+## 5. Test triage
+
+`dashboard.chip.test.tsx` — seven tests throw `No QueryClient set` before reaching an assertion. That is a test-harness gap, not a product regression: the component calls React Query directly while the test renders it bare. Confirm the dashboard renders correctly in the running app, then wrap the test file in a `QueryClientProvider`.
+
+For any other failure, report file, test name, expected, actual, and whether it is a stale expectation or a real regression. Do not update an expectation without naming the source change that justifies it.
+
+---
+
+## 6. Two questions to answer in the report
+
+**Public surfaces.** `public-price-finder-access.md` exists, so this has had some thought. State plainly: which routes serve data without authentication, what a signed-out visitor can retrieve, and whether admin roles are enforced server-side or only in the UI. A public price surface and a permissions system are the two places an untested assumption becomes a live exposure.
+
+**A second MRP pipeline.** The repository `fonnjain/Prayag-ECommerce-Hub` contains `scripts/src/sync-external-mrp.ts` and a commit adding a sanitaryware variant price sheet and "new -D/-DM sink variants". Prayag MRP now appears to live in two places.
+
+Describe where the Hub gets its MRP: from the six official workbooks, from this application's database, or from somewhere else. If it is a third path, it bypasses every correction made here — the SINK column-K handler, the withdrawal rule, the phantom-period removal — and the two systems will disagree on sink prices specifically. Do not change anything in the other repository; just say what the relationship is.
+
+---
+
+## 7. Report
+
+One line per check: check, expected, actual read from the database, pass or fail. Then a short list of anything that failed, with what was found.
+
+If everything passes, say so and give the figures. **Make no commits** unless section 5 requires the test-harness fix, in which case commit only that.

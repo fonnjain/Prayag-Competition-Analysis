@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import * as XLSX from "xlsx";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   catalogProductsTable,
   db,
@@ -28,12 +28,14 @@ const REVIEW_CANCEL_FILE = `review-cancel-test-${RUN}.csv`;
 const REINTRO_MARKER_FILE = `removal-marker-${RUN}.xlsx`;
 const REINTRO_PRICE_FILE = `removal-reintroduction-${RUN}.xlsx`;
 const WITHDRAWAL_MARKER_FILE = `removal-withdrawal-${RUN}.xlsx`;
+const CORRECTION_PROTECTION_FILE = `correction-protection-${RUN}.xlsx`;
 const TEST_FILES = [
   REVIEW_FILE,
   REVIEW_CANCEL_FILE,
   REINTRO_MARKER_FILE,
   REINTRO_PRICE_FILE,
   WITHDRAWAL_MARKER_FILE,
+  CORRECTION_PROTECTION_FILE,
 ];
 
 const app = express();
@@ -482,5 +484,37 @@ describe("MRP import blocking review", () => {
     expect(
       confirmed.find((product) => product.itemCode === "616-D"),
     ).toMatchObject({ discontinuedFrom: "2026-09-01" });
+
+    const protectionCheck = await request
+      .post("/catalog/load-mrp")
+      .field("effectiveDate", "2026-08-01")
+      .field("sourceId", String(ptmtSourceId))
+      .field("downloadedAt", "2026-08-19")
+      .attach(
+        "file",
+        workbookBuffer([[discontinuationCorrectionV2.unmarkedCodes[0], "REMOVED"]]),
+        {
+          filename: CORRECTION_PROTECTION_FILE,
+          contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      );
+    expect(protectionCheck.status).toBe(200);
+    const [stillLive, discontinuedCount] = await Promise.all([
+      db
+        .select({ discontinuedFrom: catalogProductsTable.discontinuedFrom })
+        .from(catalogProductsTable)
+        .where(
+          eq(
+            catalogProductsTable.itemCode,
+            discontinuationCorrectionV2.unmarkedCodes[0],
+          ),
+        ),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(catalogProductsTable)
+        .where(sql`${catalogProductsTable.discontinuedFrom} IS NOT NULL`),
+    ]);
+    expect(stillLive[0]?.discontinuedFrom).toBeNull();
+    expect(Number(discontinuedCount[0]?.count)).toBe(90);
   });
 });

@@ -7,4 +7,4 @@ A numeric MRP in the same revision as a `REMOVED` marker is historical context, 
 
 **Why:** Source price lists can retain a last payable MRP alongside a withdrawal marker. Treating that same-period price as a reintroduction makes withdrawn products reappear, while ignoring later prices hides genuine reintroductions.
 
-**How to apply:** Preserve removal observations from parsed source sheets, reconcile them with approved Standard-price history during the load transaction, and never globally clear withdrawal flags for a normal source upload. Versioned correction manifests still use the dedicated correction upload route.
+**How to apply:** Preserve removal observations from parsed source sheets and reconcile them with approved Standard-price history during the load transaction. After every normal source upload, reassert only the audited code/date entries in the active versioned correction manifest; do not clear unrelated withdrawal flags. Update that manifest when later verified source evidence changes an audited code’s status.

@@ -16,6 +16,7 @@ import {
 import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
+import { discontinuationCorrectionV2 } from "../data/discontinuationCorrectionV2";
 import {
   ensureOfficialMrpSources,
   isIsoDate,
@@ -169,6 +170,38 @@ async function applyDiscontinuationCorrection(
     }
   });
   await recomputeCurrentFlags();
+}
+
+/**
+ * The versioned correction resolves source-sheet ambiguities that a single
+ * workbook cannot see. Reassert only those audited codes after a normal load;
+ * leave any unrelated source withdrawal untouched.
+ */
+async function reassertVersionedDiscontinuationCorrection(): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(catalogProductsTable)
+      .set({ discontinuedFrom: null, updatedAt: new Date() })
+      .where(
+        inArray(
+          catalogProductsTable.itemCode,
+          [...discontinuationCorrectionV2.unmarkedCodes],
+        ),
+      );
+
+    const confirmedByDate = new Map<string, string[]>();
+    for (const row of discontinuationCorrectionV2.confirmed) {
+      const codes = confirmedByDate.get(row.discontinuedFrom) ?? [];
+      codes.push(row.itemCode);
+      confirmedByDate.set(row.discontinuedFrom, codes);
+    }
+    for (const [discontinuedFrom, itemCodes] of confirmedByDate) {
+      await tx
+        .update(catalogProductsTable)
+        .set({ discontinuedFrom, updatedAt: new Date() })
+        .where(inArray(catalogProductsTable.itemCode, itemCodes));
+    }
+  });
 }
 
 function parseSheet(grid: unknown[][], knownCodes: Set<string>): ParseResult {
@@ -1209,6 +1242,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
         fileSummaries.push(summary);
       }
 
+      await reassertVersionedDiscontinuationCorrection();
       await recomputeCurrentFlags();
 
       // Build aggregate totals across all files.
@@ -1261,6 +1295,7 @@ router.post("/catalog/load-mrp", upload.single("file"), async (req, res) => {
       loadBatchId,
     );
 
+    await reassertVersionedDiscontinuationCorrection();
     await recomputeCurrentFlags();
     await db
       .update(mrpLoadBatchesTable)
