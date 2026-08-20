@@ -1,0 +1,94 @@
+# Replit Prompt — Push the Loader Fixes, Then Guard the Write Routes
+
+Two items. Part A first and on its own, because the fixes it protects currently exist in one place only.
+
+---
+
+## Part A — `89c7f6c` is not on GitHub
+
+`origin/main` is at `6082de9`. Commit `89c7f6c` does not exist in the remote — the object is not there at all. The duplicate-batch fix and the effective-date fix live only in this workspace.
+
+Those are the two changes that stop the batch 154 failure recurring. If the workspace is reset, rolled back, or a merge goes wrong, they are gone and nothing in the repository records that they were ever made.
+
+**Push `89c7f6c` to `origin/main` before doing anything else in this task.** Then confirm by reporting what `origin/main` resolves to and that `89c7f6c` is reachable from it.
+
+If the push conflicts, report the conflict and stop. Do not resolve it by rebasing or squashing away the loader changes.
+
+---
+
+## Part B — Any logged-in user can run a catalogue import
+
+`routes/index.ts` mounts every router behind a single `requireAuth` that checks only `req.isAuthenticated()`:
+
+```ts
+router.use(requireAuth);                 // any authenticated user
+router.use(adminUsersRouter);            // has its own requireAdmin
+router.use(apiKeysRouter);
+router.use(priceFinderRouter);
+router.use(catalogRouter);
+router.use(catalogImportExportRouter);   // no role check
+router.use(catalogSyncRouter);           // no role check
+router.use(importBatchesRouter);         // no role check
+```
+
+There is no role check at that boundary. `adminUsers.ts` already does this properly — `requireAdmin` testing `req.user.role !== "admin"`, applied at `/admin/users`. The pattern exists; it is not applied to the import routes.
+
+**The batch 154 incident is the argument.** A single import inserted 1,828 rows dated today, silently overrode correct prices, and inverted the Erosa range. That reach currently belongs to every account with a login, not to administrators. This is about limiting blast radius from ordinary mistakes, not about distrust.
+
+### What to change
+
+Lift `requireAdmin` out of `adminUsers.ts` into a shared middleware and apply it to the routes that **write** catalogue or price data:
+
+- `catalogImportExportRouter` — the MRP and catalogue import paths
+- `catalogSyncRouter`
+- `importBatchesRouter` — approve and commit
+- `apiKeysRouter` — issuing keys is an administrative act
+
+### Two things to get right
+
+**`catalogRouter` serves reads as well as writes.** Do not put a blanket admin guard on it — that would lock ordinary users out of the catalogue they need to do their jobs. Apply the guard to its write endpoints only, and list which endpoints you classified as writes and which as reads.
+
+**Guard server-side, at the router.** Hiding a button in the UI is not a control. Confirm that a direct request to an import endpoint from a non-admin session returns 403 with no UI involved.
+
+### Report
+
+Which routers and endpoints now require admin, which remain available to any authenticated user, and the reasoning for anything that was a judgement call.
+
+---
+
+## Part C — The Price Finder note contradicts the code
+
+`public-price-finder-access.md` describes the Price Finder as publicly accessible. The router is mounted after `requireAuth`, so it is not.
+
+Decide which is intended and make them agree:
+
+- If it should be public, mount it before `requireAuth` and state exactly what an anonymous visitor can retrieve.
+- If it should stay authenticated, correct the note.
+
+Either is defensible. A note that disagrees with the code is worse than no note, because the next person reads the note.
+
+---
+
+## Acceptance tests
+
+```
+1.  A non-admin authenticated session receives 403 from the MRP import endpoint.
+2.  A non-admin authenticated session receives 403 from catalogue sync,
+    import-batch approve, and API key creation.
+3.  An admin session succeeds on all of the above.
+4.  A non-admin authenticated session can still read the catalogue, run a
+    comparison, and use analysis — no regression for ordinary users.
+5.  An anonymous request to any of these returns 401, not 403.
+6.  Whatever Part C decides, a test asserts it: either an anonymous Price Finder
+    request succeeds, or it returns 401.
+```
+
+Test 4 is the one that catches over-correction. Locking ordinary users out of the catalogue would be a worse outcome than the gap being closed.
+
+---
+
+## Scope
+
+Parts A, B and C only. Do not touch the manifest reassertion, the CP observation set, or the eight EMERALD 61 codes — those are waiting on a lifecycle answer from the price-list owner.
+
+Push Part A separately and first. Parts B and C can share one clean commit.
