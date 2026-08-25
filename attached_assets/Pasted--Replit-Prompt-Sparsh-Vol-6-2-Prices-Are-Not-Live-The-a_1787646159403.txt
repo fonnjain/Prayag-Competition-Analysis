@@ -1,0 +1,93 @@
+# Replit Prompt — Sparsh Vol 6.2 Prices Are Not Live
+
+The application is showing Sparsh Pearl's **previous** catalogue prices, not the Vol 6.2 prices that were reviewed and approved.
+
+## The evidence
+
+Product `151` (Ball Cock with Rod & Ball 15mm, Black Pearl) displays:
+
+```
+Sparsh Pearl   ₹410.00   Valid from 5 Mar 2026   Current gap +28.8%
+```
+
+`151` maps to Sparsh `BCC-301`. In the verified Vol 6.2 baseline, and on catalogue page 83 read directly:
+
+| | |
+|---|---|
+| Old MRP (previous volume) | **₹410** ← what is displayed |
+| Vol 6.2 MRP | **₹330** |
+
+"Valid from 5 Mar 2026" is the earlier batch's effective date. The Vol 6.2 batch was loaded `w.e.f. 2026-08-20`.
+
+**This item matters more than most.** `BCC-301` is one of only 14 products where Sparsh *cut* the price — down 19.5%, against a ~+15.8% median rise everywhere else. So the stale figure does not merely drift, it points the wrong way:
+
+- Displayed ₹410 → gap **+28.8%**, Prayag looks far cheaper
+- Correct ₹330 → gap **+3.7%**
+
+A 25-point error on the flattering side. And from 01 Sep 2026, when Prayag rises to ₹336, Prayag becomes **more expensive** than Sparsh on this item — the opposite of what the screen currently implies.
+
+---
+
+## Part A — Diagnose before changing anything
+
+Report:
+
+1. Every `competitor_prices` batch for Sparsh Pearl: batch id, effective date, row count, status.
+2. Is there a batch at effective date **2026-08-20**? If yes, how many rows, and what status.
+3. What `BCC-301` currently resolves to, with the effective date of the row being used.
+4. How many of the 150 mapped rows currently resolve to their **Vol 6.2** price rather than the previous one.
+
+Point 4 decides the shape of the problem:
+
+- **Zero of 150** → the Approve & Commit never ran. The whole batch needs committing.
+- **Most but not all** → the commit ran and some rows failed. Report which and why before fixing anything.
+- **All 150** → the data is right and the display is reading the wrong row. Then the fault is in the query, not the import.
+
+---
+
+## Part B — If the batch was never committed
+
+Locate the reviewed Sparsh Pearl batch — the one with **141 ready, 9 needs-review, 0 not-found, 86 new products** — and commit it.
+
+**Commit the 150 mapped rows only.** The 86 new products stay out: they have no Competitor Master mapping and are with the Prayag team for review. They must not create `catalog_products` rows under any circumstance — a Prayag product invented from a competitor catalogue is exactly the contamination this project has already had to unwind once.
+
+If the batch has expired or been discarded, say so rather than re-running the extraction. Re-importing is a bigger operation and needs its own decision.
+
+---
+
+## Part C — If the batch committed but the display is stale
+
+Then `competitor_prices` holds the right rows and something downstream is picking the wrong one. Check in this order:
+
+- Is the comparison reading the **stored** `prayag_mrp_at_compare` snapshot, or resolving live and by date?
+- If it resolves by date, what `asOf` is the product page passing? A page defaulting to an earlier date would legitimately return the 5 Mar row.
+- Is `is_current` stale on `competitor_prices`? It is a convenience flag and has gone stale in this project before — the resolution must be by effective date, not by the flag.
+
+---
+
+## Verification
+
+After whichever fix applies:
+
+```
+BCC-301   → ₹330, effective 2026-08-20
+Product 151 gap  → +3.7%, not +28.8%
+RPS-2285  → ₹1,388 (was ₹1,200 pre-commit)
+Median gap across the 150  → about +10.8%, up from about -1%
+Prayag cheaper on          → about 132 of 150
+```
+
+The median moving to roughly **+10.8%** is the headline confirmation. It has been predicted twice from the source data and matched the app's own arithmetic to within 0.1 points, so it is a reliable check that the whole batch landed rather than a few rows.
+
+Also confirm nothing else moved: `mrp_price_history` still **13,048** rows, discontinued still **90**, live products at 2026-09-01 still **6,213**. Committing competitor prices must not touch Prayag's catalogue.
+
+---
+
+## Report
+
+- The Part A diagnosis in full, before any change.
+- Which of Part B or Part C applied, and why.
+- The verification figures, read from the database.
+- Confirmation that no `catalog_products` rows were created from the 86 new products.
+
+If Part A shows the data is already correct and only the display is wrong, **do not re-commit the batch** — fix the query instead. Re-committing over correct data would hide the real fault.
