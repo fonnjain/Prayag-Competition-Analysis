@@ -1,0 +1,82 @@
+# Replit Prompt — Explain the Sparsh Retiming Before It Runs
+
+I declined the production write because I did not understand it well enough to approve it. **Do not run anything.** Explain it first, in plain terms, and I will decide afterwards.
+
+Answer as if to someone who understands the business but not the schema. Where a number is involved, give the actual number rather than describing it.
+
+---
+
+## 1. What does the script change?
+
+- Which table and which rows, and how many rows.
+- What the value is now, and what it becomes.
+- Does it touch **only** the Sparsh Pearl Vol 6.2 competitor batch, or anything else?
+- Does it touch Prayag MRP data at any point? Confirm plainly yes or no.
+
+---
+
+## 2. What will look different on screen tomorrow?
+
+Give me the before-and-after for the things people actually look at:
+
+- Product `151` — the Sparsh price shown today, and after the change.
+- The **median gap across the 150 mapped products**, before and after.
+- How many of the 150 show Prayag as cheaper, before and after.
+- Anything on the dashboard or Competition Analysis that changes materially.
+
+I expect today's Sparsh price to revert to **₹410** and the median to move from about **+10.8% to about −1.1%**. Confirm those figures from the database, or correct them.
+
+If that is right, say clearly whether it is a **correction or a regression**, and why. I need to be able to explain this to the sales team in one sentence.
+
+---
+
+## 3. Why is this the right date?
+
+The batch is currently dated 2026-08-20, which is the day the file was uploaded. The proposal is 2026-09-01.
+
+- What evidence supports 01 September as the date Vol 6.2 takes effect?
+- What happens to comparisons dated between 20 August and 01 September?
+- The **earlier** Sparsh period is dated 2026-03-05, which is a Prayag PTMT revision date rather than a Sparsh one. Is that date being changed by this script? It should not be.
+
+---
+
+## 4. Is it reversible?
+
+- If the result is wrong, what exactly restores the previous state?
+- Has the rollback been tested, or only written?
+- What is captured before the change so the previous state is recoverable — a backup, an audit row, both?
+- If the script is interrupted halfway, what state is the database left in?
+
+---
+
+## 5. Does this fix the cause, or only this batch?
+
+The competitor import takes `effectiveDate` from the upload form and falls back to the server's current date when it does not parse. The review screen displayed a date the database did not hold.
+
+- Does this script address either of those, or only retime the existing rows?
+- If only retiming: what stops the **next** PDF import from repeating the problem?
+
+I would rather fix the cause and the batch together than retime this one and meet the same issue on the next catalogue.
+
+---
+
+## 6. What about development?
+
+Development still holds the previous Sparsh period as current, and a pending batch dated 2026-03-05. Reading a development screen is what started this whole investigation.
+
+- Does this script apply to development, production, or both?
+- What happens to the pending development batch?
+
+---
+
+## 7. Which write was declined, and why did it need approval?
+
+Say plainly whether the block was a **permission control in the application**, or simply a confirmation step. If a permission control, which one and at what boundary — that is useful to know independently, since the catalogue import routes were found to have no admin restriction.
+
+---
+
+## Then stop
+
+Answer these seven points and **make no changes** — no production write, no development write, no schema change, no commit.
+
+If any answer is "I am not certain", say so rather than filling the gap. An honest gap is more useful to me than a confident guess, and I will ask for whatever is missing.
