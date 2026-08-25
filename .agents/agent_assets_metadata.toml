@@ -46,3 +46,17 @@ uri = "file://attached_assets/prayag-verified-catalog-sync.json"
 type = "unspecified"
 title = "Download: prayag-verified-catalog-sync.json"
 description = "Click the download control on this attachment first. Then choose the downloaded JSON file from your Windows Downloads folder in the production Data Health page."
+
+[[outputs]]
+id = "NoQbcYUQfptWOFCyBuFPP"
+uri = "file://.agents/outputs/Sparsh-Pearl-review-2026-08-20-batch-12.xlsx"
+type = "table"
+title = "Sparsh Pearl review workbook — batch 12"
+description = "Production review export captured before discard; 150 mapped rows from batch 12 dated 20 August 2026."
+
+[[outputs]]
+id = "-9ICB0yybPhgCTIJb_Qs6"
+uri = "file://.agents/outputs/Sparsh-Pearl-review-2026-08-20-batch-13.xlsx"
+type = "table"
+title = "Sparsh Pearl review workbook — batch 13"
+description = "Production review export captured before discard; 150 mapped rows from batch 13 dated 20 August 2026."
