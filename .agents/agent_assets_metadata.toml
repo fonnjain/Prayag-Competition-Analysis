@@ -60,3 +60,10 @@ uri = "file://.agents/outputs/Sparsh-Pearl-review-2026-08-20-batch-13.xlsx"
 type = "table"
 title = "Sparsh Pearl review workbook — batch 13"
 description = "Production review export captured before discard; 150 mapped rows from batch 13 dated 20 August 2026."
+
+[[outputs]]
+id = "9QMXDPStfvVSTJEjijZcj"
+uri = "file://.agents/outputs/Sparsh-Pearl-batch-13-new-products.xlsx"
+type = "table"
+title = "Sparsh Pearl — 101 new products (batch 13)"
+description = "Production staging export with product code, extracted name, MRP, catalogue page, series mapping, blank Prayag review columns, and 15 batch-13-only codes marked."

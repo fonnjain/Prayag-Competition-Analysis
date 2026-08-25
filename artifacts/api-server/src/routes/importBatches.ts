@@ -169,6 +169,25 @@ async function recomputeCurrentFlags(competitor: string): Promise<void> {
   `);
 }
 
+function resolveNewProductSeries(
+  competitor: string,
+  competitorCode: string | null,
+): { sparshSeries: string; prayagSeries: string } {
+  if (competitor !== "Sparsh Pearl") {
+    return { sparshSeries: "—", prayagSeries: "—" };
+  }
+
+  const normalizedCode = competitorCode?.trim().toUpperCase() ?? "";
+  const series = sparshPearlProfile.seriesMap.find((entry) =>
+    normalizedCode.startsWith(entry.codePrefix),
+  );
+
+  return {
+    sparshSeries: series?.sparshSeries ?? "Roman / allied",
+    prayagSeries: series?.prayagSeries ?? "Roman / allied",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // POST /catalog/import-batches
 // ---------------------------------------------------------------------------
@@ -609,9 +628,39 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
     ]);
   }
 
+  const newProductHeader = [
+    `${batch.competitor} Code`,
+    "Product Name (Extracted)",
+    "MRP",
+    "Catalogue Page",
+    `${batch.competitor} Series`,
+    "Equivalent Prayag Series",
+    "Does an equivalent exist",
+    "Prayag Cat No.",
+    "Notes",
+  ];
+  const newProductBody = stagingRows
+    .filter((r) => r.status === "new_product")
+    .map((r) => {
+      const series = resolveNewProductSeries(batch.competitor, r.competitorCodeCatalogue);
+      return [
+        r.competitorCodeCatalogue ?? r.competitorCodeMaster ?? "",
+        r.catalogueDescription ?? r.description ?? "",
+        r.newMrp ?? null,
+        r.page ?? null,
+        series.sparshSeries,
+        series.prayagSeries,
+        "",
+        "",
+        "",
+      ];
+    });
+
   const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+  const newProductsWs = XLSX.utils.aoa_to_sheet([newProductHeader, ...newProductBody]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Review");
+  XLSX.utils.book_append_sheet(wb, newProductsWs, "New Products");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const fname = `${batch.competitor.replace(/\s+/g, "-")}-review-${batch.effectiveDate}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

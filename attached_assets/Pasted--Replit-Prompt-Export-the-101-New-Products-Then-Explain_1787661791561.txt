@@ -1,0 +1,75 @@
+# Replit Prompt — Export the 101 New Products, Then Explain the Variance
+
+Do not run the discard yet. Two things first.
+
+---
+
+## Context: batch #13 is the better extraction
+
+The 15 codes present only in batch `#13` were checked against an independent visual read of the catalogue pages at 200 DPI. **Twelve match exactly** — same price, same page. Three (`RPS-2276`, `RPS-2284`, `RPS-2290`, all page 27 Stop Cocks) were found by batch `#13` and missed by that independent read.
+
+So batch `#13`'s 101 is the most complete list anyone has:
+
+| Source | New products found |
+|---|---:|
+| Batch `#12` | 86 |
+| Independent page read | 98 |
+| **Batch `#13`** | **101** |
+
+Batch `#12` is 15 short, and the missing ones are not obscure — `TS-99` Wall Mixer ₹1,296, `RS-113` Wall Mixer ₹1,314, `RPS-2287` Center Hole Basin Mixer ₹1,642 are mainstream items.
+
+---
+
+## Part A — Export the 101 new products
+
+The current export includes only the 150 mapped rows. The `new_product` staging rows are not in it, and they exist nowhere else — not in the product catalogue, not in `competitor_prices`, not in any report.
+
+Produce a workbook of **batch #13's 101 new-product rows** with, per row:
+
+- Competitor code
+- Product name as extracted
+- MRP
+- Catalogue page
+- Sparsh series, and the equivalent Prayag series where the code family maps to one (`ED-` → Quadra, `RS-` → Diamond, `RPS-` → Vitro, `EVA-` → Cobra, `REG-` → Black Pearl, `TS-` → STANDARD, everything else → Roman / allied)
+- Three empty columns for the Prayag team: **does an equivalent exist**, **Prayag Cat No.**, **notes**
+
+Mark the 15 codes that appear only in batch `#13`, so the difference from the previously circulated list of 86 is visible.
+
+**Then fix the export itself.** A review export that silently omits the New Products tab is a gap — the tab exists in the UI, so the workbook should carry it. Add a New Products sheet to the standard export rather than producing this one as a one-off.
+
+---
+
+## Part B — Why did two runs differ by 15?
+
+Same PDF, same catalogue profile, two batches: one found 86 new products, the other 101. The mapped 150 were identical in both.
+
+That is not a rounding difference. Report:
+
+1. **Which batch ran first**, with timestamps.
+2. **What changed between them** — extractor code, catalogue profile, prompt, model, page list, DPI. If nothing changed, say so plainly.
+3. If nothing changed, then **the extractor is not repeatable on the same input.** State that as the finding.
+
+The three codes batch `#13` found and the independent read missed — `RPS-2276`, `RPS-2284`, `RPS-2290` — are all page 27 Stop Cocks, which sit in the small two-code tiles the runbook flags as error-prone. That is consistent with the variance being concentrated in a specific tile layout rather than spread randomly.
+
+**This matters beyond this catalogue.** If two runs of the same extractor on the same PDF can differ by 15 products, then a single run is not sufficient evidence of coverage, and every future competitor catalogue has the same exposure. The two-pass read with adjudication that was specified for price extraction addresses exactly this — report whether it was ever implemented, and whether it covers code discovery as well as prices.
+
+---
+
+## Part C — Then discard
+
+Once Part A's workbook exists and Part B is answered, run the prepared discard for production batches `#12` and `#13`.
+
+Preserve all 487 staging rows. Mark only those two batches discarded. Record the audit reason.
+
+Production write access is read-only from the workspace, so this needs an authorized writable connection — flag it when ready rather than attempting a workaround.
+
+---
+
+## Report
+
+- The 101-row workbook, with the 15 batch-`#13`-only codes marked.
+- Whether the standard export now includes new products.
+- Part B's answer: which ran first, what changed, and whether the extractor is repeatable.
+- Confirmation that the discard is pending a writable connection, or that it completed.
+
+**Do not re-run the extraction to try to reconcile the counts.** A third run producing a third number would confirm the variance without explaining it. The question is why two existing runs differ, not what a new one produces.
