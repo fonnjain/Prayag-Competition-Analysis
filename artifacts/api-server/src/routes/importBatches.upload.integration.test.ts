@@ -68,4 +68,28 @@ describe("PDF catalogue upload effective date", () => {
     expect(response.body.error).toMatch(/effectiveDate.*valid/i);
     await assertNoBatchCreated();
   });
+
+  it("returns the persisted submitted effective date to the import review flow", async () => {
+    competitor = `__test_review_date_${Date.now()}__`;
+    const [batch] = await db
+      .insert(importBatchesTable)
+      .values({
+        competitor,
+        effectiveDate: "2026-09-01",
+        sourceFileName: "verified-period.pdf",
+        priceBasis: "MRP",
+        status: "pending",
+        rowCounts: JSON.stringify({ ok: 0, needs_review: 0, not_found: 0, new_products: 0 }),
+      })
+      .returning({ id: importBatchesTable.id });
+
+    const response = await request.get(`/catalog/import-batches/${batch!.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      id: batch!.id,
+      competitor,
+      effectiveDate: "2026-09-01",
+    });
+  });
 });
