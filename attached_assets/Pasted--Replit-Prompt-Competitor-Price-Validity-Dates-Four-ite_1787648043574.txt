@@ -1,0 +1,127 @@
+# Replit Prompt — Competitor Price Validity Dates
+
+Four items. Part A changes what the application reports and must be done knowingly, not quietly.
+
+---
+
+## Part A — Sparsh Pearl Vol 6.2 takes effect 01 September 2026
+
+Production currently holds all 150 Vol 6.2 competitor prices at effective date **2026-08-20**. That is the date the file was uploaded, not the date the catalogue takes force.
+
+**Change the Vol 6.2 batch effective date to `2026-09-01`.** Apply in production and development.
+
+**Leave the earlier Sparsh period exactly as it is.** Its stored date stays untouched — do not adjust, correct or re-derive it.
+
+### This changes the numbers on screen, and that is the intended outcome
+
+The comparison today is period-mismatched: Sparsh's **new** prices measured against Prayag's **old** prices. Correcting the date makes both sides move together.
+
+| | Median gap | Prayag cheaper |
+|---|---:|---:|
+| Now — Sparsh Vol 6.2 vs Prayag 05 Mar (mismatched) | +10.8% | 132 / 150 |
+| After — today, both on previous prices | **−1.1%** | 59 / 150 |
+| After — from 01 Sep, both on new prices | **+2.9%** | 98 / 150 |
+
+Worked example, `BCC-301` against Prayag `151`:
+
+```
+Today    Sparsh ₹410  vs Prayag ₹318.24  →  +28.8%
+01 Sep   Sparsh ₹330  vs Prayag ₹336.00  →   −1.8%   (Prayag dearer)
+```
+
+**So today's screen will show ₹410 again, and that will now be correct** — Vol 6.2 is not yet in force. The +10.8% figure was never true of any single moment; it was an artefact of comparing two different periods.
+
+Do not treat the drop from +10.8% to −1.1% as a regression. Confirm it, and report both figures.
+
+---
+
+## Part B — Competitor prices need validity windows
+
+Prayag prices already resolve into windows — the product page shows *"Valid 5 Mar 2026 – 31 Aug 2026"* and *"Increases to ₹336 on 1 Sept 2026"*. Competitor prices show only *"Valid from …"*.
+
+Give competitor prices the same treatment, reusing the existing `priceWindow` logic rather than writing a parallel implementation:
+
+- **Valid from** — the batch's effective date.
+- **Valid to** — the day before the next batch for that competitor and code takes effect; open-ended when none exists.
+- **An upcoming-change indicator** when a later batch exists, matching the Prayag "changes soon" treatment.
+
+After Part A, `BCC-301` should read: **₹410, valid 5 Mar 2026 – 31 Aug 2026, falls to ₹330 on 1 Sept 2026.**
+
+That a competitor price is *falling* is exactly the kind of thing this application exists to surface, and it is currently invisible.
+
+Gap resolution must stay **period-matched**: the competitor price in force at the requested date, against the Prayag price in force at the same date. Never the current competitor price against a dated Prayag price, or the reverse.
+
+---
+
+## Part C — The review screen shows a date the database does not hold
+
+The review screen displayed `w.e.f. 2026-08-20` while the batch stored `2026-03-05`. 2026-08-20 was that day's date.
+
+So the review screen is **not reading the batch's persisted effective date** — it is showing a default. The import path takes `effectiveDate` from the upload form, and falls back to the server's current date when it does not parse.
+
+Two fixes:
+
+**Capture at upload, display read-only thereafter.** The review screen must read `batch.effectiveDate` from the batch record. One source of truth, no re-derivation.
+
+**Remove the current-date fallback entirely.** If no valid effective date is supplied, **reject the import** with a clear message. Do not assume a date.
+
+This is the same defect class fixed in the MRP loader on 23 August, where the rule was: *never substitute the load date, today's date, or any default.* The competitor path still has both halves — a user-supplied date and a silent today-fallback. Apply the same rule.
+
+Three separate incidents in this project have come from two dates being conflated: the phantom 2026-04-20 period, `downloaded_at` versus `loaded_at`, and this one. Close the path rather than patching the instance.
+
+---
+
+## Part D — Development is stale
+
+Development still holds the previous Sparsh period as current and a pending batch dated 2026-03-05, while production has the full Vol 6.2 set.
+
+**Discard the pending development batch.** Its contents are correct but its period is wrong; committing it would put ₹330 under a March date. Do not approve it.
+
+Then bring development's competitor prices in line with production, so the team is not reading stale figures. That mismatch is what prompted this whole investigation.
+
+---
+
+## One question to answer, not to solve
+
+Part B needs both ends of a window. The earlier Sparsh period is stored as **2026-03-05**, which is a Prayag PTMT revision date — not a Sparsh one. It appears to have been borrowed rather than sourced.
+
+**Leave it as it is**, per instruction. But report it: state that the earlier Sparsh period's date has no known provenance, so the "valid from" end of that window is unverified. Whoever owns the competitor data should confirm when Sparsh's previous volume actually took effect.
+
+---
+
+## Acceptance tests
+
+```
+1.  Vol 6.2 batch effective date is 2026-09-01 in both environments.
+2.  The earlier Sparsh period's stored date is UNCHANGED.
+3.  BCC-301 resolves to 410 at asOf = today, and 330 at asOf = 2026-09-01.
+4.  Product 151 shows: valid 5 Mar – 31 Aug 2026, changing to 330 on 1 Sept.
+5.  Median gap across the 150: about −1.1% today, about +2.9% at asOf 2026-09-01.
+6.  An import with no valid effectiveDate is REJECTED — no batch created, no
+    date assumed.
+7.  The review screen's displayed date equals the batch's persisted date. Submit
+    a date other than today and confirm the screen shows what was submitted.
+8.  Gap resolution is period-matched: the competitor and Prayag prices used are
+    both those in force at the requested date.
+9.  Prayag MRP data is untouched — 13,048 rows, 90 discontinued, 6,213 live
+    at 2026-09-01.
+```
+
+Test 7 is the one that proves Part C. A screen that happens to agree with the database on the day of testing proves nothing — submit a different date deliberately.
+
+---
+
+## Report
+
+Read every figure from the database:
+
+- Vol 6.2 batch effective date, before and after, in both environments.
+- The earlier Sparsh period's date, confirming it is unchanged.
+- Median gap today and at 2026-09-01. Expected about −1.1% and +2.9%.
+- `BCC-301` at both dates, with the window shown on the product page.
+- Whether the pending development batch was discarded, and development's competitor state after.
+- Confirmation that Prayag MRP counts are unchanged.
+
+One clean commit for Parts B and C. Parts A and D are data operations — record them in the batch audit log with reasons.
+
+**Flag before finishing:** the reported median moves from +10.8% to about −1.1% for today's date. That is the intended result of Part A, not a fault, but anyone reading the dashboard tomorrow will notice. Say so plainly in the report so the change is communicated rather than discovered.
