@@ -754,6 +754,84 @@ export default function PriceFinderPage() {
       )}
       </div>
 
+      {/* Results Picker — keep search results ahead of catalogue browsing */}
+      {!selectedItemCode && hasSearch && (
+        <div
+          className="bg-card border rounded-xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none"
+          data-testid="search-results"
+        >
+          {isSearchLoading ? (
+            <div className="p-6 text-center text-muted-foreground font-medium">Searching...</div>
+          ) : isSearchError ? (
+            <div className="p-6 text-center text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Failed to load search results.
+            </div>
+          ) : results.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No products match the active filters. Remove or edit a chip to widen the list.
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {totalCount > results.length && (
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  Showing the first {results.length.toLocaleString("en-IN")} of {totalCount.toLocaleString("en-IN")} matching products. Add another filter to narrow the list.
+                </p>
+              )}
+              {results.map((res) => (
+                <button
+                  key={res.itemCode}
+                  onClick={() => confirmProduct(res.itemCode)}
+                  className="w-full text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between group"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-sm font-bold text-primary">{res.itemCode}</span>
+                    </div>
+                    <p className="text-foreground font-semibold text-lg">{res.productName}</p>
+                    <DiscontinuationBadge value={res.discontinuedFrom} />
+                    <p className="text-xs font-medium text-muted-foreground mt-1">
+                      {[res.division, res.category].filter(Boolean).join(" • ")}
+                    </p>
+                    <CompetitorLine
+                      brand={res.bestCompetitorBrand}
+                      price={res.bestCompetitorPrice}
+                      gapPct={res.bestCompetitorGapPct}
+                    />
+                    {res.colourVariantCount != null && res.colourVariantCount > 0 && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-indigo-600 font-medium">
+                        <Palette className="w-3 h-3 shrink-0" />
+                        +{res.colourVariantCount} colour option{res.colourVariantCount > 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-right">
+                    <div className="hidden sm:block">
+                      {res.currentMrp != null ? (
+                        <p className="font-black text-xl text-foreground">₹{res.currentMrp.toFixed(2)}</p>
+                      ) : (
+                        <p className="text-sm font-bold text-amber-600">Pending</p>
+                      )}
+                      <PriceWindowDetails
+                        compact
+                        currentPrice={res.currentMrp}
+                        validFrom={res.currentEffectiveDate}
+                        validTo={res.currentValidTo}
+                        upcomingPrice={res.upcomingMrp}
+                        upcomingEffectiveDate={res.upcomingEffectiveDate}
+                        upcomingChangePct={res.upcomingChangePct}
+                        className="mt-1 max-w-[260px]"
+                      />
+                    </div>
+                    <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <section className="rounded-xl border bg-card p-4 md:p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -909,81 +987,6 @@ export default function PriceFinderPage() {
           </div>
         )}
       </section>
-
-      {/* Results Picker */}
-      {!selectedItemCode && hasSearch && (
-        <div className="bg-card border rounded-xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none">
-          {isSearchLoading ? (
-            <div className="p-6 text-center text-muted-foreground font-medium">Searching...</div>
-          ) : isSearchError ? (
-            <div className="p-6 text-center text-destructive flex items-center justify-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              Failed to load search results.
-            </div>
-          ) : results.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              No products match the active filters. Remove or edit a chip to widen the list.
-            </div>
-          ) : (
-            <div className="divide-y divide-border/50">
-              {totalCount > results.length && (
-                <p className="px-4 py-3 text-sm text-muted-foreground">
-                  Showing the first {results.length.toLocaleString("en-IN")} of {totalCount.toLocaleString("en-IN")} matching products. Add another filter to narrow the list.
-                </p>
-              )}
-              {results.map((res) => (
-                <button
-                  key={res.itemCode}
-                  onClick={() => confirmProduct(res.itemCode)}
-                  className="w-full text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between group"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-sm font-bold text-primary">{res.itemCode}</span>
-                    </div>
-                    <p className="text-foreground font-semibold text-lg">{res.productName}</p>
-                    <DiscontinuationBadge value={res.discontinuedFrom} />
-                    <p className="text-xs font-medium text-muted-foreground mt-1">
-                      {[res.division, res.category].filter(Boolean).join(" • ")}
-                    </p>
-                    <CompetitorLine
-                      brand={res.bestCompetitorBrand}
-                      price={res.bestCompetitorPrice}
-                      gapPct={res.bestCompetitorGapPct}
-                    />
-                    {res.colourVariantCount != null && res.colourVariantCount > 0 && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-indigo-600 font-medium">
-                        <Palette className="w-3 h-3 shrink-0" />
-                        +{res.colourVariantCount} colour option{res.colourVariantCount > 1 ? "s" : ""}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-right">
-                    <div className="hidden sm:block">
-                      {res.currentMrp != null ? (
-                        <p className="font-black text-xl text-foreground">₹{res.currentMrp.toFixed(2)}</p>
-                      ) : (
-                        <p className="text-sm font-bold text-amber-600">Pending</p>
-                      )}
-                      <PriceWindowDetails
-                        compact
-                        currentPrice={res.currentMrp}
-                        validFrom={res.currentEffectiveDate}
-                        validTo={res.currentValidTo}
-                        upcomingPrice={res.upcomingMrp}
-                        upcomingEffectiveDate={res.upcomingEffectiveDate}
-                        upcomingChangePct={res.upcomingChangePct}
-                        className="mt-1 max-w-[260px]"
-                      />
-                    </div>
-                    <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Selected Product View */}
       {selectedItemCode && (
