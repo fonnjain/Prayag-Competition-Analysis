@@ -1,0 +1,117 @@
+# Replit Prompt — Show the Upcoming Gap, Not Just the Upcoming Prices
+
+The validity windows now work on both sides. What is missing is the comparison between them at the future date.
+
+## What the product page shows today
+
+For product `151` (Ball Cock with Rod & Ball 15mm):
+
+```
+Prayag   ₹318.24   valid 5 Mar – 31 Aug 2026   increases to ₹336.00 on 1 Sept (+5.6%)
+Sparsh   ₹410.00   valid 5 Mar – 31 Aug 2026   decreases to ₹330.00 on 1 Sept (−19.5%)
+Current gap  +28.8%
+```
+
+Every number needed is on the screen. The one that matters is not:
+
+```
+From 1 Sept 2026:  ₹336.00 vs ₹330.00  →  −1.8%
+```
+
+**Today Prayag is 28.8% cheaper. On 1 September Prayag becomes 1.8% more expensive.** A 31-point swing and a reversal of position, and the page shows neither — a reader has to notice two separate "changes soon" notes and do the arithmetic themselves.
+
+## This is not a one-off
+
+Across the 150 mapped products, comparing today against 1 September:
+
+| | Today | From 01 Sep |
+|---|---:|---:|
+| Prayag cheaper on | 59 / 150 | **98 / 150** |
+| Median gap | −1.1% | **+2.9%** |
+
+**54 of 150 products change competitive position on that date** — 46 move in Prayag's favour, **8 move against it**. Those 8 are the ones worth surfacing, because nothing on the current screen distinguishes them from the other 142.
+
+The largest swings against Prayag:
+
+| Code | Product | Today | 01 Sep | Swing |
+|---|---|---:|---:|---:|
+| `151` | Ball Cock with Rod & Ball 15mm | +28.8% | **−1.8%** | −31 pts |
+| `164` | Ball Cock Body without Rod & Ball 32mm | +33.0% | +5.9% | −27 pts |
+| `333` | Tank Nipple 25mm | 0.0% | **−18.9%** | −19 pts |
+| `332` | Tank Nipple 20mm | −0.4% | **−18.9%** | −18 pts |
+| `170` | Ball Cock Rod (Aluminium) 32mm | −7.6% | **−24.3%** | −17 pts |
+
+---
+
+## What to build
+
+### The upcoming gap
+
+Wherever a current gap is shown, show the gap at the next date on which **either** side changes, when such a date exists.
+
+Compute it the same way the current gap is computed, but resolve both prices at that future date: the Prayag price in force then, against the competitor price in force then. **Both sides resolved at the same date** — never the future price of one against the current price of the other.
+
+For product 151 that is 1 Sept 2026: ₹336.00 against ₹330.00, giving −1.8%.
+
+### Handle the general case, not just this one
+
+The two sides will not always change on the same day. Determine the next change date as **the earliest future effective date across both sides**, then resolve each side at that date — which may mean one side's price is unchanged.
+
+If more than one future change date exists, use the nearest. Do not show a chain of future gaps; one is enough for a product page.
+
+If neither side has a future price, show nothing. Do not render an empty slot or repeat the current gap.
+
+### State the direction in words
+
+A negative percentage next to the word "gap" is ambiguous — a reader cannot tell whether it means Prayag is cheaper or dearer without knowing the convention. Say it:
+
+```
+From 1 Sept 2026:  −1.8%  ·  Prayag becomes more expensive
+```
+
+### Mark the reversals
+
+When the gap changes sign, that is a different event from the gap merely narrowing, and it should read differently. A product where Prayag is cheaper today and dearer from 1 September is the single most useful thing this page can tell a salesperson.
+
+Use the existing "changes soon" visual language rather than inventing a new one — it is already established on both cards.
+
+---
+
+## Where else this belongs
+
+The product page is the first place, but the same figure matters on the list views. On the Comparison and Competition Analysis pages, add the ability to see the gap **as of a chosen date**, so someone can view the whole range as it will stand on 1 September rather than reading products one at a time.
+
+If a date selector already exists there, ensure it drives both sides consistently. If not, treat this as a separate follow-up rather than expanding this task — the product page is the priority.
+
+---
+
+## Verification
+
+```
+1.  Product 151 shows an upcoming gap of −1.8% at 1 Sept 2026, with wording
+    stating Prayag becomes more expensive.
+2.  Product 164 shows +5.9% at 1 Sept — narrowing but still in Prayag's favour,
+    and NOT marked as a reversal.
+3.  Product 333 (Tank Nipple 25mm) shows −18.9% at 1 Sept, marked as a reversal
+    from 0.0%.
+4.  A product where only Prayag has a future price resolves correctly: the future
+    Prayag price against the unchanged competitor price.
+5.  A product with no future price on either side shows no upcoming-gap element.
+6.  Across the 150 mapped products, 54 are flagged as changing competitive
+    position on 1 Sept — 46 favourable, 8 unfavourable.
+7.  The current gap is unchanged everywhere. This adds a figure; it must not
+    alter the existing one.
+```
+
+Test 7 matters. The current gap has been verified against source twice and matched to within 0.03 points. Nothing here should move it.
+
+---
+
+## Report
+
+- The upcoming gap for products 151, 164, 333 and 170, with the date used for each.
+- The count of products changing competitive position on 1 Sept, split favourable and unfavourable. Expected **54**, split **46 / 8**.
+- Confirmation that current gaps are unchanged.
+- How the next change date is determined when the two sides change on different dates.
+
+One clean commit.
