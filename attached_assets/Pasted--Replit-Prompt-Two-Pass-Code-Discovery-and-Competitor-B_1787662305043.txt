@@ -1,0 +1,106 @@
+# Replit Prompt — Two-Pass Code Discovery and Competitor Batch Provenance
+
+Two related fixes. The first stops a proven defect; the second makes the next one diagnosable.
+
+---
+
+## The established finding
+
+Batches `#12` and `#13` ran **5 minutes 12 seconds apart** on 20 August 2026 against the same PDF, same model, same 17 pages, with no code change between them. They found **86** and **101** new product codes respectively. The mapped 150 were identical in both.
+
+So the extractor is not repeatable for code discovery. This is confirmed, not suspected.
+
+An independent visual read of the pages at 200 DPI agreed with batch `#13` on 12 of the 15 extra codes, and **missed three that `#13` found** — `RPS-2276`, `RPS-2284`, `RPS-2290`, all page 27 Stop Cocks. The variance concentrates on pages 27, 25 and 19, in the small two-code tiles the runbook already flags as error-prone.
+
+**The existing coverage gate cannot catch this.** It measures mapped-target coverage — both batches reported 96%, so neither triggered a wider-page retry. A check that counts only codes it already knows about is structurally incapable of noticing that unknown codes went undiscovered.
+
+---
+
+## Part A — Two-pass extraction, at the discovery level
+
+A two-pass read with adjudication was specified in the earlier hardening work and never implemented. Implement it now, and make sure it operates on **code discovery**, not only on prices. Missing a price is visible; a product that never appears is not.
+
+### The mechanism
+
+Read each page **twice** as independent passes. Then reconcile per page:
+
+| Condition | Action |
+|---|---|
+| Both passes return the same code set | Accept |
+| A code appears in one pass only | **Re-read that page** and adjudicate |
+| Both return a code but with different prices | **Re-read that page** and adjudicate |
+
+The adjudication read is a third read of that single page, and its result is final. Record on the item which pass or passes found it, and mark adjudicated items.
+
+**Do not take the union of two passes and call it done.** The union would have produced 101 here, which happens to be right, but it would equally absorb a hallucinated code from a single pass with nothing to check it against. A disagreement means that page needs looking at again, not that both answers are true.
+
+### Report discovery disagreement explicitly
+
+The batch summary must show: codes found by both passes, codes found by one pass only, and codes adjudicated. If the two passes disagree at all, that belongs in the review UI beside the New Products count — a silent 86 and a silent 101 are indistinguishable to the reader today.
+
+### Validate against the known case
+
+Batch `#12` and `#13` are a natural test. A correct implementation run against the same PDF should return **101** regardless of which pass finds what first, and should flag the page 27, 25 and 19 tiles as adjudicated rather than as clean single-pass hits.
+
+---
+
+## Part B — Competitor batches need the provenance MRP batches already have
+
+You reported that no source-file hash, prompt revision, catalogue-profile revision or code revision is stored per competitor batch, so byte-for-byte sameness between `#12` and `#13` cannot be proven retroactively. That is why "what changed between the two runs" could only be answered by inference.
+
+`mrp_load_batches` already solved this on the MRP side. Give competitor imports the same treatment:
+
+- `file_sha256` — the identifier that actually works. Filenames repeat across volumes; hashes do not.
+- `file_size_bytes`
+- `extractor_version` — code revision or a version constant
+- `catalogue_profile_revision`
+- `prompt_revision`
+- `model` — already known per run, currently not stored
+- `pages_requested`
+- `passes_run` and `items_adjudicated` from Part A
+
+Then two batches from the same file are provably comparable, and two from different files are provably not. Right now neither can be established.
+
+Backfill what is knowable for batches `#12`, `#13` and `#14` — model and page list are recorded in the run logs. Leave unknowable fields null rather than guessing, and say which were left null.
+
+**Do not add a duplicate-content guard to competitor imports as part of this.** Re-extracting the same catalogue is a legitimate operation, and after Part A it is how a variance gets investigated. The hash is for provenance here, not for blocking.
+
+---
+
+## Acceptance tests
+
+```
+1.  A page where both passes agree is not re-read — exactly two reads.
+2.  A code found by one pass only triggers an adjudication read of that page,
+    and the adjudicated result is what is stored.
+3.  A price differing between passes triggers adjudication for that page.
+4.  Extracting Sparsh Vol 6.2 returns 101 new product codes, including
+    RPS-2276, RPS-2284 and RPS-2290.
+5.  The batch summary reports codes found by both passes, by one only, and
+    adjudicated; the review UI shows the one-pass-only count.
+6.  Every new competitor batch stores a file_sha256 and extractor_version.
+7.  Two extractions of the same PDF produce the same file_sha256 and can be
+    compared on that basis.
+8.  The mapped 150 are unaffected — same codes, same prices, same match
+    methods as batches #12 and #13.
+```
+
+Test 8 is the guard against over-correction. The mapped set has been stable across both batches and verified against source twice; nothing here should move it.
+
+---
+
+## Report
+
+- Number of pages requiring adjudication on a Vol 6.2 re-extraction, and which.
+- New product codes found: expected **101**.
+- Codes found by one pass only, before adjudication.
+- Cost and time delta against the single-pass run.
+- Which provenance fields were backfilled for `#12`, `#13`, `#14`, and which were left null.
+
+---
+
+## Out of scope
+
+Do not run the production discard as part of this — it still needs a writable connection and is tracked separately. Do not re-extract into a new production batch; run the validation extraction in development.
+
+One clean commit.
