@@ -2,7 +2,6 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedCatalogIfEmpty, backfillCatalogSizes, seedVariantPricesIfEmpty } from "./lib/catalogSeed";
 import { seedAdminUser } from "./lib/adminSeed";
-import { correctSparshVol62EffectiveDate } from "./lib/competitorPeriodCorrection";
 
 const rawPort = process.env["PORT"];
 
@@ -43,16 +42,5 @@ app.listen(port, async (err) => {
     await seedVariantPricesIfEmpty();
   } catch (seedErr) {
     logger.error({ err: seedErr }, "Failed to seed sanitaryware variant prices");
-  }
-
-  try {
-    const correction = await correctSparshVol62EffectiveDate();
-    logger.info(correction, "Checked Sparsh Vol 6.2 effective-date correction");
-  } catch (correctionErr) {
-    logger.fatal(
-      { err: correctionErr },
-      "Sparsh Vol 6.2 effective-date correction preflight failed",
-    );
-    process.exit(1);
   }
 });

@@ -1865,8 +1865,12 @@ router.post(
       typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
         ? req.body.effectiveDate.trim()
         : null;
-    if (!effectiveDateBody || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDateBody)) {
+    if (!effectiveDateBody) {
       res.status(400).json({ error: "effectiveDate (YYYY-MM-DD) is required" });
+      return;
+    }
+    if (!isIsoDate(effectiveDateBody)) {
+      res.status(400).json({ error: "effectiveDate must be a valid calendar date (YYYY-MM-DD)" });
       return;
     }
     const effectiveDate = effectiveDateBody;

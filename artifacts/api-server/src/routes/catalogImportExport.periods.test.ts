@@ -37,6 +37,24 @@ afterAll(async () => {
 });
 
 describe("MRP loader period and duplicate safeguards", () => {
+  it("rejects an impossible competitor workbook effective date before parsing it", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(router);
+
+    const response = await supertest(app)
+      .post("/catalog/load-competitor")
+      .field("competitor", "Invalid date fixture")
+      .field("effectiveDate", "2026-02-30")
+      .attach("file", Buffer.from("Code,Description,MRP\nFIX-1,Fixture,100\n"), {
+        filename: "fixture.csv",
+        contentType: "text/csv",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/valid calendar date/i);
+  });
+
   it("uses source header periods rather than a supplied or current date", () => {
     const parsed = parseWorkbookBuffer(datedWorkbookBuffer(), new Set(["PERIOD-TEST"]));
     expect(parsed.hasHeaderPeriods).toBe(true);

@@ -35,6 +35,7 @@ import {
 } from "../lib/catalogueMatcher.js";
 import type { CatalogueProfile } from "../lib/catalogueProfile.js";
 import sparshPearlProfileJson from "../lib/catalogue-profiles/sparsh-pearl.json" assert { type: "json" };
+import { isIsoDate } from "../lib/mrpProvenance.js";
 
 const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
 
@@ -43,11 +44,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 150 * 1024 * 1024 }, // 150 MB for PDFs
 });
-
-function isIsoCalendarDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  return new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
-}
 
 // Known Sparsh Pearl code aliases (Vol 6.2 verified).
 // After import diagnostics confirmed which codes are actually in the PDF extraction:
@@ -192,7 +188,7 @@ router.post(
 
     const effectiveDate =
       typeof req.body.effectiveDate === "string" ? req.body.effectiveDate.trim() : "";
-    if (!isIsoCalendarDate(effectiveDate)) {
+  if (!isIsoDate(effectiveDate)) {
       res.status(400).json({
         error: "effectiveDate is required and must be a valid YYYY-MM-DD calendar date.",
       });
