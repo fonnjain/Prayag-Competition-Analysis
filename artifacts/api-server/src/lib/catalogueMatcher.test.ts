@@ -30,6 +30,8 @@ function makeItem(overrides: Partial<ExtractedItem> = {}): ExtractedItem {
     mrp: 110,
     variant: "15mm",
     page: 1,
+    discoveryPasses: [1, 2],
+    adjudicated: false,
     ...overrides,
   };
 }
@@ -413,5 +415,41 @@ describe("multiple targets", () => {
     // The one-catalogue-item-per-target rule is intentional.
     expect(staging[0]!.status).toBe("ok");
     expect(staging[1]!.status).toBe("needs_review");
+  });
+});
+
+describe("mapped-price preservation", () => {
+  it("keeps all 150 mapped rows intact when the final discovery set includes evidence", () => {
+    const targets = Array.from({ length: 150 }, (_, index) =>
+      makeTarget({
+        competitorCode: `SP-${index + 1}`,
+        matchedPrayagCode: `PRY-${index + 1}`,
+        description: `Mapped product ${index + 1}`,
+        size: null,
+      }),
+    );
+    const extracted = Array.from({ length: 150 }, (_, index) =>
+      makeItem({
+        cat_no: `SP-${index + 1}`,
+        product_name: `Mapped product ${index + 1}`,
+        variant: null,
+        discoveryPasses: [1, 2],
+        adjudicated: false,
+      }),
+    );
+
+    const { staging, newProducts } = matchCatalogue(
+      "Sparsh Pearl",
+      targets,
+      extracted,
+      [],
+      "MRP",
+      null,
+    );
+
+    expect(staging).toHaveLength(150);
+    expect(newProducts).toEqual([]);
+    expect(staging.every((row) => row.status === "ok")).toBe(true);
+    expect(staging.every((row) => row.discoveryEvidence?.includes('"foundInPasses":[1,2]'))).toBe(true);
   });
 });

@@ -291,6 +291,22 @@ export const importBatchesTable = pgTable(
     rowCounts: text("row_counts"),
     // Claude model used for PDF extraction. Null for Excel/CSV imports.
     extractionModel: text("extraction_model"),
+    // Immutable identity of the uploaded source. This is audit metadata only:
+    // the same PDF may be intentionally re-extracted to investigate variance.
+    fileSha256: text("file_sha256"),
+    fileSizeBytes: integer("file_size_bytes"),
+    // Versioned extractor inputs make two batches comparable without relying on
+    // filenames or deployment timestamps.
+    extractorVersion: text("extractor_version"),
+    catalogueProfileRevision: text("catalogue_profile_revision"),
+    promptRevision: text("prompt_revision"),
+    model: text("model"),
+    // JSON array of original 1-based catalogue pages requested for extraction.
+    pagesRequested: text("pages_requested"),
+    // Two independent discovery reads always run; pages with disagreement get
+    // one additional adjudication read.
+    passesRun: integer("passes_run"),
+    itemsAdjudicated: integer("items_adjudicated"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -332,6 +348,10 @@ export const competitorPriceStagingTable = pgTable(
     gapPct: doublePrecision("gap_pct"),
     // Page number in the source PDF where this item was found.
     page: integer("page"),
+    // JSON evidence of the independent discovery reads that found this code,
+    // plus the final accepted pass. Keeps review decisions auditable.
+    discoveryEvidence: text("discovery_evidence"),
+    adjudicated: boolean("adjudicated").notNull().default(false),
     // 'code+desc' = matched by code (and description/size agreed).
     // 'desc+size' = matched by description + size (code differed — renumbering).
     matchMethod: text("match_method"),

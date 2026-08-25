@@ -79,7 +79,26 @@ describe("PDF catalogue upload effective date", () => {
         sourceFileName: "verified-period.pdf",
         priceBasis: "MRP",
         status: "pending",
-        rowCounts: JSON.stringify({ ok: 0, needs_review: 0, not_found: 0, new_products: 0 }),
+        rowCounts: JSON.stringify({
+          ok: 0,
+          needs_review: 0,
+          not_found: 0,
+          new_products: 101,
+          codes_found_both_passes: 250,
+          codes_found_one_pass_only: 15,
+          pages_adjudicated: [12, 14],
+          items_adjudicated: 31,
+          passes_run: 2,
+        }),
+        fileSha256: "a".repeat(64),
+        fileSizeBytes: 1234,
+        extractorVersion: "pdf-code-discovery-v2",
+        catalogueProfileRevision: "sparsh-pearl-vol62-r1",
+        promptRevision: "catalogue-extraction-r2",
+        model: "claude-opus-5",
+        pagesRequested: JSON.stringify([10, 11]),
+        passesRun: 2,
+        itemsAdjudicated: 31,
       })
       .returning({ id: importBatchesTable.id });
 
@@ -90,6 +109,14 @@ describe("PDF catalogue upload effective date", () => {
       id: batch!.id,
       competitor,
       effectiveDate: "2026-09-01",
+      model: "claude-opus-5",
+      pagesRequested: "[10,11]",
+      passesRun: 2,
+      itemsAdjudicated: 31,
+      rowCounts: expect.objectContaining({
+        codes_found_one_pass_only: 15,
+        pages_adjudicated: [12, 14],
+      }),
     });
   });
 });

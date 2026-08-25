@@ -22,6 +22,8 @@ export interface SeriesEntry {
 export interface CatalogueProfile {
   competitor: string;
   catalogueName: string;
+  /** Stable revision of the profile mapping used for an import batch. */
+  revision?: string;
   /** Total page count of the full catalogue PDF. Used to clamp widened ranges. */
   pageCount: number;
   codeFamilies: string[];

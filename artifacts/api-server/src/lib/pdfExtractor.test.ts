@@ -1,15 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ---------------------------------------------------------------------------
-// Hoist mock factories so they're available inside vi.mock() closures
-// ---------------------------------------------------------------------------
-
 const mockMessagesCreate = vi.hoisted(() => vi.fn());
-
-// ---------------------------------------------------------------------------
-// Mock the Anthropic SDK — no real HTTP requests
-// Uses a class so `new Anthropic(...)` works correctly.
-// ---------------------------------------------------------------------------
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class MockAnthropic {
@@ -17,465 +8,221 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-// ---------------------------------------------------------------------------
-// Mock pdf-lib — no real PDF parsing needed
-// ---------------------------------------------------------------------------
-
 vi.mock("pdf-lib", () => {
-  // newDoc returned by PDFDocument.create()
-  const makeFakeNewDoc = () => ({
+  const makeOutputDocument = () => ({
     copyPages: vi.fn().mockResolvedValue([{}]),
     addPage: vi.fn(),
     save: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
   });
-
-  // srcDoc returned by PDFDocument.load()
-  const makeFakeSrcDoc = (pageCount = 1) => ({
-    getPageCount: () => pageCount,
-  });
-
   return {
     PDFDocument: {
-      load: vi.fn().mockImplementation(async () => makeFakeSrcDoc(1)),
-      create: vi.fn().mockImplementation(async () => makeFakeNewDoc()),
+      load: vi.fn().mockResolvedValue({ getPageCount: () => 1 }),
+      create: vi.fn().mockResolvedValue(makeOutputDocument()),
     },
   };
 });
 
-// ---------------------------------------------------------------------------
-// Import the module under test AFTER mocks are registered
-// ---------------------------------------------------------------------------
+import {
+  extractFromPdf,
+  EXTRACTION_MODEL,
+  EXTRACTOR_VERSION,
+  PROMPT_REVISION,
+  buildPdfBatchProvenance,
+} from "./pdfExtractor.js";
+import { PDFDocument } from "pdf-lib";
 
-import { extractFromPdf, EXTRACTION_MODEL } from "./pdfExtractor.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Build a Claude API response with the given JSON text as the first content block. */
-function makeClaudeResponse(jsonText: string) {
-  return {
-    content: [{ type: "text", text: jsonText }],
-  };
-}
-
-/** A minimal valid fake PDF buffer (content doesn't matter — pdf-lib is mocked). */
 const FAKE_PDF = Buffer.from("fake-pdf-bytes");
-
-// ---------------------------------------------------------------------------
-// Setup
-// ---------------------------------------------------------------------------
+const item = (code: string, mrp: number, productName = "Widget") => ({
+  cat_no: code,
+  variant: null,
+  mrp,
+  product_name: productName,
+  page: 1,
+});
+const response = (items: unknown[]) => ({
+  stop_reason: "end_turn",
+  content: [{ type: "text", text: JSON.stringify(items) }],
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(PDFDocument.load).mockResolvedValue({ getPageCount: () => 1 } as never);
   process.env.ANTHROPIC_API_KEY = "test-key";
 });
 
-// ---------------------------------------------------------------------------
-// Well-formed response → correct ExtractedItem array
-// ---------------------------------------------------------------------------
+describe("two-pass catalogue discovery", () => {
+  it("accepts matching page reads after exactly two intentional model calls", async () => {
+    mockMessagesCreate.mockResolvedValue(response([item("ED-950", 467)]));
 
-describe("well-formed Claude response", () => {
-  it("returns a correctly shaped ExtractedItem array", async () => {
-    const rawItems = [
-      {
+    const result = await extractFromPdf(FAKE_PDF, [], []);
+
+    expect(mockMessagesCreate).toHaveBeenCalledTimes(2);
+    expect(result.items).toEqual([
+      expect.objectContaining({
         cat_no: "ED-950",
-        variant: null,
         mrp: 467,
-        product_name: "Bib Cock with Flange",
-        page: 64,
-      },
-      {
-        cat_no: "ED-951",
-        variant: "45 Degree",
-        mrp: 555,
-        product_name: "Long Body Bib Cock",
-        page: 64,
-      },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-
-    expect(items).toHaveLength(2);
-    expect(failedChunks).toHaveLength(0);
-
-    expect(items[0]).toMatchObject({
-      cat_no: "ED-950",
-      variant: null,
-      mrp: 467,
-      product_name: "Bib Cock with Flange",
-      page: 64,
-    });
-
-    expect(items[1]).toMatchObject({
-      cat_no: "ED-951",
-      variant: "45 Degree",
-      mrp: 555,
-      product_name: "Long Body Bib Cock",
-      page: 64,
-    });
-  });
-
-  it("uppercases cat_no regardless of casing in Claude response", async () => {
-    const rawItems = [
-      { cat_no: "ed-950", variant: null, mrp: 100, product_name: "Widget", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items[0]!.cat_no).toBe("ED-950");
-  });
-
-  it("trims whitespace from cat_no", async () => {
-    const rawItems = [
-      { cat_no: "  ED-950  ", variant: null, mrp: 100, product_name: "Widget", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items[0]!.cat_no).toBe("ED-950");
-  });
-
-  it("passes through non-null variant as a trimmed string", async () => {
-    const rawItems = [
-      { cat_no: "ED-951", variant: "  45 Degree  ", mrp: 555, product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items[0]!.variant).toBe("45 Degree");
-  });
-
-  it("coerces an empty-string variant to null", async () => {
-    const rawItems = [
-      { cat_no: "ED-951", variant: "", mrp: 555, product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items[0]!.variant).toBeNull();
-  });
-
-  it("falls back to chunk.startPage (1) when page field is absent", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: 200, product_name: "x" },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    // chunk.startPage for the single mocked chunk is 1
-    expect(items[0]!.page).toBe(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Price normalisation
-// ---------------------------------------------------------------------------
-
-describe("price normalisation", () => {
-  it("converts a string mrp to a number", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: "120.50", product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items[0]!.mrp).toBe(120.5);
-    expect(typeof items[0]!.mrp).toBe("number");
-  });
-
-  it("converts an integer string mrp correctly", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: "467", product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items[0]!.mrp).toBe(467);
-  });
-
-  it("filters out items where mrp is zero", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: 0, product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-  });
-
-  it("filters out items where mrp is negative", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: -10, product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-  });
-
-  it("filters out items where mrp is non-numeric garbage", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: "N/A", product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Malformed / empty Claude response → graceful empty array
-// ---------------------------------------------------------------------------
-
-describe("malformed or empty Claude response", () => {
-  it("returns empty items array when Claude returns an empty JSON array", async () => {
-    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse("[]"));
-
-    const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toEqual([]);
-    expect(failedChunks).toHaveLength(0);
-  });
-
-  it("returns empty items and one failed chunk when JSON is invalid (both retry attempts fail)", async () => {
-    // Both attempts throw a JSON parse error
-    mockMessagesCreate.mockRejectedValue(new SyntaxError("Unexpected token"));
-
-    const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-    expect(failedChunks).toHaveLength(1);
-    expect(failedChunks[0]).toMatchObject({
-      chunkIndex: 1,
-      startPage: 1,
-      endPage: 1,
-      error: expect.stringContaining("Unexpected token"),
-    });
-  });
-
-  it("returns empty items array when response content array is empty", async () => {
-    mockMessagesCreate.mockResolvedValueOnce({ content: [] });
-
-    const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-    // Empty model output is a recoverable no-items result, not a failed PDF
-    // chunk; callers can continue reviewing the remaining catalogue pages.
-    expect(failedChunks).toHaveLength(0);
-  });
-
-  it("returns empty items array when response content block type is not 'text'", async () => {
-    mockMessagesCreate.mockResolvedValueOnce({
-      content: [{ type: "tool_use", id: "x", name: "foo", input: {} }],
-    });
-
-    const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-    // A non-text model block is likewise a recoverable no-items result.
-    expect(failedChunks).toHaveLength(0);
-  });
-
-  it("filters out items whose cat_no resolves to an empty string", async () => {
-    const rawItems = [
-      { cat_no: null, variant: null, mrp: 100, product_name: "x", page: 1 },
-      { cat_no: "", variant: null, mrp: 200, product_name: "y", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(0);
-  });
-
-  it("silently skips non-object elements inside the JSON array", async () => {
-    // Claude occasionally emits a mixed array with nulls or strings
-    const mixed = JSON.stringify([
-      null,
-      "some prose",
-      42,
-      { cat_no: "ED-950", variant: null, mrp: 100, product_name: "x", page: 1 },
+        page: 1,
+        discoveryPasses: [1, 2],
+        adjudicated: false,
+      }),
     ]);
-    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse(mixed));
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(1);
-    expect(items[0]!.cat_no).toBe("ED-950");
+    expect(result.pagesAdjudicated).toEqual([]);
+    expect(result.codesFoundBothPasses).toBe(1);
+    expect(result.codesFoundOnePassOnly).toBe(0);
+    expect(result.itemsAdjudicated).toBe(0);
+    expect(result.passesRun).toBe(2);
   });
-});
 
-// ---------------------------------------------------------------------------
-// Failed chunk reporting
-// ---------------------------------------------------------------------------
+  it("adjudicates a code found in one initial read instead of accepting their union", async () => {
+    mockMessagesCreate
+      .mockResolvedValueOnce(response([item("ED-950", 467)]))
+      .mockResolvedValueOnce(response([item("ED-950", 467), item("RS-111", 555)]))
+      .mockResolvedValueOnce(response([item("ED-950", 467)]));
 
-describe("failed chunk reporting", () => {
-  it("records startPage and endPage of failed chunk", async () => {
+    const result = await extractFromPdf(FAKE_PDF, [], []);
+
+    expect(mockMessagesCreate).toHaveBeenCalledTimes(3);
+    expect(result.pagesAdjudicated).toEqual([1]);
+    expect(result.codesFoundBothPasses).toBe(1);
+    expect(result.codesFoundOnePassOnly).toBe(1);
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        cat_no: "ED-950",
+        discoveryPasses: [1, 2, 3],
+        adjudicated: true,
+      }),
+    ]);
+    expect(result.items.find((found) => found.cat_no === "RS-111")).toBeUndefined();
+    expect(result.itemsAdjudicated).toBe(1);
+  });
+
+  it("adjudicates a price disagreement and stores the third-read price", async () => {
+    mockMessagesCreate
+      .mockResolvedValueOnce(response([item("ED-950", 467)]))
+      .mockResolvedValueOnce(response([item("ED-950", 499)]))
+      .mockResolvedValueOnce(response([item("ED-950", 480)]));
+
+    const result = await extractFromPdf(FAKE_PDF, [], []);
+
+    expect(mockMessagesCreate).toHaveBeenCalledTimes(3);
+    expect(result.pagesAdjudicated).toEqual([1]);
+    expect(result.items[0]).toMatchObject({
+      cat_no: "ED-950",
+      mrp: 480,
+      discoveryPasses: [1, 2, 3],
+      adjudicated: true,
+    });
+  });
+
+  it("widens only with supplemental pages and never rereads agreed original pages", async () => {
+    vi.mocked(PDFDocument.load).mockResolvedValue({ getPageCount: () => 2 } as never);
+    mockMessagesCreate.mockResolvedValue(response([]));
+
+    const result = await extractFromPdf(
+      FAKE_PDF,
+      ["MISSING"],
+      [],
+      undefined,
+      {
+        competitor: "Test",
+        catalogueName: "Low coverage",
+        pageCount: 2,
+        codeFamilies: [],
+        seriesMap: [{
+          prayagSeries: "All",
+          sparshSeries: "All",
+          codePrefix: "TEST-",
+          pages: [1],
+        }],
+      },
+    );
+
+    expect(mockMessagesCreate).toHaveBeenCalledTimes(4);
+    expect(result.pagesRequested).toEqual([1]);
+    expect(result.pagesSupplemental).toEqual([2]);
+    expect(result.pagesSent).toBe(2);
+    expect(result.pagesWidened).toBe(true);
+  });
+
+  it("normalises item fields while retaining page evidence", async () => {
+    mockMessagesCreate.mockResolvedValue(response([
+      { cat_no: " ed-950 ", variant: " 45 Degree ", mrp: "120.50", product_name: " Bib Cock ", page: 1 },
+      { cat_no: "ED-951", variant: null, mrp: 0, product_name: "Ignored", page: 1 },
+    ]));
+
+    const result = await extractFromPdf(FAKE_PDF, [], []);
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        cat_no: "ED-950",
+        variant: "45 Degree",
+        mrp: 120.5,
+        product_name: "Bib Cock",
+        discoveryPasses: [1, 2],
+      }),
+    ]);
+  });
+
+  it("records both failed reads when an API error persists", async () => {
     mockMessagesCreate.mockRejectedValue(new Error("API timeout"));
 
-    const { failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(failedChunks).toHaveLength(1);
-    expect(failedChunks[0]!.startPage).toBe(1);
-    expect(failedChunks[0]!.endPage).toBe(1);
+    const result = await extractFromPdf(FAKE_PDF, [], []);
+
+    expect(result.items).toEqual([]);
+    expect(result.failedChunks).toHaveLength(2);
+    expect(result.failedChunks[0]).toMatchObject({
+      startPage: 1,
+      endPage: 1,
+      error: "API timeout",
+    });
   });
 
-  it("includes the error message in the failed chunk", async () => {
-    mockMessagesCreate.mockRejectedValue(new Error("Rate limit exceeded"));
+  it("uses the declared model and reports pass-aware progress", async () => {
+    mockMessagesCreate.mockResolvedValue(response([]));
+    const progress: Array<{ pass: number; chunk: number; totalChunks: number }> = [];
 
-    const { failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(failedChunks[0]!.error).toContain("Rate limit exceeded");
+    await extractFromPdf(FAKE_PDF, [], [], (value) => progress.push(value));
+
+    expect(mockMessagesCreate.mock.calls[0]?.[0]).toMatchObject({ model: EXTRACTION_MODEL });
+    expect(progress).toMatchObject([
+      { pass: 1, chunk: 1, totalChunks: 2 },
+      { pass: 2, chunk: 2, totalChunks: 2 },
+    ]);
   });
 
-  it("returns no failed chunks when all chunks succeed", async () => {
-    mockMessagesCreate.mockResolvedValue(makeClaudeResponse("[]"));
-
-    const { failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(failedChunks).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Markdown fence stripping
-// ---------------------------------------------------------------------------
-
-describe("markdown fence stripping", () => {
-  it("strips ```json ... ``` fences that Claude adds despite instructions", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: 467, product_name: "Bib Cock", page: 1 },
-    ];
-    const fenced = "```json\n" + JSON.stringify(rawItems) + "\n```";
-    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse(fenced));
-
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(1);
-    expect(items[0]!.cat_no).toBe("ED-950");
+  it("exposes stable version constants for batch provenance", () => {
+    expect(EXTRACTOR_VERSION).toMatch(/^pdf-code-discovery-/);
+    expect(PROMPT_REVISION).toMatch(/^catalogue-extraction-/);
   });
 
-  it("strips plain ``` ... ``` fences", async () => {
-    const rawItems = [
-      { cat_no: "ED-951", variant: "15mm", mrp: 200, product_name: "Widget", page: 2 },
-    ];
-    const fenced = "```\n" + JSON.stringify(rawItems) + "\n```";
-    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse(fenced));
+  it("captures a deterministic source identity and profile revision before extraction", () => {
+    const provenance = buildPdfBatchProvenance(FAKE_PDF, {
+      competitor: "Sparsh Pearl",
+      catalogueName: "PTMT Vol 6.2",
+      revision: "test-profile-r1",
+      pageCount: 1,
+      codeFamilies: [],
+      seriesMap: [{
+        prayagSeries: "All",
+        sparshSeries: "All",
+        codePrefix: "TEST-",
+        pages: [1],
+      }],
+    });
 
-    const { items } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(1);
-    expect(items[0]!.mrp).toBe(200);
+    expect(provenance).toEqual({
+      fileSha256: "50af8d443ccf8b2777b72a9169cd0665ef4be5335b8f53543556fa0d320b135b",
+      fileSizeBytes: FAKE_PDF.length,
+      extractorVersion: EXTRACTOR_VERSION,
+      catalogueProfileRevision: "test-profile-r1",
+      promptRevision: PROMPT_REVISION,
+      model: EXTRACTION_MODEL,
+      pagesRequested: "[1]",
+    });
   });
-});
 
-// ---------------------------------------------------------------------------
-// Retry logic
-// ---------------------------------------------------------------------------
-
-describe("retry on transient failure", () => {
-  it("succeeds on the second attempt when the first throws", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: 467, product_name: "x", page: 1 },
-    ];
-    mockMessagesCreate
-      .mockRejectedValueOnce(new Error("Network blip"))
-      .mockResolvedValueOnce(makeClaudeResponse(JSON.stringify(rawItems)));
-
-    const { items, failedChunks } = await extractFromPdf(FAKE_PDF, [], []);
-    expect(items).toHaveLength(1);
-    expect(items[0]!.cat_no).toBe("ED-950");
-    // Second attempt succeeded — chunk should NOT be marked as failed
-    expect(failedChunks).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Model name consistency
-// ---------------------------------------------------------------------------
-
-describe("model name", () => {
-  it("passes EXTRACTION_MODEL to the Claude API, not a hardcoded string", async () => {
-    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse("[]"));
-
-    await extractFromPdf(FAKE_PDF, [], []);
-
-    expect(mockMessagesCreate).toHaveBeenCalledOnce();
-    const callArg = mockMessagesCreate.mock.calls[0]![0] as { model: string };
-    expect(callArg.model).toBe(EXTRACTION_MODEL);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Missing API key
-// ---------------------------------------------------------------------------
-
-describe("missing ANTHROPIC_API_KEY", () => {
-  it("throws immediately when the env var is not set", async () => {
+  it("fails before reading when no integration key is available", async () => {
     delete process.env.ANTHROPIC_API_KEY;
-
-    await expect(extractFromPdf(FAKE_PDF, [], [])).rejects.toThrow(
-      "ANTHROPIC_API_KEY is not set",
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// onProgress callback
-// ---------------------------------------------------------------------------
-
-describe("onProgress callback", () => {
-  it("calls onProgress once per chunk with correct metadata", async () => {
-    mockMessagesCreate.mockResolvedValueOnce(makeClaudeResponse("[]"));
-
-    const progress: unknown[] = [];
-    await extractFromPdf(FAKE_PDF, [], [], (p) => progress.push(p));
-
-    expect(progress).toHaveLength(1);
-    const p = progress[0] as {
-      chunk: number;
-      totalChunks: number;
-      startPage: number;
-      itemsFound: number;
-      totalItemsFound: number;
-    };
-    expect(p.chunk).toBe(1);
-    expect(p.totalChunks).toBe(1);
-    expect(p.startPage).toBe(1);
-    expect(p.itemsFound).toBe(0);
-    expect(p.totalItemsFound).toBe(0);
-  });
-
-  it("reports correct itemsFound count when items are extracted", async () => {
-    const rawItems = [
-      { cat_no: "ED-950", variant: null, mrp: 100, product_name: "x", page: 1 },
-      { cat_no: "ED-951", variant: null, mrp: 200, product_name: "y", page: 1 },
-    ];
-    mockMessagesCreate.mockResolvedValueOnce(
-      makeClaudeResponse(JSON.stringify(rawItems)),
-    );
-
-    const progress: unknown[] = [];
-    await extractFromPdf(FAKE_PDF, [], [], (p) => progress.push(p));
-
-    const p = progress[0] as { itemsFound: number; totalItemsFound: number };
-    expect(p.itemsFound).toBe(2);
-    expect(p.totalItemsFound).toBe(2);
+    await expect(extractFromPdf(FAKE_PDF, [], [])).rejects.toThrow("ANTHROPIC_API_KEY is not set");
   });
 });

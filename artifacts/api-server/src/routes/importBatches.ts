@@ -27,7 +27,11 @@ import {
 } from "@workspace/db";
 import { normCode } from "../lib/catalog.js";
 import { requireAdmin } from "../middlewares/authMiddleware";
-import { extractFromPdf, EXTRACTION_MODEL } from "../lib/pdfExtractor.js";
+import {
+  extractFromPdf,
+  EXTRACTION_MODEL,
+  buildPdfBatchProvenance,
+} from "../lib/pdfExtractor.js";
 import {
   matchCatalogue,
   type MatchTarget,
@@ -257,10 +261,24 @@ router.post(
       await seedAliasesIfNeeded(competitor);
 
       sendSse("status", { stage: "preparing", message: "Preparing extraction…" });
+      // Resolve profile before persisting so the original requested pages are
+      // part of the immutable batch provenance.
+      const catalogueProfile =
+        competitor === "Sparsh Pearl" ? sparshPearlProfile : undefined;
+      const provenance = buildPdfBatchProvenance(file.buffer, catalogueProfile);
 
       const [batchRows] = await Promise.all([
         db.insert(importBatchesTable)
-          .values({ competitor, effectiveDate, sourceFileName: file.originalname, priceBasis, gstPct, status: "pending", extractionModel: EXTRACTION_MODEL })
+          .values({
+            competitor,
+            effectiveDate,
+            sourceFileName: file.originalname,
+            priceBasis,
+            gstPct,
+            status: "pending",
+            extractionModel: EXTRACTION_MODEL,
+            ...provenance,
+          })
           .returning(),
       ]);
       const batch = batchRows[0];
@@ -285,9 +303,6 @@ router.post(
 
       // Resolve profile for this competitor (Sparsh Pearl → sparshPearlProfile).
       // Add more profiles here as new competitors are onboarded.
-      const catalogueProfile =
-        competitor === "Sparsh Pearl" ? sparshPearlProfile : undefined;
-
       const profileCodeFamilies =
         catalogueProfile?.codeFamilies ?? sparshPearlProfile.codeFamilies;
 
@@ -302,8 +317,17 @@ router.post(
         items: extracted,
         failedChunks,
         pagesSent,
+        pagesRequested,
+        pagesSupplemental,
         pagesWidened,
         coverage,
+        passesRun,
+        pagesAdjudicated,
+        codesFoundBothPasses,
+        codesFoundOnePassOnly,
+        itemsAdjudicated,
+        modelCalls,
+        elapsedMs,
       } = await extractFromPdf(
         file.buffer,
         targetCodes,
@@ -357,6 +381,11 @@ router.post(
           prayagMrpCurrent: null,
           gapPct: null,
           page: item.page,
+           discoveryEvidence: JSON.stringify({
+             foundInPasses: item.discoveryPasses,
+             finalPass: item.adjudicated ? 3 : 2,
+           }),
+           adjudicated: item.adjudicated,
           matchMethod: null,
           status: "new_product" as const,
           reviewReason: null,
@@ -374,11 +403,25 @@ router.post(
         new_products: newProducts.length,
         // Extraction quality metadata
         pagesSent,
+         pagesRequested,
+         supplemental_pages: pagesSupplemental,
         pagesWidened,
         coverage: Math.round(coverage * 1000) / 1000, // 3 decimal places
+         codes_found_both_passes: codesFoundBothPasses,
+         codes_found_one_pass_only: codesFoundOnePassOnly,
+         pages_adjudicated: pagesAdjudicated,
+         items_adjudicated: itemsAdjudicated,
+         passes_run: passesRun,
+         model_calls: modelCalls,
+         extraction_elapsed_ms: elapsedMs,
       };
       await db.update(importBatchesTable)
-        .set({ rowCounts: JSON.stringify(counts) })
+        .set({
+          rowCounts: JSON.stringify(counts),
+          pagesRequested: JSON.stringify(pagesRequested),
+          passesRun,
+          itemsAdjudicated,
+        })
         .where(eq(importBatchesTable.id, batchId));
 
       const failedChunksSummary = failedChunks.map((fc) => ({

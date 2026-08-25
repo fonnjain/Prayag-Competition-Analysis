@@ -45,6 +45,8 @@ export interface StagingRow {
   prayagMrpCurrent: number | null;
   gapPct: number | null;
   page: number | null;
+  discoveryEvidence: string | null;
+  adjudicated: boolean;
   matchMethod: string | null;
   status: "ok" | "needs_review" | "not_found" | "new_product";
   reviewReason: string | null;
@@ -177,6 +179,13 @@ export function matchCatalogue(
       prayagMrpCurrent: target.prayagMrpCurrent,
       gapPct,
       page: found?.page ?? null,
+      discoveryEvidence: found
+        ? JSON.stringify({
+            foundInPasses: found.discoveryPasses,
+            finalPass: found.adjudicated ? 3 : 2,
+          })
+        : null,
+      adjudicated: found?.adjudicated ?? false,
       matchMethod,
       status,
       reviewReason,

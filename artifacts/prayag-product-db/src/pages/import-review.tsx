@@ -47,6 +47,8 @@ interface StagingRow {
   prayagMrpCurrent: number | null;
   gapPct: number | null;
   page: number | null;
+  discoveryEvidence: string | null;
+  adjudicated: boolean;
   matchMethod: string | null;
   status: RowStatus;
   reviewReason: string | null;
@@ -60,7 +62,26 @@ interface BatchData {
   priceBasis: string;
   gstPct: number | null;
   status: string;
-  rowCounts: { ok: number; needs_review: number; not_found: number; new_products: number } | null;
+  fileSha256: string | null;
+  fileSizeBytes: number | null;
+  extractorVersion: string | null;
+  catalogueProfileRevision: string | null;
+  promptRevision: string | null;
+  model: string | null;
+  pagesRequested: string | null;
+  passesRun: number | null;
+  itemsAdjudicated: number | null;
+  rowCounts: {
+    ok: number;
+    needs_review: number;
+    not_found: number;
+    new_products: number;
+    codes_found_both_passes?: number;
+    codes_found_one_pass_only?: number;
+    pages_adjudicated?: number[];
+    items_adjudicated?: number;
+    passes_run?: number;
+  } | null;
   rows: StagingRow[];
 }
 
@@ -113,10 +134,22 @@ function GapChip({ pct }: { pct: number | null }) {
   return <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-mono ${cls}`}>{label}</span>;
 }
 
+function discoveryLabel(row: StagingRow): string | null {
+  if (!row.discoveryEvidence) return null;
+  try {
+    const evidence = JSON.parse(row.discoveryEvidence) as { foundInPasses?: number[]; finalPass?: number };
+    if (!Array.isArray(evidence.foundInPasses) || evidence.foundInPasses.length === 0) return null;
+    return `Found in read${evidence.foundInPasses.length === 1 ? "" : "s"} ${evidence.foundInPasses.join(", ")} · final read ${evidence.finalPass ?? "—"}`;
+  } catch {
+    return null;
+  }
+}
+
 type TabKey = "needs_review" | "ok" | "not_found" | "new_product";
 
 function RowCard({ row }: { row: StagingRow }) {
   const [expanded, setExpanded] = useState(false);
+  const discovery = discoveryLabel(row);
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
       <button
@@ -136,6 +169,11 @@ function RowCard({ row }: { row: StagingRow }) {
             )}
             {row.page != null && (
               <span className="text-xs text-muted-foreground">p.{row.page}</span>
+            )}
+            {row.adjudicated && (
+              <Badge className="text-xs bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100">
+                Adjudicated
+              </Badge>
             )}
           </div>
           <div className="text-sm text-muted-foreground mt-0.5 truncate">
@@ -206,6 +244,12 @@ function RowCard({ row }: { row: StagingRow }) {
               <div className="text-xs text-muted-foreground mb-0.5">Page</div>
               <span>{row.page ?? "—"}</span>
             </div>
+            {discovery && (
+              <div className="sm:col-span-2">
+                <div className="text-xs text-muted-foreground mb-0.5">Discovery evidence</div>
+                <span>{discovery}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -399,6 +443,13 @@ export default function ImportReviewPage() {
             {batch.sourceFileName} · w.e.f. {batch.effectiveDate} · Price basis:{" "}
             <span className="font-medium">{batch.priceBasis}{batch.gstPct != null ? ` + ${batch.gstPct}% GST` : ""}</span>
           </p>
+          {(batch.fileSha256 || batch.model || batch.extractorVersion) && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {batch.fileSha256 ? `SHA-256 ${batch.fileSha256.slice(0, 12)}…` : "Source hash unavailable"}{" "}
+              · {batch.model ?? batch.extractorVersion ?? "Extractor metadata unavailable"}
+              {batch.catalogueProfileRevision ? ` · profile ${batch.catalogueProfileRevision}` : ""}
+            </p>
+          )}
         </div>
       </div>
 
@@ -436,7 +487,7 @@ export default function ImportReviewPage() {
 
       {/* Count cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
+          {[
           { label: "Ready",        count: batch.rowCounts?.ok ?? 0,          cls: "text-green-600" },
           { label: "Needs Review", count: batch.rowCounts?.needs_review ?? 0, cls: "text-amber-600" },
           { label: "Not Found",    count: batch.rowCounts?.not_found ?? 0,    cls: "text-muted-foreground" },
@@ -445,9 +496,29 @@ export default function ImportReviewPage() {
           <div key={label} className="bg-card border rounded-lg p-4">
             <div className="text-xs text-muted-foreground mb-1">{label}</div>
             <div className={`text-3xl font-mono font-bold ${cls}`}>{count}</div>
+              {label === "New Products" && batch.rowCounts && (
+                <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                  <div>{batch.rowCounts.codes_found_both_passes ?? "—"} found by both reads</div>
+                  <div className={(batch.rowCounts.codes_found_one_pass_only ?? 0) > 0 ? "text-amber-700 font-medium" : ""}>
+                    {batch.rowCounts.codes_found_one_pass_only ?? "—"} one-pass-only
+                  </div>
+                  <div>{batch.rowCounts.items_adjudicated ?? batch.itemsAdjudicated ?? 0} adjudicated</div>
+                </div>
+              )}
           </div>
         ))}
       </div>
+
+        {((batch.rowCounts?.codes_found_one_pass_only ?? 0) > 0 || (batch.rowCounts?.items_adjudicated ?? 0) > 0) && (
+          <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 text-sm text-amber-900">
+            <strong>Discovery disagreement detected.</strong>{" "}
+            {batch.rowCounts?.codes_found_one_pass_only ?? 0} codes appeared in only one initial read;{" "}
+            {batch.rowCounts?.items_adjudicated ?? 0} final rows were selected from an adjudication read.
+            {(batch.rowCounts?.pages_adjudicated?.length ?? 0) > 0 && (
+              <> Pages re-read: {batch.rowCounts!.pages_adjudicated!.join(", ")}.</>
+            )}
+          </div>
+        )}
 
       {/* Action bar */}
       {!isAlreadyDone && (

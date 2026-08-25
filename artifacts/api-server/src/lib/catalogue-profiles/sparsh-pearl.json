@@ -1,6 +1,7 @@
 {
   "competitor": "Sparsh Pearl",
   "catalogueName": "PTMT Vol 6.2",
+  "revision": "sparsh-pearl-vol62-r1",
   "pageCount": 108,
   "codeFamilies": ["ED-", "RS-", "RPS-", "EVA-", "REG-", "TS-", "WC-", "UWC-", "BCC-", "BCB-", "AP-", "CPS-", "CPH-", "NCP-", "PSJ-", "PMJ-", "UJS-", "FV-", "FVE-", "WIH-", "WOH-", "WMP-", "BT-", "BTEP-", "TFT-", "TR-", "BA-"],
   "ignoredFamilies": ["FTS-", "EDE-", "EDP-", "LUR-", "SHP-", "HF-", "AF-", "SC-", "CCQF-", "LFT-", "SHN-", "ET-", "PC-", "FWP-", "WP-", "SL-"],
