@@ -42,12 +42,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Today's date in YYYY-MM-DD (local timezone)
-function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", {
@@ -74,7 +68,7 @@ export default function ImportCompetitorPage() {
   const [, navigate] = useLocation();
   const [file, setFile] = useState<File | null>(null);
   const [competitor, setCompetitor] = useState("");
-  const [effectiveDate, setEffectiveDate] = useState(todayIso());
+  const [effectiveDate, setEffectiveDate] = useState("");
   const [priceBasis, setPriceBasis] = useState<"MRP" | "Ex-GST">("MRP");
   const [gstPct, setGstPct] = useState<number>(18);
   const [isUploading, setIsUploading] = useState(false);

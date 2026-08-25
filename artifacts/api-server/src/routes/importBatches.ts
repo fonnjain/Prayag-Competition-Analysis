@@ -44,6 +44,11 @@ const upload = multer({
   limits: { fileSize: 150 * 1024 * 1024 }, // 150 MB for PDFs
 });
 
+function isIsoCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+}
+
 // Known Sparsh Pearl code aliases (Vol 6.2 verified).
 // After import diagnostics confirmed which codes are actually in the PDF extraction:
 //   - WMP pipe renumbering: WMP-186→WMP-188 (2 Mtr), WMP-188→WMP-189 (3 Mtr)
@@ -185,10 +190,14 @@ router.post(
         : null;
     if (!competitor) { res.status(400).json({ error: "competitor is required" }); return; }
 
-    const rawDate = typeof req.body.effectiveDate === "string" ? req.body.effectiveDate.trim() : "";
-    const effectiveDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
-      ? rawDate
-      : new Date().toISOString().slice(0, 10);
+    const effectiveDate =
+      typeof req.body.effectiveDate === "string" ? req.body.effectiveDate.trim() : "";
+    if (!isIsoCalendarDate(effectiveDate)) {
+      res.status(400).json({
+        error: "effectiveDate is required and must be a valid YYYY-MM-DD calendar date.",
+      });
+      return;
+    }
 
     const priceBasis = req.body.priceBasis === "Ex-GST" ? "Ex-GST" : "MRP";
     const gstPct =
