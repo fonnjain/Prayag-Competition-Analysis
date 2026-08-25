@@ -832,6 +832,15 @@ export default function PriceFinderPage() {
       )}
       </div>
 
+      {/* Selected product result stays above catalogue browsing */}
+      {selectedItemCode && (
+        <ProductView
+          itemCode={selectedItemCode}
+          speechEnabled={speechEnabled}
+          speakRequestId={speechRequested ? selectionSequence : 0}
+        />
+      )}
+
       <section className="rounded-xl border bg-card p-4 md:p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -988,14 +997,6 @@ export default function PriceFinderPage() {
         )}
       </section>
 
-      {/* Selected Product View */}
-      {selectedItemCode && (
-        <ProductView
-          itemCode={selectedItemCode}
-          speechEnabled={speechEnabled}
-          speakRequestId={speechRequested ? selectionSequence : 0}
-        />
-      )}
     </div>
   );
 }
