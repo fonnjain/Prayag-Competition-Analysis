@@ -1,0 +1,133 @@
+# Replit Prompt — Price Finder Comparison, as a Separate Surface
+
+A comparison page that belongs to **Price Finder**, not to Competition Analysis. Separate because the two serve different people with different access.
+
+`comparison.tsx` in `prayag-product-db` stays exactly as it is. This is a second, narrower surface — do not merge them, and do not change the existing one.
+
+---
+
+## Why separate
+
+Competition Analysis is a management tool. It exposes net-to-net pricing driven by discount settings, match confidence internals, mapping review, unmapped competitor products and import controls. **Margin data is in there.**
+
+Price Finder is a counter tool. Someone serving a customer needs the MRP, the competitor's MRP and the difference. Nothing else.
+
+Building the selected-set comparison into the existing page would mean granting counter staff access to a surface carrying discount and margin information. A separate page is what makes the access boundary possible.
+
+---
+
+## Part A — A third role
+
+`users.role` is `varchar` defaulting to `'user'`, and `requireAdmin` tests `role !== "admin"`. Two roles today: `admin` and `user`.
+
+Add a **`counter`** role — read-only, and scoped to price lookup:
+
+| Surface | admin | user | counter |
+|---|---|---|---|
+| Price Finder | yes | yes | **yes** |
+| Price Finder Comparison (this page) | yes | yes | **yes** |
+| Product Database / catalogue browse | yes | yes | no |
+| Competition Analysis | yes | yes | **no** |
+| Discount settings, net-to-net | yes | no | **no** |
+| Imports, MRP load, mapping review | yes | no | no |
+
+Confirm the `user` row above against how the application is actually used before implementing — I have inferred it. If `user` should also be restricted from Competition Analysis, say so and propose it rather than assuming either way.
+
+**Enforce server-side at the router**, using the existing `requireAdmin` pattern. A hidden nav item is not access control. A `counter` session requesting a Competition Analysis endpoint directly must receive 403.
+
+Add role assignment to the existing admin users page, and make the role visible there.
+
+---
+
+## Part B — Selection in Price Finder
+
+A checkbox on each search result and each catalogue-browse row. Selecting one or more reveals a bar with the count and a **Compare** button.
+
+The selection must survive a new search, moving between search and browse, and opening a product detail page and returning. Someone looks up a bib cock, selects it, searches a sink cock, selects that — both stay.
+
+Include a **Clear** control and the ability to remove an individual product from the bar without finding its row again.
+
+Cap at **50 products**, with a clear message at the limit.
+
+---
+
+## Part C — The comparison page
+
+A new route on the Price Finder surface. It shows only the selected products.
+
+Per row:
+
+- Cat No., product name, series, division
+- **Prayag MRP in force**, with its effective date
+- **Each competitor's MRP in force**, with its effective date
+- The difference, and which is cheaper
+- Where either side has a future price: the upcoming price and the date
+
+**Both sides must resolve at the same date.** Never the current price of one against a dated price of the other — that mismatch produced a false +10.8% median on this project and took a week to unwind. Reuse the shared period-resolution logic; do not write a second implementation.
+
+### What this page must not show
+
+- Net-to-net pricing, discount percentages, or anything derived from discount settings
+- Match confidence, match method, or review status
+- Unmapped competitor products
+- Cost, margin, or any internal field
+
+If a field is not needed to answer *"what do we charge and what do they charge"*, leave it off. This page will be open on a counter in front of customers.
+
+### Competitor filter
+
+Multi-select, so the user chooses which competitor columns appear. Only Sparsh Pearl has data today; Vectus exists with none.
+
+A competitor with no price for a product must show as **"no data"**, visually distinct from a difference of zero. Those are different facts and must not look alike.
+
+### Shareable
+
+Pass the selection as product codes in the URL so the view can be sent to a colleague — that is how this will be used. If the list outgrows a URL, fall back to a stored selection with an id, rather than losing shareability.
+
+---
+
+## Part D — Export
+
+An Excel export of the comparison as shown, honouring the competitor filter.
+
+Every price must carry its **effective date** in the sheet, and the sheet must state the as-of date the comparison was run for. These files get mailed and read weeks later; a price without a date cannot be checked.
+
+Same exclusions as the page — no net-to-net, no margin, no internal fields. A counter export may reach a customer.
+
+---
+
+## Acceptance tests
+
+```
+1.  A counter-role session can open Price Finder and this comparison page.
+2.  A counter-role session requesting a Competition Analysis endpoint directly
+    receives 403, not a hidden menu item.
+3.  A counter-role session requesting discount settings receives 403.
+4.  Selecting 3 products across two separate searches, then Compare, shows
+    exactly those 3.
+5.  The selection survives a new search, browsing, and product detail and back.
+6.  The comparison URL opens the same set in a new session.
+7.  Prayag and competitor prices in each row resolve at the same date; a product
+    with no competitor price shows "no data", not a zero difference.
+8.  The export contains an effective date beside every price and the as-of date
+    on the sheet.
+9.  No net-to-net, discount, margin, match-confidence or review field appears on
+    the page or in the export.
+10. The existing Competition Analysis comparison page is unchanged in behaviour
+    for admin and user roles.
+11. No catalog_products row is created by any part of this flow.
+```
+
+Tests 2, 3 and 9 are the point of building this separately. If a counter role can reach margin data by any route, the separation has failed.
+
+---
+
+## Report
+
+- The role matrix as implemented, and whether you agree with the `user` row or propose changing it.
+- Where selection state is held and how it survives navigation.
+- Which shared function resolves both sides at the same date.
+- How "no data" is shown on screen and in the export.
+- Confirmation that the existing Competition Analysis page is untouched.
+
+One clean commit.
