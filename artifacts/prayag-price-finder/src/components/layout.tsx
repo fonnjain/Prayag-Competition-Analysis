@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
-import { Box, Home, LogOut, Search, TrendingUp, Menu, X } from "lucide-react";
+import { Box, Home, LogOut, Search, TrendingUp, Menu, X, Scale } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -9,16 +9,21 @@ interface LayoutProps {
 }
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/product-db/", label: "Product Database", icon: Box },
-  { href: "/analysis/", label: "Competition Analysis", icon: TrendingUp },
-  { href: "/price-finder/", label: "Price Finder", icon: Search, active: true },
+  { href: "/", label: "Home", icon: Home, counterAllowed: false },
+  { href: "/product-db/", label: "Product Database", icon: Box, counterAllowed: false },
+  { href: "/analysis/", label: "Competition Analysis", icon: TrendingUp, counterAllowed: false },
+  { href: "/price-finder/", label: "Price Finder", icon: Search, counterAllowed: true },
+  { href: "/price-finder/comparison", label: "Compare", icon: Scale, counterAllowed: true },
 ];
 
 export function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "User";
+  const visibleNavItems =
+    user?.role === "counter"
+      ? navItems.filter((item) => item.counterAllowed)
+      : navItems;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
@@ -51,14 +56,13 @@ export function Layout({ children }: LayoutProps) {
             
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center ml-8 gap-1">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <a
                   key={item.href}
                   href={item.href}
-                  aria-current={item.active ? "page" : undefined}
                   className={cn(
                     "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                    item.active
+                    item.href === "/price-finder/"
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
@@ -110,15 +114,14 @@ export function Layout({ children }: LayoutProps) {
               <div className="px-4">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-4 mb-2">Switch App</p>
                 <nav className="space-y-1">
-                  {navItems.map((item) => (
+                  {visibleNavItems.map((item) => (
                     <a
                       key={item.href}
                       href={item.href}
-                      aria-current={item.active ? "page" : undefined}
                       onClick={() => setMobileMenuOpen(false)}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md",
-                        item.active
+                        item.href === "/price-finder/"
                           ? "bg-primary/10 text-primary"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}

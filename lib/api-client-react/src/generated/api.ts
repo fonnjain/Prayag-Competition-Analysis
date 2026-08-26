@@ -63,6 +63,7 @@ import type {
   ErrorEnvelope,
   ErrorResponse,
   ExportAnalysisParams,
+  ExportPriceFinderComparisonParams,
   ExternalGetComparisonParams,
   ExternalGetProductParams,
   ExternalListProductsParams,
@@ -83,6 +84,7 @@ import type {
   GetMappingReviewParams,
   GetMrpIncreasesParams,
   GetPriceFinderBrowseParams,
+  GetPriceFinderComparisonParams,
   GetPriceFinderSearchParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
@@ -96,6 +98,7 @@ import type {
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
   PriceFinderBrowseResponse,
+  PriceFinderComparisonResponse,
   PriceFinderProductResponse,
   PriceFinderSearchResponse,
   PriceHistory,
@@ -1231,6 +1234,192 @@ export function useGetPriceFinderProduct<TData = Awaited<ReturnType<typeof getPr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPriceFinderProductQueryOptions(itemCode,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPriceFinderComparisonUrl = (params: GetPriceFinderComparisonParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["code","competitor"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/comparison?${stringifiedParams}` : `/api/price-finder/comparison`
+}
+
+/**
+ * Read-only dated comparison for up to 50 catalog products. Both Prayag and competitor prices resolve to the latest eligible revision on or before the same as-of date; future revisions are returned separately.
+
+ * @summary Compare selected Price Finder products against selected competitors
+ */
+export const getPriceFinderComparison = async (params: GetPriceFinderComparisonParams, options?: RequestInit): Promise<PriceFinderComparisonResponse> => {
+
+  return customFetch<PriceFinderComparisonResponse>(getGetPriceFinderComparisonUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderComparisonQueryKey = (params?: GetPriceFinderComparisonParams,) => {
+    return [
+    `/api/price-finder/comparison`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceFinderComparisonQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderComparison>>, TError = ErrorType<ErrorResponse>>(params: GetPriceFinderComparisonParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderComparison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderComparisonQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderComparison>>> = ({ signal }) => getPriceFinderComparison(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderComparison>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderComparisonQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderComparison>>>
+export type GetPriceFinderComparisonQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Compare selected Price Finder products against selected competitors
+ */
+
+export function useGetPriceFinderComparison<TData = Awaited<ReturnType<typeof getPriceFinderComparison>>, TError = ErrorType<ErrorResponse>>(
+ params: GetPriceFinderComparisonParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderComparison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderComparisonQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportPriceFinderComparisonUrl = (params: ExportPriceFinderComparisonParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["code","competitor"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/comparison/export?${stringifiedParams}` : `/api/price-finder/comparison/export`
+}
+
+/**
+ * @summary Export selected Price Finder comparisons
+ */
+export const exportPriceFinderComparison = async (params: ExportPriceFinderComparisonParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportPriceFinderComparisonUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportPriceFinderComparisonQueryKey = (params?: ExportPriceFinderComparisonParams,) => {
+    return [
+    `/api/price-finder/comparison/export`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportPriceFinderComparisonQueryOptions = <TData = Awaited<ReturnType<typeof exportPriceFinderComparison>>, TError = ErrorType<ErrorResponse>>(params: ExportPriceFinderComparisonParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportPriceFinderComparison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportPriceFinderComparisonQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportPriceFinderComparison>>> = ({ signal }) => exportPriceFinderComparison(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportPriceFinderComparison>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportPriceFinderComparisonQueryResult = NonNullable<Awaited<ReturnType<typeof exportPriceFinderComparison>>>
+export type ExportPriceFinderComparisonQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Export selected Price Finder comparisons
+ */
+
+export function useExportPriceFinderComparison<TData = Awaited<ReturnType<typeof exportPriceFinderComparison>>, TError = ErrorType<ErrorResponse>>(
+ params: ExportPriceFinderComparisonParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportPriceFinderComparison>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportPriceFinderComparisonQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

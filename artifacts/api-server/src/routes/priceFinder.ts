@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
+import XLSX from "xlsx";
 import {
   priceChangePct,
   validToFromNextDate,
@@ -8,6 +9,220 @@ import {
 } from "../lib/priceWindow.js";
 
 const router: IRouter = Router();
+
+const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Vectus"] as const;
+type PriceFinderCompetitor = (typeof PRICE_FINDER_COMPETITORS)[number];
+
+function queryArray(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : value == null ? [] : [value];
+  return values
+    .flatMap((item) => String(item).split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function comparisonAsOf(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  const asOf = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+    throw new Error("asOf must be a valid date in YYYY-MM-DD format.");
+  }
+  const parsed = new Date(`${asOf}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== asOf) {
+    throw new Error("asOf must be a valid date in YYYY-MM-DD format.");
+  }
+  return asOf;
+}
+
+function sqlList(values: string[]) {
+  return sql.join(values.map((value) => sql`${value}`), sql`, `);
+}
+
+type ComparisonProductRow = {
+  item_code: string;
+  product_name: string | null;
+  division: string | null;
+  category: string | null;
+  discontinued_from: string | null;
+  prayag_mrp: number | null;
+  prayag_date: string | null;
+  prayag_next_mrp: number | null;
+  prayag_next_date: string | null;
+};
+
+type ComparisonPriceRow = {
+  item_code: string;
+  competitor: string;
+  current_price: number | null;
+  current_date: string | null;
+  next_price: number | null;
+  next_date: string | null;
+};
+
+function normalizeComparisonPrice(price: number | null): number | null {
+  return price == null ? null : Number(price);
+}
+
+async function buildPriceFinderComparison(
+  codes: string[],
+  competitors: PriceFinderCompetitor[],
+  asOf: string,
+) {
+  const codeList = sqlList(codes);
+  const productResult = await db.execute<ComparisonProductRow>(sql`
+    SELECT
+      p.item_code,
+      p.product_name,
+      p.division,
+      p.category,
+      p.discontinued_from,
+      current_price.mrp AS prayag_mrp,
+      current_price.effective_date AS prayag_date,
+      upcoming_price.mrp AS prayag_next_mrp,
+      upcoming_price.effective_date AS prayag_next_date
+    FROM catalog_products p
+    LEFT JOIN LATERAL (
+      SELECT h.mrp, h.effective_date
+      FROM mrp_price_history h
+      WHERE h.item_code = p.item_code
+        AND h.variant = 'Standard'
+        AND h.mrp IS NOT NULL
+        AND h.review_status = 'approved'
+        AND h.effective_date <= ${asOf}
+      ORDER BY h.effective_date DESC, h.id DESC
+      LIMIT 1
+    ) current_price ON true
+    LEFT JOIN LATERAL (
+      SELECT h.mrp, h.effective_date
+      FROM mrp_price_history h
+      WHERE h.item_code = p.item_code
+        AND h.variant = 'Standard'
+        AND h.mrp IS NOT NULL
+        AND h.review_status = 'approved'
+        AND h.effective_date > ${asOf}
+        AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
+      ORDER BY h.effective_date ASC, h.id DESC
+      LIMIT 1
+    ) upcoming_price ON true
+    WHERE p.item_code IN (${codeList})
+      AND p.is_active IS TRUE
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
+  `);
+
+  const productMap = new Map(productResult.rows.map((row) => [row.item_code, row]));
+  const unknownCodes = codes.filter((code) => !productMap.has(code));
+  if (unknownCodes.length > 0) {
+    throw new Error(`Unknown or inactive product code: ${unknownCodes.join(", ")}`);
+  }
+
+  const pricesResult = await db.execute<ComparisonPriceRow>(sql`
+    SELECT
+      p.item_code,
+      brands.competitor,
+      current_price.normalized_price AS current_price,
+      current_price.effective_date AS current_date,
+      upcoming_price.normalized_price AS next_price,
+      upcoming_price.effective_date AS next_date
+    FROM catalog_products p
+    CROSS JOIN (VALUES ${sql.join(
+      competitors.map((competitor) => sql`(${competitor})`),
+      sql`, `,
+    )}) AS brands(competitor)
+    LEFT JOIN LATERAL (
+      SELECT
+        CASE
+          WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+            THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+          ELSE cp.price
+        END AS normalized_price,
+        cp.effective_date
+      FROM competitor_prices cp
+      WHERE cp.competitor = brands.competitor
+        AND cp.matched_prayag_code = p.item_code
+        AND cp.match_status = 'matched'
+        AND cp.price IS NOT NULL
+        AND cp.effective_date <= ${asOf}
+      ORDER BY cp.effective_date DESC, cp.id DESC
+      LIMIT 1
+    ) current_price ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        CASE
+          WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+            THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+          ELSE cp.price
+        END AS normalized_price,
+        cp.effective_date
+      FROM competitor_prices cp
+      WHERE cp.competitor = brands.competitor
+        AND cp.matched_prayag_code = p.item_code
+        AND cp.match_status = 'matched'
+        AND cp.price IS NOT NULL
+        AND cp.effective_date > ${asOf}
+      ORDER BY cp.effective_date ASC, cp.id DESC
+      LIMIT 1
+    ) upcoming_price ON true
+    WHERE p.item_code IN (${codeList})
+      AND p.is_active IS TRUE
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
+  `);
+
+  const priceMap = new Map<string, Map<string, ComparisonPriceRow>>();
+  for (const row of pricesResult.rows) {
+    const byBrand = priceMap.get(row.item_code) ?? new Map<string, ComparisonPriceRow>();
+    byBrand.set(row.competitor, row);
+    priceMap.set(row.item_code, byBrand);
+  }
+
+  const rows = codes.map((itemCode) => {
+    const product = productMap.get(itemCode)!;
+    const prayagPrice = normalizeComparisonPrice(product.prayag_mrp);
+    const prayagNextPrice = normalizeComparisonPrice(product.prayag_next_mrp);
+    const byBrand = priceMap.get(itemCode) ?? new Map();
+    const competitorRows = competitors.map((competitor) => {
+      const priceRow = byBrand.get(competitor);
+      const price = normalizeComparisonPrice(priceRow?.current_price ?? null);
+      const difference = prayagPrice != null && price != null ? price - prayagPrice : null;
+      const differencePct =
+        difference != null && prayagPrice && prayagPrice > 0
+          ? (difference / prayagPrice) * 100
+          : null;
+      return {
+        competitor,
+        price,
+        effectiveDate: priceRow?.current_date ?? null,
+        validTo: validToFromNextDate(priceRow?.next_date ?? null),
+        upcomingPrice: normalizeComparisonPrice(priceRow?.next_price ?? null),
+        upcomingEffectiveDate: priceRow?.next_date ?? null,
+        difference,
+        differencePct,
+        cheaperSide:
+          difference == null ? null : Math.abs(difference) < 0.005 ? "parity" : difference > 0 ? "Prayag" : competitor,
+      };
+    });
+    return {
+      itemCode,
+      productName: product.product_name,
+      division: product.division,
+      category: product.category,
+      prayag: {
+        price: prayagPrice,
+        effectiveDate: product.prayag_date,
+        validTo: validToFromNextDateOrDiscontinuation(
+          product.prayag_next_date,
+          product.discontinued_from,
+        ),
+        upcomingPrice: prayagNextPrice,
+        upcomingEffectiveDate: product.prayag_next_date,
+      },
+      competitors: competitorRows,
+    };
+  });
+
+  return { asOfDate: asOf, competitors, rows };
+}
 
 type SearchRow = {
   item_code: string;
@@ -775,5 +990,105 @@ router.get(
     });
   },
 );
+
+router.get("/price-finder/comparison", async (req, res) => {
+  const codes = [...new Set(queryArray(req.query.code ?? req.query.codes))];
+  const requestedCompetitors = [...new Set(queryArray(req.query.competitor))];
+  const competitors = (
+    requestedCompetitors.length > 0 ? requestedCompetitors : ["Sparsh Pearl"]
+  ) as PriceFinderCompetitor[];
+
+  if (codes.length === 0 || codes.length > 50) {
+    res.status(400).json({ error: "Select between 1 and 50 products." });
+    return;
+  }
+  if (
+    competitors.some(
+      (competitor) =>
+        !PRICE_FINDER_COMPETITORS.includes(competitor as PriceFinderCompetitor),
+    )
+  ) {
+    res.status(400).json({
+      error: `Competitor must be one of: ${PRICE_FINDER_COMPETITORS.join(", ")}.`,
+    });
+    return;
+  }
+
+  try {
+    const asOf = comparisonAsOf(req.query.asOf);
+    res.json(await buildPriceFinderComparison(codes, competitors, asOf));
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Comparison could not be loaded.",
+    });
+  }
+});
+
+router.get("/price-finder/comparison/export", async (req, res) => {
+  const codes = [...new Set(queryArray(req.query.code ?? req.query.codes))];
+  const requestedCompetitors = [...new Set(queryArray(req.query.competitor))];
+  const competitors = (
+    requestedCompetitors.length > 0 ? requestedCompetitors : ["Sparsh Pearl"]
+  ) as PriceFinderCompetitor[];
+
+  if (codes.length === 0 || codes.length > 50) {
+    res.status(400).json({ error: "Select between 1 and 50 products." });
+    return;
+  }
+  if (
+    competitors.some(
+      (competitor) =>
+        !PRICE_FINDER_COMPETITORS.includes(competitor as PriceFinderCompetitor),
+    )
+  ) {
+    res.status(400).json({
+      error: `Competitor must be one of: ${PRICE_FINDER_COMPETITORS.join(", ")}.`,
+    });
+    return;
+  }
+
+  try {
+    const asOf = comparisonAsOf(req.query.asOf);
+    const comparison = await buildPriceFinderComparison(codes, competitors, asOf);
+    const exportRows = comparison.rows.flatMap((row) =>
+      row.competitors.map((competitor) => ({
+        "Item code": row.itemCode,
+        "Product name": row.productName ?? "",
+        Division: row.division ?? "",
+        Category: row.category ?? "",
+        "As of": comparison.asOfDate,
+        "Prayag MRP": row.prayag.price,
+        "Prayag effective date": row.prayag.effectiveDate ?? "",
+        Competitor: competitor.competitor,
+        "Competitor price": competitor.price,
+        "Competitor effective date": competitor.effectiveDate ?? "",
+        Difference: competitor.difference,
+        "Difference %": competitor.differencePct,
+        "Cheaper side": competitor.cheaperSide ?? "No data",
+        "Prayag upcoming price": row.prayag.upcomingPrice,
+        "Prayag upcoming effective date": row.prayag.upcomingEffectiveDate ?? "",
+        "Competitor upcoming price": competitor.upcomingPrice,
+        "Competitor upcoming effective date": competitor.upcomingEffectiveDate ?? "",
+      })),
+    );
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(exportRows);
+    XLSX.utils.book_append_sheet(workbook, sheet, "Price comparison");
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="prayag-price-comparison-${asOf}.xlsx"`,
+    );
+    res.send(buffer);
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Comparison export could not be created.",
+    });
+  }
+});
 
 export default router;

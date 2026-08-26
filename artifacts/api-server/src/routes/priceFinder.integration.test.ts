@@ -311,6 +311,23 @@ describe("Price Finder date-driven validity", () => {
     expect(codes).not.toContain(INACTIVE);
   });
 
+  it("rejects discontinued products and impossible dates from dated comparisons", async () => {
+    const [withdrawn, impossibleDate] = await Promise.all([
+      request.get("/price-finder/comparison").query({
+        code: WITHDRAWING,
+        asOf: NEXT_DATE,
+      }),
+      request.get("/price-finder/comparison").query({
+        code: CHANGING,
+        asOf: "2026-02-31",
+      }),
+    ]);
+    expect(withdrawn.status).toBe(400);
+    expect(withdrawn.body.error).toMatch(/unknown or inactive/i);
+    expect(impossibleDate.status).toBe(400);
+    expect(impossibleDate.body.error).toMatch(/valid date/i);
+  });
+
   it("keeps progressive filters and price windows in the same search response", async () => {
     const response = await request
       .get("/price-finder/search")

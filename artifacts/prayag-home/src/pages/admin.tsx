@@ -35,7 +35,7 @@ type AdminUser = {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  role: "admin" | "user";
+  role: "admin" | "user" | "counter";
   createdAt: string;
 };
 
@@ -61,7 +61,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("pRAYAG@2026");
-  const [role, setRole] = useState<"admin" | "user">("user");
+  const [role, setRole] = useState<"admin" | "user" | "counter">("user");
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
@@ -138,7 +138,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
           <div>
             <label className="block text-sm font-medium mb-2">Role</label>
             <div className="flex gap-3">
-              {(["user", "admin"] as const).map((r) => (
+              {(["user", "counter", "admin"] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -154,7 +154,9 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
                   <p className="text-xs mt-0.5 text-muted-foreground">
                     {r === "admin"
                       ? "Full access including user management"
-                      : "Standard workspace access"}
+                      : r === "counter"
+                        ? "Price Finder and product comparison only"
+                        : "Standard workspace access"}
                   </p>
                 </button>
               ))}
@@ -355,9 +357,8 @@ function UserRow({
   const updateRole = useUpdateAdminUserRole();
   const isSelf = user.id === currentUserId;
 
-  async function toggleRole() {
-    const next = user.role === "admin" ? "user" : "admin";
-    await updateRole.mutateAsync({ id: user.id, data: { role: next } });
+  async function changeRole(role: AdminUser["role"]) {
+    await updateRole.mutateAsync({ id: user.id, data: { role } });
     await qc.invalidateQueries({ queryKey: getListAdminUsersQueryKey() });
   }
 
@@ -369,7 +370,9 @@ function UserRow({
           "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
           user.role === "admin"
             ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground",
+            : user.role === "counter"
+              ? "bg-amber-100 text-amber-800"
+              : "bg-muted text-muted-foreground",
         )}
       >
         {initials(user)}
@@ -392,32 +395,32 @@ function UserRow({
           "hidden sm:inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium shrink-0",
           user.role === "admin"
             ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground",
+            : user.role === "counter"
+              ? "bg-amber-100 text-amber-800"
+              : "bg-muted text-muted-foreground",
         )}
       >
-        {user.role === "admin" ? <Shield className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
-        {user.role === "admin" ? "Admin" : "User"}
+        {user.role === "admin" ? <Shield className="w-3 h-3" /> : user.role === "counter" ? <Search className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
+        {user.role === "admin" ? "Admin" : user.role === "counter" ? "Counter" : "User"}
       </span>
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0">
-        <button
-          onClick={toggleRole}
+        <select
+          value={user.role}
+          onChange={(event) => changeRole(event.target.value as AdminUser["role"])}
           disabled={isSelf || updateRole.isPending}
-          title={user.role === "admin" ? "Demote to user" : "Promote to admin"}
           className={cn(
-            "rounded-md p-2 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            "rounded-md border bg-background px-2 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary",
             isSelf
               ? "opacity-30 cursor-not-allowed"
-              : "hover:bg-accent text-muted-foreground hover:text-foreground",
+              : "text-foreground",
           )}
         >
-          {user.role === "admin" ? (
-            <ShieldOff className="w-4 h-4" />
-          ) : (
-            <Shield className="w-4 h-4" />
-          )}
-        </button>
+          <option value="admin">Admin</option>
+          <option value="user">User</option>
+          <option value="counter">Counter</option>
+        </select>
         <button
           onClick={onResetPassword}
           title="Reset password"
@@ -455,6 +458,7 @@ export default function AdminPage() {
   const users = (data?.users ?? []) as AdminUser[];
   const admins = users.filter((u) => u.role === "admin");
   const normal = users.filter((u) => u.role === "user");
+  const counters = users.filter((u) => u.role === "counter");
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -593,6 +597,28 @@ export default function AdminPage() {
               </div>
             )}
 
+            {counters.length > 0 && (
+              <div className={admins.length > 0 || normal.length > 0 ? "border-t" : ""}>
+                <div className="px-4 py-2.5 bg-amber-50 border-b flex items-center gap-2">
+                  <Search className="w-4 h-4 text-amber-700" />
+                  <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+                    Counter access · {counters.length}
+                  </span>
+                </div>
+                <div className="divide-y">
+                  {counters.map((u) => (
+                    <UserRow
+                      key={u.id}
+                      user={u}
+                      currentUserId={currentUser?.id ?? ""}
+                      onResetPassword={() => setResetTarget(u)}
+                      onDelete={() => setDeleteTarget(u)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {users.length === 0 && (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">No users yet.</p>
             )}
@@ -603,6 +629,7 @@ export default function AdminPage() {
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground space-y-1">
           <p><strong className="text-foreground">Admin</strong> — full workspace access + user management</p>
           <p><strong className="text-foreground">User</strong> — standard workspace access (all apps, no user management)</p>
+          <p><strong className="text-foreground">Counter</strong> — Price Finder search, browse, comparison, and export only</p>
         </div>
       </main>
 

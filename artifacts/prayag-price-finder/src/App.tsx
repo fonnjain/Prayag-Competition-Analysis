@@ -13,6 +13,7 @@ import {
 import { AuthProvider } from '@workspace/replit-auth-web';
 import { Layout } from '@/components/layout';
 import PriceFinderPage from '@/pages/home';
+import ComparisonPage from '@/pages/comparison';
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ function Router() {
       <Layout>
         <Switch>
           <Route path="/" component={PriceFinderPage} />
+          <Route path="/comparison" component={ComparisonPage} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

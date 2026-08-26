@@ -19,10 +19,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { PriceWindowDetails } from "@/components/price-window";
 import { buildSpokenPriceSummary } from "@/lib/priceSpeech";
 import { getPriceFinderSearchDisplay } from "@/lib/priceFinderSearchState";
+import { useSelection } from "@/lib/useSelection";
 import {
   useGetPriceFinderBrowse,
   useGetPriceFinderProduct,
@@ -235,6 +238,8 @@ function useVoiceSearch(
 }
 
 export default function PriceFinderPage() {
+  const { codes, toggleCode, clearCodes } = useSelection();
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [filters, setFilters] = useState<string[]>(() =>
@@ -412,6 +417,14 @@ export default function PriceFinderPage() {
     setSelectionSequence((value) => value + 1);
     setSpeechRequested(speechEnabled);
   }, [cancelSpeech, speechEnabled]);
+  const toggleComparisonCode = useCallback((itemCode: string) => {
+    const updated = toggleCode(itemCode);
+    setSelectionNotice(
+      updated
+        ? null
+        : "You can compare up to 50 products. Remove a product before adding another.",
+    );
+  }, [toggleCode]);
   // Query 1: divisions list (no division selected)
   const { data: divisionsData, isLoading: isDivisionsLoading } = useGetPriceFinderBrowse(
     { limit: 300 },
@@ -467,6 +480,52 @@ export default function PriceFinderPage() {
           Fast counter-side lookup for Prayag prices and market position.
         </p>
       </div>
+
+      <div
+        className={cn(
+          "sticky top-16 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-sm backdrop-blur transition-colors",
+          codes.length
+            ? "border-primary/30 bg-primary/5"
+            : "border-border bg-card/90",
+        )}
+        data-testid="comparison-selection-bar"
+      >
+        <div>
+          <p className="text-sm font-semibold">
+            {codes.length
+              ? `${codes.length} product${codes.length === 1 ? "" : "s"} selected`
+              : "Select products to compare"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Choose up to 50 products from search results or the catalogue.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {codes.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                clearCodes();
+                setSelectionNotice(null);
+              }}
+            >
+              Clear selection
+            </Button>
+          )}
+          {codes.length ? (
+            <Link href={`/comparison?${new URLSearchParams(codes.map((code) => ["code", code])).toString()}`}>
+              <Button type="button" size="sm">Compare selected</Button>
+            </Link>
+          ) : (
+            <Button type="button" size="sm" disabled>Compare selected</Button>
+          )}
+        </div>
+      </div>
+      {selectionNotice && (
+        <p className="text-sm text-amber-700" role="status">{selectionNotice}</p>
+      )}
 
       {voiceError && (
         <p className="text-sm text-amber-700" role="status">
@@ -707,11 +766,21 @@ export default function PriceFinderPage() {
                 </p>
               )}
               {results.map((res) => (
-                <button
-                  key={res.itemCode}
-                  onClick={() => confirmProduct(res.itemCode)}
-                  className="w-full text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between group"
-                >
+                <div key={res.itemCode} className="w-full flex items-stretch group border-b last:border-b-0 border-border/50">
+                  <div
+                    className="w-14 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={codes.includes(res.itemCode)}
+                      onCheckedChange={() => toggleComparisonCode(res.itemCode)}
+                      aria-label={`Select ${res.itemCode}`}
+                      className="w-5 h-5 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                  </div>
+                  <button
+                    onClick={() => confirmProduct(res.itemCode)}
+                    className="flex-1 text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between"
+                  >
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-sm font-bold text-primary">{res.itemCode}</span>
@@ -754,6 +823,7 @@ export default function PriceFinderPage() {
                     <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                 </button>
+                </div>
               ))}
             </div>
           )}
@@ -957,12 +1027,22 @@ export default function PriceFinderPage() {
               ) : (
                 <div className="divide-y rounded-lg border">
                   {(productsData?.products ?? []).map((item) => (
-                    <button
-                      key={item.itemCode}
-                      type="button"
-                      onClick={() => confirmProduct(item.itemCode)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
-                    >
+                    <div key={item.itemCode} className="w-full flex items-stretch group border-b last:border-b-0 border-border/50">
+                      <div
+                        className="w-14 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={codes.includes(item.itemCode)}
+                          onCheckedChange={() => toggleComparisonCode(item.itemCode)}
+                          aria-label={`Select ${item.itemCode}`}
+                          className="w-5 h-5 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => confirmProduct(item.itemCode)}
+                        className="flex-1 flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                      >
                       <span>
                         <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
                         <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
@@ -989,6 +1069,7 @@ export default function PriceFinderPage() {
                         )}
                       </span>
                     </button>
+                    </div>
                   ))}
                 </div>
               )

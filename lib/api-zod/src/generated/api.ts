@@ -462,6 +462,66 @@ export const GetPriceFinderProductResponse = zod.object({
 
 
 /**
+ * Read-only dated comparison for up to 50 catalog products. Both Prayag and competitor prices resolve to the latest eligible revision on or before the same as-of date; future revisions are returned separately.
+
+ * @summary Compare selected Price Finder products against selected competitors
+ */
+export const getPriceFinderComparisonQueryCodeMax = 50;
+
+
+
+export const GetPriceFinderComparisonQueryParams = zod.object({
+  "code": zod.array(zod.coerce.string()).min(1).max(getPriceFinderComparisonQueryCodeMax).describe('One or more selected Prayag item codes, maximum 50.'),
+  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Vectus'])).optional().describe('Competitor brands to include. Defaults to Sparsh Pearl.'),
+  "asOf": zod.date().optional().describe('Resolve both sides as of this date (YYYY-MM-DD). Defaults to today.')
+})
+
+export const GetPriceFinderComparisonResponse = zod.object({
+  "asOfDate": zod.coerce.date(),
+  "competitors": zod.array(zod.enum(['Sparsh Pearl', 'Vectus'])),
+  "rows": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "prayag": zod.object({
+  "price": zod.number().nullable(),
+  "effectiveDate": zod.coerce.date().nullable(),
+  "validTo": zod.coerce.date().nullable(),
+  "upcomingPrice": zod.number().nullable(),
+  "upcomingEffectiveDate": zod.coerce.date().nullable()
+}),
+  "competitors": zod.array(zod.object({
+  "price": zod.number().nullable(),
+  "effectiveDate": zod.coerce.date().nullable(),
+  "validTo": zod.coerce.date().nullable(),
+  "upcomingPrice": zod.number().nullable(),
+  "upcomingEffectiveDate": zod.coerce.date().nullable()
+}).and(zod.object({
+  "competitor": zod.enum(['Sparsh Pearl', 'Vectus']),
+  "difference": zod.number().nullable().describe('Competitor price minus Prayag MRP.'),
+  "differencePct": zod.number().nullable().describe('Difference relative to Prayag MRP.'),
+  "cheaperSide": zod.string().nullable().describe('Prayag, the competitor name, parity, or null when no dated price is available.')
+})))
+}))
+})
+
+
+/**
+ * @summary Export selected Price Finder comparisons
+ */
+export const exportPriceFinderComparisonQueryCodeMax = 50;
+
+
+
+export const ExportPriceFinderComparisonQueryParams = zod.object({
+  "code": zod.array(zod.coerce.string()).min(1).max(exportPriceFinderComparisonQueryCodeMax),
+  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Vectus'])).optional(),
+  "asOf": zod.date().optional()
+})
+
+
+/**
  * @summary Set a new current MRP for a product (inline edit, no file upload required)
  */
 export const PatchCatalogProductMrpParams = zod.object({
@@ -1409,7 +1469,7 @@ export const ListAdminUsersResponse = zod.object({
   "email": zod.string(),
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
-  "role": zod.enum(['admin', 'user']),
+  "role": zod.enum(['admin', 'user', 'counter']),
   "createdAt": zod.coerce.date()
 }))
 })
@@ -1427,7 +1487,7 @@ export const CreateAdminUserBody = zod.object({
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
   "password": zod.string().min(createAdminUserBodyPasswordMin).optional().describe('Initial password. If omitted, account is created without a password.'),
-  "role": zod.enum(['admin', 'user'])
+  "role": zod.enum(['admin', 'user', 'counter'])
 })
 
 
@@ -1471,7 +1531,7 @@ export const UpdateAdminUserRoleParams = zod.object({
 })
 
 export const UpdateAdminUserRoleBody = zod.object({
-  "role": zod.enum(['admin', 'user'])
+  "role": zod.enum(['admin', 'user', 'counter'])
 })
 
 export const UpdateAdminUserRoleResponse = zod.object({
@@ -1479,7 +1539,7 @@ export const UpdateAdminUserRoleResponse = zod.object({
   "email": zod.string(),
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
-  "role": zod.enum(['admin', 'user']),
+  "role": zod.enum(['admin', 'user', 'counter']),
   "createdAt": zod.coerce.date()
 })
 
@@ -1498,7 +1558,7 @@ export const GetCurrentAuthUserResponse = zod.object({
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.string().nullish().describe('User role: \"admin\" has access to user management; \"user\" is a normal workspace member.')
+  "role": zod.union([zod.literal('admin'),zod.literal('user'),zod.literal('counter'),zod.literal(null)]).nullish().describe('User role: \"admin\" manages the workspace; \"user\" is a normal workspace member; \"counter\" only uses Price Finder.')
 }),zod.null()])
 })
 

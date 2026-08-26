@@ -28,7 +28,7 @@ router.get("/admin/users", async (_req, res) => {
       email: u.email ?? "",
       firstName: u.firstName ?? null,
       lastName: u.lastName ?? null,
-      role: u.role as "admin" | "user",
+      role: u.role as "admin" | "user" | "counter",
       createdAt: u.createdAt.toISOString(),
     })),
   });
@@ -42,8 +42,8 @@ router.post("/admin/users", async (req, res) => {
     res.status(400).json({ error: "Valid email is required." });
     return;
   }
-  if (!role || !["admin", "user"].includes(role)) {
-    res.status(400).json({ error: "Role must be 'admin' or 'user'." });
+  if (!role || !["admin", "user", "counter"].includes(role)) {
+    res.status(400).json({ error: "Role must be 'admin', 'user', or 'counter'." });
     return;
   }
   if (password !== undefined && (typeof password !== "string" || password.length < 8)) {
@@ -89,7 +89,7 @@ router.post("/admin/users", async (req, res) => {
     email: created.email ?? "",
     firstName: created.firstName ?? null,
     lastName: created.lastName ?? null,
-    role: created.role as "admin" | "user",
+    role: created.role as "admin" | "user" | "counter",
     createdAt: created.createdAt.toISOString(),
   });
 });
@@ -148,8 +148,8 @@ router.patch("/admin/users/:id/role", async (req, res) => {
   const { id } = req.params;
   const { role } = req.body ?? {};
 
-  if (!role || !["admin", "user"].includes(role)) {
-    res.status(400).json({ error: "Role must be 'admin' or 'user'." });
+  if (!role || !["admin", "user", "counter"].includes(role)) {
+    res.status(400).json({ error: "Role must be 'admin', 'user', or 'counter'." });
     return;
   }
 
@@ -182,7 +182,7 @@ router.patch("/admin/users/:id/role", async (req, res) => {
     email: updated.email ?? "",
     firstName: updated.firstName ?? null,
     lastName: updated.lastName ?? null,
-    role: updated.role as "admin" | "user",
+    role: updated.role as "admin" | "user" | "counter",
     createdAt: updated.createdAt.toISOString(),
   });
 });

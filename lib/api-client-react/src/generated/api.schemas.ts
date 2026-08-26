@@ -195,6 +195,72 @@ export interface PriceFinderBrowseResponse {
   products: PriceFinderSearchResult[];
 }
 
+export interface PriceFinderComparisonPrice {
+  /** @nullable */
+  price: number | null;
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  validTo: string | null;
+  /** @nullable */
+  upcomingPrice: number | null;
+  /** @nullable */
+  upcomingEffectiveDate: string | null;
+}
+
+export type PriceFinderComparisonCompetitorCompetitor = typeof PriceFinderComparisonCompetitorCompetitor[keyof typeof PriceFinderComparisonCompetitorCompetitor];
+
+
+export const PriceFinderComparisonCompetitorCompetitor = {
+  Sparsh_Pearl: 'Sparsh Pearl',
+  Vectus: 'Vectus',
+} as const;
+
+export type PriceFinderComparisonCompetitor = PriceFinderComparisonPrice & ({
+  competitor: PriceFinderComparisonCompetitorCompetitor;
+  /**
+     * Competitor price minus Prayag MRP.
+     * @nullable
+     */
+  difference: number | null;
+  /**
+     * Difference relative to Prayag MRP.
+     * @nullable
+     */
+  differencePct: number | null;
+  /**
+     * Prayag, the competitor name, parity, or null when no dated price is available.
+     * @nullable
+     */
+  cheaperSide: string | null;
+});
+
+export interface PriceFinderComparisonRow {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  prayag: PriceFinderComparisonPrice;
+  competitors: PriceFinderComparisonCompetitor[];
+}
+
+export type PriceFinderComparisonResponseCompetitorsItem = typeof PriceFinderComparisonResponseCompetitorsItem[keyof typeof PriceFinderComparisonResponseCompetitorsItem];
+
+
+export const PriceFinderComparisonResponseCompetitorsItem = {
+  Sparsh_Pearl: 'Sparsh Pearl',
+  Vectus: 'Vectus',
+} as const;
+
+export interface PriceFinderComparisonResponse {
+  asOfDate: string;
+  competitors: PriceFinderComparisonResponseCompetitorsItem[];
+  rows: PriceFinderComparisonRow[];
+}
+
 export interface PriceFinderProduct {
   itemCode: string;
   /** @nullable */
@@ -1065,6 +1131,19 @@ export interface ApiKeyCreated {
   apiKey: ApiKey;
 }
 
+/**
+ * User role: "admin" manages the workspace; "user" is a normal workspace member; "counter" only uses Price Finder.
+ * @nullable
+ */
+export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole] | null;
+
+
+export const AuthUserRole = {
+  admin: 'admin',
+  user: 'user',
+  counter: 'counter',
+} as const;
+
 export interface AuthUser {
   id: string;
   /** @nullable */
@@ -1076,10 +1155,10 @@ export interface AuthUser {
   /** @nullable */
   profileImageUrl?: string | null;
   /**
-     * User role: "admin" has access to user management; "user" is a normal workspace member.
+     * User role: "admin" manages the workspace; "user" is a normal workspace member; "counter" only uses Price Finder.
      * @nullable
      */
-  role?: string | null;
+  role?: AuthUserRole;
 }
 
 export type AdminUserRole = typeof AdminUserRole[keyof typeof AdminUserRole];
@@ -1088,6 +1167,7 @@ export type AdminUserRole = typeof AdminUserRole[keyof typeof AdminUserRole];
 export const AdminUserRole = {
   admin: 'admin',
   user: 'user',
+  counter: 'counter',
 } as const;
 
 export interface AdminUser {
@@ -1111,6 +1191,7 @@ export type CreateAdminUserBodyRole = typeof CreateAdminUserBodyRole[keyof typeo
 export const CreateAdminUserBodyRole = {
   admin: 'admin',
   user: 'user',
+  counter: 'counter',
 } as const;
 
 export interface CreateAdminUserBody {
@@ -1138,6 +1219,7 @@ export type UpdateUserRoleBodyRole = typeof UpdateUserRoleBodyRole[keyof typeof 
 export const UpdateUserRoleBodyRole = {
   admin: 'admin',
   user: 'user',
+  counter: 'counter',
 } as const;
 
 export interface UpdateUserRoleBody {
@@ -1374,6 +1456,49 @@ category?: string;
  */
 limit?: number;
 };
+
+export type GetPriceFinderComparisonParams = {
+/**
+ * One or more selected Prayag item codes, maximum 50.
+ * @minItems 1
+ * @maxItems 50
+ */
+code: string[];
+/**
+ * Competitor brands to include. Defaults to Sparsh Pearl.
+ */
+competitor?: GetPriceFinderComparisonCompetitorItem[];
+/**
+ * Resolve both sides as of this date (YYYY-MM-DD). Defaults to today.
+ */
+asOf?: string;
+};
+
+export type GetPriceFinderComparisonCompetitorItem = typeof GetPriceFinderComparisonCompetitorItem[keyof typeof GetPriceFinderComparisonCompetitorItem];
+
+
+export const GetPriceFinderComparisonCompetitorItem = {
+  Sparsh_Pearl: 'Sparsh Pearl',
+  Vectus: 'Vectus',
+} as const;
+
+export type ExportPriceFinderComparisonParams = {
+/**
+ * @minItems 1
+ * @maxItems 50
+ */
+code: string[];
+competitor?: ExportPriceFinderComparisonCompetitorItem[];
+asOf?: string;
+};
+
+export type ExportPriceFinderComparisonCompetitorItem = typeof ExportPriceFinderComparisonCompetitorItem[keyof typeof ExportPriceFinderComparisonCompetitorItem];
+
+
+export const ExportPriceFinderComparisonCompetitorItem = {
+  Sparsh_Pearl: 'Sparsh Pearl',
+  Vectus: 'Vectus',
+} as const;
 
 export type PatchCatalogProductMrpBody = {
   /** New MRP value (must be positive) */

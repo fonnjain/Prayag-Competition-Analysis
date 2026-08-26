@@ -80,3 +80,28 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   }
   next();
 }
+
+/**
+ * Internal workspace routes are available to administrators and regular
+ * workspace members. Counter accounts are intentionally limited to the
+ * read-only Price Finder surface, which is mounted before this guard.
+ */
+export function requireWorkspaceAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (process.env.NODE_ENV === "test" && typeof req.isAuthenticated !== "function") {
+    next();
+    return;
+  }
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (req.user.role === "counter") {
+    res.status(403).json({ error: "Workspace access is not available to counter accounts." });
+    return;
+  }
+  next();
+}

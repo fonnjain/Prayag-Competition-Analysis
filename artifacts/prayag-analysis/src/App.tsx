@@ -75,7 +75,7 @@ function LoginForm() {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -86,6 +86,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) return <LoginForm />;
+  if (user?.role === "counter") {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-muted/30 p-6 text-center">
+        <h1 className="text-xl font-semibold">Competition Analysis is not available to counter accounts</h1>
+        <p className="max-w-md text-sm text-muted-foreground">Use Price Finder to search products or compare selected prices.</p>
+        <a href="/price-finder/" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Open Price Finder</a>
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }

@@ -76,7 +76,7 @@ router.post('/login', async (req: Request, res: Response) => {
       firstName: user.firstName,
       lastName: user.lastName,
       profileImageUrl: user.profileImageUrl,
-      role: user.role,
+      role: user.role as "admin" | "user" | "counter" | null,
     },
   };
 
@@ -97,7 +97,8 @@ router.get('/logout', async (req: Request, res: Response) => {
   const returnTo =
     typeof rawReturnTo === 'string' &&
     rawReturnTo.startsWith('/') &&
-    !rawReturnTo.startsWith('//')
+    !rawReturnTo.startsWith('//') &&
+    !rawReturnTo.includes('\\')
       ? rawReturnTo
       : '/';
 

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requireWorkspaceAccess } from "../middlewares/authMiddleware";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import catalogRouter from "./catalog";
@@ -27,6 +27,7 @@ router.use(priceFinderRouter);
 
 // Internal routes: require a valid session
 router.use(requireAuth);
+router.use(requireWorkspaceAccess);
 router.use(adminUsersRouter);
 router.use(apiKeysRouter);
 router.use(catalogRouter);

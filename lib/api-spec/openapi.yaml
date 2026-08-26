@@ -441,6 +441,106 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /price-finder/comparison:
+    get:
+      operationId: getPriceFinderComparison
+      tags: [catalog]
+      summary: Compare selected Price Finder products against selected competitors
+      description: >
+        Read-only dated comparison for up to 50 catalog products. Both Prayag
+        and competitor prices resolve to the latest eligible revision on or
+        before the same as-of date; future revisions are returned separately.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          style: form
+          explode: true
+          description: One or more selected Prayag item codes, maximum 50.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 50
+            items:
+              type: string
+        - name: competitor
+          in: query
+          required: false
+          style: form
+          explode: true
+          description: Competitor brands to include. Defaults to Sparsh Pearl.
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [Sparsh Pearl, Vectus]
+        - name: asOf
+          in: query
+          required: false
+          description: Resolve both sides as of this date (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dated product comparisons
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceFinderComparisonResponse"
+        "400":
+          description: Invalid selection or filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /price-finder/comparison/export:
+    get:
+      operationId: exportPriceFinderComparison
+      tags: [catalog]
+      summary: Export selected Price Finder comparisons
+      parameters:
+        - name: code
+          in: query
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 50
+            items:
+              type: string
+        - name: competitor
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [Sparsh Pearl, Vectus]
+        - name: asOf
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: XLSX comparison export
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid selection or filters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/products/{itemCode}/mrp:
     patch:
       operationId: patchCatalogProductMrp
@@ -1872,6 +1972,75 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PriceFinderSearchResult"
+    PriceFinderComparisonPrice:
+      type: object
+      required: [price, effectiveDate, validTo, upcomingPrice, upcomingEffectiveDate]
+      properties:
+        price:
+          type: ["number", "null"]
+        effectiveDate:
+          type: ["string", "null"]
+          format: date
+        validTo:
+          type: ["string", "null"]
+          format: date
+        upcomingPrice:
+          type: ["number", "null"]
+        upcomingEffectiveDate:
+          type: ["string", "null"]
+          format: date
+    PriceFinderComparisonCompetitor:
+      allOf:
+        - $ref: "#/components/schemas/PriceFinderComparisonPrice"
+        - type: object
+          required: [competitor, difference, differencePct, cheaperSide]
+          properties:
+            competitor:
+              type: string
+              enum: [Sparsh Pearl, Vectus]
+            difference:
+              type: ["number", "null"]
+              description: Competitor price minus Prayag MRP.
+            differencePct:
+              type: ["number", "null"]
+              description: Difference relative to Prayag MRP.
+            cheaperSide:
+              type: ["string", "null"]
+              description: Prayag, the competitor name, parity, or null when no dated price is available.
+    PriceFinderComparisonRow:
+      type: object
+      required: [itemCode, productName, division, category, prayag, competitors]
+      properties:
+        itemCode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        division:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        prayag:
+          $ref: "#/components/schemas/PriceFinderComparisonPrice"
+        competitors:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderComparisonCompetitor"
+    PriceFinderComparisonResponse:
+      type: object
+      required: [asOfDate, competitors, rows]
+      properties:
+        asOfDate:
+          type: string
+          format: date
+        competitors:
+          type: array
+          items:
+            type: string
+            enum: [Sparsh Pearl, Vectus]
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceFinderComparisonRow"
     PriceFinderProduct:
       type: object
       required:
@@ -3143,7 +3312,8 @@ components:
           type: ["string", "null"]
         role:
           type: ["string", "null"]
-          description: 'User role: "admin" has access to user management; "user" is a normal workspace member.'
+          enum: [admin, user, counter, null]
+          description: 'User role: "admin" manages the workspace; "user" is a normal workspace member; "counter" only uses Price Finder.'
     AdminUser:
       type: object
       required: [id, email, role, createdAt]
@@ -3158,7 +3328,7 @@ components:
           type: ["string", "null"]
         role:
           type: string
-          enum: [admin, user]
+          enum: [admin, user, counter]
         createdAt:
           type: string
           format: date-time
@@ -3187,7 +3357,7 @@ components:
           description: 'Initial password. If omitted, account is created without a password.'
         role:
           type: string
-          enum: [admin, user]
+          enum: [admin, user, counter]
     ResetUserPasswordBody:
       type: object
       required: [password]
@@ -3201,7 +3371,7 @@ components:
       properties:
         role:
           type: string
-          enum: [admin, user]
+          enum: [admin, user, counter]
     AuthUserEnvelope:
       type: object
       required: [user]

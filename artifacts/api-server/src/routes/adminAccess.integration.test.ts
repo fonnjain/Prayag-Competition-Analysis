@@ -3,7 +3,7 @@ import supertest from "supertest";
 import { describe, expect, it } from "vitest";
 import routes from "./index";
 
-function requestAs(role?: "admin" | "user") {
+function requestAs(role?: "admin" | "user" | "counter") {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -55,5 +55,20 @@ describe("admin-only catalogue writes", () => {
     ]);
     expect(importAttempt.status).toBe(400);
     expect(keyAttempt.status).toBe(400);
+  });
+
+  it("keeps counter accounts in Price Finder and out of internal management routes", async () => {
+    const counter = requestAs("counter");
+    const [finder, catalog, analysis, keyWrite] = await Promise.all([
+      counter.get("/price-finder/search?q="),
+      counter.get("/catalog/products"),
+      counter.get("/analysis/filters"),
+      counter.post("/keys").send({ name: "counter-key" }),
+    ]);
+    expect(finder.status).toBe(200);
+    for (const response of [catalog, analysis, keyWrite]) {
+      expect(response.status).toBe(403);
+      expect(response.body.error).toBe("Workspace access is not available to counter accounts.");
+    }
   });
 });
