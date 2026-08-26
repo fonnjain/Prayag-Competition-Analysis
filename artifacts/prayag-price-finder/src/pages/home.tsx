@@ -238,7 +238,7 @@ function useVoiceSearch(
 }
 
 export default function PriceFinderPage() {
-  const { codes, toggleCode, clearCodes } = useSelection();
+  const { codes, toggleCode, clearCodes, removeCode } = useSelection();
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -490,7 +490,7 @@ export default function PriceFinderPage() {
         )}
         data-testid="comparison-selection-bar"
       >
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">
             {codes.length
               ? `${codes.length} product${codes.length === 1 ? "" : "s"} selected`
@@ -499,6 +499,30 @@ export default function PriceFinderPage() {
           <p className="text-xs text-muted-foreground">
             Choose up to 50 products from search results or the catalogue.
           </p>
+          {codes.length > 0 && (
+            <div className="mt-2 flex max-w-full flex-wrap gap-1.5" aria-label="Selected products">
+              {codes.map((code) => (
+                <span
+                  key={code}
+                  className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-background px-2 py-1 font-mono text-xs text-primary"
+                >
+                  {code}
+                  <button
+                    type="button"
+                    className="rounded-sm p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    onClick={() => {
+                      removeCode(code);
+                      setSelectionNotice(null);
+                    }}
+                    aria-label={`Remove ${code} from comparison`}
+                    title={`Remove ${code} from comparison`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {codes.length > 0 && (
@@ -766,14 +790,20 @@ export default function PriceFinderPage() {
                 </p>
               )}
               {results.map((res) => (
-                <div key={res.itemCode} className="w-full flex items-stretch group border-b last:border-b-0 border-border/50">
+                <div
+                  key={res.itemCode}
+                  className={cn(
+                    "w-full flex items-stretch group border-b last:border-b-0 border-border/50",
+                    codes.includes(res.itemCode) && "bg-primary/5 ring-1 ring-inset ring-primary/20",
+                  )}
+                >
                   <div
                     className="w-14 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
                   >
                     <Checkbox
                       checked={codes.includes(res.itemCode)}
                       onCheckedChange={() => toggleComparisonCode(res.itemCode)}
-                      aria-label={`Select ${res.itemCode}`}
+                      aria-label={`${codes.includes(res.itemCode) ? "Remove" : "Select"} ${res.itemCode} from comparison`}
                       className="w-5 h-5 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
                   </div>
@@ -908,6 +938,8 @@ export default function PriceFinderPage() {
           itemCode={selectedItemCode}
           speechEnabled={speechEnabled}
           speakRequestId={speechRequested ? selectionSequence : 0}
+          isSelected={codes.includes(selectedItemCode)}
+          onToggleSelection={toggleComparisonCode}
         />
       )}
 
@@ -1027,14 +1059,20 @@ export default function PriceFinderPage() {
               ) : (
                 <div className="divide-y rounded-lg border">
                   {(productsData?.products ?? []).map((item) => (
-                    <div key={item.itemCode} className="w-full flex items-stretch group border-b last:border-b-0 border-border/50">
+                    <div
+                      key={item.itemCode}
+                      className={cn(
+                        "w-full flex items-stretch group border-b last:border-b-0 border-border/50",
+                        codes.includes(item.itemCode) && "bg-primary/5 ring-1 ring-inset ring-primary/20",
+                      )}
+                    >
                       <div
                         className="w-14 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
                       >
                         <Checkbox
                           checked={codes.includes(item.itemCode)}
                           onCheckedChange={() => toggleComparisonCode(item.itemCode)}
-                          aria-label={`Select ${item.itemCode}`}
+                          aria-label={`${codes.includes(item.itemCode) ? "Remove" : "Select"} ${item.itemCode} from comparison`}
                           className="w-5 h-5 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                       </div>
@@ -1086,10 +1124,14 @@ function ProductView({
   itemCode,
   speechEnabled,
   speakRequestId,
+  isSelected,
+  onToggleSelection,
 }: {
   itemCode: string;
   speechEnabled: boolean;
   speakRequestId: number;
+  isSelected: boolean;
+  onToggleSelection: (itemCode: string) => void;
 }) {
   const { data, isLoading, isError } = useGetPriceFinderProduct(itemCode, {
     query: {
@@ -1143,18 +1185,29 @@ function ProductView({
   return (
     <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
       <div className="bg-card border rounded-xl p-6 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-medium text-muted-foreground uppercase tracking-widest">
-            <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{product.itemCode}</span>
-            {product.division && <span>• {product.division}</span>}
-            {product.category && <span>• {product.category}</span>}
-            {product.discontinuedFrom && (
-              <span className="rounded bg-destructive/10 px-2 py-0.5 text-destructive font-semibold">
-                Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
-              </span>
-            )}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-medium text-muted-foreground uppercase tracking-widest">
+              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{product.itemCode}</span>
+              {product.division && <span>• {product.division}</span>}
+              {product.category && <span>• {product.category}</span>}
+              {product.discontinuedFrom && (
+                <span className="rounded bg-destructive/10 px-2 py-0.5 text-destructive font-semibold">
+                  Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
+          <Button
+            type="button"
+            variant={isSelected ? "outline" : "default"}
+            className="shrink-0"
+            onClick={() => onToggleSelection(product.itemCode)}
+            aria-pressed={isSelected}
+          >
+            {isSelected ? "Remove from comparison" : "Add to comparison"}
+          </Button>
         </div>
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
