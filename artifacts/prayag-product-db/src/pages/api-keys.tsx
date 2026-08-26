@@ -42,9 +42,32 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@workspace/replit-auth-web";
+
+function errorMessage(error: unknown, fallback: string) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "data" in error &&
+    error.data &&
+    typeof error.data === "object" &&
+    "error" in error.data &&
+    typeof error.data.error === "string"
+  ) {
+    return error.data.error;
+  }
+  return fallback;
+}
 
 export default function ApiKeysPage() {
-  const { data, isLoading } = useGetApiKeys();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const { data, isLoading, isError, error } = useGetApiKeys({
+    query: {
+      queryKey: getGetApiKeysQueryKey(),
+      enabled: isAdmin,
+    },
+  });
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -66,10 +89,10 @@ export default function ApiKeysPage() {
           description: "Your new API key has been generated.",
         });
       },
-      onError: () => {
+      onError: (error) => {
         toast({
           title: "Creation failed",
-          description: "Could not create the API key. Please try again.",
+          description: errorMessage(error, "Could not create the API key. Please try again."),
           variant: "destructive",
         });
       },
@@ -86,10 +109,10 @@ export default function ApiKeysPage() {
           description: "The API key has been immediately disabled.",
         });
       },
-      onError: () => {
+      onError: (error) => {
         toast({
           title: "Revoke failed",
-          description: "Could not revoke the API key. Please try again.",
+          description: errorMessage(error, "Could not revoke the API key. Please try again."),
           variant: "destructive",
         });
       },
@@ -106,10 +129,10 @@ export default function ApiKeysPage() {
           description: "The API key has been permanently removed.",
         });
       },
-      onError: () => {
+      onError: (error) => {
         toast({
           title: "Delete failed",
-          description: "Could not delete the API key. Please try again.",
+          description: errorMessage(error, "Could not delete the API key. Please try again."),
           variant: "destructive",
         });
       },
@@ -135,6 +158,21 @@ export default function ApiKeysPage() {
     setCreatedSecret(null);
     setCopied(false);
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col items-center justify-center gap-3 p-8 pt-28 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+          <Key className="h-6 w-6" />
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Administrator access required</h1>
+        <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+          API keys are sensitive credentials. Only workspace administrators can view existing keys,
+          generate new ones, revoke them, or delete them.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
@@ -244,6 +282,16 @@ export default function ApiKeysPage() {
         <div className="flex-1 overflow-auto">
           {isLoading ? (
             <div className="p-8 text-center text-muted-foreground">Loading keys...</div>
+          ) : isError ? (
+            <div className="p-12 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <h3 className="font-medium text-lg">Could not load API keys</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {errorMessage(error, "Please refresh the page and try again.")}
+              </p>
+            </div>
           ) : !data || data.keys.length === 0 ? (
             <div className="p-12 text-center flex flex-col items-center">
               <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">

@@ -31,7 +31,7 @@ const navItems = [
   { href: "/load-mrp", label: "Load MRP", icon: FileSpreadsheet },
   { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
   { href: "/data-health", label: "Data Health", icon: Database },
-  { href: "/api-keys", label: "API Keys", icon: Key },
+  { href: "/api-keys", label: "API Keys", icon: Key, adminOnly: true },
 ];
 
 function getPageContext(location: string) {
@@ -72,10 +72,11 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const isActive = (href: string) => location === href || (href !== "/" && location.startsWith(href));
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user?.role === "admin");
 
   const navigation = (mobile = false) => (
     <nav className="space-y-1" aria-label="Product Database navigation">
-      {navItems.map((item) => {
+      {visibleNavItems.map((item) => {
         const Icon = item.icon;
         return (
           <Link key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)}>
