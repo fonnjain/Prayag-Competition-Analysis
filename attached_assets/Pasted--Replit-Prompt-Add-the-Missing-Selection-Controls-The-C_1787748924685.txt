@@ -1,0 +1,90 @@
+# Replit Prompt — Add the Missing Selection Controls
+
+The Compare page, the nav item and the selection bar are all in place. What is missing is any way to actually select a product.
+
+The bar reads *"Choose up to 50 products from search results or the catalogue"* — but search result rows have no selection control, so the bar promises something the interface does not offer.
+
+---
+
+## 1. Selection control on search results
+
+Add a control to each search result row that adds or removes that product from the compare list.
+
+**It must not conflict with the row's existing behaviour.** Tapping the row currently opens the product detail. Someone at a counter, on a tablet, must not select a product when they meant to open it, or open it when they meant to select. Give the control its own hit area with enough separation, and confirm on touch as well as mouse.
+
+**It toggles.** The same control removes the product if it is already selected. Selected rows must be visibly distinct while scrolling a list of results.
+
+Apply the same to the catalogue browse rows, so the bar's wording is true of both routes.
+
+---
+
+## 2. Add to compare from the product detail page
+
+When a result is opened, that page needs the same control — add to compare, or remove if already added.
+
+This is the more natural flow in practice: someone searches, opens a product to check the price for a customer, and then decides it is worth comparing. Making them go back to the results list to select it is friction at exactly the wrong moment.
+
+The control should read clearly as add or remove depending on current state, not as a generic button.
+
+---
+
+## 3. Keep the state consistent
+
+One selection list, wherever it is edited.
+
+- A product added from the detail page shows as selected when the user returns to search.
+- The bar's count updates immediately from any of the three places.
+- Removing from the bar clears the selection state on the row and on the detail page.
+
+The bar should let the user see what is currently selected and remove individual items without hunting for the row again.
+
+---
+
+## What is already working
+
+Worth preserving as-is. The inline competitor line on search results is good and should carry through:
+
+```
+151    Ball Cock with Rod & Ball 15mm      ₹318.24
+       ↘ Sparsh Pearl ₹410 · Prayag 28.8% cheaper
+
+152    Ball Cock with Rod & Ball 20mm      ₹476.00
+       ↗ Sparsh Pearl ₹465 · Prayag 2.3% costlier
+```
+
+Direction stated in words, colour and arrow reinforcing rather than carrying the meaning alone, and `151` correctly showing ₹410 because Vol 6.2 does not take effect until 1 September.
+
+**One thing to check:** `151-S` shows no competitor line at all, presumably because it has no mapped competitor price. Confirm that absence is deliberate and distinguishable from a competitor price that happens to match Prayag's. On the comparison page this must render as "no data", never as a zero difference.
+
+---
+
+## Acceptance tests
+
+```
+1.  A product can be added to the compare list from a search result row.
+2.  A product can be added from the catalogue browse rows.
+3.  A product can be added from the product detail page.
+4.  The same control removes a product that is already selected, from all three.
+5.  Tapping a search row still opens the detail page; tapping the selection
+    control does not navigate. Verified on touch as well as mouse.
+6.  A product added from the detail page shows as selected on returning to search.
+7.  The bar count reflects additions and removals from all three places
+    immediately.
+8.  An individual product can be removed from the bar itself.
+9.  Selecting a 51st product is prevented with a clear message.
+10. A product with no mapped competitor price is visually distinct from one
+    priced equal to Prayag.
+```
+
+Test 5 is the one to get right. On a counter tablet, a mis-tap either way is the difference between a working tool and an irritating one.
+
+---
+
+## Report
+
+- Where the selection control sits on each of the three surfaces, and how it is separated from the row's navigation.
+- Where selection state is held, and how the three surfaces stay in sync.
+- How a selected row is shown as selected.
+- How "no competitor price" is distinguished from "same price".
+
+One clean commit.
