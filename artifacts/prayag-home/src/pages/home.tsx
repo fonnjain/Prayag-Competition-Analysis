@@ -18,10 +18,11 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
 
 const APP_LINKS = [
-  { href: "/", label: "Home", icon: HomeIcon },
-  { href: "/product-db/", label: "Product Database", icon: PackageSearch },
-  { href: "/analysis/", label: "Competition Analysis", icon: BarChart3 },
-  { href: "/price-finder/", label: "Price Finder", icon: Search },
+  { href: "/", label: "Home", icon: HomeIcon, adminOnly: false },
+  { href: "/product-db/", label: "Product Database", icon: PackageSearch, adminOnly: false },
+  { href: "/analysis/", label: "Competition Analysis", icon: BarChart3, adminOnly: false },
+  { href: "/price-finder/", label: "Price Finder", icon: Search, adminOnly: false },
+  { href: "/admin", label: "Admin", icon: Users, adminOnly: true },
 ] as const;
 
 export default function Home() {
@@ -33,6 +34,9 @@ export default function Home() {
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     user?.email ||
     "User";
+  const visibleAppLinks = APP_LINKS.filter(
+    (link) => !link.adminOnly || isAdmin,
+  );
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background">
@@ -57,7 +61,7 @@ export default function Home() {
             className="hidden md:flex items-center gap-1"
             aria-label="Workspace navigation"
           >
-            {APP_LINKS.map((link) => {
+            {visibleAppLinks.map((link) => {
               const Icon = link.icon;
               const isHome = link.href === "/";
               return (
@@ -113,7 +117,7 @@ export default function Home() {
             className="md:hidden border-t bg-card px-4 pb-3 pt-2 flex flex-col gap-1"
             aria-label="Workspace navigation"
           >
-            {APP_LINKS.map((link) => {
+            {visibleAppLinks.map((link) => {
               const Icon = link.icon;
               const isHome = link.href === "/";
               return (
