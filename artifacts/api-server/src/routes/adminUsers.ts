@@ -73,6 +73,7 @@ router.post("/admin/users", async (req, res) => {
       firstName: firstName ?? null,
       lastName: lastName ?? null,
       passwordHash,
+      mustChangePassword: Boolean(password),
       role,
     })
     .returning({
@@ -131,7 +132,7 @@ router.put("/admin/users/:id/password", async (req, res) => {
 
   const [updated] = await db
     .update(usersTable)
-    .set({ passwordHash })
+    .set({ passwordHash, mustChangePassword: true })
     .where(eq(usersTable.id, id))
     .returning({ id: usersTable.id });
 

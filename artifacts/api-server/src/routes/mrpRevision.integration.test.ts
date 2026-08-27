@@ -33,6 +33,7 @@ const request = supertest(
       req.user = {
         id: "revision-test-admin",
         email: "revision-test-admin@example.com",
+        mustChangePassword: false,
         role: "admin",
       };
       req.isAuthenticated = (() => true) as typeof req.isAuthenticated;

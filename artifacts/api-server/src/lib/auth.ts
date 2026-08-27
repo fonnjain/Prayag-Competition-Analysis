@@ -39,6 +39,13 @@ export async function deleteSession(sid: string): Promise<void> {
   await db.delete(sessionsTable).where(eq(sessionsTable.sid, sid));
 }
 
+export async function updateSessionUser(sid: string, user: AuthUser): Promise<void> {
+  await db
+    .update(sessionsTable)
+    .set({ sess: { user } as unknown as Record<string, unknown> })
+    .where(eq(sessionsTable.sid, sid));
+}
+
 export async function clearSession(res: Response, sid?: string): Promise<void> {
   if (sid) await deleteSession(sid);
   res.clearCookie(SESSION_COOKIE, { path: '/' });

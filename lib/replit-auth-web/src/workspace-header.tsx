@@ -95,31 +95,31 @@ type WorkspaceLink = {
   label: string;
   icon: HeaderIcon;
   adminOnly?: boolean;
-  counterAllowed: boolean;
+  restrictedAllowed: boolean;
 };
 
 const WORKSPACE_LINKS: WorkspaceLink[] = [
-  { app: "home", href: "/", label: "Home", icon: HomeIcon, counterAllowed: true },
+  { app: "home", href: "/", label: "Home", icon: HomeIcon, restrictedAllowed: false },
   {
     app: "product-database",
     href: "/product-db/",
     label: "Product Database",
     icon: ProductIcon,
-    counterAllowed: false,
+    restrictedAllowed: false,
   },
   {
     app: "competition-analysis",
     href: "/analysis/",
     label: "Competition Analysis",
     icon: AnalysisIcon,
-    counterAllowed: false,
+    restrictedAllowed: false,
   },
   {
     app: "price-finder",
     href: "/price-finder/",
     label: "Price Finder",
     icon: SearchIcon,
-    counterAllowed: true,
+    restrictedAllowed: true,
   },
   {
     app: "admin",
@@ -127,23 +127,25 @@ const WORKSPACE_LINKS: WorkspaceLink[] = [
     label: "Admin",
     icon: UsersIcon,
     adminOnly: true,
-    counterAllowed: false,
+    restrictedAllowed: false,
   },
 ];
 
 export function WorkspaceHeader({ activeApp }: { activeApp: WorkspaceApp }) {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const isAdmin = user?.role === "admin";
-  const isCounter = user?.role === "counter";
+  const isRestrictedAccount = user?.role === "counter" || user?.role === "user";
   const userName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     user?.email ||
     "User";
-  const visibleLinks = WORKSPACE_LINKS.filter(
-    (link) =>
-      (!link.adminOnly || isAdmin) && (!isCounter || link.counterAllowed),
-  );
+  const visibleLinks = isLoading
+    ? []
+    : WORKSPACE_LINKS.filter(
+        (link) =>
+          (!link.adminOnly || isAdmin) && (!isRestrictedAccount || link.restrictedAllowed),
+      );
 
   const navigation = (mobile = false) => (
     <nav

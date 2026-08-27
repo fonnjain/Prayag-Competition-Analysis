@@ -31,6 +31,7 @@ export async function seedAdminUser(): Promise<void> {
       firstName: admin.firstName,
       lastName: admin.lastName,
       passwordHash: hash,
+      mustChangePassword: true,
       role: "admin",
     });
 

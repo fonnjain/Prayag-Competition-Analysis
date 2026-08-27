@@ -12,6 +12,7 @@ function requestAs(role?: "admin" | "user" | "counter") {
       req.user = {
         id: `test-${role}`,
         email: `${role}@example.test`,
+        mustChangePassword: false,
         role,
       };
     }
@@ -32,9 +33,10 @@ describe("admin-only catalogue writes", () => {
     expect(importAttempt.status).toBe(401);
   });
 
-  it("rejects non-admin users from all administrative write boundaries", async () => {
+  it("keeps normal users in Price Finder and out of internal management routes", async () => {
     const user = requestAs("user");
-    const responses = await Promise.all([
+    const [finder, ...responses] = await Promise.all([
+      user.get("/price-finder/search?q="),
       user.post("/catalog/load-mrp"),
       user.post("/catalog/sync/preflight"),
       user.post("/catalog/import-batches/999999/approve"),
@@ -43,9 +45,10 @@ describe("admin-only catalogue writes", () => {
       user.post("/keys").send({ name: "not-allowed" }),
       user.patch("/catalog/products/TEST/mrp").send({ mrp: 100, reason: "test" }),
     ]);
+    expect(finder.status).toBe(200);
     for (const response of responses) {
       expect(response.status).toBe(403);
-      expect(response.body.error).toBe("Admin access required.");
+      expect(response.body.error).toBe("Workspace access is available only to administrators.");
     }
   });
 
@@ -70,7 +73,7 @@ describe("admin-only catalogue writes", () => {
     expect(finder.status).toBe(200);
     for (const response of [catalog, analysis, keyWrite]) {
       expect(response.status).toBe(403);
-      expect(response.body.error).toBe("Workspace access is not available to counter accounts.");
+      expect(response.body.error).toBe("Workspace access is available only to administrators.");
     }
   });
 });

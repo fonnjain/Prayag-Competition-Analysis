@@ -10,7 +10,7 @@ import {
   useLocation,
   Router as WouterRouter,
 } from 'wouter';
-import { AuthProvider } from '@workspace/replit-auth-web';
+import { AuthProvider, PasswordChangeGate } from '@workspace/replit-auth-web';
 import { Layout } from '@/components/layout';
 import PriceFinderPage from '@/pages/home';
 import ComparisonPage from '@/pages/comparison';
@@ -42,7 +42,9 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
           <AuthProvider appSlug="price-finder">
-            <Router />
+            <PasswordChangeGate>
+              <Router />
+            </PasswordChangeGate>
           </AuthProvider>
         </WouterRouter>
         <Toaster />

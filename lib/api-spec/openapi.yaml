@@ -1553,6 +1553,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/activity/export:
+    get:
+      tags: [admin]
+      operationId: exportAdminActivityPdf
+      summary: Download filtered user activity as a PDF audit report
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Inclusive workspace-local date in YYYY-MM-DD format.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Inclusive workspace-local date in YYYY-MM-DD format.
+          schema:
+            type: string
+            format: date
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PDF audit report
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid date range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/users/{id}:
     delete:
       tags: [admin]
@@ -1682,6 +1727,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthUserEnvelope'
+  /auth/password:
+    put:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Change the authenticated user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordChangeInput'
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /login:
     get:
       tags: [Auth]
@@ -3652,7 +3727,7 @@ components:
           $ref: "#/components/schemas/ApiKey"
     AuthUser:
       type: object
-      required: [id]
+      required: [id, mustChangePassword]
       properties:
         id:
           type: string
@@ -3664,6 +3739,9 @@ components:
           type: ["string", "null"]
         profileImageUrl:
           type: ["string", "null"]
+        mustChangePassword:
+          type: boolean
+          description: Whether the user must choose a new password before continuing.
         role:
           type: ["string", "null"]
           enum: [admin, user, counter, null]
@@ -3734,6 +3812,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/AuthUser'
             - type: 'null'
+    PasswordChangeInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+          minLength: 8
     MobileTokenExchangeRequest:
       type: object
       required: [code, code_verifier, redirect_uri, state]

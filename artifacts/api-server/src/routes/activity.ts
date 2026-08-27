@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, asc, count, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import {
   activityDailySummariesTable,
   activityEventsTable,
@@ -36,6 +37,7 @@ const APP_PATH_PREFIXES: Record<string, string> = {
 };
 const KNOWN_ACTIONS = new Set([
   "admin.create_user",
+  "admin.activity_export_pdf",
   "admin.open_create_user",
   "admin.remove_user",
   "admin.reset_user_password",
@@ -128,6 +130,166 @@ function pathMatchesApp(appSlug: string, pagePath: string | null | undefined): b
   if (!pagePath) return true;
   const prefix = APP_PATH_PREFIXES[appSlug];
   return prefix === "/" || pagePath === prefix || pagePath.startsWith(`${prefix}/`);
+}
+
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
+function safePdfText(value: string): string {
+  return value.replace(/[^\x20-\x7E]/g, "?");
+}
+
+function formatPdfTimestamp(value: Date | null): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: WORKSPACE_TIMEZONE,
+  }).format(value);
+}
+
+async function buildActivityPdf({
+  from,
+  to,
+  userId,
+}: {
+  from: string;
+  to: string;
+  userId?: string;
+}): Promise<Uint8Array> {
+  const [rows, events] = await Promise.all([
+    db
+      .select({
+        activityDate: activityDailySummariesTable.activityDate,
+        userId: activityDailySummariesTable.userId,
+        userName: sql<string>`coalesce(nullif(trim(concat(${usersTable.firstName}, ' ', ${usersTable.lastName})), ''), ${usersTable.email})`,
+        email: usersTable.email,
+        activeSeconds: activityDailySummariesTable.activeSeconds,
+        idleSeconds: activityDailySummariesTable.idleSeconds,
+        sessionCount: activityDailySummariesTable.sessionCount,
+        pageViewCount: activityDailySummariesTable.pageViewCount,
+        actionCount: activityDailySummariesTable.actionCount,
+        lastActivityAt: activityDailySummariesTable.lastActivityAt,
+      })
+      .from(activityDailySummariesTable)
+      .innerJoin(usersTable, eq(usersTable.id, activityDailySummariesTable.userId))
+      .where(
+        and(
+          gte(activityDailySummariesTable.activityDate, from),
+          lte(activityDailySummariesTable.activityDate, to),
+          userId ? eq(activityDailySummariesTable.userId, userId) : undefined,
+        ),
+      )
+      .orderBy(desc(activityDailySummariesTable.activityDate), asc(usersTable.email)),
+    db
+      .select({
+        activityDate: activityEventsTable.activityDate,
+        userName: sql<string>`coalesce(nullif(trim(concat(${usersTable.firstName}, ' ', ${usersTable.lastName})), ''), ${usersTable.email})`,
+        email: usersTable.email,
+        appSlug: activityEventsTable.appSlug,
+        eventType: activityEventsTable.eventType,
+        occurredAt: activityEventsTable.occurredAt,
+        pagePath: activityEventsTable.pagePath,
+        action: activityEventsTable.action,
+        state: activityEventsTable.state,
+      })
+      .from(activityEventsTable)
+      .innerJoin(usersTable, eq(usersTable.id, activityEventsTable.userId))
+      .where(
+        and(
+          gte(activityEventsTable.activityDate, from),
+          lte(activityEventsTable.activityDate, to),
+          userId ? eq(activityEventsTable.userId, userId) : undefined,
+          sql`${activityEventsTable.eventType} <> 'heartbeat'`,
+        ),
+      )
+      .orderBy(
+        desc(activityEventsTable.activityDate),
+        asc(usersTable.email),
+        asc(activityEventsTable.occurredAt),
+      )
+      .limit(20_000),
+  ]);
+
+  const document = await PDFDocument.create();
+  const regular = await document.embedFont(StandardFonts.Helvetica);
+  const bold = await document.embedFont(StandardFonts.HelveticaBold);
+  const margin = 42;
+  const pageWidth = 612;
+  let page: PDFPage = document.addPage([pageWidth, 792]);
+  let cursorY = 748;
+
+  const line = (text: string, font: PDFFont = regular, size = 9, color = rgb(0.1, 0.1, 0.1)) => {
+    const maxWidth = pageWidth - margin * 2;
+    const words = safePdfText(text).split(/\s+/);
+    let current = "";
+    const lines: string[] = [];
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (font.widthOfTextAtSize(candidate, size) > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) lines.push(current);
+
+    for (const entry of lines) {
+      if (cursorY < 48) {
+        page = document.addPage([pageWidth, 792]);
+        cursorY = 748;
+      }
+      page.drawText(entry, { x: margin, y: cursorY, size, font, color });
+      cursorY -= size + 4;
+    }
+  };
+
+  line("Prayag Polymers — User Activity Audit Report", bold, 16, rgb(0, 0.39, 0.34));
+  line(`Reporting period: ${from} to ${to} · Timezone: ${WORKSPACE_TIMEZONE}`, regular, 9);
+  line(`Generated: ${formatPdfTimestamp(new Date())}${userId ? ` · Filtered user ID: ${userId}` : " · All users"}`, regular, 9);
+  cursorY -= 8;
+  line("Daily summary", bold, 12, rgb(0, 0.39, 0.34));
+  if (rows.length === 0) {
+    line("No tracked activity exists for the selected period.", regular, 9, rgb(0.35, 0.35, 0.35));
+  } else {
+    for (const row of rows) {
+      line(
+        `${row.activityDate} | ${row.userName || row.email || "Unknown user"} (${row.email ?? ""}) | Active ${formatDuration(row.activeSeconds)} | Idle ${formatDuration(row.idleSeconds)} | Sessions ${row.sessionCount} | Pages ${row.pageViewCount} | Actions ${row.actionCount}`,
+      );
+    }
+  }
+
+  cursorY -= 8;
+  line("Audit trail — pages, actions, sessions, and activity-state changes", bold, 12, rgb(0, 0.39, 0.34));
+  if (events.length === 0) {
+    line("No auditable page visits or actions exist for the selected period.", regular, 9, rgb(0.35, 0.35, 0.35));
+  } else {
+    for (const event of events) {
+      const label =
+        event.eventType === "page_view"
+          ? `Visited ${event.pagePath ?? "a page"}`
+          : event.eventType === "action"
+            ? (event.action ?? "Completed an action").replace(/[._-]+/g, " ")
+            : event.eventType === "state_change"
+              ? `Became ${event.state ?? "active"}`
+              : event.eventType === "session_start"
+                ? "Started a session"
+                : "Ended a session";
+      line(
+        `${event.activityDate} · ${formatPdfTimestamp(event.occurredAt)} · ${event.userName || event.email || "Unknown user"} · ${event.appSlug.replace(/-/g, " ")} · ${label}`,
+      );
+    }
+  }
+  if (events.length === 20_000) {
+    cursorY -= 4;
+    line("The audit trail is limited to the first 20,000 non-heartbeat events.", regular, 8, rgb(0.35, 0.35, 0.35));
+  }
+
+  return document.save();
 }
 
 function normaliseEvent(value: unknown): ActivityInput | null {
@@ -282,8 +444,11 @@ router.post("/activity/events", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Activity events contain an unknown app." });
     return;
   }
-  if (role === "counter" && (events as ActivityInput[]).some((event) => event.appSlug !== "price-finder")) {
-    res.status(403).json({ error: "Counter accounts can only record Price Finder activity." });
+  if (
+    (role === "counter" || role === "user") &&
+    (events as ActivityInput[]).some((event) => event.appSlug !== "price-finder")
+  ) {
+    res.status(403).json({ error: "This account can only record Price Finder activity." });
     return;
   }
   if (
@@ -638,6 +803,26 @@ router.get("/admin/activity/detail", requireAdmin, async (req, res) => {
       occurredAt: event.occurredAt.toISOString(),
     })),
   });
+});
+
+router.get("/admin/activity/export", requireAdmin, async (req, res) => {
+  const from = req.query.from;
+  const to = req.query.to;
+  const userId = typeof req.query.userId === "string" ? req.query.userId : undefined;
+  if (!validDate(from) || !validDate(to) || from > to) {
+    res.status(400).json({ error: "from and to must be valid ISO dates with from no later than to." });
+    return;
+  }
+
+  const pdf = await buildActivityPdf({ from, to, userId });
+  res
+    .status(200)
+    .set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": 'attachment; filename="prayag-user-activity-audit.pdf"',
+      "Cache-Control": "no-store",
+    })
+    .send(Buffer.from(pdf));
 });
 
 export default router;

@@ -45,7 +45,10 @@ export async function authMiddleware(
     return;
   }
 
-  req.user = session.user;
+  req.user = {
+    ...session.user,
+    mustChangePassword: session.user.mustChangePassword ?? false,
+  };
   next();
 }
 
@@ -74,6 +77,10 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
+  if (req.user.mustChangePassword) {
+    res.status(403).json({ error: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
+    return;
+  }
   if (req.user.role !== "admin") {
     res.status(403).json({ error: "Admin access required." });
     return;
@@ -82,9 +89,9 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 }
 
 /**
- * Internal workspace routes are available to administrators and regular
- * workspace members. Counter accounts are intentionally limited to the
- * read-only Price Finder surface, which is mounted before this guard.
+ * Internal workspace routes are reserved for administrators. Sales and
+ * counter accounts are intentionally limited to the read-only Price Finder
+ * surface, which is mounted before this guard.
  */
 export function requireWorkspaceAccess(
   req: Request,
@@ -99,8 +106,12 @@ export function requireWorkspaceAccess(
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  if (req.user.role === "counter") {
-    res.status(403).json({ error: "Workspace access is not available to counter accounts." });
+  if (req.user.mustChangePassword) {
+    res.status(403).json({ error: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
+    return;
+  }
+  if (req.user.role === "counter" || req.user.role === "user") {
+    res.status(403).json({ error: "Workspace access is available only to administrators." });
     return;
   }
   next();

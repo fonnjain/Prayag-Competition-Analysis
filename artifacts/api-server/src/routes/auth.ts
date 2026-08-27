@@ -1,4 +1,6 @@
 import {
+  ChangePasswordBody,
+  ChangePasswordResponse,
   GetCurrentAuthUserResponse,
 } from '@workspace/api-zod';
 import { db, usersTable } from '@workspace/db';
@@ -12,7 +14,9 @@ import {
   SESSION_COOKIE,
   SESSION_TTL,
   type SessionData,
+  updateSessionUser,
 } from '../lib/auth';
+import { requireAuth } from '../middlewares/authMiddleware';
 
 const router: IRouter = Router();
 
@@ -76,6 +80,7 @@ router.post('/login', async (req: Request, res: Response) => {
       firstName: user.firstName,
       lastName: user.lastName,
       profileImageUrl: user.profileImageUrl,
+      mustChangePassword: user.mustChangePassword,
       role: user.role as "admin" | "user" | "counter" | null,
     },
   };
@@ -86,6 +91,44 @@ router.post('/login', async (req: Request, res: Response) => {
   // Return sid so the client can store it as a Bearer token (avoids
   // cookie-forwarding issues in the Replit proxy environment).
   res.json({ ok: true, user: sessionData.user, sid });
+});
+
+// PUT /api/auth/password — complete a first-login or administrator-requested password change
+router.put('/auth/password', requireAuth, async (req: Request, res: Response) => {
+  const parsed = ChangePasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    return;
+  }
+  const { newPassword } = parsed.data;
+
+  const sid = getSessionId(req);
+  if (!sid || !req.user?.id) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const [account] = await db
+    .select({ passwordHash: usersTable.passwordHash })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.id));
+  if (!account) {
+    res.status(404).json({ error: 'User not found.' });
+    return;
+  }
+  if (account.passwordHash && await bcrypt.compare(newPassword, account.passwordHash)) {
+    res.status(400).json({ error: 'Choose a password different from the temporary password.' });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await db
+    .update(usersTable)
+    .set({ passwordHash, mustChangePassword: false })
+    .where(eq(usersTable.id, req.user.id));
+
+  await updateSessionUser(sid, { ...req.user, mustChangePassword: false });
+  res.json(ChangePasswordResponse.parse({ ok: true }));
 });
 
 // GET /api/logout — clear session and redirect

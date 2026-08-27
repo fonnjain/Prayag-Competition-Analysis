@@ -16,6 +16,7 @@ import {
   Search,
   TrendingUp,
   PencilLine,
+  Users,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
   { href: "/data-health", label: "Data Health", icon: Database },
   { href: "/api-keys", label: "API Keys", icon: Key, adminOnly: true },
+  { href: "/admin", label: "User Management", icon: Users, adminOnly: true, external: true },
 ];
 
 function getPageContext(location: string) {
@@ -80,19 +82,27 @@ export function Layout({ children }: LayoutProps) {
     <nav className="space-y-1" aria-label="Product Database navigation">
       {visibleNavItems.map((item) => {
         const Icon = item.icon;
-        return (
+        const content = (
+          <span
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              isActive(item.href)
+                ? "bg-white/90 text-[#174c57] shadow-sm"
+                : "text-white/75 hover:bg-white/10 hover:text-white",
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {item.label}
+          </span>
+        );
+
+        return item.external ? (
+          <a key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)}>
+            {content}
+          </a>
+        ) : (
           <Link key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)}>
-            <span
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive(item.href)
-                  ? "bg-white/90 text-[#174c57] shadow-sm"
-                  : "text-white/75 hover:bg-white/10 hover:text-white",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </span>
+            {content}
           </Link>
         );
       })}

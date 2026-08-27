@@ -1214,6 +1214,8 @@ export interface AuthUser {
   lastName?: string | null;
   /** @nullable */
   profileImageUrl?: string | null;
+  /** Whether the user must choose a new password before continuing. */
+  mustChangePassword: boolean;
   /**
      * User role: "admin" manages the workspace; "user" is a normal workspace member; "counter" only uses Price Finder.
      * @nullable
@@ -1288,6 +1290,11 @@ export interface UpdateUserRoleBody {
 
 export interface AuthUserEnvelope {
   user: AuthUser | null;
+}
+
+export interface PasswordChangeInput {
+  /** @minLength 8 */
+  newPassword: string;
 }
 
 export interface MobileTokenExchangeRequest {
@@ -2146,6 +2153,18 @@ userId: string;
  * Workspace-local date in YYYY-MM-DD format.
  */
 date: string;
+};
+
+export type ExportAdminActivityPdfParams = {
+/**
+ * Inclusive workspace-local date in YYYY-MM-DD format.
+ */
+from: string;
+/**
+ * Inclusive workspace-local date in YYYY-MM-DD format.
+ */
+to: string;
+userId?: string;
 };
 
 export type BeginBrowserLoginParams = {

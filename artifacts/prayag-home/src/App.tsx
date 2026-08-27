@@ -5,8 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Admin from "@/pages/admin";
-import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
-import { useState } from "react";
+import { useAuth, AuthProvider, PasswordChangeGate } from "@workspace/replit-auth-web";
+import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +36,7 @@ function LoginForm() {
             <label className="mb-1 block text-sm font-medium">Email</label>
             <input
               type="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -46,6 +47,7 @@ function LoginForm() {
             <label className="mb-1 block text-sm font-medium">Password</label>
             <input
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -67,7 +69,7 @@ function LoginForm() {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -79,7 +81,23 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) return <LoginForm />;
 
-  return <>{children}</>;
+  return (
+    <PasswordChangeGate>
+      {user?.role === "admin" ? children : <RestrictedHomeRedirect />}
+    </PasswordChangeGate>
+  );
+}
+
+function RestrictedHomeRedirect() {
+  useEffect(() => {
+    window.location.replace("/price-finder/");
+  }, []);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p className="text-muted-foreground">Opening Price Finder…</p>
+    </div>
+  );
 }
 
 function Router() {

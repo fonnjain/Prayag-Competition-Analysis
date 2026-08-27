@@ -1644,6 +1644,16 @@ export const GetAdminActivityDetailResponse = zod.object({
 
 
 /**
+ * @summary Download filtered user activity as a PDF audit report
+ */
+export const ExportAdminActivityPdfQueryParams = zod.object({
+  "from": zod.date().describe('Inclusive workspace-local date in YYYY-MM-DD format.'),
+  "to": zod.date().describe('Inclusive workspace-local date in YYYY-MM-DD format.'),
+  "userId": zod.coerce.string().optional()
+})
+
+
+/**
  * @summary Remove a user from the workspace
  */
 export const DeleteAdminUserParams = zod.object({
@@ -1710,8 +1720,25 @@ export const GetCurrentAuthUserResponse = zod.object({
   "firstName": zod.string().nullish(),
   "lastName": zod.string().nullish(),
   "profileImageUrl": zod.string().nullish(),
+  "mustChangePassword": zod.boolean().describe('Whether the user must choose a new password before continuing.'),
   "role": zod.union([zod.literal('admin'),zod.literal('user'),zod.literal('counter'),zod.literal(null)]).nullish().describe('User role: \"admin\" manages the workspace; \"user\" is a normal workspace member; \"counter\" only uses Price Finder.')
 }),zod.null()])
+})
+
+
+/**
+ * @summary Change the authenticated user's password
+ */
+export const changePasswordBodyNewPasswordMin = 8;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+})
+
+export const ChangePasswordResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 

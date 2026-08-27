@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChevronDown,
   Clock3,
+  Download,
   Eye,
   LoaderCircle,
   MousePointerClick,
@@ -196,6 +197,7 @@ export function ActivityPanel({ users }: { users: UserOption[] }) {
   const params = { from, to, ...(userId ? { userId } : {}) };
   const summary = useGetAdminActivitySummary(params);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
+  const exportHref = `/api/admin/activity/export?${new URLSearchParams(params).toString()}`;
 
   return (
     <section className="rounded-xl border bg-card">
@@ -209,9 +211,19 @@ export function ActivityPanel({ users }: { users: UserOption[] }) {
               Active and idle time use the Asia/Kolkata workday. Idle begins after five minutes without interaction.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-            <Clock3 className="h-3.5 w-3.5" /> {summary.data?.timezone ?? "Asia/Kolkata"}
-          </span>
+           <div className="flex flex-wrap items-center gap-2">
+             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+               <Clock3 className="h-3.5 w-3.5" /> {summary.data?.timezone ?? "Asia/Kolkata"}
+             </span>
+             <a
+               href={exportHref}
+               download="prayag-user-activity-audit.pdf"
+               data-activity="admin.activity_export_pdf"
+               className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors hover:bg-accent"
+             >
+               <Download className="h-3.5 w-3.5" /> Download PDF
+             </a>
+           </div>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">

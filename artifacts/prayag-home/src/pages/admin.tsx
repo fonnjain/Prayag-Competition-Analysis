@@ -152,7 +152,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
                       ? "Full access including user management"
                       : r === "counter"
                         ? "Price Finder and product comparison only"
-                        : "Standard workspace access"}
+                        : "Price Finder and product comparison only"}
                   </p>
                 </button>
               ))}
@@ -586,8 +586,8 @@ export default function AdminPage() {
         {/* Legend */}
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground space-y-1">
           <p><strong className="text-foreground">Admin</strong> — full workspace access + user management</p>
-          <p><strong className="text-foreground">User</strong> — standard workspace access (all apps, no user management)</p>
-          <p><strong className="text-foreground">Counter</strong> — Price Finder search, browse, comparison, and export only</p>
+          <p><strong className="text-foreground">User</strong> — Price Finder search, browse, comparison, and export only</p>
+          <p><strong className="text-foreground">Counter</strong> — legacy Price Finder-only access</p>
         </div>
       </main>
 

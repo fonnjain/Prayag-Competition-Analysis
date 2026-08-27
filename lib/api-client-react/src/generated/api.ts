@@ -72,6 +72,7 @@ import type {
   DiscountSettingsUpdate,
   ErrorEnvelope,
   ErrorResponse,
+  ExportAdminActivityPdfParams,
   ExportAnalysisParams,
   ExportPriceFinderComparisonParams,
   ExternalGetComparisonParams,
@@ -110,6 +111,7 @@ import type {
   MrpRevisionPreview,
   MrpRevisionPreviewInput,
   OkResponse,
+  PasswordChangeInput,
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
   PriceFinderBrowseResponse,
@@ -4651,6 +4653,90 @@ export function useGetAdminActivityDetail<TData = Awaited<ReturnType<typeof getA
 
 
 
+export const getExportAdminActivityPdfUrl = (params: ExportAdminActivityPdfParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/activity/export?${stringifiedParams}` : `/api/admin/activity/export`
+}
+
+/**
+ * @summary Download filtered user activity as a PDF audit report
+ */
+export const exportAdminActivityPdf = async (params: ExportAdminActivityPdfParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportAdminActivityPdfUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportAdminActivityPdfQueryKey = (params?: ExportAdminActivityPdfParams,) => {
+    return [
+    `/api/admin/activity/export`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportAdminActivityPdfQueryOptions = <TData = Awaited<ReturnType<typeof exportAdminActivityPdf>>, TError = ErrorType<ErrorResponse>>(params: ExportAdminActivityPdfParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAdminActivityPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportAdminActivityPdfQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAdminActivityPdf>>> = ({ signal }) => exportAdminActivityPdf(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportAdminActivityPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportAdminActivityPdfQueryResult = NonNullable<Awaited<ReturnType<typeof exportAdminActivityPdf>>>
+export type ExportAdminActivityPdfQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download filtered user activity as a PDF audit report
+ */
+
+export function useExportAdminActivityPdf<TData = Awaited<ReturnType<typeof exportAdminActivityPdf>>, TError = ErrorType<ErrorResponse>>(
+ params: ExportAdminActivityPdfParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAdminActivityPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportAdminActivityPdfQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getDeleteAdminUserUrl = (id: string,) => {
 
 
@@ -4941,6 +5027,77 @@ export function useGetCurrentAuthUser<TData = Awaited<ReturnType<typeof getCurre
 
 
 
+
+export const getChangePasswordUrl = () => {
+
+
+
+
+  return `/api/auth/password`
+}
+
+/**
+ * @summary Change the authenticated user's password
+ */
+export const changePassword = async (passwordChangeInput: PasswordChangeInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getChangePasswordUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      passwordChangeInput,)
+  }
+);}
+
+
+
+
+export const getChangePasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<PasswordChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<PasswordChangeInput>}, TContext> => {
+
+const mutationKey = ['changePassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<PasswordChangeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  changePassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+    export type ChangePasswordMutationBody = BodyType<PasswordChangeInput>
+    export type ChangePasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Change the authenticated user's password
+ */
+export const useChangePassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<PasswordChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changePassword>>,
+        TError,
+        {data: BodyType<PasswordChangeInput>},
+        TContext
+      > => {
+      return useMutation(getChangePasswordMutationOptions(options));
+    }
 
 export const getBeginBrowserLoginUrl = (params?: BeginBrowserLoginParams,) => {
   const normalizedParams = new URLSearchParams();

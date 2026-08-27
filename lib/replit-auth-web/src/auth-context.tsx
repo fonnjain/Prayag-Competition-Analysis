@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { AuthUser } from '@workspace/api-client-react';
-import { setAuthTokenGetter } from '@workspace/api-client-react';
+import { changePassword as changePasswordRequest, setAuthTokenGetter } from '@workspace/api-client-react';
 import { ActivityTracker } from "./activity-tracker";
 
 export type { AuthUser };
@@ -18,6 +18,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   loginWithPassword: (email: string, password: string) => Promise<LoginResult>;
+  changePassword: (newPassword: string) => Promise<LoginResult>;
   logout: () => void;
 }
 
@@ -98,6 +99,23 @@ export function AuthProvider({
     [],
   );
 
+  const changePassword = useCallback(
+    async (newPassword: string): Promise<LoginResult> => {
+      try {
+        await changePasswordRequest({ newPassword });
+        setUser((current) => current ? { ...current, mustChangePassword: false } : current);
+        return { ok: true };
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Could not change password. Please try again.';
+        return { ok: false, error: message };
+      }
+    },
+    [],
+  );
+
   const logout = useCallback(() => {
     clearStoredSid();
     deactivateBearer();
@@ -110,7 +128,7 @@ export function AuthProvider({
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginWithPassword, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginWithPassword, changePassword, logout }}>
       <ActivityTracker user={user} appSlug={appSlug} />
       {children}
     </AuthContext.Provider>
@@ -121,4 +139,86 @@ export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
   return ctx;
+}
+
+export function PasswordChangeGate({ children }: { children: React.ReactNode }) {
+  const { user, changePassword, logout } = useAuth();
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  if (!user?.mustChangePassword) return <>{children}</>;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if (newPassword.length < 8) {
+      setError('Choose a password with at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmation) {
+      setError('The password confirmation does not match.');
+      return;
+    }
+    setSaving(true);
+    const result = await changePassword(newPassword);
+    setSaving(false);
+    if (!result.ok) setError(result.error ?? 'Could not change password.');
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+      <section className="w-full max-w-md rounded-xl border bg-background p-7 shadow-sm sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary">Password update required</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Choose a new password</h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          For your account’s security, replace the temporary password before using the workspace.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="new-password" className="mb-1 block text-sm font-medium">New password</label>
+            <input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              minLength={8}
+              required
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label htmlFor="confirm-password" className="mb-1 block text-sm font-medium">Confirm new password</label>
+            <input
+              id="confirm-password"
+              type="password"
+              autoComplete="new-password"
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              minLength={8}
+              required
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saving ? 'Saving password…' : 'Save new password'}
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-4 w-full text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
+          Sign out instead
+        </button>
+      </section>
+    </main>
+  );
 }
