@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, Calendar, ChevronDown, ChevronRight, Download, FileSpreadsheet, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Loader2, Pencil, Trash2, Upload, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getGetCatalogProductsQueryKey,
@@ -85,6 +85,9 @@ export default function LoadMrpPage() {
   const [dismissedLowMrp, setDismissedLowMrp] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<MrpPeriod | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingPeriodDate, setEditingPeriodDate] = useState<string | null>(null);
+  const [editedEffectiveDate, setEditedEffectiveDate] = useState("");
+  const [isUpdatingPeriodDate, setIsUpdatingPeriodDate] = useState(false);
   const [duplicateSnapshot, setDuplicateSnapshot] = useState<DuplicateSnapshot | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -92,6 +95,43 @@ export default function LoadMrpPage() {
   const { data: periods, isLoading: periodsLoading } = useMrpPeriods();
   const { data: sources, isLoading: sourcesLoading } = useMrpSources();
   const selectedSource = sources?.find((source) => String(source.id) === sourceId) ?? null;
+
+  const savePeriodDate = async () => {
+    if (!editingPeriodDate || !editedEffectiveDate) return;
+    setIsUpdatingPeriodDate(true);
+    try {
+      const response = await fetch("/api/catalog/mrp-period-date", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentEffectiveDate: editingPeriodDate,
+          newEffectiveDate: editedEffectiveDate,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not change the effective date.");
+      toast({
+        title: "MRP Effective Date Updated",
+        description: `${data.moved} ${data.moved === 1 ? "row" : "rows"} moved to ${data.effectiveDate}.`,
+      });
+      setEditingPeriodDate(null);
+      queryClient.invalidateQueries({ queryKey: ["catalog", "mrp-periods"] });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetCatalogFiltersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonSummaryQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetComparisonByProductQueryKey() });
+    } catch (error) {
+      toast({
+        title: "Date Change Failed",
+        description: error instanceof Error ? error.message : "Could not change the effective date.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPeriodDate(false);
+    }
+  };
 
   const submitUpload = async (confirmDuplicate = false) => {
     if (!file || !effectiveDate || !sourceId || !downloadedAt) return;
@@ -286,12 +326,48 @@ export default function LoadMrpPage() {
                 key={period.effectiveDate}
                 className="flex items-center justify-between px-3 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm font-medium">{period.effectiveDate}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  {editingPeriodDate === period.effectiveDate ? (
+                    <Input
+                      type="date"
+                      value={editedEffectiveDate}
+                      onChange={(event) => setEditedEffectiveDate(event.target.value)}
+                      aria-label={`MRP effective date for ${period.effectiveDate}`}
+                      className="h-8 w-40"
+                      disabled={isUpdatingPeriodDate}
+                    />
+                  ) : (
+                    <span className="font-mono text-sm font-medium">{period.effectiveDate}</span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {period.count.toLocaleString()} item{period.count !== 1 ? "s" : ""}
                   </span>
                 </div>
+                <div className="flex items-center gap-1">
+                {editingPeriodDate === period.effectiveDate ? (
+                  <>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-primary" onClick={() => void savePeriodDate()} disabled={isUpdatingPeriodDate || !editedEffectiveDate}>
+                      {isUpdatingPeriodDate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span className="sr-only">Save effective date</span>
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditingPeriodDate(null)} disabled={isUpdatingPeriodDate}>
+                      <X className="w-3.5 h-3.5" />
+                      <span className="sr-only">Cancel date change</span>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-primary hover:text-primary"
+                    onClick={() => { setEditingPeriodDate(period.effectiveDate); setEditedEffectiveDate(period.effectiveDate); }}
+                    disabled={isDeleting}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1" />
+                    Change date
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -306,6 +382,7 @@ export default function LoadMrpPage() {
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -380,7 +457,7 @@ export default function LoadMrpPage() {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="effectiveDate">Effective Date</Label>
+            <Label htmlFor="effectiveDate">New Period Effective Date (w.e.f.)</Label>
             <Input 
               id="effectiveDate" 
               type="date" 
@@ -388,6 +465,9 @@ export default function LoadMrpPage() {
               onChange={(e) => setEffectiveDate(e.target.value)}
               required
             />
+            <p className="text-xs text-muted-foreground">
+              Use this for a new source upload. To correct an existing period’s date, use Change date above.
+            </p>
           </div>
 
           <Button type="submit" disabled={!file || !effectiveDate || !sourceId || !downloadedAt || isUploading} className="w-full">

@@ -15,6 +15,9 @@ import {
   ChevronDown,
   ChevronRight,
   Calendar,
+  Check,
+  Pencil,
+  X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -97,6 +100,9 @@ export default function ImportCompetitorPage() {
   } | null>(null);
   // Track which brands are expanded to show their periods
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [editingPeriod, setEditingPeriod] = useState<{ competitor: string; effectiveDate: string } | null>(null);
+  const [editedEffectiveDate, setEditedEffectiveDate] = useState("");
+  const [isUpdatingPeriodDate, setIsUpdatingPeriodDate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workbookPreviewSequence = useRef(0);
 
@@ -120,6 +126,43 @@ export default function ImportCompetitorPage() {
     queryClient.invalidateQueries({ queryKey: getGetComparisonMatrixQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetCompetitorBrandsQueryKey() });
+  };
+
+  const beginPeriodDateEdit = (brand: string, date: string) => {
+    setEditingPeriod({ competitor: brand, effectiveDate: date });
+    setEditedEffectiveDate(date);
+  };
+
+  const savePeriodDate = async () => {
+    if (!editingPeriod || !editedEffectiveDate) return;
+    setIsUpdatingPeriodDate(true);
+    try {
+      const response = await fetch("/api/catalog/competitor-period-date", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({
+          competitor: editingPeriod.competitor,
+          currentEffectiveDate: editingPeriod.effectiveDate,
+          newEffectiveDate: editedEffectiveDate,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not change the effective date.");
+      toast({
+        title: "Effective Date Updated",
+        description: `${data.moved} ${data.moved === 1 ? "row" : "rows"} moved to ${formatDate(data.effectiveDate)}.`,
+      });
+      setEditingPeriod(null);
+      invalidateComparisonQueries();
+    } catch (error) {
+      toast({
+        title: "Date Change Failed",
+        description: error instanceof Error ? error.message : "Could not change the effective date.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPeriodDate(false);
+    }
   };
 
   const handleFileChange = async (nextFile: File | null) => {
@@ -743,7 +786,7 @@ export default function ImportCompetitorPage() {
         <div>
           <h3 className="font-semibold text-lg">Tracked Competitor Brands</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Expand a brand to remove individual price periods, or remove the entire brand at once.
+            Expand a brand to correct an effective date, remove an individual period, or remove the entire brand at once.
           </p>
         </div>
 
@@ -831,6 +874,9 @@ export default function ImportCompetitorPage() {
                   {isExpanded && periods.length > 0 && (
                     <ul className="border-t bg-muted/30 divide-y">
                       {[...periods].reverse().map((date) => {
+                        const isEditingPeriod =
+                          editingPeriod?.competitor === brand &&
+                          editingPeriod.effectiveDate === date;
                         const isDeletingPeriod =
                           deletePeriodMutation.isPending &&
                           deletePeriodMutation.variables?.competitor === brand &&
@@ -841,14 +887,66 @@ export default function ImportCompetitorPage() {
                             key={date}
                             className="flex items-center justify-between gap-4 px-6 py-2"
                           >
-                            <div className="flex items-center gap-2 text-sm">
+                            <div className="flex items-center gap-2 text-sm min-w-0">
                               <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                              <span className="font-medium">{formatDate(date)}</span>
-                              <span className="text-xs text-muted-foreground font-mono">
-                                ({date})
-                              </span>
+                              {isEditingPeriod ? (
+                                <Input
+                                  type="date"
+                                  value={editedEffectiveDate}
+                                  onChange={(event) => setEditedEffectiveDate(event.target.value)}
+                                  aria-label={`${brand} effective date`}
+                                  className="h-8 w-40"
+                                  disabled={isUpdatingPeriodDate}
+                                />
+                              ) : (
+                                <>
+                                  <span className="font-medium">{formatDate(date)}</span>
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    ({date})
+                                  </span>
+                                </>
+                              )}
                             </div>
 
+                            <div className="flex items-center gap-1">
+                              {isEditingPeriod ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-primary"
+                                    onClick={() => void savePeriodDate()}
+                                    disabled={isUpdatingPeriodDate || !editedEffectiveDate}
+                                  >
+                                    {isUpdatingPeriodDate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                    <span className="sr-only">Save effective date</span>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2"
+                                    onClick={() => setEditingPeriod(null)}
+                                    disabled={isUpdatingPeriodDate}
+                                  >
+                                    <X className="w-3 h-3" />
+                                    <span className="sr-only">Cancel date change</span>
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-primary hover:text-primary"
+                                  onClick={() => beginPeriodDateEdit(brand, date)}
+                                  disabled={deleteMutation.isPending || deletePeriodMutation.isPending}
+                                >
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  Change date
+                                </Button>
+                              )}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
@@ -905,6 +1003,7 @@ export default function ImportCompetitorPage() {
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
+                            </div>
                           </li>
                         );
                       })}

@@ -2502,4 +2502,125 @@ router.delete("/catalog/mrp-period/:date", requireAdmin, async (req, res) => {
   res.json({ deleted: date });
 });
 
+// Move an existing MRP period without changing any prices. A target date must
+// be unused so the append-only (code, date, variant) history remains intact.
+router.patch("/catalog/mrp-period-date", requireAdmin, async (req, res) => {
+  const currentEffectiveDate = String(req.body?.currentEffectiveDate ?? "").trim();
+  const newEffectiveDate = String(req.body?.newEffectiveDate ?? "").trim();
+  if (!isIsoDate(currentEffectiveDate) || !isIsoDate(newEffectiveDate)) {
+    res.status(400).json({ error: "Both effective dates must be YYYY-MM-DD" });
+    return;
+  }
+  if (currentEffectiveDate === newEffectiveDate) {
+    res.json({ moved: 0, effectiveDate: currentEffectiveDate });
+    return;
+  }
+
+  try {
+    const moved = await db.transaction(async (tx) => {
+      await tx.execute(sql`LOCK TABLE mrp_price_history IN SHARE ROW EXCLUSIVE MODE`);
+      const [source, destination] = await Promise.all([
+        tx.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+          .where(eq(mrpPriceHistoryTable.effectiveDate, currentEffectiveDate)).limit(1),
+        tx.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+          .where(eq(mrpPriceHistoryTable.effectiveDate, newEffectiveDate)).limit(1),
+      ]);
+      if (source.length === 0) {
+        throw Object.assign(new Error(`No MRP period found for date ${currentEffectiveDate}`), { httpStatus: 404 });
+      }
+      if (destination.length > 0) {
+        throw Object.assign(new Error(`An MRP period already exists for ${newEffectiveDate}. Choose an unused date.`), { httpStatus: 409 });
+      }
+      const rows = await tx.select({
+        id: mrpPriceHistoryTable.id,
+        itemCode: mrpPriceHistoryTable.itemCode,
+        sourceFile: mrpPriceHistoryTable.sourceFile,
+        loadBatchId: mrpPriceHistoryTable.loadBatchId,
+        mrp: mrpPriceHistoryTable.mrp,
+      }).from(mrpPriceHistoryTable)
+        .where(eq(mrpPriceHistoryTable.effectiveDate, currentEffectiveDate));
+      await tx.insert(mrpHistoryProvenanceEventsTable).values(rows.map((row) => ({
+        historyRowId: row.id,
+        itemCode: row.itemCode,
+        effectiveDate: newEffectiveDate,
+        action: "period_effective_date_changed",
+        reason: `Effective date corrected from ${currentEffectiveDate} to ${newEffectiveDate}`,
+        sourceFile: row.sourceFile,
+        loadBatchId: row.loadBatchId,
+        mrp: row.mrp,
+      })));
+      await tx.update(mrpPriceHistoryTable)
+        .set({ effectiveDate: newEffectiveDate, isCurrent: false })
+        .where(eq(mrpPriceHistoryTable.effectiveDate, currentEffectiveDate));
+      await tx.execute(sql`
+        UPDATE mrp_price_history m SET is_current = true
+        FROM (
+          SELECT DISTINCT ON (h.item_code, h.variant) h.id
+          FROM mrp_price_history h JOIN catalog_products p ON p.item_code = h.item_code
+          WHERE h.effective_date <= CURRENT_DATE AND h.review_status = 'approved'
+            AND p.is_active IS TRUE
+            AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+          ORDER BY h.item_code, h.variant, h.effective_date DESC, h.id DESC
+        ) latest WHERE m.id = latest.id
+      `);
+      return rows.length;
+    });
+    res.json({ moved, previousEffectiveDate: currentEffectiveDate, effectiveDate: newEffectiveDate });
+  } catch (err: any) {
+    const status = err.httpStatus ?? 500;
+    if (status < 500) res.status(status).json({ error: err.message });
+    else {
+      req.log.error({ err, currentEffectiveDate, newEffectiveDate }, "mrp period date update failed");
+      res.status(500).json({ error: "Failed to change MRP period date" });
+    }
+  }
+});
+
+// Move every price row for a competitor period. Keep periods separate rather
+// than silently merging them, and refresh the brand's active-price flags.
+router.patch("/catalog/competitor-period-date", requireAdmin, async (req, res) => {
+  const competitor = String(req.body?.competitor ?? "").trim();
+  const currentEffectiveDate = String(req.body?.currentEffectiveDate ?? "").trim();
+  const newEffectiveDate = String(req.body?.newEffectiveDate ?? "").trim();
+  if (!competitor || !isIsoDate(currentEffectiveDate) || !isIsoDate(newEffectiveDate)) {
+    res.status(400).json({ error: "competitor and both YYYY-MM-DD effective dates are required" });
+    return;
+  }
+  if (currentEffectiveDate === newEffectiveDate) {
+    res.json({ moved: 0, competitor, effectiveDate: currentEffectiveDate });
+    return;
+  }
+  try {
+    const moved = await db.transaction(async (tx) => {
+      await tx.execute(sql`LOCK TABLE competitor_prices IN SHARE ROW EXCLUSIVE MODE`);
+      const [source, destination] = await Promise.all([
+        tx.select({ id: competitorPricesTable.id }).from(competitorPricesTable)
+          .where(and(eq(competitorPricesTable.competitor, competitor), eq(competitorPricesTable.effectiveDate, currentEffectiveDate))).limit(1),
+        tx.select({ id: competitorPricesTable.id }).from(competitorPricesTable)
+          .where(and(eq(competitorPricesTable.competitor, competitor), eq(competitorPricesTable.effectiveDate, newEffectiveDate))).limit(1),
+      ]);
+      if (source.length === 0) {
+        throw Object.assign(new Error(`No ${competitor} period found for ${currentEffectiveDate}`), { httpStatus: 404 });
+      }
+      if (destination.length > 0) {
+        throw Object.assign(new Error(`${competitor} already has a period for ${newEffectiveDate}. Choose an unused date.`), { httpStatus: 409 });
+      }
+      const result = await tx.update(competitorPricesTable)
+        .set({ effectiveDate: newEffectiveDate, isCurrent: false, updatedAt: new Date() })
+        .where(and(eq(competitorPricesTable.competitor, competitor), eq(competitorPricesTable.effectiveDate, currentEffectiveDate)))
+        .returning({ id: competitorPricesTable.id });
+      await recomputeCompetitorCurrentFlagsInTransaction(competitor, tx);
+      return result.length;
+    });
+    res.json({ moved, competitor, previousEffectiveDate: currentEffectiveDate, effectiveDate: newEffectiveDate });
+  } catch (err: any) {
+    const status = err.httpStatus ?? 500;
+    if (status < 500) res.status(status).json({ error: err.message });
+    else {
+      req.log.error({ err, competitor, currentEffectiveDate, newEffectiveDate }, "competitor period date update failed");
+      res.status(500).json({ error: "Failed to change competitor period date" });
+    }
+  }
+});
+
 export default router;
