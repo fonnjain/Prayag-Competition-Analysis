@@ -1,0 +1,123 @@
+# Replit Prompt — Adopt the New Competitor Master, Sparsh Effective 01 July 2026
+
+The Competitor Master has been revised and is now the authoritative source for competitor mapping and competitor prices. Two things change as a result, and one of them reverses a correction made last week.
+
+Input file: `Sparsh_Competitor_Master_Clean.xlsx`
+
+---
+
+## Part A — Sparsh Vol 6.2 is effective 01 July 2026, not 01 September
+
+The master header dates Sparsh Pearl Vol 6.2 as **1st Jul, 2026**. Production currently holds it at **2026-09-01**, set last week on an assumption that has now been superseded by the master.
+
+**Change the Vol 6.2 competitor period to `2026-07-01`.**
+
+### This reverses last week's visible change
+
+01 July is in the past, so Vol 6.2 is **already in force today**. The prices that reverted to the previous volume last week become current again.
+
+| | Before this change | After |
+|---|---|---|
+| `BCC-301` today | ₹410 (Vol 4.8) | **₹330** (Vol 6.2) |
+| Median gap today | −1.0% | **+10.8%** |
+| Prayag cheaper on | 55 of 150 | **132 of 150** |
+
+**And +10.8% is now a correct, period-matched figure** — not the artefact it appeared to be. Prayag's current price is its 05 March list, in force until 31 August. Sparsh's current price is Vol 6.2, in force since 01 July. Both sides are genuinely current; they simply changed on different dates.
+
+From 01 September, when Prayag's own revision takes effect, the median becomes **+2.9%** with Prayag cheaper on 98 of 150.
+
+Anyone who saw last week's shift will see it move back. Say so in the report so it is communicated rather than discovered.
+
+### Also correct the earlier period
+
+The master dates Sparsh Vol 4.8 as **1st Apr, 2024**. The application holds the earlier Sparsh period at `2026-03-05` — a Prayag PTMT revision date that was never sourced, and which has been flagged as unverified provenance since it was noticed.
+
+**Set the earlier Sparsh period to `2024-04-01`.** Its provenance is now established.
+
+---
+
+## Part B — Load the mapping and prices
+
+Sheet `competitor_mapping`, 150 rows: `prayag_code`, `competitor_code`, `vol_4_8_mrp`, `vol_6_2_mrp`, and the effective date for each.
+
+### The master now carries catalogue codes directly
+
+`WC-180`, `PSJ-255`, `PSJ-256`, `WIH-2331`, `WIH-2332` and `WMP-189` appear as themselves. **All seven Vol 6.2 aliases are absorbed into the master**, so no alias resolution is needed for this volume.
+
+Do not delete `SPARSH_ALIASES` — a future volume may drift again, and the seven entries remain a correct record of Vol 6.2's history. But confirm that loading this file produces **zero** `desc+size` matches: every code should resolve directly.
+
+### One deliberate mapping change
+
+The master corrects the washing-machine pipe size error at source:
+
+```
+WMP-188  →  Prayag 361  at ₹462  (2 Mtr)
+WMP-189  →  Prayag 362  at ₹592  (3 Mtr)
+```
+
+Previously `WMP-188` was mapped to Prayag `362` at ₹592 — the 3 Mtr price against the 2 Mtr product. This is the size-gate failure the runbook documents, now fixed in the master. Adopt the new mapping.
+
+This is the **only** mapping difference. 143 of 144 comparable Vol 6.2 prices and 143 of 144 Vol 4.8 prices match the independently verified baseline exactly.
+
+---
+
+## Part C — Prayag MRP does not come from this file
+
+The master has Prayag MRP columns. **They are not authoritative and must not be loaded.**
+
+Prayag MRP continues to come from the six official dated workbooks. The application holds 13,048 price rows with full provenance, and that must not change.
+
+This matters concretely: **343 of the master's 808 Prayag 5 March values have been rounded to whole rupees.** For example `133-N` reads 698 where the official value is 698.01, and `135-N` reads 1528 where the official value is 1527.55. No value is genuinely wrong — only precision has been lost — but loading them would degrade correct data.
+
+The `prayag_decimals_to_fix` sheet lists all 343 with their correct values. **That sheet is for correcting the Google Sheet at source. Do not load it.**
+
+### Two Prayag codes to report
+
+`1179` (O.H. Shower Square 5") and `1181` (O.H. Shower Round 5") are priced at 638 and 578 for 01 Sep in the master, but appear in none of the six official workbooks. Report them; do not create products from them.
+
+---
+
+## Part D — Vectus is out of scope
+
+The master carries 12 Vectus prices with **no Vectus cat numbers at all**. They cannot be verified or matched. Excluded from the clean file entirely.
+
+Do not create a Vectus competitor period, and do not infer codes.
+
+---
+
+## Acceptance tests
+
+```
+1.  Sparsh Vol 6.2 competitor period is 2026-07-01; the earlier period is
+    2024-04-01. No competitor period remains at 2026-09-01 or 2026-03-05.
+2.  BCC-301 resolves to ₹330 today and ₹410 at asOf = 2026-06-30.
+3.  Median gap today is about +10.8%, Prayag cheaper on 132 of 150.
+4.  Median gap at asOf = 2026-09-01 is about +2.9%, Prayag cheaper on 98 of 150.
+5.  All 150 mapped codes resolve by direct code match — zero desc+size matches.
+6.  WMP-188 maps to Prayag 361 at 462; WMP-189 maps to Prayag 362 at 592.
+7.  Prayag MRP is unchanged: 13,048 rows, 90 discontinued, 6,213 live at
+    2026-09-01. No Prayag price was written from this file.
+8.  133-N still resolves to 698.01 and 135-N to 1527.55 — the rounded master
+    values did NOT overwrite the official ones.
+9.  No Vectus competitor period exists.
+10. No catalog_products row was created from this file.
+```
+
+Tests 7 and 8 are the guard that matters. This file contains Prayag prices that are less precise than the ones already held; nothing here may touch them.
+
+---
+
+## Report
+
+Read every figure from the database:
+
+- Both Sparsh periods with their effective dates, before and after.
+- `BCC-301` today and at 2026-06-30.
+- Median gap and cheaper-count, today and at 2026-09-01, before and after.
+- Match method distribution across the 150 — expected all direct.
+- Prayag row count, discontinued count and live count, confirming no change.
+- `1179` and `1181` — present in the master, absent from the workbooks.
+
+**Flag prominently:** the reported median moves from about −1.0% back to about +10.8% for today's date. That is the intended result of adopting the master's dating, not a regression. It is also the second time this figure has moved, so state plainly what changed and why.
+
+One clean commit.
