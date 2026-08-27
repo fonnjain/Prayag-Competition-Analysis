@@ -119,6 +119,9 @@ export const mrpPriceHistoryTable = pgTable(
     // Every normal source load and manual correction has an auditable batch.
     // Null is retained only for legacy rows so Data Health can surface them.
     loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
+    // The most recent controlled revision that touched this row. Full revision
+    // history (including previous values) lives in mrp_revision_rows.
+    lastRevisionBatchId: integer("last_revision_batch_id"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     // Colour / material variant within a single Cat No.  'Standard' is the base
     // article (= White for sanitaryware) and carries the existing behaviour.
@@ -211,6 +214,8 @@ export const competitorPricesTable = pgTable(
     priceBasis: text("price_basis"),
     // GST percentage to apply when priceBasis = 'Ex-GST'. Default 18 when null.
     gstPct: doublePrecision("gst_pct"),
+    // See mrp_price_history.last_revision_batch_id.
+    lastRevisionBatchId: integer("last_revision_batch_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -223,6 +228,78 @@ export const competitorPricesTable = pgTable(
     index("competitor_prices_competitor_idx").on(t.competitor),
     index("competitor_prices_category_idx").on(t.category),
     index("competitor_prices_current_idx").on(t.competitor, t.isCurrent),
+  ],
+);
+
+// A revision batch is a durable preview/apply record. Unlike an import batch,
+// it never owns price rows: it only authorizes changes to rows that already
+// exist. Revision rows retain the preview and before/after values so apply and
+// rollback do not depend on the uploaded file remaining available.
+export const mrpRevisionBatchesTable = pgTable(
+  "mrp_revision_batches",
+  {
+    id: serial("id").primaryKey(),
+    targetType: text("target_type").notNull(), // "mrp" | "competitor"
+    competitor: text("competitor"),
+    lockedEffectiveDate: date("locked_effective_date", { mode: "string" }),
+    fileName: text("file_name").notNull(),
+    fileSha256: text("file_sha256").notNull(),
+    fileSizeBytes: integer("file_size_bytes").notNull(),
+    uploadedBy: text("uploaded_by"),
+    reason: text("reason"),
+    status: text("status").notNull().default("preview"), // preview | applied | rolled_back
+    warningAcknowledged: boolean("warning_acknowledged").notNull().default(false),
+    rowsInFile: integer("rows_in_file").notNull().default(0),
+    rowsChanged: integer("rows_changed").notNull().default(0),
+    rowsNoop: integer("rows_noop").notNull().default(0),
+    rowsRejected: integer("rows_rejected").notNull().default(0),
+    warningCount: integer("warning_count").notNull().default(0),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    rolledBackAt: timestamp("rolled_back_at", { withTimezone: true }),
+    appliedBy: text("applied_by"),
+    rolledBackBy: text("rolled_back_by"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("mrp_revision_batches_created_idx").on(t.createdAt),
+    index("mrp_revision_batches_status_idx").on(t.status),
+    index("mrp_revision_batches_hash_idx").on(t.fileSha256),
+  ],
+);
+
+// One row per uploaded revision row. target_row_id points to the exact
+// existing price row that may be changed; null rows are rejected and can never
+// be written. The target type determines whether old/new values refer to mrp
+// or competitor_prices.price.
+export const mrpRevisionRowsTable = pgTable(
+  "mrp_revision_rows",
+  {
+    id: serial("id").primaryKey(),
+    batchId: integer("batch_id")
+      .notNull()
+      .references(() => mrpRevisionBatchesTable.id),
+    rowNumber: integer("row_number").notNull(),
+    itemCode: text("item_code"),
+    effectiveDate: date("effective_date", { mode: "string" }),
+    variant: text("variant").notNull().default("Standard"),
+    competitor: text("competitor"),
+    targetRowId: integer("target_row_id"),
+    previousValue: doublePrecision("previous_value"),
+    newValue: doublePrecision("new_value"),
+    note: text("note"),
+    outcome: text("outcome").notNull(), // change | noop | rejected
+    rejectionReason: text("rejection_reason"),
+    warningReasons: text("warning_reasons"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("mrp_revision_rows_batch_idx").on(t.batchId),
+    index("mrp_revision_rows_target_idx").on(t.targetRowId),
+    index("mrp_revision_rows_outcome_idx").on(t.batchId, t.outcome),
   ],
 );
 

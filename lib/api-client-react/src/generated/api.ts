@@ -37,6 +37,8 @@ import type {
   ApiKeyCreate,
   ApiKeyCreated,
   ApiKeyList,
+  ApplyMrpRevisionInput,
+  ApplyMrpRevisionResult,
   AuthUserEnvelope,
   AutoAcceptPreview,
   AutoAcceptRequest,
@@ -98,6 +100,9 @@ import type {
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
   MrpIncreaseList,
+  MrpRevisionDetail,
+  MrpRevisionPreview,
+  MrpRevisionPreviewInput,
   OkResponse,
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
@@ -109,6 +114,7 @@ import type {
   ProductComparisonList,
   RecordAcceptBatch,
   ResetUserPasswordBody,
+  RollbackMrpRevisionResult,
   UpdateUserRoleBody
 } from './api.schemas';
 
@@ -5081,5 +5087,305 @@ export const useLogoutMobileSession = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getLogoutMobileSessionMutationOptions(options));
+    }
+
+export const getPreviewMrpRevisionUrl = () => {
+
+
+
+
+  return `/api/catalog/mrp-revisions/preview`
+}
+
+/**
+ * @summary Validate a revision workbook without changing prices
+ */
+export const previewMrpRevision = async (mrpRevisionPreviewInput: MrpRevisionPreviewInput, options?: RequestInit): Promise<MrpRevisionPreview> => {
+    const formData = new FormData();
+formData.append(`file`, mrpRevisionPreviewInput.file);
+formData.append(`targetType`, mrpRevisionPreviewInput.targetType);
+if(mrpRevisionPreviewInput.competitor !== undefined) {
+ formData.append(`competitor`, mrpRevisionPreviewInput.competitor);
+ }
+if(mrpRevisionPreviewInput.effectiveDate !== undefined) {
+ formData.append(`effectiveDate`, mrpRevisionPreviewInput.effectiveDate);
+ }
+formData.append(`reason`, mrpRevisionPreviewInput.reason);
+
+  return customFetch<MrpRevisionPreview>(getPreviewMrpRevisionUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewMrpRevisionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMrpRevision>>, TError,{data: BodyType<MrpRevisionPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewMrpRevision>>, TError,{data: BodyType<MrpRevisionPreviewInput>}, TContext> => {
+
+const mutationKey = ['previewMrpRevision'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewMrpRevision>>, {data: BodyType<MrpRevisionPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewMrpRevision(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewMrpRevisionMutationResult = NonNullable<Awaited<ReturnType<typeof previewMrpRevision>>>
+    export type PreviewMrpRevisionMutationBody = BodyType<MrpRevisionPreviewInput>
+    export type PreviewMrpRevisionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Validate a revision workbook without changing prices
+ */
+export const usePreviewMrpRevision = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMrpRevision>>, TError,{data: BodyType<MrpRevisionPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewMrpRevision>>,
+        TError,
+        {data: BodyType<MrpRevisionPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewMrpRevisionMutationOptions(options));
+    }
+
+export const getGetMrpRevisionUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/catalog/mrp-revisions/${batchId}`
+}
+
+/**
+ * @summary Read a revision batch and its row outcomes
+ */
+export const getMrpRevision = async (batchId: number, options?: RequestInit): Promise<MrpRevisionDetail> => {
+
+  return customFetch<MrpRevisionDetail>(getGetMrpRevisionUrl(batchId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpRevisionQueryKey = (batchId: number,) => {
+    return [
+    `/api/catalog/mrp-revisions/${batchId}`
+    ] as const;
+    }
+
+
+export const getGetMrpRevisionQueryOptions = <TData = Awaited<ReturnType<typeof getMrpRevision>>, TError = ErrorType<ErrorResponse>>(batchId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpRevision>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpRevisionQueryKey(batchId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpRevision>>> = ({ signal }) => getMrpRevision(batchId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(batchId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpRevision>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpRevisionQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpRevision>>>
+export type GetMrpRevisionQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read a revision batch and its row outcomes
+ */
+
+export function useGetMrpRevision<TData = Awaited<ReturnType<typeof getMrpRevision>>, TError = ErrorType<ErrorResponse>>(
+ batchId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpRevision>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpRevisionQueryOptions(batchId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getApplyMrpRevisionUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/catalog/mrp-revisions/${batchId}/apply`
+}
+
+/**
+ * @summary Apply a stored revision preview to existing price rows
+ */
+export const applyMrpRevision = async (batchId: number,
+    applyMrpRevisionInput: ApplyMrpRevisionInput, options?: RequestInit): Promise<ApplyMrpRevisionResult> => {
+
+  return customFetch<ApplyMrpRevisionResult>(getApplyMrpRevisionUrl(batchId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      applyMrpRevisionInput,)
+  }
+);}
+
+
+
+
+export const getApplyMrpRevisionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyMrpRevision>>, TError,{batchId: number;data: BodyType<ApplyMrpRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyMrpRevision>>, TError,{batchId: number;data: BodyType<ApplyMrpRevisionInput>}, TContext> => {
+
+const mutationKey = ['applyMrpRevision'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyMrpRevision>>, {batchId: number;data: BodyType<ApplyMrpRevisionInput>}> = (props) => {
+          const {batchId,data} = props ?? {};
+
+          return  applyMrpRevision(batchId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyMrpRevisionMutationResult = NonNullable<Awaited<ReturnType<typeof applyMrpRevision>>>
+    export type ApplyMrpRevisionMutationBody = BodyType<ApplyMrpRevisionInput>
+    export type ApplyMrpRevisionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Apply a stored revision preview to existing price rows
+ */
+export const useApplyMrpRevision = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyMrpRevision>>, TError,{batchId: number;data: BodyType<ApplyMrpRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyMrpRevision>>,
+        TError,
+        {batchId: number;data: BodyType<ApplyMrpRevisionInput>},
+        TContext
+      > => {
+      return useMutation(getApplyMrpRevisionMutationOptions(options));
+    }
+
+export const getRollbackMrpRevisionUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/catalog/mrp-revisions/${batchId}/rollback`
+}
+
+/**
+ * @summary Restore exact previous values from an applied revision
+ */
+export const rollbackMrpRevision = async (batchId: number, options?: RequestInit): Promise<RollbackMrpRevisionResult> => {
+
+  return customFetch<RollbackMrpRevisionResult>(getRollbackMrpRevisionUrl(batchId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRollbackMrpRevisionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rollbackMrpRevision>>, TError,{batchId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rollbackMrpRevision>>, TError,{batchId: number}, TContext> => {
+
+const mutationKey = ['rollbackMrpRevision'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rollbackMrpRevision>>, {batchId: number}> = (props) => {
+          const {batchId} = props ?? {};
+
+          return  rollbackMrpRevision(batchId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RollbackMrpRevisionMutationResult = NonNullable<Awaited<ReturnType<typeof rollbackMrpRevision>>>
+
+    export type RollbackMrpRevisionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Restore exact previous values from an applied revision
+ */
+export const useRollbackMrpRevision = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rollbackMrpRevision>>, TError,{batchId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rollbackMrpRevision>>,
+        TError,
+        {batchId: number},
+        TContext
+      > => {
+      return useMutation(getRollbackMrpRevisionMutationOptions(options));
     }
 

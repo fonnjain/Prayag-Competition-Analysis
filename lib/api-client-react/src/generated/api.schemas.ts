@@ -1396,6 +1396,105 @@ export interface CompetitorBrands {
   brandPeriods: CompetitorBrandPeriod[];
 }
 
+export type MrpRevisionPreviewInputTargetType = typeof MrpRevisionPreviewInputTargetType[keyof typeof MrpRevisionPreviewInputTargetType];
+
+
+export const MrpRevisionPreviewInputTargetType = {
+  mrp: 'mrp',
+  competitor: 'competitor',
+} as const;
+
+export interface MrpRevisionPreviewInput {
+  file: Blob;
+  targetType: MrpRevisionPreviewInputTargetType;
+  competitor?: string;
+  effectiveDate?: string;
+  /** @minLength 1 */
+  reason: string;
+}
+
+export type MrpRevisionRowOutcome = typeof MrpRevisionRowOutcome[keyof typeof MrpRevisionRowOutcome];
+
+
+export const MrpRevisionRowOutcome = {
+  change: 'change',
+  noop: 'noop',
+  rejected: 'rejected',
+} as const;
+
+export interface MrpRevisionRow {
+  id: number;
+  rowNumber: number;
+  /** @nullable */
+  itemCode?: string | null;
+  /** @nullable */
+  effectiveDate?: string | null;
+  variant: string;
+  /** @nullable */
+  competitor?: string | null;
+  /** @nullable */
+  targetRowId?: number | null;
+  /** @nullable */
+  previousValue?: number | null;
+  /** @nullable */
+  newValue?: number | null;
+  /** @nullable */
+  note?: string | null;
+  outcome: MrpRevisionRowOutcome;
+  /** @nullable */
+  rejectionReason?: string | null;
+  /** @nullable */
+  warningReasons?: string | null;
+}
+
+export type MrpRevisionPreviewTargetType = typeof MrpRevisionPreviewTargetType[keyof typeof MrpRevisionPreviewTargetType];
+
+
+export const MrpRevisionPreviewTargetType = {
+  mrp: 'mrp',
+  competitor: 'competitor',
+} as const;
+
+export interface MrpRevisionPreview {
+  batchId: number;
+  targetType: MrpRevisionPreviewTargetType;
+  /** @nullable */
+  competitor?: string | null;
+  /** @nullable */
+  effectiveDate?: string | null;
+  fileName: string;
+  fileSha256: string;
+  rowsInFile: number;
+  rowsChanged: number;
+  rowsNoop: number;
+  rowsRejected: number;
+  warningCount: number;
+  rows: MrpRevisionRow[];
+}
+
+export type MrpRevisionDetailBatch = { [key: string]: unknown };
+
+export interface MrpRevisionDetail {
+  batch: MrpRevisionDetailBatch;
+  rows: MrpRevisionRow[];
+}
+
+export interface ApplyMrpRevisionInput {
+  acknowledgeWarnings: boolean;
+}
+
+export interface ApplyMrpRevisionResult {
+  batchId: number;
+  rowsChanged: number;
+  status: 'applied';
+}
+
+export interface RollbackMrpRevisionResult {
+  batchId: number;
+  rowsRolledBack: number;
+  status: 'rolled_back';
+}
+
 /**
  * Bearer session token (used by mobile clients).
  */

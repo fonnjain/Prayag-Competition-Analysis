@@ -1683,6 +1683,108 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogoutSuccess'
+  /catalog/mrp-revisions/preview:
+    post:
+      operationId: previewMrpRevision
+      tags: [catalog]
+      summary: Validate a revision workbook without changing prices
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/MrpRevisionPreviewInput"
+      responses:
+        "200":
+          description: Stored read-only revision preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRevisionPreview"
+        "400":
+          description: Invalid revision workbook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /catalog/mrp-revisions/{batchId}:
+    get:
+      operationId: getMrpRevision
+      tags: [catalog]
+      summary: Read a revision batch and its row outcomes
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revision batch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRevisionDetail"
+        "404":
+          description: Revision batch not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /catalog/mrp-revisions/{batchId}/apply:
+    post:
+      operationId: applyMrpRevision
+      tags: [catalog]
+      summary: Apply a stored revision preview to existing price rows
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyMrpRevisionInput"
+      responses:
+        "200":
+          description: Applied revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyMrpRevisionResult"
+        "409":
+          description: Warning acknowledgement, stale preview, or invalid lifecycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /catalog/mrp-revisions/{batchId}/rollback:
+    post:
+      operationId: rollbackMrpRevision
+      tags: [catalog]
+      summary: Restore exact previous values from an applied revision
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rolled-back revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RollbackMrpRevisionResult"
+        "409":
+          description: Revision cannot be rolled back
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -3691,6 +3793,126 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CompetitorBrandPeriod"
+    MrpRevisionPreviewInput:
+      type: object
+      required: [file, targetType, reason]
+      properties:
+        file:
+          type: string
+          format: binary
+        targetType:
+          type: string
+          enum: [mrp, competitor]
+        competitor:
+          type: string
+        effectiveDate:
+          type: string
+          format: date
+        reason:
+          type: string
+          minLength: 1
+    MrpRevisionRow:
+      type: object
+      required: [id, rowNumber, variant, outcome]
+      properties:
+        id:
+          type: integer
+        rowNumber:
+          type: integer
+        itemCode:
+          type: ["string", "null"]
+        effectiveDate:
+          type: ["string", "null"]
+          format: date
+        variant:
+          type: string
+        competitor:
+          type: ["string", "null"]
+        targetRowId:
+          type: ["integer", "null"]
+        previousValue:
+          type: ["number", "null"]
+        newValue:
+          type: ["number", "null"]
+        note:
+          type: ["string", "null"]
+        outcome:
+          type: string
+          enum: [change, noop, rejected]
+        rejectionReason:
+          type: ["string", "null"]
+        warningReasons:
+          type: ["string", "null"]
+    MrpRevisionPreview:
+      type: object
+      required: [batchId, targetType, fileName, fileSha256, rowsInFile, rowsChanged, rowsNoop, rowsRejected, warningCount, rows]
+      properties:
+        batchId:
+          type: integer
+        targetType:
+          type: string
+          enum: [mrp, competitor]
+        competitor:
+          type: ["string", "null"]
+        effectiveDate:
+          type: ["string", "null"]
+          format: date
+        fileName:
+          type: string
+        fileSha256:
+          type: string
+        rowsInFile:
+          type: integer
+        rowsChanged:
+          type: integer
+        rowsNoop:
+          type: integer
+        rowsRejected:
+          type: integer
+        warningCount:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpRevisionRow"
+    MrpRevisionDetail:
+      type: object
+      required: [batch, rows]
+      properties:
+        batch:
+          type: object
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpRevisionRow"
+    ApplyMrpRevisionInput:
+      type: object
+      required: [acknowledgeWarnings]
+      properties:
+        acknowledgeWarnings:
+          type: boolean
+    ApplyMrpRevisionResult:
+      type: object
+      required: [batchId, rowsChanged, status]
+      properties:
+        batchId:
+          type: integer
+        rowsChanged:
+          type: integer
+        status:
+          type: string
+          const: applied
+    RollbackMrpRevisionResult:
+      type: object
+      required: [batchId, rowsRolledBack, status]
+      properties:
+        batchId:
+          type: integer
+        rowsRolledBack:
+          type: integer
+        status:
+          type: string
+          const: rolled_back
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

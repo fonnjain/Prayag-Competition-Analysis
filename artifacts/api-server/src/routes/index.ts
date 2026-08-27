@@ -12,6 +12,7 @@ import importBatchesRouter from "./importBatches";
 import priceFinderRouter from "./priceFinder";
 import catalogSyncRouter from "./catalogSync";
 import adminUsersRouter from "./adminUsers";
+import mrpRevisionRouter from "./mrpRevision";
 
 const router: IRouter = Router();
 
@@ -34,6 +35,7 @@ router.use(catalogRouter);
 router.use(catalogImportExportRouter);
 router.use(catalogSyncRouter);
 router.use(importBatchesRouter);
+router.use(mrpRevisionRouter);
 router.use(comparisonRouter);
 router.use(analysisRouter);
 

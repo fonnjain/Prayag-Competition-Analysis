@@ -15,6 +15,7 @@ import {
   Menu,
   Search,
   TrendingUp,
+  PencilLine,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/comparison", label: "Comparison", icon: BarChart2 },
   { href: "/mapping-review", label: "Mapping Review", icon: LinkIcon },
   { href: "/load-mrp", label: "Load MRP", icon: FileSpreadsheet },
+  { href: "/mrp-revisions", label: "Price Revisions", icon: PencilLine, adminOnly: true },
   { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
   { href: "/data-health", label: "Data Health", icon: Database },
   { href: "/api-keys", label: "API Keys", icon: Key, adminOnly: true },

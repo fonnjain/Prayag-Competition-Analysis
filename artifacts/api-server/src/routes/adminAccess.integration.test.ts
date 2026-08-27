@@ -38,6 +38,8 @@ describe("admin-only catalogue writes", () => {
       user.post("/catalog/load-mrp"),
       user.post("/catalog/sync/preflight"),
       user.post("/catalog/import-batches/999999/approve"),
+      user.post("/catalog/mrp-revisions/999999/apply"),
+      user.post("/catalog/mrp-revisions/999999/rollback"),
       user.post("/keys").send({ name: "not-allowed" }),
       user.patch("/catalog/products/TEST/mrp").send({ mrp: 100, reason: "test" }),
     ]);

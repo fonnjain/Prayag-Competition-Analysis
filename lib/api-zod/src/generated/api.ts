@@ -1684,3 +1684,108 @@ export const LogoutMobileSessionResponse = zod.object({
 })
 
 
+/**
+ * @summary Validate a revision workbook without changing prices
+ */
+
+
+
+export const PreviewMrpRevisionBody = zod.object({
+  "file": zod.instanceof(File),
+  "targetType": zod.enum(['mrp', 'competitor']),
+  "competitor": zod.string().optional(),
+  "effectiveDate": zod.coerce.date().optional(),
+  "reason": zod.string().min(1)
+})
+
+export const PreviewMrpRevisionResponse = zod.object({
+  "batchId": zod.number(),
+  "targetType": zod.enum(['mrp', 'competitor']),
+  "competitor": zod.string().nullish(),
+  "effectiveDate": zod.coerce.date().nullish(),
+  "fileName": zod.string(),
+  "fileSha256": zod.string(),
+  "rowsInFile": zod.number(),
+  "rowsChanged": zod.number(),
+  "rowsNoop": zod.number(),
+  "rowsRejected": zod.number(),
+  "warningCount": zod.number(),
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "rowNumber": zod.number(),
+  "itemCode": zod.string().nullish(),
+  "effectiveDate": zod.coerce.date().nullish(),
+  "variant": zod.string(),
+  "competitor": zod.string().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "outcome": zod.enum(['change', 'noop', 'rejected']),
+  "rejectionReason": zod.string().nullish(),
+  "warningReasons": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Read a revision batch and its row outcomes
+ */
+export const GetMrpRevisionParams = zod.object({
+  "batchId": zod.coerce.number()
+})
+
+export const GetMrpRevisionResponse = zod.object({
+  "batch": zod.object({
+
+}).passthrough(),
+  "rows": zod.array(zod.object({
+  "id": zod.number(),
+  "rowNumber": zod.number(),
+  "itemCode": zod.string().nullish(),
+  "effectiveDate": zod.coerce.date().nullish(),
+  "variant": zod.string(),
+  "competitor": zod.string().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "outcome": zod.enum(['change', 'noop', 'rejected']),
+  "rejectionReason": zod.string().nullish(),
+  "warningReasons": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Apply a stored revision preview to existing price rows
+ */
+export const ApplyMrpRevisionParams = zod.object({
+  "batchId": zod.coerce.number()
+})
+
+export const ApplyMrpRevisionBody = zod.object({
+  "acknowledgeWarnings": zod.boolean()
+})
+
+export const ApplyMrpRevisionResponse = zod.object({
+  "batchId": zod.number(),
+  "rowsChanged": zod.number(),
+  "status": zod.literal("applied")
+})
+
+
+/**
+ * @summary Restore exact previous values from an applied revision
+ */
+export const RollbackMrpRevisionParams = zod.object({
+  "batchId": zod.coerce.number()
+})
+
+export const RollbackMrpRevisionResponse = zod.object({
+  "batchId": zod.number(),
+  "rowsRolledBack": zod.number(),
+  "status": zod.literal("rolled_back")
+})
+
+

@@ -13,6 +13,7 @@ import MappingReviewPage from "@/pages/mapping-review";
 import ImportCompetitorPage from "@/pages/import-competitor";
 import ImportReviewPage from "@/pages/import-review";
 import ApiKeysPage from "@/pages/api-keys";
+import MrpRevisionsPage from "@/pages/mrp-revisions";
 import { useAuth, AuthProvider } from "@workspace/replit-auth-web";
 import { useEffect, useState } from "react";
 
@@ -111,6 +112,7 @@ function Router() {
       <Route path="/import-competitor" component={ImportCompetitorPage} />
       <Route path="/import-review/:id" component={ImportReviewPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
+      <Route path="/mrp-revisions" component={MrpRevisionsPage} />
       <Route component={NotFound} />
     </Switch>
   );
