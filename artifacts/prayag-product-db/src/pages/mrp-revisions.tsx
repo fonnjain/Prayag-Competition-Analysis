@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@workspace/replit-auth-web";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, RotateCcw, Upload } from "lucide-react";
+import { AlertTriangle, ArchiveX, CheckCircle2, FileSpreadsheet, RotateCcw, Upload } from "lucide-react";
 
 type RevisionRow = {
   id: number;
@@ -37,7 +37,7 @@ type RevisionPreview = {
   rowsNoop: number;
   rowsRejected: number;
   warningCount: number;
-  status?: "preview" | "applied" | "rolled_back";
+  status: "preview" | "applied" | "discarded" | "rolled_back";
   rows: RevisionRow[];
 };
 
@@ -66,6 +66,7 @@ export default function MrpRevisionsPage() {
   const [preview, setPreview] = useState<RevisionPreview | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -95,7 +96,7 @@ export default function MrpRevisionsPage() {
       const response = await fetch("/api/catalog/mrp-revisions/preview", { method: "POST", body });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not create revision preview.");
-      setPreview(data);
+      setPreview({ ...data, status: data.status ?? "preview" });
     } catch (error: any) {
       toast({ title: "Preview failed", description: error.message, variant: "destructive" });
     } finally {
@@ -105,6 +106,16 @@ export default function MrpRevisionsPage() {
 
   const applyPreview = async () => {
     if (!preview) return;
+    const confirmed = window.confirm([
+      "Apply this revision batch?",
+      "",
+      `Will change: ${preview.rowsChanged}`,
+      `No-op: ${preview.rowsNoop}`,
+      `Rejected: ${preview.rowsRejected}`,
+      "",
+      "Only rows marked Will change will be written.",
+    ].join("\n"));
+    if (!confirmed) return;
     setIsApplying(true);
     try {
       const response = await fetch(`/api/catalog/mrp-revisions/${preview.batchId}/apply`, {
@@ -115,12 +126,34 @@ export default function MrpRevisionsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not apply revision.");
       setPreview((current) => current ? { ...current, status: "applied" } : current);
-      queryClient.invalidateQueries({ queryKey: ["catalog"] });
+      queryClient.invalidateQueries();
       toast({ title: "Revision applied", description: `${data.rowsChanged} existing price row(s) were updated.` });
     } catch (error: any) {
       toast({ title: "Revision not applied", description: error.message, variant: "destructive" });
     } finally {
       setIsApplying(false);
+    }
+  };
+
+  const discardPreview = async () => {
+    if (!preview) return;
+    const confirmed = window.confirm([
+      "Discard this revision preview?",
+      "",
+      `${preview.rowsInFile} uploaded row(s) will remain viewable, but no price changes can be applied from this batch.`,
+    ].join("\n"));
+    if (!confirmed) return;
+    setIsDiscarding(true);
+    try {
+      const response = await fetch(`/api/catalog/mrp-revisions/${preview.batchId}/discard`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not discard revision.");
+      setPreview((current) => current ? { ...current, status: "discarded" } : current);
+      toast({ title: "Preview discarded", description: "The audited preview remains available below, and no prices were changed." });
+    } catch (error: any) {
+      toast({ title: "Preview not discarded", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDiscarding(false);
     }
   };
 
@@ -132,7 +165,7 @@ export default function MrpRevisionsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not roll back revision.");
       setPreview((current) => current ? { ...current, status: "rolled_back" } : current);
-      queryClient.invalidateQueries({ queryKey: ["catalog"] });
+      queryClient.invalidateQueries();
       toast({ title: "Revision rolled back", description: `${data.rowsRolledBack} prior value(s) were restored exactly.` });
     } catch (error: any) {
       toast({ title: "Rollback not performed", description: error.message, variant: "destructive" });
@@ -219,7 +252,7 @@ export default function MrpRevisionsPage() {
                 <p className="mt-1 font-mono text-xs text-muted-foreground">SHA-256 {preview.fileSha256}</p>
               </div>
               <div className="text-sm font-medium text-muted-foreground">
-                {preview.status === "applied" ? "Applied" : preview.status === "rolled_back" ? "Rolled back" : "Not applied"}
+                {preview.status === "applied" ? "Applied" : preview.status === "rolled_back" ? "Rolled back" : preview.status === "discarded" ? "Discarded" : "Not applied"}
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -235,6 +268,12 @@ export default function MrpRevisionsPage() {
                 </div>
               ))}
             </div>
+            <p className="mt-4 text-sm font-semibold text-foreground">
+              {preview.rowsInFile} rows · {preview.rowsChanged} will change · {preview.rowsNoop} no-ops · {preview.rowsRejected} rejected
+            </p>
+            {preview.rowsChanged === 0 && preview.rowsRejected === 0 && (
+              <p className="mt-1 text-sm text-emerald-700">All stored values already match the file. Nothing needs to be written.</p>
+            )}
             {preview.warningCount > 0 && (
               <Alert className="mt-5 border-amber-500/50 bg-amber-50 text-amber-950">
                 <AlertTriangle className="h-4 w-4 text-amber-700" />
@@ -250,10 +289,27 @@ export default function MrpRevisionsPage() {
                     <span>I reviewed the warnings and confirm these corrections are intentional.</span>
                   </label>
                 )}
-                <Button disabled={isApplying || preview.rowsChanged === 0 || (preview.warningCount > 0 && !acknowledged)} onClick={applyPreview}>
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  {preview.rowsChanged === 0 && (
+                    <p className="max-w-xs text-right text-xs text-muted-foreground">
+                      {preview.rowsRejected > 0
+                        ? `Nothing to apply: ${preview.rowsInFile} rows, ${preview.rowsNoop} no-ops, ${preview.rowsRejected} rejected.`
+                        : `Nothing to apply: ${preview.rowsInFile} rows, all no-ops.`}
+                    </p>
+                  )}
+                  <Button
+                    variant="outline"
+                    disabled={isApplying || isDiscarding}
+                    onClick={discardPreview}
+                  >
+                    <ArchiveX className="mr-2 h-4 w-4" />
+                    {isDiscarding ? "Discarding…" : "Discard"}
+                  </Button>
+                  <Button disabled={isApplying || isDiscarding || preview.rowsChanged === 0 || (preview.warningCount > 0 && !acknowledged)} onClick={applyPreview}>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   {isApplying ? "Applying…" : `Apply ${preview.rowsChanged} change${preview.rowsChanged === 1 ? "" : "s"}`}
-                </Button>
+                  </Button>
+                </div>
               </div>
             )}
             {preview.status === "applied" && (

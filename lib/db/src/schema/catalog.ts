@@ -247,7 +247,7 @@ export const mrpRevisionBatchesTable = pgTable(
     fileSizeBytes: integer("file_size_bytes").notNull(),
     uploadedBy: text("uploaded_by"),
     reason: text("reason"),
-    status: text("status").notNull().default("preview"), // preview | applied | rolled_back
+    status: text("status").notNull().default("preview"), // preview | applied | discarded | rolled_back
     warningAcknowledged: boolean("warning_acknowledged").notNull().default(false),
     rowsInFile: integer("rows_in_file").notNull().default(0),
     rowsChanged: integer("rows_changed").notNull().default(0),
@@ -258,6 +258,8 @@ export const mrpRevisionBatchesTable = pgTable(
     rolledBackAt: timestamp("rolled_back_at", { withTimezone: true }),
     appliedBy: text("applied_by"),
     rolledBackBy: text("rolled_back_by"),
+    discardedAt: timestamp("discarded_at", { withTimezone: true }),
+    discardedBy: text("discarded_by"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

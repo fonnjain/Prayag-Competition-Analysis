@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -63,6 +63,20 @@ function numberValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const LEGITIMATE_LOW_PRICE_CODES = new Set([
+  "EPT-01",
+  "126",
+  "126-SQ",
+  "PH-1",
+  "TTS-03",
+  "PH-2",
+  "TTS-01",
+  "137",
+  "TTS-02",
+  "311",
+  "302",
+]);
+
 export function parseRevisionWorkbook(
   buffer: Buffer,
   targetType: TargetType,
@@ -96,7 +110,7 @@ export function parseRevisionWorkbook(
 
   return rows.slice(1).map((row, index) => ({
     rowNumber: index + 2,
-    itemCode: textValue(row[codeCol]) ?? "",
+    itemCode: normCode(textValue(row[codeCol]) ?? ""),
     effectiveDate: dateValue(row[dateCol]),
     variant: textValue(row[variantCol]) ?? "Standard",
     competitor: targetType === "competitor" ? textValue(row[competitorCol]) : null,
@@ -109,7 +123,8 @@ function targetTypeValue(value: unknown): TargetType | null {
   return value === "mrp" || value === "competitor" ? value : null;
 }
 
-function warningFor(
+export function warningFor(
+  itemCode: string,
   division: string | null,
   previous: number,
   next: number,
@@ -118,7 +133,8 @@ function warningFor(
   if (
     next < 50 &&
     division &&
-    /PTMT|CP Fittings|Sanitaryware/i.test(division)
+    /PTMT|CP Fittings|Sanitaryware/i.test(division) &&
+    !LEGITIMATE_LOW_PRICE_CODES.has(normCode(itemCode))
   ) {
     warnings.push(`New value ₹${next} is below ₹50 for ${division}.`);
   }
@@ -255,7 +271,7 @@ router.post(
           }
           targetRow = mrpRows.find(
             (candidate) =>
-              candidate.itemCode === product.itemCode &&
+              normCode(candidate.itemCode) === normCode(product.itemCode) &&
               candidate.effectiveDate === row.effectiveDate &&
               candidate.variant === row.variant,
           );
@@ -288,8 +304,10 @@ router.post(
           continue;
         }
 
-        const warnings = warningFor(division, previous, row.newValue);
         const isNoop = previous === row.newValue;
+        const warnings = isNoop
+          ? []
+          : warningFor(row.itemCode, division, previous, row.newValue);
         if (isNoop) noop++;
         else {
           changed++;
@@ -360,6 +378,7 @@ router.post(
         effectiveDate: lockedDate,
         fileName: req.file.originalname,
         fileSha256,
+        status: "preview",
         rowsInFile: parsed.length,
         rowsChanged: changed,
         rowsNoop: noop,
@@ -401,6 +420,13 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
   }
   try {
     const applied = await db.transaction(async (tx) => {
+      // The status check and terminal transition must be serialized so an
+      // Apply and Discard request can never both win for the same preview.
+      await tx.execute(sql`
+        SELECT id FROM mrp_revision_batches
+        WHERE id = ${batchId}
+        FOR UPDATE
+      `);
       const batch = (await tx.select().from(mrpRevisionBatchesTable)
         .where(eq(mrpRevisionBatchesTable.id, batchId)).limit(1))[0];
       if (!batch) throw Object.assign(new Error("Revision batch not found."), { httpStatus: 404 });
@@ -411,11 +437,29 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
       const rows = await tx.select().from(mrpRevisionRowsTable)
         .where(and(eq(mrpRevisionRowsTable.batchId, batchId), eq(mrpRevisionRowsTable.outcome, "change")))
         .orderBy(asc(mrpRevisionRowsTable.id));
+      if (rows.length === 0) {
+        throw Object.assign(
+          new Error(
+            batch.rowsRejected > 0
+              ? `Nothing to apply: ${batch.rowsInFile} rows, ${batch.rowsNoop} no-ops, ${batch.rowsRejected} rejected.`
+              : `Nothing to apply: ${batch.rowsInFile} rows, all no-ops.`,
+          ),
+          { httpStatus: 409 },
+        );
+      }
       for (const row of rows) {
         if (!row.targetRowId || row.previousValue == null || row.newValue == null) {
           throw new Error(`Revision row ${row.rowNumber} is missing its target or values.`);
         }
         if (batch.targetType === "mrp") {
+          // Different previews can point to the same price row. Lock it before
+          // validating the previous value so a stale batch cannot overwrite a
+          // revision that committed while it was waiting.
+          await tx.execute(sql`
+            SELECT id FROM mrp_price_history
+            WHERE id = ${row.targetRowId}
+            FOR UPDATE
+          `);
           const current = (await tx.select({ id: mrpPriceHistoryTable.id, mrp: mrpPriceHistoryTable.mrp })
             .from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
           if (!current || current.mrp !== row.previousValue) {
@@ -437,6 +481,11 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
             mrp: row.newValue,
           });
         } else {
+          await tx.execute(sql`
+            SELECT id FROM competitor_prices
+            WHERE id = ${row.targetRowId}
+            FOR UPDATE
+          `);
           const current = (await tx.select({ id: competitorPricesTable.id, price: competitorPricesTable.price })
             .from(competitorPricesTable).where(eq(competitorPricesTable.id, row.targetRowId)).limit(1))[0];
           if (!current || current.price !== row.previousValue) {
@@ -466,6 +515,40 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
   }
 });
 
+router.post("/catalog/mrp-revisions/:batchId/discard", requireAdmin, async (req, res) => {
+  const batchId = Number(req.params.batchId);
+  if (!Number.isInteger(batchId)) {
+    res.status(400).json({ error: "batchId must be an integer." });
+    return;
+  }
+  try {
+    const discarded = await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        SELECT id FROM mrp_revision_batches
+        WHERE id = ${batchId}
+        FOR UPDATE
+      `);
+      const batch = (await tx.select().from(mrpRevisionBatchesTable)
+        .where(eq(mrpRevisionBatchesTable.id, batchId)).limit(1))[0];
+      if (!batch) throw Object.assign(new Error("Revision batch not found."), { httpStatus: 404 });
+      if (batch.status !== "preview") {
+        throw Object.assign(new Error(`Revision batch is already ${batch.status}.`), { httpStatus: 409 });
+      }
+      await tx.update(mrpRevisionBatchesTable).set({
+        status: "discarded",
+        discardedAt: new Date(),
+        discardedBy: userLabel(req),
+      }).where(eq(mrpRevisionBatchesTable.id, batchId));
+      return { batchId, status: "discarded" as const };
+    });
+    res.json(discarded);
+  } catch (error: any) {
+    const status = error.httpStatus ?? 500;
+    if (status >= 500) req.log.error({ err: error, batchId }, "MRP revision discard failed");
+    res.status(status).json({ error: error.message ?? "Could not discard revision." });
+  }
+});
+
 router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req, res) => {
   const batchId = Number(req.params.batchId);
   if (!Number.isInteger(batchId)) {
@@ -474,6 +557,11 @@ router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req
   }
   try {
     const rolledBack = await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        SELECT id FROM mrp_revision_batches
+        WHERE id = ${batchId}
+        FOR UPDATE
+      `);
       const batch = (await tx.select().from(mrpRevisionBatchesTable)
         .where(eq(mrpRevisionBatchesTable.id, batchId)).limit(1))[0];
       if (!batch) throw Object.assign(new Error("Revision batch not found."), { httpStatus: 404 });
@@ -484,6 +572,11 @@ router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req
       for (const row of rows) {
         if (!row.targetRowId || row.previousValue == null || row.newValue == null) throw new Error(`Revision row ${row.rowNumber} is incomplete.`);
         if (batch.targetType === "mrp") {
+          await tx.execute(sql`
+            SELECT id FROM mrp_price_history
+            WHERE id = ${row.targetRowId}
+            FOR UPDATE
+          `);
           const current = (await tx.select({ mrp: mrpPriceHistoryTable.mrp })
             .from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
           if (!current || current.mrp !== row.newValue) {
@@ -505,6 +598,11 @@ router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req
             mrp: row.previousValue,
           });
         } else {
+          await tx.execute(sql`
+            SELECT id FROM competitor_prices
+            WHERE id = ${row.targetRowId}
+            FOR UPDATE
+          `);
           const current = (await tx.select({ price: competitorPricesTable.price })
             .from(competitorPricesTable).where(eq(competitorPricesTable.id, row.targetRowId)).limit(1))[0];
           if (!current || current.price !== row.newValue) {

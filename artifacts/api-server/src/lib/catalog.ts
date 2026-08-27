@@ -85,5 +85,6 @@ export function normCode(s: unknown): string {
   return String(s ?? "")
     .trim()
     .toUpperCase()
-    .replace(/\s+/g, "");
+    .replace(/\s+/g, "")
+    .replace(/\.0$/, "");
 }
