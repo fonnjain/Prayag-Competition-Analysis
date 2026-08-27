@@ -18,6 +18,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/date-format";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -91,22 +92,12 @@ interface CatalogSyncPreview {
 
 function formatDate(value: string | null): string {
   if (!value) return "Not loaded";
-  return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDisplayDate(value);
 }
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "In progress";
-  return new Date(value).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value);
 }
 
 function SyncSummary({
@@ -666,7 +657,7 @@ export default function DataHealthPage() {
                   <tr key={`${row.itemCode}-${row.effectiveDate}`} className="border-t">
                     <td className="px-4 py-2 font-mono">{row.itemCode}</td>
                     <td className="px-4 py-2 text-muted-foreground">{row.productName ?? "—"}</td>
-                    <td className="px-4 py-2 font-mono">{row.effectiveDate}</td>
+                    <td className="px-4 py-2 font-mono">{formatDisplayDate(row.effectiveDate)}</td>
                     <td className="px-4 py-2 text-right font-mono">
                       {row.mrp == null ? "—" : `₹${row.mrp.toFixed(2)}`}
                     </td>

@@ -10,17 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Download, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatDisplayDate } from "@/lib/date-format";
 
 const PAGE_SIZE = 50;
-
-function discontinuationLabel(value: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00Z`));
-}
 interface InlineEditState {
   itemCode: string;
   mrp: string;
@@ -321,7 +313,7 @@ export default function CatalogPage() {
                       </Link>
                       {product.discontinuedFrom && (
                         <div className="mt-1 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-                          Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+                          Discontinued from {formatDisplayDate(product.discontinuedFrom)}
                         </div>
                       )}
                     </td>
@@ -329,7 +321,7 @@ export default function CatalogPage() {
                       <div>{product.productName}</div>
                       {product.discontinuedFrom && (
                         <span className="mt-1 inline-flex rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                          Discontinued from {discontinuationLabel(product.discontinuedFrom)}
+                          Discontinued from {formatDisplayDate(product.discontinuedFrom)}
                         </span>
                       )}
                     </td>
@@ -344,7 +336,7 @@ export default function CatalogPage() {
                       />
                     </td>
                     <td className="px-4 py-3 font-mono text-muted-foreground">
-                      {product.effectiveDate || "-"}
+                      {product.effectiveDate ? formatDisplayDate(product.effectiveDate) : "-"}
                     </td>
                   </tr>
                 ))

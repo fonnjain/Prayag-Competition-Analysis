@@ -5,6 +5,7 @@ import {
   getGetDiscountSettingsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatDisplayDateTime } from "@/lib/date-format";
 import {
   Card,
   CardContent,
@@ -84,7 +85,7 @@ export default function DiscountSettings() {
   };
 
   const lastUpdated = data?.updatedAt
-    ? new Date(data.updatedAt).toLocaleString()
+    ? formatDisplayDateTime(data.updatedAt)
     : "never";
 
   return (

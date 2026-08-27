@@ -18,6 +18,7 @@ import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { formatDisplayDate } from "@/lib/date-format";
 import {
   CheckCircle2,
   XCircle,
@@ -440,7 +441,7 @@ export default function ImportReviewPage() {
             Review Import — {batch.competitor}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {batch.sourceFileName} · w.e.f. {batch.effectiveDate} · Price basis:{" "}
+            {batch.sourceFileName} · w.e.f. {formatDisplayDate(batch.effectiveDate)} · Price basis:{" "}
             <span className="font-medium">{batch.priceBasis}{batch.gstPct != null ? ` + ${batch.gstPct}% GST` : ""}</span>
           </p>
           {(batch.fileSha256 || batch.model || batch.extractorVersion) && (

@@ -18,17 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronRight, TrendingUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDisplayDate } from "@/lib/date-format";
 
 function shortDate(value?: string | null): string {
-  if (!value) return "date unavailable";
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
+  return value ? formatDisplayDate(value) : "date unavailable";
 }
 
 function validityLabel(from?: string | null, to?: string | null): string | null {
@@ -268,7 +261,7 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
               <TableBody>
                 {data.prayagHistory.map((p) => (
                   <TableRow key={p.effectiveDate} className="text-xs">
-                    <TableCell className="py-1.5 font-mono">{p.effectiveDate}</TableCell>
+                    <TableCell className="py-1.5 font-mono">{formatDisplayDate(p.effectiveDate)}</TableCell>
                     <TableCell className="py-1.5 text-muted-foreground">{p.priceBasis ?? '—'}</TableCell>
                     <TableCell className="py-1.5 text-right font-medium">
                       {p.mrp != null ? `₹${p.mrp.toFixed(2)}` : '—'}
@@ -324,7 +317,7 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
                     <TableBody>
                       {comp.periods.map((p) => (
                         <TableRow key={p.effectiveDate} className="text-xs">
-                          <TableCell className="py-1.5 font-mono">{p.effectiveDate}</TableCell>
+                          <TableCell className="py-1.5 font-mono">{formatDisplayDate(p.effectiveDate)}</TableCell>
                           <TableCell className="py-1.5 text-right">
                             {p.price != null ? `₹${p.price.toFixed(2)}` : '—'}
                             {p.unit && <span className="text-muted-foreground ml-1">/{p.unit}</span>}

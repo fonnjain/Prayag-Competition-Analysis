@@ -19,6 +19,7 @@ import {
 import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, CalendarDays } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { formatDisplayDate } from "@/lib/date-format";
 
 import { OverviewCards } from "@/components/dashboard/OverviewCards";
 import { BrandComparison } from "@/components/dashboard/BrandComparison";
@@ -65,9 +66,9 @@ export default function Dashboard() {
       .filter((date): date is string => !!date),
   )].sort();
   const snapshotLabel = provenance?.snapshotDate
-    ? `Prayag MRP as of ${new Date(`${provenance.snapshotDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+    ? `Prayag MRP as of ${formatDisplayDate(provenance.snapshotDate)}`
     : sourceDates.length > 1
-      ? `Prayag MRP snapshots span ${new Date(`${sourceDates[0]}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}–${new Date(`${sourceDates.at(-1)}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+      ? `Prayag MRP snapshots span ${formatDisplayDate(sourceDates[0])}–${formatDisplayDate(sourceDates.at(-1))}`
       : null;
   // Mode rides along inside the filters object so every child hook + the export
   // URL pick it up automatically. "mrp" is the default and is omitted.

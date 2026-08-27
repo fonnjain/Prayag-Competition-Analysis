@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Zap, Download, Undo2, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/date-format";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,7 +58,7 @@ function formatBatchTime(iso: string): string {
   if (diffMin < 60) return `${diffMin} min ago`;
   const diffHr = Math.round(diffMin / 60);
   if (diffHr < 24) return `${diffHr} hr ago`;
-  return new Date(iso).toLocaleString();
+  return formatDisplayDateTime(iso);
 }
 
 function ConfidenceBadge({ confidence }: { confidence?: string | null }) {
@@ -673,7 +674,7 @@ export default function MappingReviewPage() {
                       </td>
                       <td className="px-4 py-3 font-medium">{row.competitor}</td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap font-mono text-xs">
-                        {row.effectiveDate ?? "—"}
+                        {formatDisplayDate(row.effectiveDate)}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{row.category || "-"}</td>
                       <td className="px-4 py-3 max-w-[250px] truncate" title={row.description || ""}>

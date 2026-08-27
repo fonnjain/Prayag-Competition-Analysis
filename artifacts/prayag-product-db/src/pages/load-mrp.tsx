@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Loader2, Pencil, Trash2, Upload, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatDisplayDate } from "@/lib/date-format";
 import {
   getGetCatalogProductsQueryKey,
   getGetCatalogDataHealthQueryKey,
@@ -112,7 +113,7 @@ export default function LoadMrpPage() {
       if (!response.ok) throw new Error(data.error || "Could not change the effective date.");
       toast({
         title: "MRP Effective Date Updated",
-        description: `${data.moved} ${data.moved === 1 ? "row" : "rows"} moved to ${data.effectiveDate}.`,
+        description: `${data.moved} ${data.moved === 1 ? "row" : "rows"} moved to ${formatDisplayDate(data.effectiveDate)}.`,
       });
       setEditingPeriodDate(null);
       queryClient.invalidateQueries({ queryKey: ["catalog", "mrp-periods"] });
@@ -261,7 +262,7 @@ export default function LoadMrpPage() {
       }
       toast({
         title: "Period Deleted",
-        description: `Removed all MRP prices for ${pendingDelete.effectiveDate}.`,
+        description: `Removed all MRP prices for ${formatDisplayDate(pendingDelete.effectiveDate)}.`,
       });
       queryClient.invalidateQueries({ queryKey: ["catalog", "mrp-periods"] });
       queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
@@ -332,12 +333,12 @@ export default function LoadMrpPage() {
                       type="date"
                       value={editedEffectiveDate}
                       onChange={(event) => setEditedEffectiveDate(event.target.value)}
-                      aria-label={`MRP effective date for ${period.effectiveDate}`}
+                      aria-label={`MRP effective date for ${formatDisplayDate(period.effectiveDate)}`}
                       className="h-8 w-40"
                       disabled={isUpdatingPeriodDate}
                     />
                   ) : (
-                    <span className="font-mono text-sm font-medium">{period.effectiveDate}</span>
+                    <span className="font-mono text-sm font-medium">{formatDisplayDate(period.effectiveDate)}</span>
                   )}
                   <span className="text-xs text-muted-foreground">
                     {period.count.toLocaleString()} item{period.count !== 1 ? "s" : ""}
@@ -376,7 +377,7 @@ export default function LoadMrpPage() {
                   title={
                     periods.length <= 1
                       ? "Cannot delete the only remaining period"
-                      : `Delete all prices for ${period.effectiveDate}`
+                      : `Delete all prices for ${formatDisplayDate(period.effectiveDate)}`
                   }
                   onClick={() => setPendingDelete(period)}
                 >
@@ -508,7 +509,7 @@ export default function LoadMrpPage() {
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
                 <div className="font-medium">{result.provenance.sourceDivision}</div>
                 <div className="mt-1 text-muted-foreground">
-                  Snapshot downloaded {result.provenance.downloadedAt} · SHA-256{" "}
+                  Snapshot downloaded {formatDisplayDate(result.provenance.downloadedAt)} · SHA-256{" "}
                   <code className="font-mono text-xs">{result.provenance.fileSha256}</code>
                 </div>
               </div>
@@ -868,11 +869,11 @@ export default function LoadMrpPage() {
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete MRP period {pendingDelete?.effectiveDate}?</AlertDialogTitle>
+            <AlertDialogTitle>Delete MRP period {formatDisplayDate(pendingDelete?.effectiveDate)}?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently remove all{" "}
               <strong>{pendingDelete?.count.toLocaleString()} price rows</strong> for effective date{" "}
-              <strong>{pendingDelete?.effectiveDate}</strong>. Current prices for each product are
+              <strong>{formatDisplayDate(pendingDelete?.effectiveDate)}</strong>. Current prices for each product are
               determined by the latest period on or before today — deleting this period may change
               which prices are active. This cannot be undone.
             </AlertDialogDescription>
@@ -901,7 +902,7 @@ export default function LoadMrpPage() {
             <AlertDialogTitle>Load the same snapshot again?</AlertDialogTitle>
             <AlertDialogDescription>
               This is byte-for-byte the file loaded on{" "}
-              <strong>{duplicateSnapshot?.loadedAt?.slice(0, 10)}</strong> for{" "}
+              <strong>{formatDisplayDate(duplicateSnapshot?.loadedAt)}</strong> for{" "}
               <strong>{duplicateSnapshot?.sourceDivision}</strong>. It has SHA-256{" "}
               <code>{duplicateSnapshot?.fileSha256}</code>. Loading it again will be
               recorded, but duplicate price rows will not be added.

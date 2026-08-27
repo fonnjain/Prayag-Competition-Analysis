@@ -1,16 +1,9 @@
 import { AlertTriangle, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { formatDisplayDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
 
 export function formatPriceDate(value?: string | null): string {
-  if (!value) return "date unavailable";
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
+  return value ? formatDisplayDate(value) : "date unavailable";
 }
 
 export function validityText(

@@ -3,6 +3,7 @@ import { useGetCatalogProduct, getGetCatalogProductQueryKey } from "@workspace/a
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { formatDisplayDate } from "@/lib/date-format";
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/product/:itemCode");
@@ -21,7 +22,7 @@ export default function ProductDetailPage() {
   }
 
   const chartData = [...data.history].reverse().map(h => ({
-    date: h.effectiveDate,
+    date: formatDisplayDate(h.effectiveDate),
     mrp: h.mrp
   }));
 
@@ -89,7 +90,7 @@ export default function ProductDetailPage() {
                 {data.history.map((row) => (
                   <tr key={row.id} className={`border-b last:border-0 ${row.isCurrent ? 'bg-primary/5' : ''}`}>
                     <td className="px-4 py-3 font-mono">
-                      {row.effectiveDate}
+                      {formatDisplayDate(row.effectiveDate)}
                       {row.isCurrent && (
                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-primary/20 text-primary">
                           CURRENT

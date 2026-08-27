@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@workspace/replit-auth-web";
+import { formatDisplayDate } from "@/lib/date-format";
 import { AlertTriangle, ArchiveX, CheckCircle2, FileSpreadsheet, RotateCcw, Upload } from "lucide-react";
 
 type RevisionRow = {
@@ -342,7 +343,7 @@ export default function MrpRevisionsPage() {
                       <tr key={row.id} className={row.outcome === "rejected" ? "bg-destructive/5" : warnings.length ? "bg-amber-50/70" : ""}>
                         <td className="px-4 py-3 font-mono text-xs">{row.rowNumber}</td>
                         <td className="px-4 py-3 font-mono">{row.itemCode ?? "—"}</td>
-                        <td className="px-4 py-3"><div>{row.effectiveDate ?? "—"}</div><div className="text-xs text-muted-foreground">{row.variant}</div></td>
+                        <td className="px-4 py-3"><div>{formatDisplayDate(row.effectiveDate)}</div><div className="text-xs text-muted-foreground">{row.variant}</div></td>
                         <td className="px-4 py-3">{money(row.previousValue)}</td>
                         <td className="px-4 py-3">{money(row.newValue)} {delta != null && <span className="ml-1 text-xs text-muted-foreground">({delta > 0 ? "+" : ""}{delta.toFixed(2)})</span>}</td>
                         <td className="max-w-sm px-4 py-3">

@@ -18,17 +18,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { formatDisplayDate } from "@/lib/date-format";
 import { PriceWindowDetails } from "@/components/price-window";
 
 const PAGE_SIZE = 50;
-
-function formatSnapshotDate(value: string): string {
-  return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 type ViewMode = "byProduct" | "byCompetitor";
 
@@ -115,7 +108,7 @@ function PendingRevisionNote({
       className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300 cursor-help"
     >
       <Clock3 className="w-3 h-3 shrink-0" />
-      <span>Confirmed price used · newer {effectiveDate} revision: {reviewStatus}</span>
+      <span>Confirmed price used · newer {formatDisplayDate(effectiveDate)} revision: {reviewStatus}</span>
     </div>
   );
 }
@@ -158,9 +151,9 @@ export default function ComparisonPage() {
       .filter((date): date is string => !!date),
   )].sort();
   const snapshotLabel = provenance?.snapshotDate
-    ? `Prayag MRP as of ${formatSnapshotDate(provenance.snapshotDate)}`
+    ? `Prayag MRP as of ${formatDisplayDate(provenance.snapshotDate)}`
     : sourceDates.length > 1
-      ? `Prayag MRP snapshots span ${formatSnapshotDate(sourceDates[0]!)}–${formatSnapshotDate(sourceDates.at(-1)!)}`
+      ? `Prayag MRP snapshots span ${formatDisplayDate(sourceDates[0]!)}–${formatDisplayDate(sourceDates.at(-1)!)}`
       : null;
   
   const { data: summaryData, isLoading: summaryLoading } = useGetComparisonSummary({

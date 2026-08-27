@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { PriceWindowDetails } from "@/components/price-window";
+import { formatPriceDate, PriceWindowDetails } from "@/components/price-window";
 import { buildSpokenPriceSummary } from "@/lib/priceSpeech";
 import { getPriceFinderSearchDisplay } from "@/lib/priceFinderSearchState";
 import { useSelection } from "@/lib/useSelection";
@@ -1193,7 +1193,7 @@ function ProductView({
               {product.category && <span>• {product.category}</span>}
               {product.discontinuedFrom && (
                 <span className="rounded bg-destructive/10 px-2 py-0.5 text-destructive font-semibold">
-                  Discontinued from {new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${product.discontinuedFrom}T00:00:00`))}
+                  Discontinued from {formatPriceDate(product.discontinuedFrom)}
                 </span>
               )}
             </div>
@@ -1342,15 +1342,9 @@ function ProductView({
 
 function DiscontinuationBadge({ value }: { value: string | null | undefined }) {
   if (!value) return null;
-  const label = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00Z`));
   return (
     <span className="inline-flex rounded bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive mt-1">
-      Discontinued from {label}
+      Discontinued from {formatPriceDate(value)}
     </span>
   );
 }

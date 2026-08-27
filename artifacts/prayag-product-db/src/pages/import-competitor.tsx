@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatDisplayDate } from "@/lib/date-format";
 import {
   useGetComparisonFilters,
   useDeleteCatalogCompetitor,
@@ -48,15 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 function formatDate(iso: string): string {
-  try {
-    return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDisplayDate(iso);
 }
 
 interface SparshMasterPeriodDraft {
@@ -465,7 +458,7 @@ export default function ImportCompetitorPage() {
           title: "Upload Successful",
           description: importedPeriods
             ? `Imported ${data.results.inserted} verified rows for ${data.results.competitor} across ${importedPeriods.map((period) => formatDate(period.effectiveDate)).join(" and ")}.`
-            : `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${effectiveDate}).`,
+            : `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${formatDate(effectiveDate)}).`,
         });
         invalidateComparisonQueries();
 
@@ -750,7 +743,7 @@ export default function ImportCompetitorPage() {
           ) : (
             <p className="text-sm text-muted-foreground">
               Effective date:{" "}
-              <span className="font-mono font-medium">{effectiveDate}</span>
+              <span className="font-mono font-medium">{formatDate(effectiveDate)}</span>
             </p>
           )}
 

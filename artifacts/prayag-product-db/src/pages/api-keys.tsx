@@ -7,7 +7,7 @@ import {
   getGetApiKeysQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/date-format";
 import {
   Key,
   Plus,
@@ -327,10 +327,10 @@ export default function ApiKeysPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {format(new Date(k.createdAt), "MMM d, yyyy")}
+                      {formatDisplayDate(k.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {k.lastUsedAt ? format(new Date(k.lastUsedAt), "MMM d, yyyy HH:mm") : "Never"}
+                      {k.lastUsedAt ? formatDisplayDateTime(k.lastUsedAt) : "Never"}
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       {k.isActive && (
