@@ -1,0 +1,125 @@
+# Replit Prompt — Fix the Price Revision Upload Screen
+
+The period guard works — it correctly rejected 343 rows whose date did not match the selection. But it fired because the operator could not read what they were selecting. Three problems, and the first caused the other two.
+
+---
+
+## 1. The period dropdown is unreadable
+
+It currently renders:
+
+```
+01-09-2026 · CP Fittings / Faucets | PTMT & Plastic Fittings / CP Fittings /
+Faucets | PTMT & Plastic Fittings | Pipes & Fittings / Ceramic Sanitaryware |
+PTMT & Plastic Fittings · 2,148 rows · currently open-ended
+```
+
+The label is joining **every distinct division combination** present in the period. Because a code can belong to more than one division — `CP Fittings / Faucets | PTMT & Plastic Fittings` is a single code's value — the concatenation multiplies out into a string nobody can read, and it overflows the control.
+
+Nobody can pick the right period from that. The operator chose `2026-09-01` when they meant `2026-03-05`, and all 343 rows were rejected as a result.
+
+**Make the option label short and unambiguous:**
+
+```
+05 Mar 2026 · 2,167 rows
+01 Sep 2026 · 2,148 rows
+01 Feb 2026 · 2,244 rows
+```
+
+Name a division only when the period belongs to exactly one. If a period spans several, write `multiple divisions` — never a list.
+
+### The date format is a second hazard
+
+Three formats appear on one screen: `01-09-2026` in the dropdown, `05-03-2026` in the table, `2026-03-05` in the error text. `01-09-2026` can be read as 1 September or 9 January.
+
+Use one unambiguous format everywhere on this page — **`05 Mar 2026`**, with the month as letters. Numeric day-month ordering has no place on a screen whose entire purpose is choosing between periods.
+
+---
+
+## 2. The scope box repeats the same unreadable string
+
+Below the dropdown, "Selected revision scope" prints the same concatenation again.
+
+Replace it with structured lines:
+
+```
+Period            05 Mar 2026
+Rows in period    2,167
+Divisions         PTMT & Plastic Fittings (1,983) · CP Fittings / Faucets (120) · …
+In force until    31 Aug 2026
+```
+
+Show the top three divisions by row count and a count of any remainder. The operator needs to recognise the period, not read an inventory of it.
+
+---
+
+## 3. The layout overflows
+
+The page scrolls horizontally, content sits underneath the top navigation, and the summary cards are cut off — "No-op 0" and "Rejected 343" are only partly visible.
+
+The cause is the unbounded strings above forcing the container wider than the viewport. Fixing the labels will resolve most of it, but constrain the containers as well so no future value can break the layout. Long text truncates with an ellipsis and a tooltip; it does not stretch the page.
+
+Verify at a normal laptop width, and on a tablet — this is used at a counter.
+
+---
+
+## 4. "Current" shows a dash on rejected rows
+
+Every rejected row shows `—` under CURRENT. The product exists and has a price; it simply has it at a different date from the one selected.
+
+For a date-mismatch rejection, look up and show the current value **at the row's own date**, labelled so the distinction is clear:
+
+```
+101   05 Mar 2026   ₹112.20 (at 05 Mar)   →   ₹112
+      Rejected · row date 05 Mar 2026 does not match selected period 01 Sep 2026
+```
+
+That single change would have made the mistake obvious immediately — the operator would have seen real prices sitting at March and realised they had picked September.
+
+Where a row is rejected because the **code** does not exist, `—` is correct. Reserve it for that case.
+
+---
+
+## 5. Offer the fix when every row mismatches
+
+343 of 343 rejected for the same reason is not 343 problems. It is one wrong selection.
+
+When every row shares a single mismatching date, say so at the top and offer the correction directly:
+
+> All 343 rows are dated **05 Mar 2026**, but **01 Sep 2026** is selected.
+> [ Switch to 05 Mar 2026 and preview again ]
+
+Do not switch automatically. The operator confirms — but they should not have to re-upload the file to recover from a dropdown mistake.
+
+---
+
+## Acceptance tests
+
+```
+1.  Each dropdown option fits on one line and shows date and row count only.
+2.  A period spanning several divisions reads "multiple divisions", not a list.
+3.  Every date on the page renders as "05 Mar 2026" — no numeric day-month form.
+4.  The scope box shows structured lines, not a concatenated string.
+5.  No horizontal page scroll at 1366px width; nothing sits under the top nav.
+6.  Summary cards are fully visible without scrolling sideways.
+7.  A row rejected for a date mismatch shows the current value at its own date,
+    labelled; a row rejected for a missing code shows a dash.
+8.  When all rows share one mismatching date, a banner states it and offers to
+    switch periods, without switching on its own.
+9.  The 343-row file with 05 Mar 2026 selected previews as 343 will-change,
+    0 rejected.
+```
+
+Test 9 is the end state. If it does not reach that, report what is still rejecting rather than adjusting the counts.
+
+---
+
+## Report
+
+- The dropdown option labels as they now render, all of them.
+- The scope box for 05 Mar 2026.
+- Preview result for the 343-row file with 05 Mar 2026 selected.
+- What a deliberate mismatch now shows — same file against 01 Sep 2026.
+- Confirmation of no horizontal overflow at laptop and tablet widths.
+
+One clean commit.
