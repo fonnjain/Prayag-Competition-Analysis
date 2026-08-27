@@ -1,0 +1,110 @@
+# Replit Prompt — Choose the Effective Period on the Revision Form
+
+The form reads the effective date per row from the workbook. That works, but it means the operator never states which period they intend to change — they find out afterwards, from the preview.
+
+Add an explicit period selector, and make it a **guard rather than an override**.
+
+---
+
+## Why a guard, not an override
+
+Every serious data incident on this project has been a price landing in the wrong period:
+
+- The phantom `2026-04-20` — 930 rows of September prices under an April date
+- Batch 154 — 1,828 rows stamped with the upload date
+- Competitor imports defaulting an unparseable date to today
+
+If the form could **override** the workbook's dates, a March correction file could be applied to the September period with one wrong dropdown selection. That is the same failure again, with a nicer interface.
+
+So the selector states the intended target, and the workbook must agree with it. Disagreement is an error, not something to resolve silently.
+
+---
+
+## 1. The selector
+
+A dropdown of **existing periods only**. Never a free date field — a typed date is how impossible and unintended dates get in, and this tool must not be able to reach a period that does not exist.
+
+Populate it from the distinct `effective_date` values actually present, with enough context to choose correctly:
+
+```
+2026-03-05  ·  PTMT & Plastic Fittings  ·  2,167 rows
+2026-09-01  ·  PTMT & Plastic Fittings  ·  2,148 rows
+2026-02-01  ·  Pipes & Fittings         ·  2,244 rows
+2026-08-01  ·  CP Fittings / Faucets    ·  1,071 rows
+```
+
+A bare date is not enough. `2026-03-05` and `2026-09-01` look alike in a dropdown and mean entirely different things.
+
+Required before preview. No default selection — an operator should choose, not accept whatever was first in the list.
+
+---
+
+## 2. The workbook must agree
+
+Once a period is selected:
+
+- A row whose `effective_date` matches the selection is processed as now.
+- A row whose `effective_date` **differs** is rejected, with the reason naming both dates: *"Row date 2026-09-01 does not match the selected period 2026-03-05."*
+- A workbook with **no** `effective_date` column applies every row to the selected period. That is the one case where the selection supplies the date rather than checking it, and it is safe because there is nothing to contradict.
+
+Summarise mismatches at the top of the preview rather than only per row. A file where every row is rejected for a date mismatch is almost certainly the wrong file, and the operator should see that immediately rather than scrolling 343 rows.
+
+---
+
+## 3. Confirm the scope before upload
+
+Once a period is chosen, show what it contains before any file is processed — division, row count, and the date the period runs until where a later period exists:
+
+> **2026-03-05 · PTMT & Plastic Fittings · 2,167 rows · in force until 2026-08-31**
+
+That last part matters. Someone correcting a period that ended months ago is doing something different from someone correcting the period currently in force, and the form should make which one obvious.
+
+---
+
+## 4. Competitor revisions
+
+The same, with **competitor and period selected together**. A competitor revision must not be able to reach another brand's rows, so the selector should be scoped: choose Sparsh Pearl, then choose from Sparsh Pearl's periods only.
+
+---
+
+## 5. The immediate use
+
+The current file is 343 Prayag rows, all at `2026-03-05`, rounding values to whole rupees to match the 01 Sep convention. With the selector in place: choose `2026-03-05`, upload, and every row should match.
+
+If any row reports a date mismatch on that file, the selector or the parser is wrong — the file is uniform.
+
+---
+
+## Acceptance tests
+
+```
+1.  The period dropdown lists only effective dates that exist in the database.
+2.  There is no free-text date entry anywhere on the form.
+3.  Preview is blocked until a period is selected.
+4.  A row dated 2026-09-01 uploaded against the selected 2026-03-05 is rejected,
+    with both dates named in the message.
+5.  A workbook with no effective_date column applies all rows to the selected
+    period.
+6.  A workbook whose rows all mismatch shows a summary at the top, not only
+    343 individual rejections.
+7.  The selected period's division, row count and end date are shown before
+    a file is processed.
+8.  A competitor revision can only select periods belonging to the chosen
+    competitor.
+9.  The 343-row file at 2026-03-05, with 2026-03-05 selected, previews as
+    343 will-change and 0 rejected.
+10. No period is created by any path through this form.
+```
+
+Test 10 is the invariant. The selector exists to make the target explicit, not to widen what the tool can reach.
+
+---
+
+## Report
+
+- The periods offered in the dropdown, with their context strings.
+- Preview result for the 343-row file with `2026-03-05` selected.
+- What a deliberate mismatch produces — upload the same file against `2026-09-01` and report the message.
+- Confirmation that no period can be created or typed.
+
+One clean commit.

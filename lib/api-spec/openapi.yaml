@@ -1447,6 +1447,112 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /activity/events:
+    post:
+      tags: [activity]
+      operationId: recordActivityEvents
+      summary: Record batched authenticated workspace activity
+      description: Stores page visits, safe action labels, and active/idle heartbeats. Sensitive form values are never accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityEventsInput'
+      responses:
+        '202':
+          description: Events accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityEventsAccepted'
+        '400':
+          description: Invalid activity payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/activity/summary:
+    get:
+      tags: [admin]
+      operationId: getAdminActivitySummary
+      summary: Get daily activity totals for workspace users
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Inclusive workspace-local date in YYYY-MM-DD format.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Inclusive workspace-local date in YYYY-MM-DD format.
+          schema:
+            type: string
+            format: date
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daily activity summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActivitySummaryList'
+        '400':
+          description: Invalid date range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/activity/detail:
+    get:
+      tags: [admin]
+      operationId: getAdminActivityDetail
+      summary: Get a user's sessions, pages, and actions for one day
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: true
+          description: Workspace-local date in YYYY-MM-DD format.
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Activity detail for the selected user and day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminActivityDetail'
+        '400':
+          description: Invalid date or user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/users/{id}:
     delete:
       tags: [admin]
@@ -3913,6 +4019,156 @@ components:
         status:
           type: string
           const: rolled_back
+    ActivityEventInput:
+      type: object
+      required: [eventId, sessionId, appSlug, eventType, occurredAt]
+      properties:
+        eventId:
+          type: string
+          minLength: 8
+          maxLength: 80
+        sessionId:
+          type: string
+          minLength: 8
+          maxLength: 80
+        appSlug:
+          type: string
+          minLength: 1
+          maxLength: 40
+        eventType:
+          type: string
+          enum: [session_start, session_end, heartbeat, page_view, action, state_change]
+        occurredAt:
+          type: string
+          format: date-time
+        pagePath:
+          type: ["string", "null"]
+          maxLength: 500
+        action:
+          type: ["string", "null"]
+          maxLength: 120
+        state:
+          type: ["string", "null"]
+          enum: [active, idle, null]
+        metadata:
+          type: ["object", "null"]
+          additionalProperties: false
+          description: Optional safe context; never include form values or credentials.
+    ActivityEventsInput:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/ActivityEventInput"
+    ActivityEventsAccepted:
+      type: object
+      required: [accepted]
+      properties:
+        accepted:
+          type: integer
+    AdminActivitySummary:
+      type: object
+      required: [activityDate, userId, userName, email, activeSeconds, idleSeconds, sessionCount, pageViewCount, actionCount]
+      properties:
+        activityDate:
+          type: string
+          format: date
+        userId:
+          type: string
+        userName:
+          type: string
+        email:
+          type: string
+        activeSeconds:
+          type: integer
+        idleSeconds:
+          type: integer
+        sessionCount:
+          type: integer
+        pageViewCount:
+          type: integer
+        actionCount:
+          type: integer
+        lastActivityAt:
+          type: ["string", "null"]
+          format: date-time
+    AdminActivitySummaryList:
+      type: object
+      required: [timezone, rows]
+      properties:
+        timezone:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminActivitySummary"
+    AdminActivitySession:
+      type: object
+      required: [id, appSlug, startedAt, lastSeenAt, activeSeconds, idleSeconds, lastState]
+      properties:
+        id:
+          type: string
+        appSlug:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: ["string", "null"]
+          format: date-time
+        activeSeconds:
+          type: integer
+        idleSeconds:
+          type: integer
+        lastState:
+          type: string
+        lastPagePath:
+          type: ["string", "null"]
+    AdminActivityEvent:
+      type: object
+      required: [eventId, appSlug, eventType, occurredAt]
+      properties:
+        eventId:
+          type: string
+        appSlug:
+          type: string
+        eventType:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        pagePath:
+          type: ["string", "null"]
+        action:
+          type: ["string", "null"]
+        state:
+          type: ["string", "null"]
+    AdminActivityDetail:
+      type: object
+      required: [timezone, activityDate, userId, sessions, events]
+      properties:
+        timezone:
+          type: string
+        activityDate:
+          type: string
+          format: date
+        userId:
+          type: string
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminActivitySession"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminActivityEvent"
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

@@ -18,3 +18,4 @@
 - [Catalog baseline audits](catalog-baseline-audits.md) — never force an MRP count target; reconcile documented invalid keys before deleting history.
 - [Source removal period semantics](source-removal-period-semantics.md) — same-period MRP does not negate REMOVED; only later prices prove reintroduction.
 - [CP observation preflight](cp-observation-preflight.md) — scanning every CP sheet still leaves eight restored codes with removal-only evidence; retain the manifest until resolved.
+- [Activity tracking accounting](activity-tracking-accounting.md) — charge elapsed time to the prior state; page/action events never advance the heartbeat cursor; protect app telemetry by role.

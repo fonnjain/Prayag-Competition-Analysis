@@ -140,7 +140,7 @@ function App() {
   if (isLegacyPriceFinderUrl) return <PriceFinderRedirect />;
 
   return (
-    <AuthProvider>
+    <AuthProvider appSlug="product-db">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

@@ -130,11 +130,11 @@ export default function Dashboard() {
         <ModeToggle mode={mode} onChange={setMode} />
         <div className="flex-1" />
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => handleExport("csv")} disabled={exportLoading}>
+          <Button variant="outline" size="sm" onClick={() => handleExport("csv")} disabled={exportLoading} data-activity="analysis.export_csv">
             <Download className="h-4 w-4 mr-2" />
             CSV
           </Button>
-          <Button size="sm" onClick={() => handleExport("xlsx")} disabled={exportLoading}>
+          <Button size="sm" onClick={() => handleExport("xlsx")} disabled={exportLoading} data-activity="analysis.export_excel">
             <Download className="h-4 w-4 mr-2" />
             Excel Export
           </Button>

@@ -1546,6 +1546,104 @@ export const CreateAdminUserBody = zod.object({
 
 
 /**
+ * Stores page visits, safe action labels, and active/idle heartbeats. Sensitive form values are never accepted.
+ * @summary Record batched authenticated workspace activity
+ */
+export const recordActivityEventsBodyEventsItemEventIdMin = 8;
+export const recordActivityEventsBodyEventsItemEventIdMax = 80;
+
+export const recordActivityEventsBodyEventsItemSessionIdMin = 8;
+export const recordActivityEventsBodyEventsItemSessionIdMax = 80;
+
+export const recordActivityEventsBodyEventsItemAppSlugMax = 40;
+
+export const recordActivityEventsBodyEventsItemPagePathMax = 500;
+
+export const recordActivityEventsBodyEventsItemActionMax = 120;
+
+export const recordActivityEventsBodyEventsMax = 50;
+
+
+
+export const RecordActivityEventsBody = zod.object({
+  "events": zod.array(zod.object({
+  "eventId": zod.string().min(recordActivityEventsBodyEventsItemEventIdMin).max(recordActivityEventsBodyEventsItemEventIdMax),
+  "sessionId": zod.string().min(recordActivityEventsBodyEventsItemSessionIdMin).max(recordActivityEventsBodyEventsItemSessionIdMax),
+  "appSlug": zod.string().min(1).max(recordActivityEventsBodyEventsItemAppSlugMax),
+  "eventType": zod.enum(['session_start', 'session_end', 'heartbeat', 'page_view', 'action', 'state_change']),
+  "occurredAt": zod.coerce.date(),
+  "pagePath": zod.string().max(recordActivityEventsBodyEventsItemPagePathMax).nullish(),
+  "action": zod.string().max(recordActivityEventsBodyEventsItemActionMax).nullish(),
+  "state": zod.union([zod.literal('active'),zod.literal('idle'),zod.literal(null)]).nullish(),
+  "metadata": zod.object({
+
+}).nullish().describe('Optional safe context; never include form values or credentials.')
+})).min(1).max(recordActivityEventsBodyEventsMax)
+})
+
+
+/**
+ * @summary Get daily activity totals for workspace users
+ */
+export const GetAdminActivitySummaryQueryParams = zod.object({
+  "from": zod.date().describe('Inclusive workspace-local date in YYYY-MM-DD format.'),
+  "to": zod.date().describe('Inclusive workspace-local date in YYYY-MM-DD format.'),
+  "userId": zod.coerce.string().optional()
+})
+
+export const GetAdminActivitySummaryResponse = zod.object({
+  "timezone": zod.string(),
+  "rows": zod.array(zod.object({
+  "activityDate": zod.coerce.date(),
+  "userId": zod.string(),
+  "userName": zod.string(),
+  "email": zod.string(),
+  "activeSeconds": zod.number(),
+  "idleSeconds": zod.number(),
+  "sessionCount": zod.number(),
+  "pageViewCount": zod.number(),
+  "actionCount": zod.number(),
+  "lastActivityAt": zod.coerce.date().nullish()
+}))
+})
+
+
+/**
+ * @summary Get a user's sessions, pages, and actions for one day
+ */
+export const GetAdminActivityDetailQueryParams = zod.object({
+  "userId": zod.coerce.string(),
+  "date": zod.date().describe('Workspace-local date in YYYY-MM-DD format.')
+})
+
+export const GetAdminActivityDetailResponse = zod.object({
+  "timezone": zod.string(),
+  "activityDate": zod.coerce.date(),
+  "userId": zod.string(),
+  "sessions": zod.array(zod.object({
+  "id": zod.string(),
+  "appSlug": zod.string(),
+  "startedAt": zod.coerce.date(),
+  "lastSeenAt": zod.coerce.date(),
+  "endedAt": zod.coerce.date().nullish(),
+  "activeSeconds": zod.number(),
+  "idleSeconds": zod.number(),
+  "lastState": zod.string(),
+  "lastPagePath": zod.string().nullish()
+})),
+  "events": zod.array(zod.object({
+  "eventId": zod.string(),
+  "appSlug": zod.string(),
+  "eventType": zod.string(),
+  "occurredAt": zod.coerce.date(),
+  "pagePath": zod.string().nullish(),
+  "action": zod.string().nullish(),
+  "state": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary Remove a user from the workspace
  */
 export const DeleteAdminUserParams = zod.object({

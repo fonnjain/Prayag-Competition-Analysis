@@ -109,6 +109,7 @@ function MrpCell({
             onClick={save}
             disabled={isPending}
             title="Save"
+            data-activity="catalog.save_mrp"
           >
             <Check className="h-3.5 w-3.5" />
           </Button>

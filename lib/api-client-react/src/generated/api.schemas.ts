@@ -1495,6 +1495,138 @@ export interface RollbackMrpRevisionResult {
   status: 'rolled_back';
 }
 
+export type ActivityEventInputEventType = typeof ActivityEventInputEventType[keyof typeof ActivityEventInputEventType];
+
+
+export const ActivityEventInputEventType = {
+  session_start: 'session_start',
+  session_end: 'session_end',
+  heartbeat: 'heartbeat',
+  page_view: 'page_view',
+  action: 'action',
+  state_change: 'state_change',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ActivityEventInputState = typeof ActivityEventInputState[keyof typeof ActivityEventInputState] | null;
+
+
+export const ActivityEventInputState = {
+  active: 'active',
+  idle: 'idle',
+} as const;
+
+/**
+ * Optional safe context; never include form values or credentials.
+ * @nullable
+ */
+export type ActivityEventInputMetadata = { [key: string]: unknown } | null;
+
+export interface ActivityEventInput {
+  /**
+     * @minLength 8
+     * @maxLength 80
+     */
+  eventId: string;
+  /**
+     * @minLength 8
+     * @maxLength 80
+     */
+  sessionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  appSlug: string;
+  eventType: ActivityEventInputEventType;
+  occurredAt: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  pagePath?: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  action?: string | null;
+  /** @nullable */
+  state?: ActivityEventInputState;
+  /**
+     * Optional safe context; never include form values or credentials.
+     * @nullable
+     */
+  metadata?: ActivityEventInputMetadata;
+}
+
+export interface ActivityEventsInput {
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  events: ActivityEventInput[];
+}
+
+export interface ActivityEventsAccepted {
+  accepted: number;
+}
+
+export interface AdminActivitySummary {
+  activityDate: string;
+  userId: string;
+  userName: string;
+  email: string;
+  activeSeconds: number;
+  idleSeconds: number;
+  sessionCount: number;
+  pageViewCount: number;
+  actionCount: number;
+  /** @nullable */
+  lastActivityAt?: string | null;
+}
+
+export interface AdminActivitySummaryList {
+  timezone: string;
+  rows: AdminActivitySummary[];
+}
+
+export interface AdminActivitySession {
+  id: string;
+  appSlug: string;
+  startedAt: string;
+  lastSeenAt: string;
+  /** @nullable */
+  endedAt?: string | null;
+  activeSeconds: number;
+  idleSeconds: number;
+  lastState: string;
+  /** @nullable */
+  lastPagePath?: string | null;
+}
+
+export interface AdminActivityEvent {
+  eventId: string;
+  appSlug: string;
+  eventType: string;
+  occurredAt: string;
+  /** @nullable */
+  pagePath?: string | null;
+  /** @nullable */
+  action?: string | null;
+  /** @nullable */
+  state?: string | null;
+}
+
+export interface AdminActivityDetail {
+  timezone: string;
+  activityDate: string;
+  userId: string;
+  sessions: AdminActivitySession[];
+  events: AdminActivityEvent[];
+}
+
 /**
  * Bearer session token (used by mobile clients).
  */
@@ -1994,6 +2126,26 @@ category?: string;
  */
 effectivePeriod?: string;
 limit?: number;
+};
+
+export type GetAdminActivitySummaryParams = {
+/**
+ * Inclusive workspace-local date in YYYY-MM-DD format.
+ */
+from: string;
+/**
+ * Inclusive workspace-local date in YYYY-MM-DD format.
+ */
+to: string;
+userId?: string;
+};
+
+export type GetAdminActivityDetailParams = {
+userId: string;
+/**
+ * Workspace-local date in YYYY-MM-DD format.
+ */
+date: string;
 };
 
 export type BeginBrowserLoginParams = {

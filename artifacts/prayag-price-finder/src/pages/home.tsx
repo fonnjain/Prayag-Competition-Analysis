@@ -540,7 +540,7 @@ export default function PriceFinderPage() {
           )}
           {codes.length ? (
             <Link href={`/comparison?${new URLSearchParams(codes.map((code) => ["code", code])).toString()}`}>
-              <Button type="button" size="sm">Compare selected</Button>
+              <Button type="button" size="sm" data-activity="price_finder.compare_selected">Compare selected</Button>
             </Link>
           ) : (
             <Button type="button" size="sm" disabled>Compare selected</Button>

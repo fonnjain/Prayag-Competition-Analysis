@@ -490,7 +490,7 @@ export default function ImportCompetitorPage() {
       </div>
 
       <div className="bg-card border rounded-lg p-6">
-        <form onSubmit={handleUpload} className="space-y-6">
+        <form data-activity="competitor_import.upload" onSubmit={handleUpload} className="space-y-6">
           {/* Brand + Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">

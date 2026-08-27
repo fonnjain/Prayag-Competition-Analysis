@@ -22,6 +22,7 @@ import {
   getListAdminUsersQueryKey,
 } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
+import { ActivityPanel } from "@/components/activity-panel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
+        <form data-activity="admin.create_user" onSubmit={submit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">First name</label>
@@ -231,7 +232,7 @@ function ResetPasswordDialog({ user, onClose }: { user: AdminUser; onClose: () =
               </button>
             </div>
           ) : (
-            <form onSubmit={submit} className="space-y-4">
+            <form data-activity="admin.reset_user_password" onSubmit={submit} className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Set a new password for <strong>{displayName(user)}</strong>.
               </p>
@@ -324,6 +325,7 @@ function DeleteDialog({ user, onClose }: { user: AdminUser; onClose: () => void 
           </button>
           <button
             onClick={confirm}
+            data-activity="admin.remove_user"
             disabled={del.isPending}
             className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
           >
@@ -485,6 +487,7 @@ export default function AdminPage() {
           </div>
           <button
             onClick={() => setShowAdd(true)}
+            data-activity="admin.open_create_user"
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <UserPlus className="w-4 h-4" />
@@ -577,6 +580,8 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+        <ActivityPanel users={users} />
 
         {/* Legend */}
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground space-y-1">

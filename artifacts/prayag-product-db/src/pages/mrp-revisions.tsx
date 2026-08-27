@@ -197,7 +197,7 @@ export default function MrpRevisionsPage() {
         </p>
       </div>
 
-      <form onSubmit={previewWorkbook} className="grid gap-5 rounded-xl border bg-card p-5 shadow-sm lg:grid-cols-[1fr_1fr]">
+      <form data-activity="mrp_revision.preview" onSubmit={previewWorkbook} className="grid gap-5 rounded-xl border bg-card p-5 shadow-sm lg:grid-cols-[1fr_1fr]">
         <div className="space-y-2">
           <Label>Revision type</Label>
           <Select value={targetType} onValueChange={(value) => { setTargetType(value as "mrp" | "competitor"); setPreview(null); }}>
@@ -302,11 +302,12 @@ export default function MrpRevisionsPage() {
                     variant="outline"
                     disabled={isApplying || isDiscarding}
                     onClick={discardPreview}
+                    data-activity="mrp_revision.discard"
                   >
                     <ArchiveX className="mr-2 h-4 w-4" />
                     {isDiscarding ? "Discarding…" : "Discard"}
                   </Button>
-                  <Button disabled={isApplying || isDiscarding || preview.rowsChanged === 0 || (preview.warningCount > 0 && !acknowledged)} onClick={applyPreview}>
+                  <Button disabled={isApplying || isDiscarding || preview.rowsChanged === 0 || (preview.warningCount > 0 && !acknowledged)} onClick={applyPreview} data-activity="mrp_revision.apply">
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   {isApplying ? "Applying…" : `Apply ${preview.rowsChanged} change${preview.rowsChanged === 1 ? "" : "s"}`}
                   </Button>
@@ -315,7 +316,7 @@ export default function MrpRevisionsPage() {
             )}
             {preview.status === "applied" && (
               <div className="mt-5 flex justify-end border-t pt-5">
-                <Button variant="outline" disabled={isRollingBack} onClick={rollback}>
+                <Button variant="outline" disabled={isRollingBack} onClick={rollback} data-activity="mrp_revision.rollback">
                   <RotateCcw className="mr-2 h-4 w-4" />
                   {isRollingBack ? "Restoring…" : "Rollback this batch"}
                 </Button>

@@ -94,7 +94,7 @@ function Router() {
 
 function App() {
   return (
-    <AuthProvider>
+    <AuthProvider appSlug="home">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

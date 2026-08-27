@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { AuthUser } from '@workspace/api-client-react';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
+import { ActivityTracker } from "./activity-tracker";
 
 export type { AuthUser };
 
@@ -34,7 +35,13 @@ function deactivateBearer() { setAuthTokenGetter(null); }
 
 const AuthContext = createContext<AuthState | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  appSlug = "home",
+}: {
+  children: React.ReactNode;
+  appSlug?: string;
+}) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const fetchedRef = useRef(false);
@@ -104,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginWithPassword, logout }}>
+      <ActivityTracker user={user} appSlug={appSlug} />
       {children}
     </AuthContext.Provider>
   );

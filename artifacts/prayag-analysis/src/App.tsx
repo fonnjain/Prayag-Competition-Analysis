@@ -113,7 +113,7 @@ function Router() {
 
 function App() {
   return (
-    <AuthProvider>
+    <AuthProvider appSlug="analysis">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={200}>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

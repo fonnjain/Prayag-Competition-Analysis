@@ -397,7 +397,7 @@ export default function LoadMrpPage() {
 
       {/* Upload Form */}
       <div className="bg-card border rounded-lg p-6">
-        <form onSubmit={handleUpload} className="space-y-6">
+        <form data-activity="mrp_import.upload" onSubmit={handleUpload} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="file">Price Sheet (Excel / CSV / ZIP)</Label>
             <Input 

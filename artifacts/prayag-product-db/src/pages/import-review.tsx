@@ -524,11 +524,11 @@ export default function ImportReviewPage() {
       {/* Action bar */}
       {!isAlreadyDone && (
         <div className="flex items-center gap-3 flex-wrap">
-          <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2">
+          <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2" data-activity="competitor_import.approve">
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             Approve &amp; Commit ({toApprove} rows)
           </Button>
-          <Button variant="outline" onClick={handleDiscard} disabled={isApproving || isDiscarding} className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30">
+          <Button variant="outline" onClick={handleDiscard} disabled={isApproving || isDiscarding} className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30" data-activity="competitor_import.discard">
             {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
             Discard Batch
           </Button>
@@ -654,11 +654,11 @@ export default function ImportReviewPage() {
       {/* Bottom action bar (duplicate for long pages) */}
       {!isAlreadyDone && batch.rows.length > 6 && (
         <div className="flex items-center gap-3 flex-wrap pt-2 border-t">
-          <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2">
+          <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2" data-activity="competitor_import.approve">
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
             Approve &amp; Commit ({toApprove} rows)
           </Button>
-          <Button variant="outline" onClick={handleDiscard} disabled={isApproving || isDiscarding} className="gap-2 text-destructive hover:text-destructive border-destructive/30">
+          <Button variant="outline" onClick={handleDiscard} disabled={isApproving || isDiscarding} className="gap-2 text-destructive hover:text-destructive border-destructive/30" data-activity="competitor_import.discard">
             {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
             Discard Batch
           </Button>

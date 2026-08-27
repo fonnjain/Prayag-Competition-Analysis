@@ -98,7 +98,7 @@ export default function DiscountSettings() {
             Used only by the Net-to-Net comparison
           </p>
         </div>
-        <Button onClick={handleSave} disabled={update.isPending || hasErrors}>
+        <Button onClick={handleSave} disabled={update.isPending || hasErrors} data-activity="analysis.save_discounts">
           {update.isPending ? "Saving…" : "Save Changes"}
         </Button>
       </div>

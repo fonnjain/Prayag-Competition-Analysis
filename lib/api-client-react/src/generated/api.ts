@@ -23,6 +23,10 @@ import type {
   AcceptBatch,
   AcceptBatchDeleteResult,
   AcceptBatchList,
+  ActivityEventsAccepted,
+  ActivityEventsInput,
+  AdminActivityDetail,
+  AdminActivitySummaryList,
   AdminUser,
   AdminUserList,
   AnalysisBrandStat,
@@ -73,6 +77,8 @@ import type {
   ExternalGetComparisonParams,
   ExternalGetProductParams,
   ExternalListProductsParams,
+  GetAdminActivityDetailParams,
+  GetAdminActivitySummaryParams,
   GetAnalysisByBrandParams,
   GetAnalysisByCategoryParams,
   GetAnalysisCoverageMatrixParams,
@@ -4404,6 +4410,246 @@ export const useCreateAdminUser = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getCreateAdminUserMutationOptions(options));
     }
+
+export const getRecordActivityEventsUrl = () => {
+
+
+
+
+  return `/api/activity/events`
+}
+
+/**
+ * Stores page visits, safe action labels, and active/idle heartbeats. Sensitive form values are never accepted.
+ * @summary Record batched authenticated workspace activity
+ */
+export const recordActivityEvents = async (activityEventsInput: ActivityEventsInput, options?: RequestInit): Promise<ActivityEventsAccepted> => {
+
+  return customFetch<ActivityEventsAccepted>(getRecordActivityEventsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      activityEventsInput,)
+  }
+);}
+
+
+
+
+export const getRecordActivityEventsMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordActivityEvents>>, TError,{data: BodyType<ActivityEventsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordActivityEvents>>, TError,{data: BodyType<ActivityEventsInput>}, TContext> => {
+
+const mutationKey = ['recordActivityEvents'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordActivityEvents>>, {data: BodyType<ActivityEventsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordActivityEvents(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordActivityEventsMutationResult = NonNullable<Awaited<ReturnType<typeof recordActivityEvents>>>
+    export type RecordActivityEventsMutationBody = BodyType<ActivityEventsInput>
+    export type RecordActivityEventsMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Record batched authenticated workspace activity
+ */
+export const useRecordActivityEvents = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordActivityEvents>>, TError,{data: BodyType<ActivityEventsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordActivityEvents>>,
+        TError,
+        {data: BodyType<ActivityEventsInput>},
+        TContext
+      > => {
+      return useMutation(getRecordActivityEventsMutationOptions(options));
+    }
+
+export const getGetAdminActivitySummaryUrl = (params: GetAdminActivitySummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/activity/summary?${stringifiedParams}` : `/api/admin/activity/summary`
+}
+
+/**
+ * @summary Get daily activity totals for workspace users
+ */
+export const getAdminActivitySummary = async (params: GetAdminActivitySummaryParams, options?: RequestInit): Promise<AdminActivitySummaryList> => {
+
+  return customFetch<AdminActivitySummaryList>(getGetAdminActivitySummaryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminActivitySummaryQueryKey = (params?: GetAdminActivitySummaryParams,) => {
+    return [
+    `/api/admin/activity/summary`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminActivitySummaryQueryOptions = <TData = Awaited<ReturnType<typeof getAdminActivitySummary>>, TError = ErrorType<ErrorResponse>>(params: GetAdminActivitySummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminActivitySummaryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminActivitySummary>>> = ({ signal }) => getAdminActivitySummary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminActivitySummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminActivitySummary>>>
+export type GetAdminActivitySummaryQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get daily activity totals for workspace users
+ */
+
+export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof getAdminActivitySummary>>, TError = ErrorType<ErrorResponse>>(
+ params: GetAdminActivitySummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminActivitySummaryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAdminActivityDetailUrl = (params: GetAdminActivityDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/activity/detail?${stringifiedParams}` : `/api/admin/activity/detail`
+}
+
+/**
+ * @summary Get a user's sessions, pages, and actions for one day
+ */
+export const getAdminActivityDetail = async (params: GetAdminActivityDetailParams, options?: RequestInit): Promise<AdminActivityDetail> => {
+
+  return customFetch<AdminActivityDetail>(getGetAdminActivityDetailUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminActivityDetailQueryKey = (params?: GetAdminActivityDetailParams,) => {
+    return [
+    `/api/admin/activity/detail`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminActivityDetailQueryOptions = <TData = Awaited<ReturnType<typeof getAdminActivityDetail>>, TError = ErrorType<ErrorResponse>>(params: GetAdminActivityDetailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminActivityDetailQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminActivityDetail>>> = ({ signal }) => getAdminActivityDetail(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminActivityDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminActivityDetail>>>
+export type GetAdminActivityDetailQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a user's sessions, pages, and actions for one day
+ */
+
+export function useGetAdminActivityDetail<TData = Awaited<ReturnType<typeof getAdminActivityDetail>>, TError = ErrorType<ErrorResponse>>(
+ params: GetAdminActivityDetailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminActivityDetailQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getDeleteAdminUserUrl = (id: string,) => {
 

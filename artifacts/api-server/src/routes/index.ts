@@ -13,6 +13,7 @@ import priceFinderRouter from "./priceFinder";
 import catalogSyncRouter from "./catalogSync";
 import adminUsersRouter from "./adminUsers";
 import mrpRevisionRouter from "./mrpRevision";
+import activityRouter from "./activity";
 
 const router: IRouter = Router();
 
@@ -25,6 +26,7 @@ router.use(externalV1Router);
 
 // Public, read-only product prices. This router has no mutations.
 router.use(priceFinderRouter);
+router.use(activityRouter);
 
 // Internal routes: require a valid session
 router.use(requireAuth);
