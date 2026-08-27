@@ -97,6 +97,8 @@ export default function ImportCompetitorPage() {
   const brandPeriods = brandsData?.brandPeriods ?? [];
 
   const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
+  const isAuthoritativeSparshMaster =
+    !isPdf && /sparsh.*competitor.*master/i.test(file?.name ?? "");
 
   const invalidateComparisonQueries = () => {
     queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
@@ -201,7 +203,7 @@ export default function ImportCompetitorPage() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !competitor.trim() || !effectiveDate) return;
+    if (!file || !competitor.trim() || (!isAuthoritativeSparshMaster && !effectiveDate)) return;
 
     setIsUploading(true);
     setResult(null);
@@ -210,7 +212,7 @@ export default function ImportCompetitorPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("competitor", competitor.trim());
-    formData.append("effectiveDate", effectiveDate);
+    if (!isAuthoritativeSparshMaster) formData.append("effectiveDate", effectiveDate);
     formData.append("priceBasis", priceBasis);
     if (priceBasis === "Ex-GST") formData.append("gstPct", String(gstPct));
 
@@ -344,9 +346,14 @@ export default function ImportCompetitorPage() {
         if (!res.ok) throw new Error((data as any).error || "Failed to upload competitor file");
 
         setResult(data.results);
+        const importedPeriods = data.results.periods as
+          | { effectiveDate: string; inserted: number }[]
+          | undefined;
         toast({
           title: "Upload Successful",
-          description: `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${effectiveDate}).`,
+          description: importedPeriods
+            ? `Imported ${data.results.inserted} verified rows for ${data.results.competitor} across ${importedPeriods.map((period) => formatDate(period.effectiveDate)).join(" and ")}.`
+            : `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${effectiveDate}).`,
         });
         invalidateComparisonQueries();
 
@@ -409,10 +416,14 @@ export default function ImportCompetitorPage() {
                 type="date"
                 value={effectiveDate}
                 onChange={(e) => setEffectiveDate(e.target.value)}
-                required
+                required={!isAuthoritativeSparshMaster}
+                disabled={isAuthoritativeSparshMaster}
+                data-testid="input-competitor-effective-date"
               />
               <p className="text-xs text-muted-foreground">
-                The date from which these prices apply (w.e.f.).
+                {isAuthoritativeSparshMaster
+                  ? "This verified Sparsh master supplies both effective dates itself: 1 Apr 2024 and 1 Jul 2026."
+                  : "The date from which these prices apply (w.e.f.)."}
               </p>
             </div>
           </div>
@@ -483,7 +494,11 @@ export default function ImportCompetitorPage() {
                       : " Extraction takes ~30 seconds."}
                   </span>
                 ) : (
-                  <span>— will import directly</span>
+                  <span>
+                    {isAuthoritativeSparshMaster
+                      ? "— verified master detected; both dated Sparsh periods will be imported directly."
+                      : "— will import directly"}
+                  </span>
                 )}
               </div>
             )}
@@ -520,8 +535,14 @@ export default function ImportCompetitorPage() {
 
           <Button
             type="submit"
-            disabled={!file || !competitor.trim() || !effectiveDate || isUploading}
+            disabled={
+              !file ||
+              !competitor.trim() ||
+              (!isAuthoritativeSparshMaster && !effectiveDate) ||
+              isUploading
+            }
             className="w-full"
+            data-testid="button-import-competitor"
           >
             {isUploading ? (
               <>
@@ -550,10 +571,19 @@ export default function ImportCompetitorPage() {
             <FileUp className="w-5 h-5 text-primary" />
             Import Summary: {result.competitor}
           </h3>
-          <p className="text-sm text-muted-foreground">
-            Effective date:{" "}
-            <span className="font-mono font-medium">{effectiveDate}</span>
-          </p>
+          {Array.isArray(result.periods) ? (
+            <p className="text-sm text-muted-foreground" data-testid="text-import-master-periods">
+              Effective dates:{" "}
+              <span className="font-mono font-medium">
+                {result.periods.map((period: { effectiveDate: string }) => formatDate(period.effectiveDate)).join(" and ")}
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Effective date:{" "}
+              <span className="font-mono font-medium">{effectiveDate}</span>
+            </p>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="p-4 bg-muted/50 rounded-md">
