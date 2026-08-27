@@ -1,0 +1,136 @@
+# Replit Prompt — MRP Revision by Upload
+
+Build a way to correct already-loaded prices for an existing effective date, by uploading a spreadsheet. For Prayag MRP and for competitor prices.
+
+Every correction on this project so far has been a one-off SQL script and a bespoke prompt. That does not scale and it leaves each fix outside the normal audited path. This replaces that.
+
+Input file: `MRP_Revision_Upload_Template.xlsx` — both the format and the first real correction.
+
+---
+
+## 1. The constraint that makes this safe
+
+**This tool revises existing rows. It never creates a period, and never creates a product.**
+
+That single rule is what separates a correction tool from a second loader. It matters because of what this project has already seen:
+
+- A phantom `2026-04-20` period, 930 rows, September prices under an April date
+- Batch 154 — 1,828 rows dated the day of upload, silently overriding correct prices
+- Competitor imports defaulting an unparseable date to today
+
+Every one of those was a *period* appearing where none should exist. A tool that can only touch dates that already exist cannot repeat them.
+
+So:
+
+| Situation | Action |
+|---|---|
+| Code exists, date exists | Update the `mrp` |
+| Code exists, **date does not** | **Report. Do not insert.** |
+| Code **does not exist** | **Report. Do not create.** |
+| Blank `new_mrp` | **Reject the row.** Not a way to clear a price |
+
+If a genuinely new period needs loading, that is the MRP loader's job, with its own provenance and validation. Say so in the error rather than silently doing it here.
+
+**Only the codes present in the upload are touched.** Codes in that period but absent from the file are left alone — this is not "replace the whole period". If wholesale replacement is ever wanted, that is a different and far more dangerous operation, and it is not this one.
+
+---
+
+## 2. Preview, then apply
+
+Nothing writes on upload. Parse, validate, and show what would change:
+
+- Rows that will change, with **item code, effective date, variant, current value, new value, difference**
+- Rows where the new value equals the stored value — no-ops, counted separately
+- Rows rejected, with the reason per row
+- Totals: rows in file, will change, no-op, rejected
+
+The user applies from the preview. Nothing is written until then.
+
+**Flag before applying**, using the plausibility rules already built for the MRP loader:
+
+- Any new value below ₹50 in PTMT, CP or Sanitaryware
+- Any change above +60% or below −20% against the stored value
+- More than 20% of the period's rows changing in one upload
+
+Flagging is not blocking. Show the count prominently and require an explicit acknowledgement. A 343-row precision fix is legitimate; a 343-row change of a different kind may not be, and the person applying it should have to look.
+
+---
+
+## 3. Provenance and reversal
+
+Create a revision batch per upload, with the same discipline as `mrp_load_batches`:
+
+`file_sha256`, `file_name`, `uploaded_by`, `applied_at`, `reason`, `rows_changed`, `rows_rejected`.
+
+`rows_changed` records what the revision wrote — a historical fact, never updated afterwards. That principle is already established for load batches and applies identically here.
+
+**Store the previous value of every row changed**, against the revision batch. This is a bulk overwrite tool; without the prior values it is not reversible, and a bulk overwrite that cannot be undone should not exist.
+
+Provide a rollback that restores those previous values, and test it — do not merely write a runbook.
+
+Link each affected `mrp_price_history` row to the revision batch, so "why does this row differ from the workbook it came from" is answerable.
+
+---
+
+## 4. Competitor revisions
+
+Same mechanism, same constraints, against `competitor_prices`. The upload adds a `competitor` column; `item_code` holds the competitor's code.
+
+Scoped to a competitor **and** an effective date together. A revision must not be able to move a price between competitors or between periods.
+
+---
+
+## 5. Access
+
+**Admin only**, enforced server-side at the router with the existing `requireAdmin` pattern.
+
+This is the widest-reaching write in the application — wider than the catalogue importer, because it edits prices already in force. A `counter` or `user` session requesting the endpoint directly must receive 403, not a hidden menu item.
+
+---
+
+## 6. The first real use
+
+The template's `revision` sheet holds **343 Prayag corrections** at `2026-03-05`: values whose decimals were lost when the Competitor Master was rewritten. `170` should be 281.52 not 282, `135-N` should be 1527.55 not 1528.
+
+**Check before applying.** The application takes Prayag MRP from the six official workbooks, so these values may already be correct in the database — in which case the preview will show 343 no-ops and nothing to apply. That is a successful outcome and confirms the tool reports honestly.
+
+Run it in development first, then production. Report the preview counts from each.
+
+The `reference_do_not_upload` sheet is for human checking. The loader must read only the `revision` sheet.
+
+---
+
+## 7. Acceptance tests
+
+```
+1.  A row whose effective_date has no existing entry is rejected and reported,
+    with no row inserted.
+2.  A row whose item_code is not in catalog_products is rejected and reported,
+    with no product created.
+3.  A blank new_mrp is rejected.
+4.  Upload alone writes nothing; only Apply writes.
+5.  Applying the 343-row file changes only mrp values — row counts stay at
+    13,048 total, 12,750 Standard, 298 colour.
+6.  A row whose new value equals the stored value is reported as a no-op and
+    not written.
+7.  Previous values are stored, and rollback restores every changed row exactly.
+8.  A value below ₹50 in PTMT is flagged before apply.
+9.  An upload changing more than 20% of a period's rows is flagged.
+10. A non-admin session receives 403 from the revision endpoint.
+11. A competitor revision cannot change a row's competitor or effective_date.
+12. Codes in the period but absent from the upload are untouched.
+```
+
+Tests 1 and 12 define the tool. Test 1 stops it becoming a second loader; test 12 stops it becoming a period-wipe.
+
+---
+
+## 8. Report
+
+- Preview counts from development and production for the 343-row file: will change, no-op, rejected.
+- Whether the database already held the correct values — and say so plainly if it did.
+- Row counts before and after in both environments.
+- Confirmation that rollback was tested, not just written.
+- The revision batch record: hash, user, reason, rows changed.
+
+One clean commit.
