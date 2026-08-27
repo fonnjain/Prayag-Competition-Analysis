@@ -14,7 +14,11 @@ import {
   mrpHistoryProvenanceEventsTable,
   importBatchesTable,
 } from "@workspace/db";
-import { recomputeCurrentFlags, recomputeCompetitorCurrentFlags, normCode } from "../lib/catalog";
+import {
+  recomputeCurrentFlags,
+  recomputeCompetitorCurrentFlagsInTransaction,
+  normCode,
+} from "../lib/catalog";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
@@ -1696,17 +1700,30 @@ interface ParsedCompetitorRow {
 const SPARSH_MASTER_SHEET = "competitor_mapping";
 const SPARSH_MASTER_COMPETITOR = "Sparsh Pearl";
 const SPARSH_MASTER_ROW_COUNT = 150;
-const SPARSH_MASTER_PERIODS = [
-  { priceKey: "vol_4_8_mrp", dateKey: "vol_4_8_effective_from", effectiveDate: "2024-04-01" },
-  { priceKey: "vol_6_2_mrp", dateKey: "vol_6_2_effective_from", effectiveDate: "2026-07-01" },
+const SPARSH_MASTER_PERIOD_FIELDS = [
+  { key: "vol_4_8", label: "Vol 4.8", priceKey: "vol_4_8_mrp", dateKey: "vol_4_8_effective_from" },
+  { key: "vol_6_2", label: "Vol 6.2", priceKey: "vol_6_2_mrp", dateKey: "vol_6_2_effective_from" },
 ] as const;
+
+interface SparshMasterPeriod {
+  key: (typeof SPARSH_MASTER_PERIOD_FIELDS)[number]["key"];
+  label: (typeof SPARSH_MASTER_PERIOD_FIELDS)[number]["label"];
+  priceKey: (typeof SPARSH_MASTER_PERIOD_FIELDS)[number]["priceKey"];
+  dateKey: (typeof SPARSH_MASTER_PERIOD_FIELDS)[number]["dateKey"];
+  sourceEffectiveDate: string;
+}
 
 interface SparshMasterRow {
   prayagCode: string;
   description: string | null;
   series: string | null;
   competitorCode: string;
-  prices: Record<(typeof SPARSH_MASTER_PERIODS)[number]["effectiveDate"], number>;
+  prices: Record<string, number>;
+}
+
+interface SparshMasterParseResult {
+  rows: SparshMasterRow[];
+  periods: SparshMasterPeriod[];
 }
 
 /**
@@ -1718,7 +1735,7 @@ interface SparshMasterRow {
 export function parseSparshCompetitorMaster(
   workbook: XLSX.WorkBook,
   canonicalCodes: Map<string, string>,
-): SparshMasterRow[] | null {
+): SparshMasterParseResult | null {
   const sheet = workbook.Sheets[SPARSH_MASTER_SHEET];
   if (!sheet) return null;
 
@@ -1729,7 +1746,7 @@ export function parseSparshCompetitorMaster(
     "prayag_series",
     "competitor",
     "competitor_code",
-    ...SPARSH_MASTER_PERIODS.flatMap((period) => [period.priceKey, period.dateKey]),
+    ...SPARSH_MASTER_PERIOD_FIELDS.flatMap((period) => [period.priceKey, period.dateKey]),
   ];
   const headers = new Set(
     XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null })[0]
@@ -1745,6 +1762,27 @@ export function parseSparshCompetitorMaster(
     throw new Error(
       `Sparsh master must contain exactly ${SPARSH_MASTER_ROW_COUNT} mapping rows; found ${rows.length}.`,
     );
+  }
+
+  const periods = SPARSH_MASTER_PERIOD_FIELDS.map((period) => {
+    const dates = new Set(
+      rows
+        .map((row) => toDateStr(row[period.dateKey]))
+        .filter((date): date is string => Boolean(date)),
+    );
+    if (dates.size !== 1) {
+      throw new Error(
+        `Sparsh master must contain one consistent ${period.dateKey} value across all rows.`,
+      );
+    }
+    const sourceEffectiveDate = [...dates][0]!;
+    if (!isIsoDate(sourceEffectiveDate)) {
+      throw new Error(`Sparsh master has an invalid ${period.dateKey} value.`);
+    }
+    return { ...period, sourceEffectiveDate };
+  });
+  if (new Set(periods.map((period) => period.sourceEffectiveDate)).size !== periods.length) {
+    throw new Error("Sparsh master period dates must be distinct.");
   }
 
   const competitorCodes = new Set<string>();
@@ -1774,11 +1812,11 @@ export function parseSparshCompetitorMaster(
       throw new Error(`Sparsh master row ${rowNumber} duplicates a competitor or Prayag mapping code.`);
     }
 
-    const prices = {} as SparshMasterRow["prices"];
-    for (const period of SPARSH_MASTER_PERIODS) {
+    const prices: SparshMasterRow["prices"] = {};
+    for (const period of periods) {
       const effectiveDate = toDateStr(row[period.dateKey]);
       const price = Number(row[period.priceKey]);
-      if (effectiveDate !== period.effectiveDate) {
+      if (effectiveDate !== period.sourceEffectiveDate) {
         throw new Error(
           `Sparsh master row ${rowNumber} has an unexpected ${period.dateKey} value.`,
         );
@@ -1786,7 +1824,7 @@ export function parseSparshCompetitorMaster(
       if (!Number.isFinite(price) || price <= 0) {
         throw new Error(`Sparsh master row ${rowNumber} has an invalid ${period.priceKey} value.`);
       }
-      prices[period.effectiveDate] = price;
+      prices[period.sourceEffectiveDate] = price;
     }
 
     competitorCodes.add(competitorCodeKey);
@@ -1805,7 +1843,39 @@ export function parseSparshCompetitorMaster(
       `Sparsh master refers to Prayag code(s) that are not in the official catalog: ${missingPrayagCodes.join(", ")}.`,
     );
   }
-  return parsed;
+  return { rows: parsed, periods };
+}
+
+export function resolveSparshEffectiveDates(
+  periods: SparshMasterPeriod[],
+  rawOverrides: unknown,
+): string[] {
+  if (rawOverrides == null || rawOverrides === "") {
+    return periods.map((period) => period.sourceEffectiveDate);
+  }
+
+  let overrides: unknown = rawOverrides;
+  if (typeof rawOverrides === "string") {
+    try {
+      overrides = JSON.parse(rawOverrides);
+    } catch {
+      throw new Error("periodDates must be a JSON array of YYYY-MM-DD dates.");
+    }
+  }
+  if (!Array.isArray(overrides) || overrides.length !== periods.length) {
+    throw new Error(`periodDates must contain exactly ${periods.length} effective date(s).`);
+  }
+
+  const effectiveDates = overrides.map((value, index) => {
+    if (typeof value !== "string" || !isIsoDate(value)) {
+      throw new Error(`periodDates[${index}] must be a valid calendar date (YYYY-MM-DD).`);
+    }
+    return value;
+  });
+  if (new Set(effectiveDates).size !== effectiveDates.length) {
+    throw new Error("Each Sparsh source period must have a distinct effective date.");
+  }
+  return effectiveDates;
 }
 
 // Locate a column whose header contains any of the keywords (excluding some).
@@ -1957,6 +2027,50 @@ router.get("/catalog/competitor-brands", async (_req, res) => {
   res.json({ brands, brandPeriods });
 });
 
+// POST /catalog/preview-competitor — validate a workbook before the upload form
+// asks the administrator to confirm any source-period date overrides.
+router.post(
+  "/catalog/preview-competitor",
+  requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const ext = file.originalname.toLowerCase().split(".").pop() ?? "";
+    if (!["xlsx", "xls", "csv"].includes(ext)) {
+      res.json({ isSparshMaster: false });
+      return;
+    }
+
+    try {
+      const existingProducts = await db
+        .select({ itemCode: catalogProductsTable.itemCode })
+        .from(catalogProductsTable);
+      const canonical = new Map<string, string>(
+        existingProducts.map((product) => [normCode(product.itemCode), product.itemCode]),
+      );
+      const workbook = XLSX.read(file.buffer, { type: "buffer" });
+      const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
+
+      res.json({
+        isSparshMaster: Boolean(sparshMaster),
+        periods: sparshMaster?.periods.map((period) => ({
+          key: period.key,
+          label: period.label,
+          sourceEffectiveDate: period.sourceEffectiveDate,
+        })) ?? [],
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Could not read competitor workbook.",
+      });
+    }
+  },
+);
+
 // POST /catalog/load-competitor — upload a competitor workbook (any brand).
 router.post(
   "/catalog/load-competitor",
@@ -2005,18 +2119,31 @@ router.post(
           return;
         }
 
+        let effectiveDates: string[];
+        try {
+          effectiveDates = resolveSparshEffectiveDates(
+            sparshMaster.periods,
+            req.body.periodDates,
+          );
+        } catch (error) {
+          res.status(400).json({
+            error: error instanceof Error ? error.message : "Invalid Sparsh effective dates.",
+          });
+          return;
+        }
+
         const sourceHash = sha256ForBuffer(file.buffer);
-        const directMatchCount = sparshMaster.length;
-        const values = SPARSH_MASTER_PERIODS.flatMap((period) =>
-          sparshMaster.map((row) => ({
+        const directMatchCount = sparshMaster.rows.length;
+        const values = sparshMaster.periods.flatMap((period, periodIndex) =>
+          sparshMaster.rows.map((row) => ({
             competitor: SPARSH_MASTER_COMPETITOR,
             category: row.series,
             description: row.description,
             size: null,
-            price: row.prices[period.effectiveDate],
+            price: row.prices[period.sourceEffectiveDate],
             unit: "MRP",
             competitorCode: row.competitorCode,
-            effectiveDate: period.effectiveDate,
+            effectiveDate: effectiveDates[periodIndex]!,
             matchedPrayagCode: row.prayagCode,
             matchStatus: "matched",
             // The workbook carries a verified direct mapping, rather than a
@@ -2038,13 +2165,14 @@ router.post(
             .delete(competitorPricesTable)
             .where(eq(competitorPricesTable.competitor, SPARSH_MASTER_COMPETITOR));
 
-          for (const period of SPARSH_MASTER_PERIODS) {
+          for (const [periodIndex, period] of sparshMaster.periods.entries()) {
+            const effectiveDate = effectiveDates[periodIndex]!;
             const periodValues = values.filter(
-              (value) => value.effectiveDate === period.effectiveDate,
+              (value) => value.effectiveDate === effectiveDate,
             );
             await tx.insert(importBatchesTable).values({
               competitor: SPARSH_MASTER_COMPETITOR,
-              effectiveDate: period.effectiveDate,
+              effectiveDate,
               sourceFileName: name,
               priceBasis: "MRP",
               gstPct: null,
@@ -2055,6 +2183,8 @@ router.post(
                 direct_code: directMatchCount,
                 desc_size: 0,
                 source: "authoritative_sparsh_competitor_master",
+                source_effective_date: period.sourceEffectiveDate,
+                effective_date_overridden: effectiveDate !== period.sourceEffectiveDate,
               }),
               extractionModel: null,
               fileSha256: sourceHash,
@@ -2069,11 +2199,20 @@ router.post(
             });
             await tx.insert(competitorPricesTable).values(periodValues);
           }
+          await recomputeCompetitorCurrentFlagsInTransaction(
+            SPARSH_MASTER_COMPETITOR,
+            tx,
+          );
         });
-        await recomputeCompetitorCurrentFlags(SPARSH_MASTER_COMPETITOR);
 
         req.log?.info(
-          { rows: values.length, periods: SPARSH_MASTER_PERIODS.map((period) => period.effectiveDate) },
+          {
+            rows: values.length,
+            periods: sparshMaster.periods.map((period, index) => ({
+              sourceEffectiveDate: period.sourceEffectiveDate,
+              effectiveDate: effectiveDates[index],
+            })),
+          },
           "Adopted authoritative Sparsh competitor master",
         );
         res.json({
@@ -2085,8 +2224,11 @@ router.post(
             matched: values.length,
             unmatched: 0,
             rejectedByGap: 0,
-            periods: SPARSH_MASTER_PERIODS.map((period) => ({
-              effectiveDate: period.effectiveDate,
+            periods: sparshMaster.periods.map((period, index) => ({
+              label: period.label,
+              sourceEffectiveDate: period.sourceEffectiveDate,
+              effectiveDate: effectiveDates[index],
+              overridden: effectiveDates[index] !== period.sourceEffectiveDate,
               inserted: directMatchCount,
               directMatches: directMatchCount,
               descSizeMatches: 0,
@@ -2204,18 +2346,19 @@ router.post(
 
       // Period-aware: delete only the rows for this (competitor, effectiveDate)
       // so older periods are preserved. A different effectiveDate adds a new period.
-      await db
-        .delete(competitorPricesTable)
-        .where(
-          sql`competitor = ${competitor} AND effective_date = ${effectiveDate}`,
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(competitorPricesTable)
+          .where(
+            sql`competitor = ${competitor} AND effective_date = ${effectiveDate}`,
+          );
 
-      for (let i = 0; i < values.length; i += 500) {
-        await db.insert(competitorPricesTable).values(values.slice(i, i + 500));
-      }
+        for (let i = 0; i < values.length; i += 500) {
+          await tx.insert(competitorPricesTable).values(values.slice(i, i + 500));
+        }
 
-      // Recompute is_current across all periods for this competitor.
-      await recomputeCompetitorCurrentFlags(competitor);
+        await recomputeCompetitorCurrentFlagsInTransaction(competitor, tx);
+      });
 
       res.json({
         results: {

@@ -1,7 +1,10 @@
 import { fileURLToPath } from "node:url";
 import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
-import { parseSparshCompetitorMaster } from "./catalogImportExport";
+import {
+  parseSparshCompetitorMaster,
+  resolveSparshEffectiveDates,
+} from "./catalogImportExport";
 
 const masterPath = fileURLToPath(
   new URL(
@@ -27,18 +30,45 @@ function catalogMap(): Map<string, string> {
 
 describe("authoritative Sparsh competitor master", () => {
   it("reads the two verified periods as 150 direct mappings", () => {
-    const rows = parseSparshCompetitorMaster(workbook(), catalogMap());
+    const master = parseSparshCompetitorMaster(workbook(), catalogMap());
 
-    expect(rows).toHaveLength(150);
-    expect(rows?.every((row) => row.competitorCode.length > 0)).toBe(true);
-    expect(rows?.find((row) => row.competitorCode === "WMP-188")).toMatchObject({
+    expect(master?.rows).toHaveLength(150);
+    expect(master?.periods.map((period) => period.sourceEffectiveDate)).toEqual([
+      "2024-04-01",
+      "2026-07-01",
+    ]);
+    expect(master?.rows.every((row) => row.competitorCode.length > 0)).toBe(true);
+    expect(master?.rows.find((row) => row.competitorCode === "WMP-188")).toMatchObject({
       prayagCode: "361",
       prices: { "2024-04-01": 468, "2026-07-01": 462 },
     });
-    expect(rows?.find((row) => row.competitorCode === "WMP-189")).toMatchObject({
+    expect(master?.rows.find((row) => row.competitorCode === "WMP-189")).toMatchObject({
       prayagCode: "362",
       prices: { "2024-04-01": 592, "2026-07-01": 592 },
     });
+  });
+
+  it("allows an administrator to move a detected September period to 1 July", () => {
+    const master = parseSparshCompetitorMaster(workbook(), catalogMap());
+    expect(master).not.toBeNull();
+
+    const legacyPeriods = master!.periods.map((period) =>
+      period.key === "vol_6_2"
+        ? { ...period, sourceEffectiveDate: "2026-09-01" }
+        : period,
+    );
+    expect(
+      resolveSparshEffectiveDates(legacyPeriods, ["2024-04-01", "2026-07-01"]),
+    ).toEqual(["2024-04-01", "2026-07-01"]);
+  });
+
+  it("rejects date overrides that merge two source periods", () => {
+    const master = parseSparshCompetitorMaster(workbook(), catalogMap());
+    expect(master).not.toBeNull();
+
+    expect(() =>
+      resolveSparshEffectiveDates(master!.periods, ["2026-07-01", "2026-07-01"]),
+    ).toThrow(/distinct/i);
   });
 
   it("fails closed when a master mapping is absent from the official catalog", () => {

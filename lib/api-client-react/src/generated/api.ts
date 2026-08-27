@@ -55,6 +55,10 @@ import type {
   ComparisonSummary,
   CompetitorBrands,
   CompetitorMappingUpdate,
+  CompetitorWorkbookImport,
+  CompetitorWorkbookImportInput,
+  CompetitorWorkbookPreview,
+  CompetitorWorkbookPreviewInput,
   CreateAdminUserBody,
   DeleteCompetitorPeriodResult,
   DeleteCompetitorResult,
@@ -2825,6 +2829,165 @@ export function useGetCompetitorBrands<TData = Awaited<ReturnType<typeof getComp
 
 
 
+
+export const getPreviewCompetitorWorkbookUrl = () => {
+
+
+
+
+  return `/api/catalog/preview-competitor`
+}
+
+/**
+ * @summary Detect validated source periods in a competitor workbook
+ */
+export const previewCompetitorWorkbook = async (competitorWorkbookPreviewInput: CompetitorWorkbookPreviewInput, options?: RequestInit): Promise<CompetitorWorkbookPreview> => {
+    const formData = new FormData();
+formData.append(`file`, competitorWorkbookPreviewInput.file);
+
+  return customFetch<CompetitorWorkbookPreview>(getPreviewCompetitorWorkbookUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewCompetitorWorkbookMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookPreviewInput>}, TContext> => {
+
+const mutationKey = ['previewCompetitorWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewCompetitorWorkbook>>, {data: BodyType<CompetitorWorkbookPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewCompetitorWorkbook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewCompetitorWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof previewCompetitorWorkbook>>>
+    export type PreviewCompetitorWorkbookMutationBody = BodyType<CompetitorWorkbookPreviewInput>
+    export type PreviewCompetitorWorkbookMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Detect validated source periods in a competitor workbook
+ */
+export const usePreviewCompetitorWorkbook = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewCompetitorWorkbook>>,
+        TError,
+        {data: BodyType<CompetitorWorkbookPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewCompetitorWorkbookMutationOptions(options));
+    }
+
+export const getLoadCompetitorWorkbookUrl = () => {
+
+
+
+
+  return `/api/catalog/load-competitor`
+}
+
+/**
+ * @summary Import competitor prices with an approved effective date
+ */
+export const loadCompetitorWorkbook = async (competitorWorkbookImportInput: CompetitorWorkbookImportInput, options?: RequestInit): Promise<CompetitorWorkbookImport> => {
+    const formData = new FormData();
+formData.append(`file`, competitorWorkbookImportInput.file);
+formData.append(`competitor`, competitorWorkbookImportInput.competitor);
+if(competitorWorkbookImportInput.effectiveDate !== undefined) {
+ formData.append(`effectiveDate`, competitorWorkbookImportInput.effectiveDate);
+ }
+if(competitorWorkbookImportInput.periodDates !== undefined) {
+ formData.append(`periodDates`, competitorWorkbookImportInput.periodDates);
+ }
+if(competitorWorkbookImportInput.priceBasis !== undefined) {
+ formData.append(`priceBasis`, competitorWorkbookImportInput.priceBasis);
+ }
+if(competitorWorkbookImportInput.gstPct !== undefined) {
+ formData.append(`gstPct`, competitorWorkbookImportInput.gstPct.toString())
+ }
+
+  return customFetch<CompetitorWorkbookImport>(getLoadCompetitorWorkbookUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getLoadCompetitorWorkbookMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loadCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof loadCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookImportInput>}, TContext> => {
+
+const mutationKey = ['loadCompetitorWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loadCompetitorWorkbook>>, {data: BodyType<CompetitorWorkbookImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  loadCompetitorWorkbook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoadCompetitorWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof loadCompetitorWorkbook>>>
+    export type LoadCompetitorWorkbookMutationBody = BodyType<CompetitorWorkbookImportInput>
+    export type LoadCompetitorWorkbookMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Import competitor prices with an approved effective date
+ */
+export const useLoadCompetitorWorkbook = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loadCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loadCompetitorWorkbook>>,
+        TError,
+        {data: BodyType<CompetitorWorkbookImportInput>},
+        TContext
+      > => {
+      return useMutation(getLoadCompetitorWorkbookMutationOptions(options));
+    }
 
 export const getDeleteCatalogCompetitorUrl = (competitor: string,) => {
 

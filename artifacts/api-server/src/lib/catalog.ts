@@ -1,6 +1,8 @@
 import { sql, eq } from "drizzle-orm";
 import { db, competitorPricesTable } from "@workspace/db";
 
+type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 // Recompute is_current per item_code: the row with the latest effective_date
 // (tie-broken by highest id / most recent load) is current; all others false.
 // This is the only place is_current is mutated — price rows are never deleted.
@@ -32,13 +34,20 @@ export async function recomputeCurrentFlags(): Promise<void> {
 // Recompute is_current on competitor_prices for a given brand after a period
 // change. Matched rows: latest effective_date per (competitor, matched_prayag_code).
 // Unmatched rows: all rows from the newest period for that competitor.
-export async function recomputeCompetitorCurrentFlags(
+export async function recomputeCompetitorCurrentFlagsInTransaction(
   competitor: string,
+  tx: DatabaseTransaction,
 ): Promise<void> {
-  await db.execute(
+  // A competitor import can replace hundreds of rows. Keep its reset/set pair
+  // serialized with other mutations for the same brand and inside the caller's
+  // transaction so an error can never commit an all-false period.
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext(${"competitor-current-flags:" + competitor}))`,
+  );
+  await tx.execute(
     sql`UPDATE competitor_prices SET is_current = false WHERE competitor = ${competitor}`,
   );
-  await db.execute(sql`
+  await tx.execute(sql`
     UPDATE competitor_prices
     SET is_current = true
     WHERE id IN (
@@ -50,7 +59,7 @@ export async function recomputeCompetitorCurrentFlags(
       ORDER BY competitor, matched_prayag_code, effective_date DESC NULLS LAST, id DESC
     )
   `);
-  await db.execute(sql`
+  await tx.execute(sql`
     UPDATE competitor_prices
     SET is_current = true
     WHERE competitor = ${competitor}
@@ -62,6 +71,14 @@ export async function recomputeCompetitorCurrentFlags(
           AND effective_date <= CURRENT_DATE
       )
   `);
+}
+
+export async function recomputeCompetitorCurrentFlags(
+  competitor: string,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await recomputeCompetitorCurrentFlagsInTransaction(competitor, tx);
+  });
 }
 
 export function normCode(s: unknown): string {

@@ -9,6 +9,66 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface CompetitorWorkbookPreviewInput {
+  file: Blob;
+}
+
+export interface CompetitorWorkbookPeriod {
+  key: string;
+  label: string;
+  sourceEffectiveDate: string;
+}
+
+export interface CompetitorWorkbookPreview {
+  isSparshMaster: boolean;
+  periods: CompetitorWorkbookPeriod[];
+}
+
+export type CompetitorWorkbookImportInputPriceBasis = typeof CompetitorWorkbookImportInputPriceBasis[keyof typeof CompetitorWorkbookImportInputPriceBasis];
+
+
+export const CompetitorWorkbookImportInputPriceBasis = {
+  MRP: 'MRP',
+  'Ex-GST': 'Ex-GST',
+} as const;
+
+export interface CompetitorWorkbookImportInput {
+  file: Blob;
+  /** @minLength 1 */
+  competitor: string;
+  /** Required for ordinary uploads; omitted for a verified multi-period master. */
+  effectiveDate?: string;
+  /** JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods. */
+  periodDates?: string;
+  priceBasis?: CompetitorWorkbookImportInputPriceBasis;
+  gstPct?: number;
+}
+
+export interface CompetitorWorkbookImportedPeriod {
+  label?: string;
+  sourceEffectiveDate?: string;
+  effectiveDate: string;
+  overridden?: boolean;
+  inserted: number;
+  directMatches: number;
+  descSizeMatches: number;
+}
+
+export interface CompetitorWorkbookImportSummary {
+  competitor: string;
+  file: string;
+  totalRows: number;
+  inserted: number;
+  matched: number;
+  unmatched: number;
+  rejectedByGap: number;
+  periods?: CompetitorWorkbookImportedPeriod[];
+}
+
+export interface CompetitorWorkbookImport {
+  results: CompetitorWorkbookImportSummary;
+}
+
 export interface CatalogProductListItem {
   id: number;
   itemCode: string;

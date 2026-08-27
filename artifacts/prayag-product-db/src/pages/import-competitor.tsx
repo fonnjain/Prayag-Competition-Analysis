@@ -29,6 +29,8 @@ import {
   getGetComparisonMatrixQueryKey,
   getGetMappingReviewQueryKey,
   getGetCompetitorBrandsQueryKey,
+  previewCompetitorWorkbook,
+  loadCompetitorWorkbook,
 } from "@workspace/api-client-react";
 import {
   AlertDialog,
@@ -54,6 +56,13 @@ function formatDate(iso: string): string {
   }
 }
 
+interface SparshMasterPeriodDraft {
+  key: string;
+  label: string;
+  sourceEffectiveDate: string;
+  effectiveDate: string;
+}
+
 /** Bearer token stored by the auth layer — needed for raw fetch() calls that
  *  bypass the generated API client (which injects Authorization automatically). */
 function getAuthHeaders(): Record<string, string> {
@@ -71,6 +80,9 @@ export default function ImportCompetitorPage() {
   const [effectiveDate, setEffectiveDate] = useState("");
   const [priceBasis, setPriceBasis] = useState<"MRP" | "Ex-GST">("MRP");
   const [gstPct, setGstPct] = useState<number>(18);
+  const [sparshPeriods, setSparshPeriods] = useState<SparshMasterPeriodDraft[]>([]);
+  const [isPreviewingWorkbook, setIsPreviewingWorkbook] = useState(false);
+  const [workbookPreviewError, setWorkbookPreviewError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
   // SSE extraction progress state
@@ -86,6 +98,7 @@ export default function ImportCompetitorPage() {
   // Track which brands are expanded to show their periods
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const workbookPreviewSequence = useRef(0);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -97,8 +110,7 @@ export default function ImportCompetitorPage() {
   const brandPeriods = brandsData?.brandPeriods ?? [];
 
   const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
-  const isAuthoritativeSparshMaster =
-    !isPdf && /sparsh.*competitor.*master/i.test(file?.name ?? "");
+  const isAuthoritativeSparshMaster = sparshPeriods.length > 0;
 
   const invalidateComparisonQueries = () => {
     queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
@@ -108,6 +120,45 @@ export default function ImportCompetitorPage() {
     queryClient.invalidateQueries({ queryKey: getGetComparisonMatrixQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetMappingReviewQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetCompetitorBrandsQueryKey() });
+  };
+
+  const handleFileChange = async (nextFile: File | null) => {
+    const requestSequence = ++workbookPreviewSequence.current;
+    setFile(nextFile);
+    setResult(null);
+    setSparshPeriods([]);
+    setWorkbookPreviewError(null);
+
+    if (!nextFile || nextFile.name.toLowerCase().endsWith(".pdf")) {
+      setIsPreviewingWorkbook(false);
+      return;
+    }
+
+    setIsPreviewingWorkbook(true);
+    try {
+      const data = await previewCompetitorWorkbook({ file: nextFile });
+      if (requestSequence !== workbookPreviewSequence.current) return;
+
+      if (data.isSparshMaster && Array.isArray(data.periods) && data.periods.length > 0) {
+        setSparshPeriods(
+          data.periods.map((period: Omit<SparshMasterPeriodDraft, "effectiveDate">) => ({
+            ...period,
+            effectiveDate: period.sourceEffectiveDate,
+          })),
+        );
+        setCompetitor("Sparsh Pearl");
+        setPriceBasis("MRP");
+      }
+    } catch (error) {
+      if (requestSequence !== workbookPreviewSequence.current) return;
+      setWorkbookPreviewError(
+        error instanceof Error ? error.message : "Could not read the uploaded workbook.",
+      );
+    } finally {
+      if (requestSequence === workbookPreviewSequence.current) {
+        setIsPreviewingWorkbook(false);
+      }
+    }
   };
 
   const recoverCompletedPdfBatch = async (batchId: number): Promise<boolean> => {
@@ -203,7 +254,17 @@ export default function ImportCompetitorPage() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !competitor.trim() || (!isAuthoritativeSparshMaster && !effectiveDate)) return;
+    const hasCompleteSparshDates =
+      sparshPeriods.length > 0 && sparshPeriods.every((period) => Boolean(period.effectiveDate));
+    if (
+      !file ||
+      !competitor.trim() ||
+      isPreviewingWorkbook ||
+      workbookPreviewError ||
+      (isAuthoritativeSparshMaster ? !hasCompleteSparshDates : !effectiveDate)
+    ) {
+      return;
+    }
 
     setIsUploading(true);
     setResult(null);
@@ -212,7 +273,14 @@ export default function ImportCompetitorPage() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("competitor", competitor.trim());
-    if (!isAuthoritativeSparshMaster) formData.append("effectiveDate", effectiveDate);
+    if (isAuthoritativeSparshMaster) {
+      formData.append(
+        "periodDates",
+        JSON.stringify(sparshPeriods.map((period) => period.effectiveDate)),
+      );
+    } else {
+      formData.append("effectiveDate", effectiveDate);
+    }
     formData.append("priceBasis", priceBasis);
     if (priceBasis === "Ex-GST") formData.append("gstPct", String(gstPct));
 
@@ -336,19 +404,20 @@ export default function ImportCompetitorPage() {
           "The extraction connection closed before the result arrived. The server may still be processing this batch; please try again in a moment.",
         );
       } else {
-        // Excel/CSV → existing direct-import route
-        const res = await fetch(`/api/catalog/load-competitor`, {
-          method: "POST",
-          body: formData,
-          headers: getAuthHeaders(),
+        // Excel/CSV → typed direct-import route
+        const data = await loadCompetitorWorkbook({
+          file,
+          competitor: competitor.trim(),
+          effectiveDate: isAuthoritativeSparshMaster ? undefined : effectiveDate,
+          periodDates: isAuthoritativeSparshMaster
+            ? JSON.stringify(sparshPeriods.map((period) => period.effectiveDate))
+            : undefined,
+          priceBasis,
+          gstPct: priceBasis === "Ex-GST" ? gstPct : undefined,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error((data as any).error || "Failed to upload competitor file");
 
         setResult(data.results);
-        const importedPeriods = data.results.periods as
-          | { effectiveDate: string; inserted: number }[]
-          | undefined;
+        const importedPeriods = data.results.periods;
         toast({
           title: "Upload Successful",
           description: importedPeriods
@@ -358,6 +427,8 @@ export default function ImportCompetitorPage() {
         invalidateComparisonQueries();
 
         setFile(null);
+        setSparshPeriods([]);
+        setWorkbookPreviewError(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     } catch (err: any) {
@@ -409,23 +480,55 @@ export default function ImportCompetitorPage() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="effectiveDate">Price Effective Date</Label>
-              <Input
-                id="effectiveDate"
-                type="date"
-                value={effectiveDate}
-                onChange={(e) => setEffectiveDate(e.target.value)}
-                required={!isAuthoritativeSparshMaster}
-                disabled={isAuthoritativeSparshMaster}
-                data-testid="input-competitor-effective-date"
-              />
-              <p className="text-xs text-muted-foreground">
-                {isAuthoritativeSparshMaster
-                  ? "This verified Sparsh master supplies both effective dates itself: 1 Apr 2024 and 1 Jul 2026."
-                  : "The date from which these prices apply (w.e.f.)."}
-              </p>
-            </div>
+            {isAuthoritativeSparshMaster ? (
+              <div className="space-y-3">
+                <Label>Detected Sparsh Price Periods</Label>
+                {sparshPeriods.map((period, index) => (
+                  <div key={period.key} className="rounded-md border bg-muted/30 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium">{period.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Workbook: {formatDate(period.sourceEffectiveDate)}
+                      </span>
+                    </div>
+                    <Input
+                      type="date"
+                      value={period.effectiveDate}
+                      onChange={(event) =>
+                        setSparshPeriods((current) =>
+                          current.map((currentPeriod, currentIndex) =>
+                            currentIndex === index
+                              ? { ...currentPeriod, effectiveDate: event.target.value }
+                              : currentPeriod,
+                          ),
+                        )
+                      }
+                      aria-label={`${period.label} effective date`}
+                      data-testid={`input-sparsh-period-date-${period.key}`}
+                    />
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  Choose the effective date for each detected period. Importing replaces only
+                  Sparsh Pearl prices and retains the workbook date in the audit record.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="effectiveDate">Price Effective Date</Label>
+                <Input
+                  id="effectiveDate"
+                  type="date"
+                  value={effectiveDate}
+                  onChange={(e) => setEffectiveDate(e.target.value)}
+                  required
+                  data-testid="input-competitor-effective-date"
+                />
+                <p className="text-xs text-muted-foreground">
+                  The date from which these prices apply (w.e.f.).
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Price Basis */}
@@ -475,7 +578,7 @@ export default function ImportCompetitorPage() {
               id="file"
               type="file"
               accept=".xlsx,.xls,.csv,.pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              onChange={(e) => void handleFileChange(e.target.files?.[0] || null)}
               required
             />
             {file && (
@@ -495,12 +598,19 @@ export default function ImportCompetitorPage() {
                   </span>
                 ) : (
                   <span>
-                    {isAuthoritativeSparshMaster
-                      ? "— verified master detected; both dated Sparsh periods will be imported directly."
+                    {isPreviewingWorkbook
+                      ? "— checking workbook periods…"
+                      : isAuthoritativeSparshMaster
+                      ? "— verified Sparsh master detected; review or change each period date before importing."
                       : "— will import directly"}
                   </span>
                 )}
               </div>
+            )}
+            {workbookPreviewError && (
+              <p className="text-xs text-destructive" data-testid="text-workbook-preview-error">
+                {workbookPreviewError}
+              </p>
             )}
           </div>
 
@@ -538,7 +648,11 @@ export default function ImportCompetitorPage() {
             disabled={
               !file ||
               !competitor.trim() ||
-              (!isAuthoritativeSparshMaster && !effectiveDate) ||
+              isPreviewingWorkbook ||
+              Boolean(workbookPreviewError) ||
+              (isAuthoritativeSparshMaster
+                ? !sparshPeriods.every((period) => Boolean(period.effectiveDate))
+                : !effectiveDate) ||
               isUploading
             }
             className="w-full"
@@ -575,7 +689,19 @@ export default function ImportCompetitorPage() {
             <p className="text-sm text-muted-foreground" data-testid="text-import-master-periods">
               Effective dates:{" "}
               <span className="font-mono font-medium">
-                {result.periods.map((period: { effectiveDate: string }) => formatDate(period.effectiveDate)).join(" and ")}
+                {result.periods
+                  .map((period: {
+                    label?: string;
+                    sourceEffectiveDate?: string;
+                    effectiveDate: string;
+                  }) => {
+                    const appliedDate = formatDate(period.effectiveDate);
+                    return period.sourceEffectiveDate &&
+                      period.sourceEffectiveDate !== period.effectiveDate
+                      ? `${period.label ?? "Period"}: ${formatDate(period.sourceEffectiveDate)} → ${appliedDate}`
+                      : `${period.label ? `${period.label}: ` : ""}${appliedDate}`;
+                  })
+                  .join(" · ")}
               </span>
             </p>
           ) : (

@@ -1016,6 +1016,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CompetitorBrands"
+  /catalog/preview-competitor:
+    post:
+      operationId: previewCompetitorWorkbook
+      tags: [catalog]
+      summary: Detect validated source periods in a competitor workbook
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CompetitorWorkbookPreviewInput"
+      responses:
+        "200":
+          description: Workbook classification and any detected verified periods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetitorWorkbookPreview"
+        "400":
+          description: Invalid workbook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /catalog/load-competitor:
+    post:
+      operationId: loadCompetitorWorkbook
+      tags: [catalog]
+      summary: Import competitor prices with an approved effective date
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CompetitorWorkbookImportInput"
+      responses:
+        "200":
+          description: Imported competitor price rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetitorWorkbookImport"
+        "400":
+          description: Invalid workbook or effective date selection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/competitors/{competitor}:
     delete:
       operationId: deleteCatalogCompetitor
@@ -1717,6 +1765,104 @@ components:
       properties:
         error:
           type: string
+    CompetitorWorkbookPreviewInput:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+    CompetitorWorkbookPeriod:
+      type: object
+      required: [key, label, sourceEffectiveDate]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        sourceEffectiveDate:
+          type: string
+          format: date
+    CompetitorWorkbookPreview:
+      type: object
+      required: [isSparshMaster, periods]
+      properties:
+        isSparshMaster:
+          type: boolean
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorWorkbookPeriod"
+    CompetitorWorkbookImportInput:
+      type: object
+      required: [file, competitor]
+      properties:
+        file:
+          type: string
+          format: binary
+        competitor:
+          type: string
+          minLength: 1
+        effectiveDate:
+          type: string
+          format: date
+          description: Required for ordinary uploads; omitted for a verified multi-period master.
+        periodDates:
+          type: string
+          description: JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods.
+        priceBasis:
+          type: string
+          enum: [MRP, Ex-GST]
+        gstPct:
+          type: number
+    CompetitorWorkbookImportedPeriod:
+      type: object
+      required: [effectiveDate, inserted, directMatches, descSizeMatches]
+      properties:
+        label:
+          type: string
+        sourceEffectiveDate:
+          type: string
+          format: date
+        effectiveDate:
+          type: string
+          format: date
+        overridden:
+          type: boolean
+        inserted:
+          type: integer
+        directMatches:
+          type: integer
+        descSizeMatches:
+          type: integer
+    CompetitorWorkbookImportSummary:
+      type: object
+      required: [competitor, file, totalRows, inserted, matched, unmatched, rejectedByGap]
+      properties:
+        competitor:
+          type: string
+        file:
+          type: string
+        totalRows:
+          type: integer
+        inserted:
+          type: integer
+        matched:
+          type: integer
+        unmatched:
+          type: integer
+        rejectedByGap:
+          type: integer
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorWorkbookImportedPeriod"
+    CompetitorWorkbookImport:
+      type: object
+      required: [results]
+      properties:
+        results:
+          $ref: "#/components/schemas/CompetitorWorkbookImportSummary"
     CatalogProductListItem:
       type: object
       required: [id, itemCode, hasPrice]

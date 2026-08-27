@@ -1046,6 +1046,60 @@ export const GetCompetitorBrandsResponse = zod.object({
 
 
 /**
+ * @summary Detect validated source periods in a competitor workbook
+ */
+export const PreviewCompetitorWorkbookBody = zod.object({
+  "file": zod.instanceof(File)
+})
+
+export const PreviewCompetitorWorkbookResponse = zod.object({
+  "isSparshMaster": zod.boolean(),
+  "periods": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "sourceEffectiveDate": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Import competitor prices with an approved effective date
+ */
+
+
+
+export const LoadCompetitorWorkbookBody = zod.object({
+  "file": zod.instanceof(File),
+  "competitor": zod.string().min(1),
+  "effectiveDate": zod.coerce.date().optional().describe('Required for ordinary uploads; omitted for a verified multi-period master.'),
+  "periodDates": zod.string().optional().describe('JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods.'),
+  "priceBasis": zod.enum(['MRP', 'Ex-GST']).optional(),
+  "gstPct": zod.number().optional()
+})
+
+export const LoadCompetitorWorkbookResponse = zod.object({
+  "results": zod.object({
+  "competitor": zod.string(),
+  "file": zod.string(),
+  "totalRows": zod.number(),
+  "inserted": zod.number(),
+  "matched": zod.number(),
+  "unmatched": zod.number(),
+  "rejectedByGap": zod.number(),
+  "periods": zod.array(zod.object({
+  "label": zod.string().optional(),
+  "sourceEffectiveDate": zod.coerce.date().optional(),
+  "effectiveDate": zod.coerce.date(),
+  "overridden": zod.boolean().optional(),
+  "inserted": zod.number(),
+  "directMatches": zod.number(),
+  "descSizeMatches": zod.number()
+})).optional()
+})
+})
+
+
+/**
  * @summary Delete all price rows for a competitor brand
  */
 export const DeleteCatalogCompetitorParams = zod.object({
