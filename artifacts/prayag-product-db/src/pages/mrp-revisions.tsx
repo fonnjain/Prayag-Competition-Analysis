@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@workspace/replit-auth-web";
-import { formatDisplayDate } from "@/lib/date-format";
 import { AlertTriangle, ArchiveX, CheckCircle2, FileSpreadsheet, RotateCcw, Upload } from "lucide-react";
 
 type RevisionRow = {
@@ -51,8 +50,13 @@ type RevisionScope = {
   endsOn: string | null;
 };
 
+type RevisionDivisionSummary = {
+  division: string;
+  count: number;
+};
+
 type MrpRevisionScope = RevisionScope & {
-  division: string | null;
+  divisions: RevisionDivisionSummary[];
 };
 
 type CompetitorRevisionScope = RevisionScope & {
@@ -77,14 +81,20 @@ function money(value: number | null) {
   return value == null ? "—" : `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
-function periodContext(scope: RevisionScope, division?: string | null) {
-  const context = [
-    formatDisplayDate(scope.effectiveDate),
-    division,
-    `${scope.rowCount.toLocaleString("en-IN")} rows`,
-    scope.endsOn ? `in force until ${formatDisplayDate(scope.endsOn)}` : "currently open-ended",
-  ].filter(Boolean);
-  return context.join(" · ");
+function formatRevisionDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${match[3]} ${months[Number(match[2]) - 1]} ${match[1]}`;
+}
+
+function formatRevisionText(value: string): string {
+  return value.replace(/\b\d{4}-\d{2}-\d{2}\b/g, formatRevisionDate);
+}
+
+function compactPeriodLabel(scope: RevisionScope) {
+  return `${formatRevisionDate(scope.effectiveDate)} · ${scope.rowCount.toLocaleString("en-IN")} rows`;
 }
 
 export default function MrpRevisionsPage() {
@@ -119,14 +129,13 @@ export default function MrpRevisionsPage() {
       ? scopes.data?.mrpPeriods.find((scope) => scope.effectiveDate === effectiveDate)
       : competitorPeriods.find((scope) => scope.effectiveDate === effectiveDate);
 
-  const previewWorkbook = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const createPreview = async (selectedDate = effectiveDate) => {
     if (!file) return;
     if (!reason.trim()) {
       toast({ title: "Add a reason", description: "A short audit reason is required before previewing.", variant: "destructive" });
       return;
     }
-    if (!effectiveDate || (targetType === "competitor" && !competitor)) {
+    if (!selectedDate || (targetType === "competitor" && !competitor)) {
       toast({ title: "Choose a revision scope", description: "Select an existing period before creating a preview.", variant: "destructive" });
       return;
     }
@@ -137,7 +146,7 @@ export default function MrpRevisionsPage() {
     body.append("file", file);
     body.append("targetType", targetType);
     body.append("reason", reason.trim());
-    body.append("effectiveDate", effectiveDate);
+    body.append("effectiveDate", selectedDate);
     if (targetType === "competitor") {
       body.append("competitor", competitor.trim());
     }
@@ -151,6 +160,37 @@ export default function MrpRevisionsPage() {
     } finally {
       setIsPreviewing(false);
     }
+  };
+
+  const previewWorkbook = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await createPreview();
+  };
+
+  const switchToSourcePeriod = async () => {
+    if (!preview || preview.dateMismatchCount !== preview.rowsInFile) return;
+    const sourceDate = preview.dateMismatchDates.length === 1 ? preview.dateMismatchDates[0] : null;
+    const sourceScopeExists = sourceDate && (
+      targetType === "mrp"
+        ? scopes.data?.mrpPeriods.some((scope) => scope.effectiveDate === sourceDate)
+        : competitorPeriods.some((scope) => scope.effectiveDate === sourceDate)
+    );
+    if (!sourceDate || !sourceScopeExists) {
+      toast({
+        title: "Source period is unavailable",
+        description: "This workbook’s date is not an existing revision scope for the selected price type.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const confirmed = window.confirm(
+      `Switch the selected period to ${formatRevisionDate(sourceDate)} and create a new preview using the same uploaded workbook? No prices will be changed.`,
+    );
+    if (!confirmed) return;
+    setEffectiveDate(sourceDate);
+    setPreview(null);
+    setAcknowledged(false);
+    await createPreview(sourceDate);
   };
 
   const applyPreview = async () => {
@@ -236,7 +276,7 @@ export default function MrpRevisionsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-7 p-5 sm:p-8">
+    <div className="mx-auto min-w-0 max-w-7xl space-y-7 overflow-x-hidden p-5 sm:p-8">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#2d7c78]">Controlled correction</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Price revision upload</h1>
@@ -245,8 +285,8 @@ export default function MrpRevisionsPage() {
         </p>
       </div>
 
-      <form data-activity="mrp_revision.preview" onSubmit={previewWorkbook} className="grid gap-5 rounded-xl border bg-card p-5 shadow-sm lg:grid-cols-[1fr_1fr]">
-        <div className="space-y-2">
+      <form data-activity="mrp_revision.preview" onSubmit={previewWorkbook} className="grid min-w-0 gap-5 rounded-xl border bg-card p-5 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-2">
           <Label>Revision type</Label>
           <Select value={targetType} onValueChange={(value) => {
             setTargetType(value as "mrp" | "competitor");
@@ -273,8 +313,8 @@ export default function MrpRevisionsPage() {
             <AlertDescription>{scopes.error instanceof Error ? scopes.error.message : "Reload the page before uploading a revision."}</AlertDescription>
           </Alert>
         ) : targetType === "competitor" ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label>Competitor</Label>
               <Select value={competitor} onValueChange={(value) => { setCompetitor(value); setEffectiveDate(""); setPreview(null); }}>
                 <SelectTrigger><SelectValue placeholder="Choose a competitor" /></SelectTrigger>
@@ -285,14 +325,14 @@ export default function MrpRevisionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Existing effective period</Label>
               <Select value={effectiveDate} onValueChange={(value) => { setEffectiveDate(value); setPreview(null); }} disabled={!competitor}>
                 <SelectTrigger><SelectValue placeholder={competitor ? "Choose a period" : "Choose a competitor first"} /></SelectTrigger>
                 <SelectContent>
                   {competitorPeriods.map((scope) => (
                     <SelectItem key={scope.effectiveDate} value={scope.effectiveDate}>
-                      {periodContext(scope)}
+                      {compactPeriodLabel(scope)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -300,7 +340,7 @@ export default function MrpRevisionsPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label>Existing effective period</Label>
             <Select value={effectiveDate} onValueChange={(value) => { setEffectiveDate(value); setPreview(null); }}>
               <SelectTrigger><SelectValue placeholder="Choose the MRP period to correct" /></SelectTrigger>
@@ -310,7 +350,7 @@ export default function MrpRevisionsPage() {
                   .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
                   .map((scope) => (
                     <SelectItem key={scope.effectiveDate} value={scope.effectiveDate}>
-                      {periodContext(scope, scope.division)}
+                      {compactPeriodLabel(scope)}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -318,14 +358,34 @@ export default function MrpRevisionsPage() {
           </div>
         )}
         {selectedScope && (
-          <div className="lg:col-span-2 rounded-lg border border-[#2d7c78]/30 bg-[#2d7c78]/5 px-4 py-3 text-sm">
+          <div className="min-w-0 rounded-lg border border-[#2d7c78]/30 bg-[#2d7c78]/5 px-4 py-3 text-sm lg:col-span-2">
             <p className="font-medium text-[#1d5d5a]">Selected revision scope</p>
-            <p className="mt-1 text-muted-foreground">
-              {periodContext(
-                selectedScope,
-                "division" in selectedScope ? selectedScope.division : competitor,
+            <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">
+              <dt className="font-medium text-muted-foreground">Period</dt>
+              <dd>{formatRevisionDate(selectedScope.effectiveDate)}</dd>
+              <dt className="font-medium text-muted-foreground">Rows</dt>
+              <dd>{selectedScope.rowCount.toLocaleString("en-IN")}</dd>
+              {"divisions" in selectedScope ? (
+                <>
+                  <dt className="font-medium text-muted-foreground">Divisions</dt>
+                  <dd
+                    className="truncate"
+                    title={selectedScope.divisions.map((entry) => `${entry.division} (${entry.count.toLocaleString("en-IN")})`).join(", ") || "Not recorded"}
+                  >
+                    {selectedScope.divisions.length > 1 && "Multiple divisions · "}
+                    {selectedScope.divisions.slice(0, 3).map((entry) => `${entry.division} · ${entry.count.toLocaleString("en-IN")}`).join(", ") || "Not recorded"}
+                    {selectedScope.divisions.length > 3 && ` · +${selectedScope.divisions.length - 3} more division${selectedScope.divisions.length === 4 ? "" : "s"}`}
+                  </dd>
+                </>
+              ) : (
+                <>
+                  <dt className="font-medium text-muted-foreground">Competitor</dt>
+                  <dd className="truncate" title={competitor}>{competitor}</dd>
+                </>
               )}
-            </p>
+              <dt className="font-medium text-muted-foreground">Valid until</dt>
+              <dd>{selectedScope.endsOn ? formatRevisionDate(selectedScope.endsOn) : "Open-ended"}</dd>
+            </dl>
             <p className="mt-1 text-xs text-muted-foreground">
               Workbook dates must match this period. If the workbook has no effective-date column, this selected period is applied to every uploaded row.
             </p>
@@ -351,11 +411,11 @@ export default function MrpRevisionsPage() {
       {preview && (
         <section className="space-y-5">
           <div className="rounded-xl border bg-card p-5 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preview batch {preview.batchId}</p>
-                <h2 className="mt-1 font-semibold">{preview.fileName}</h2>
-                <p className="mt-1 font-mono text-xs text-muted-foreground">SHA-256 {preview.fileSha256}</p>
+                <h2 className="mt-1 truncate font-semibold" title={preview.fileName}>{preview.fileName}</h2>
+                <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={`SHA-256 ${preview.fileSha256}`}>SHA-256 {preview.fileSha256}</p>
               </div>
               <div className="text-sm font-medium text-muted-foreground">
                 {preview.status === "applied" ? "Applied" : preview.status === "rolled_back" ? "Rolled back" : preview.status === "discarded" ? "Discarded" : "Not applied"}
@@ -381,11 +441,16 @@ export default function MrpRevisionsPage() {
               <Alert variant="destructive" className="mt-5">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>
-                  {preview.dateMismatchCount} row{preview.dateMismatchCount === 1 ? "" : "s"} do not match the selected period {formatDisplayDate(preview.effectiveDate)}
+                  {preview.dateMismatchCount} row{preview.dateMismatchCount === 1 ? "" : "s"} do not match the selected period {formatRevisionDate(preview.effectiveDate)}
                 </AlertTitle>
                 <AlertDescription>
-                  Workbook date{preview.dateMismatchDates.length === 1 ? "" : "s"} {preview.dateMismatchDates.map(formatDisplayDate).join(", ")} {preview.dateMismatchDates.length === 1 ? "does" : "do"} not match the selected scope. These rows will not be applied.
-                  {preview.dateMismatchCount === preview.rowsInFile && " Every uploaded row was rejected for this mismatch; choose the matching period or upload the matching workbook."}
+                  Workbook date{preview.dateMismatchDates.length === 1 ? "" : "s"} {preview.dateMismatchDates.map(formatRevisionDate).join(", ")} {preview.dateMismatchDates.length === 1 ? "does" : "do"} not match the selected scope. These rows will not be applied.
+                  {preview.dateMismatchCount === preview.rowsInFile && " Every uploaded row was rejected for this mismatch."}
+                  {preview.dateMismatchCount === preview.rowsInFile && preview.dateMismatchDates.length === 1 && (
+                    <Button variant="outline" size="sm" className="ml-0 mt-3 w-full sm:ml-3 sm:mt-0 sm:w-auto" onClick={switchToSourcePeriod}>
+                      Switch to {formatRevisionDate(preview.dateMismatchDates[0])} and re-preview
+                    </Button>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
@@ -441,16 +506,16 @@ export default function MrpRevisionsPage() {
             )}
           </div>
 
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm">
             <div className="border-b px-5 py-4">
               <h2 className="font-semibold">Row-by-row outcome</h2>
               <p className="mt-1 text-sm text-muted-foreground">Only rows marked “Will change” are written when you apply this batch.</p>
             </div>
-            <div className="max-h-[34rem] overflow-auto">
-              <table className="min-w-full text-left text-sm">
+            <div className="max-h-[34rem] max-w-full overflow-auto">
+              <table className="min-w-[720px] text-left text-sm">
                 <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3">Row</th><th className="px-4 py-3">Code</th><th className="px-4 py-3">Period / variant</th><th className="px-4 py-3">Current</th><th className="px-4 py-3">New</th><th className="px-4 py-3">Outcome</th>
+                    <th className="px-4 py-3">Row</th><th className="px-4 py-3">Code</th><th className="px-4 py-3">Period / variant</th><th className="px-4 py-3">Current at row date</th><th className="px-4 py-3">New</th><th className="px-4 py-3">Outcome</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -460,16 +525,16 @@ export default function MrpRevisionsPage() {
                     return (
                       <tr key={row.id} className={row.outcome === "rejected" ? "bg-destructive/5" : warnings.length ? "bg-amber-50/70" : ""}>
                         <td className="px-4 py-3 font-mono text-xs">{row.rowNumber}</td>
-                        <td className="px-4 py-3 font-mono">{row.itemCode ?? "—"}</td>
-                        <td className="px-4 py-3"><div>{formatDisplayDate(row.effectiveDate)}</div><div className="text-xs text-muted-foreground">{row.variant}</div></td>
+                        <td className="max-w-40 px-4 py-3 font-mono"><div className="truncate" title={row.itemCode ?? undefined}>{row.itemCode ?? "—"}</div></td>
+                        <td className="px-4 py-3"><div>{formatRevisionDate(row.effectiveDate)}</div><div className="max-w-32 truncate text-xs text-muted-foreground" title={row.variant}>{row.variant}</div></td>
                         <td className="px-4 py-3">{money(row.previousValue)}</td>
                         <td className="px-4 py-3">{money(row.newValue)} {delta != null && <span className="ml-1 text-xs text-muted-foreground">({delta > 0 ? "+" : ""}{delta.toFixed(2)})</span>}</td>
                         <td className="max-w-sm px-4 py-3">
                           <span className={row.outcome === "change" ? "font-medium text-emerald-700" : row.outcome === "noop" ? "font-medium text-slate-600" : "font-medium text-destructive"}>
                             {row.outcome === "change" ? "Will change" : row.outcome === "noop" ? "No-op" : "Rejected"}
                           </span>
-                          {row.rejectionReason && <p className="mt-1 text-xs text-destructive">{row.rejectionReason}</p>}
-                          {warnings.map((warning) => <p key={warning} className="mt-1 text-xs text-amber-800">{warning}</p>)}
+                          {row.rejectionReason && <p className="mt-1 max-w-sm truncate text-xs text-destructive" title={formatRevisionText(row.rejectionReason)}>{formatRevisionText(row.rejectionReason)}</p>}
+                          {warnings.map((warning) => <p key={warning} className="mt-1 max-w-sm truncate text-xs text-amber-800" title={formatRevisionText(warning)}>{formatRevisionText(warning)}</p>)}
                         </td>
                       </tr>
                     );

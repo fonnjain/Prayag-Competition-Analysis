@@ -1815,7 +1815,10 @@ export const LogoutMobileSessionResponse = zod.object({
 export const GetMrpRevisionScopesResponse = zod.object({
   "mrpPeriods": zod.array(zod.object({
   "effectiveDate": zod.coerce.date(),
-  "division": zod.string().nullable(),
+  "divisions": zod.array(zod.object({
+  "division": zod.string(),
+  "count": zod.number()
+})),
   "rowCount": zod.number(),
   "endsOn": zod.coerce.date().nullable()
 })),

@@ -111,11 +111,12 @@ async function createChangePreview(reason: string) {
 
 beforeAll(async () => {
   await db.insert(catalogProductsTable).values([
-    { itemCode: CODE, productName: "Revision fixture", division: "PTMT & Plastic Fittings", category: "Test" },
+    { itemCode: CODE, productName: "Revision fixture", division: "PTMT & Plastic Fittings / CP Fittings", category: "Test" },
     { itemCode: UNTOUCHED_CODE, productName: "Untouched fixture", division: "PTMT & Plastic Fittings", category: "Test" },
   ]);
   await db.insert(mrpPriceHistoryTable).values([
     { itemCode: CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
+    { itemCode: CODE, mrp: 90, priceBasis: "MRP", effectiveDate: "2040-03-06", loadDate: "2040-03-06", variant: "Standard" },
     { itemCode: UNTOUCHED_CODE, mrp: 200, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
   ]);
   await db.insert(competitorPricesTable).values([
@@ -150,7 +151,10 @@ describe("MRP revision preview, apply and rollback", () => {
     expect(scopes.body.mrpPeriods).toEqual(expect.arrayContaining([
       expect.objectContaining({
         effectiveDate: DATE,
-        division: "PTMT & Plastic Fittings",
+        divisions: [
+          { division: "PTMT & Plastic Fittings", count: 2 },
+          { division: "CP Fittings", count: 1 },
+        ],
         rowCount: 2,
       }),
     ]));
@@ -216,6 +220,7 @@ describe("MRP revision preview, apply and rollback", () => {
     )).toMatchObject({
       outcome: "rejected",
       rejectionReason: "Row date 2040-03-06 does not match the selected period 2040-03-05.",
+      previousValue: 90,
     });
     batchIds.push(preview.body.batchId);
     expect(preview.body.rows.find((row: { outcome: string; itemCode: string }) =>
@@ -438,6 +443,7 @@ describe("MRP revision preview, apply and rollback", () => {
         outcome: "rejected",
         rejectionReason: "Row date 2026-03-05 does not match the selected period 2026-09-01.",
       });
+      expect(mismatchPreview.body.rows[0].previousValue).not.toBeNull();
     },
   );
 });

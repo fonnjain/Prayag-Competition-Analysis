@@ -4022,18 +4022,28 @@ components:
           minLength: 1
     MrpRevisionScope:
       type: object
-      required: [effectiveDate, division, rowCount, endsOn]
+      required: [effectiveDate, divisions, rowCount, endsOn]
       properties:
         effectiveDate:
           type: string
           format: date
-        division:
-          type: ["string", "null"]
+        divisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevisionDivisionSummary"
         rowCount:
           type: integer
         endsOn:
           type: ["string", "null"]
           format: date
+    RevisionDivisionSummary:
+      type: object
+      required: [division, count]
+      properties:
+        division:
+          type: string
+        count:
+          type: integer
     CompetitorRevisionScope:
       type: object
       required: [competitor, effectiveDate, rowCount, endsOn]

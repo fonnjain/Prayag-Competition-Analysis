@@ -1420,10 +1420,14 @@ export interface MrpRevisionPreviewInput {
   reason: string;
 }
 
+export interface RevisionDivisionSummary {
+  division: string;
+  count: number;
+}
+
 export interface MrpRevisionScope {
   effectiveDate: string;
-  /** @nullable */
-  division: string | null;
+  divisions: RevisionDivisionSummary[];
   rowCount: number;
   /** @nullable */
   endsOn: string | null;

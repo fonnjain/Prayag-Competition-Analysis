@@ -43,13 +43,23 @@ type RevisionScopeDate = {
   endsOn: string | null;
 };
 
+type RevisionDivisionSummary = {
+  division: string;
+  count: number;
+};
+
 type MrpRevisionScope = RevisionScopeDate & {
-  division: string | null;
+  divisions: RevisionDivisionSummary[];
 };
 
 type CompetitorRevisionScope = RevisionScopeDate & {
   competitor: string;
 };
+
+function splitDivisions(value: string | null): string[] {
+  if (!value) return [];
+  return [...new Set(value.split(/\s*(?:\||\/)\s*/).map((part) => part.trim()).filter(Boolean))];
+}
 
 function textValue(value: unknown): string | null {
   if (value == null || String(value).trim() === "") return null;
@@ -207,20 +217,25 @@ router.get("/catalog/mrp-revisions/scopes", requireAdmin, async (_req, res) => {
       ),
   ]);
 
+  const mrpDivisionCounts = new Map<string, Map<string, number>>();
+  for (const group of mrpGroups) {
+    const divisions = mrpDivisionCounts.get(group.effectiveDate) ?? new Map<string, number>();
+    for (const division of splitDivisions(group.division)) {
+      divisions.set(division, (divisions.get(division) ?? 0) + group.rowCount);
+    }
+    mrpDivisionCounts.set(group.effectiveDate, divisions);
+  }
   const mrpByDate = new Map<string, MrpRevisionScope>();
   for (const group of mrpGroups) {
     const existing = mrpByDate.get(group.effectiveDate);
     if (existing) {
       existing.rowCount += group.rowCount;
-      if (group.division && !existing.division?.includes(group.division)) {
-        existing.division = existing.division
-          ? `${existing.division} / ${group.division}`
-          : group.division;
-      }
     } else {
       mrpByDate.set(group.effectiveDate, {
         effectiveDate: group.effectiveDate,
-        division: group.division,
+        divisions: [...(mrpDivisionCounts.get(group.effectiveDate) ?? new Map())]
+          .map(([division, count]) => ({ division, count }))
+          .sort((a, b) => b.count - a.count || a.division.localeCompare(b.division)),
         rowCount: group.rowCount,
         endsOn: null,
       });
@@ -297,18 +312,16 @@ router.post(
       const products = await db.select().from(catalogProductsTable);
       const productByCode = new Map(products.map((product) => [normCode(product.itemCode), product]));
 
-      const mrpRows = targetType === "mrp"
+      const allMrpRows = targetType === "mrp"
         ? await db.select().from(mrpPriceHistoryTable)
-            .where(eq(mrpPriceHistoryTable.effectiveDate, lockedDate))
         : [];
-      const competitorRows = targetType === "competitor"
+      const mrpRows = allMrpRows.filter((row) => row.effectiveDate === lockedDate);
+      const allCompetitorRows = targetType === "competitor"
         ? await db.select().from(competitorPricesTable).where(
-            and(
-              eq(competitorPricesTable.competitor, lockedCompetitor!),
-              eq(competitorPricesTable.effectiveDate, lockedDate!),
-            ),
+            eq(competitorPricesTable.competitor, lockedCompetitor!),
           )
         : [];
+      const competitorRows = allCompetitorRows.filter((row) => row.effectiveDate === lockedDate);
       if (targetType === "mrp" && mrpRows.length === 0) {
         throw Object.assign(
           new Error(`No existing MRP period found for selected date ${lockedDate}.`),
@@ -344,7 +357,7 @@ router.post(
         const rowDate: string | null = parsedWorkbook.hasEffectiveDateColumn
           ? row.effectiveDate
           : lockedDate;
-        const reject = (reason: string) => {
+        const reject = (reason: string, previousValue: number | null = null) => {
           rejected++;
           rowsToInsert.push({
             rowNumber: row.rowNumber,
@@ -352,6 +365,7 @@ router.post(
             effectiveDate: rowDate,
             variant: row.variant,
             competitor: row.competitor,
+            previousValue,
             newValue: row.newValue,
             note: row.note,
             outcome: "rejected",
@@ -366,10 +380,29 @@ router.post(
           reject("effective_date must be a valid YYYY-MM-DD date.");
           continue;
         }
+        const product = productByCode.get(normCode(row.itemCode));
         if (rowDate !== lockedDate) {
           dateMismatchCount++;
           dateMismatchDates.add(rowDate);
-          reject(`Row date ${rowDate} does not match the selected period ${lockedDate}.`);
+          let rowDatePrevious: number | null = null;
+          if (targetType === "mrp" && product) {
+            rowDatePrevious = allMrpRows.find(
+                (candidate) =>
+                  normCode(candidate.itemCode) === normCode(product.itemCode) &&
+                  candidate.effectiveDate === rowDate &&
+                  candidate.variant === row.variant,
+              )?.mrp ?? null;
+          } else if (targetType === "competitor") {
+            rowDatePrevious = allCompetitorRows.find(
+                (candidate) =>
+                  normCode(candidate.competitorCode) === normCode(row.itemCode) &&
+                  candidate.effectiveDate === rowDate,
+              )?.price ?? null;
+          }
+          reject(
+            `Row date ${rowDate} does not match the selected period ${lockedDate}.`,
+            rowDatePrevious,
+          );
           continue;
         }
         if (row.newValue == null) {
@@ -387,7 +420,6 @@ router.post(
           }
         }
 
-        const product = productByCode.get(normCode(row.itemCode));
         let targetRow: typeof mrpRows[number] | typeof competitorRows[number] | undefined;
         let previous: number | null = null;
         let division: string | null = product?.division ?? null;

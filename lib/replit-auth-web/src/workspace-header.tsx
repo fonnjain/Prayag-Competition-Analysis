@@ -152,8 +152,8 @@ export function WorkspaceHeader({ activeApp }: { activeApp: WorkspaceApp }) {
       id={mobile ? "workspace-mobile-navigation" : undefined}
       className={
         mobile
-          ? "flex flex-col gap-1 border-t bg-card px-4 pb-3 pt-2 md:hidden"
-          : "hidden items-center gap-1 md:flex"
+          ? "flex flex-col gap-1 border-t bg-card px-4 pb-3 pt-2 lg:hidden"
+          : "hidden items-center gap-1 lg:flex"
       }
       aria-label="Workspace navigation"
     >
@@ -221,7 +221,7 @@ export function WorkspaceHeader({ activeApp }: { activeApp: WorkspaceApp }) {
           )}
           <button
             type="button"
-            className="flex items-center justify-center rounded-md p-1.5 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f766e] md:hidden"
+            className="flex items-center justify-center rounded-md p-1.5 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0f766e] lg:hidden"
             aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={menuOpen}
             aria-controls="workspace-mobile-navigation"
