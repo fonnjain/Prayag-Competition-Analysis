@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { eq, inArray } from "drizzle-orm";
 import {
   catalogProductsTable,
+  competitorPricesTable,
   db,
   mrpHistoryProvenanceEventsTable,
   mrpPriceHistoryTable,
@@ -20,6 +21,11 @@ const RUN = Date.now();
 const CODE = `__MRP_REVISION_${RUN}__`;
 const UNTOUCHED_CODE = `__MRP_REVISION_UNTOUCHED_${RUN}__`;
 const DATE = "2040-03-05";
+const COMPETITOR = `Revision Competitor ${RUN}`;
+const OTHER_COMPETITOR = `Other Revision Competitor ${RUN}`;
+const COMPETITOR_CODE = `REV-COMP-${RUN}`;
+const COMPETITOR_DATE = "2040-04-01";
+const COMPETITOR_LATER_DATE = "2040-09-01";
 const SUPPLIED_WORKBOOK = fileURLToPath(
   new URL(
     "../../../../attached_assets/MRP_Revision_Upload_Template_1787838250278.xlsx",
@@ -71,9 +77,31 @@ function noopWorkbook(): Buffer {
   return XLSX.write(book, { type: "buffer", bookType: "xlsx" });
 }
 
+function noDateWorkbook(): Buffer {
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+    ["item_code", "variant", "new_mrp", "note"],
+    [CODE, "Standard", 110, "selected date must be used"],
+  ]), "revision");
+  return XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+}
+
+function competitorWorkbook(
+  date = COMPETITOR_DATE,
+  competitor = COMPETITOR,
+): Buffer {
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+    ["item_code", "effective_date", "variant", "new_mrp", "competitor", "note"],
+    [COMPETITOR_CODE, date, "Standard", 125, competitor, "competitor correction"],
+  ]), "revision");
+  return XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+}
+
 async function createChangePreview(reason: string) {
   const preview = await request.post("/catalog/mrp-revisions/preview")
     .field("targetType", "mrp")
+    .field("effectiveDate", DATE)
     .field("reason", reason)
     .attach("file", workbook(), { filename: "revision.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   expect(preview.status).toBe(200);
@@ -90,6 +118,11 @@ beforeAll(async () => {
     { itemCode: CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
     { itemCode: UNTOUCHED_CODE, mrp: 200, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
   ]);
+  await db.insert(competitorPricesTable).values([
+    { competitor: COMPETITOR, competitorCode: COMPETITOR_CODE, price: 100, effectiveDate: COMPETITOR_DATE, matchStatus: "matched" },
+    { competitor: COMPETITOR, competitorCode: COMPETITOR_CODE, price: 130, effectiveDate: COMPETITOR_LATER_DATE, matchStatus: "matched" },
+    { competitor: OTHER_COMPETITOR, competitorCode: COMPETITOR_CODE, price: 140, effectiveDate: COMPETITOR_DATE, matchStatus: "matched" },
+  ]);
 });
 
 afterAll(async () => {
@@ -99,6 +132,8 @@ afterAll(async () => {
   }
   await db.delete(mrpHistoryProvenanceEventsTable)
     .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, UNTOUCHED_CODE]));
+  await db.delete(competitorPricesTable)
+    .where(inArray(competitorPricesTable.competitor, [COMPETITOR, OTHER_COMPETITOR]));
   await db.delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, [CODE, UNTOUCHED_CODE]));
   await db.delete(catalogProductsTable)
@@ -106,9 +141,59 @@ afterAll(async () => {
 });
 
 describe("MRP revision preview, apply and rollback", () => {
+  it("lists existing revision scopes and rejects a missing or nonexistent selected period without creating one", async () => {
+    const beforePeriods = await db
+      .selectDistinct({ effectiveDate: mrpPriceHistoryTable.effectiveDate })
+      .from(mrpPriceHistoryTable);
+    const scopes = await request.get("/catalog/mrp-revisions/scopes");
+    expect(scopes.status).toBe(200);
+    expect(scopes.body.mrpPeriods).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        effectiveDate: DATE,
+        division: "PTMT & Plastic Fittings",
+        rowCount: 2,
+      }),
+    ]));
+    expect(scopes.body.competitorPeriods).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        competitor: COMPETITOR,
+        effectiveDate: COMPETITOR_DATE,
+        rowCount: 1,
+        endsOn: expect.any(String),
+      }),
+      expect.objectContaining({
+        competitor: COMPETITOR,
+        effectiveDate: COMPETITOR_LATER_DATE,
+        rowCount: 1,
+        endsOn: null,
+      }),
+    ]));
+
+    const missingDate = await request.post("/catalog/mrp-revisions/preview")
+      .field("targetType", "mrp")
+      .field("reason", "A selected period is required")
+      .attach("file", noopWorkbook(), { filename: "missing-date.xlsx" });
+    expect(missingDate.status).toBe(400);
+    expect(missingDate.body.error).toMatch(/existing effectiveDate/i);
+
+    const nonexistentDate = await request.post("/catalog/mrp-revisions/preview")
+      .field("targetType", "mrp")
+      .field("effectiveDate", "2041-01-01")
+      .field("reason", "Selected dates must already exist")
+      .attach("file", noopWorkbook(), { filename: "nonexistent-date.xlsx" });
+    expect(nonexistentDate.status).toBe(400);
+    expect(nonexistentDate.body.error).toContain("No existing MRP period found");
+
+    const afterPeriods = await db
+      .selectDistinct({ effectiveDate: mrpPriceHistoryTable.effectiveDate })
+      .from(mrpPriceHistoryTable);
+    expect(afterPeriods).toEqual(beforePeriods);
+  });
+
   it("normalizes uploaded codes, warns only on changing rows, rejects invalid rows, and restores exact previous values", async () => {
     const preview = await request.post("/catalog/mrp-revisions/preview")
       .field("targetType", "mrp")
+      .field("effectiveDate", DATE)
       .field("reason", "Test the controlled revision pathway")
       .attach("file", workbook(), { filename: "revision.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
@@ -121,6 +206,17 @@ describe("MRP revision preview, apply and rollback", () => {
       status: "preview",
     });
     expect(preview.body.warningCount).toBeGreaterThan(1);
+    expect(preview.body).toMatchObject({
+      hasEffectiveDateColumn: true,
+      dateMismatchCount: 1,
+      dateMismatchDates: ["2040-03-06"],
+    });
+    expect(preview.body.rows.find((row: { effectiveDate: string; outcome: string }) =>
+      row.effectiveDate === "2040-03-06",
+    )).toMatchObject({
+      outcome: "rejected",
+      rejectionReason: "Row date 2040-03-06 does not match the selected period 2040-03-05.",
+    });
     batchIds.push(preview.body.batchId);
     expect(preview.body.rows.find((row: { outcome: string; itemCode: string }) =>
       row.itemCode === UNTOUCHED_CODE,
@@ -164,6 +260,7 @@ describe("MRP revision preview, apply and rollback", () => {
   it("reports a no-op-only preview clearly, blocks direct apply, and records a durable discard", async () => {
     const preview = await request.post("/catalog/mrp-revisions/preview")
       .field("targetType", "mrp")
+      .field("effectiveDate", DATE)
       .field("reason", "Test a no-op-only preview")
       .attach("file", noopWorkbook(), { filename: "noop-revision.xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
@@ -194,6 +291,54 @@ describe("MRP revision preview, apply and rollback", () => {
     });
     expect(retained.body.batch.discardedAt).toBeTruthy();
     expect(retained.body.rows).toHaveLength(1);
+  });
+
+  it("uses the selected existing period only when the workbook has no effective-date column", async () => {
+    const preview = await request.post("/catalog/mrp-revisions/preview")
+      .field("targetType", "mrp")
+      .field("effectiveDate", DATE)
+      .field("reason", "Allow a legacy correction file without a date column")
+      .attach("file", noDateWorkbook(), { filename: "no-date-revision.xlsx" });
+    expect(preview.status).toBe(200);
+    batchIds.push(preview.body.batchId);
+    expect(preview.body).toMatchObject({
+      effectiveDate: DATE,
+      hasEffectiveDateColumn: false,
+      dateMismatchCount: 0,
+      rowsChanged: 1,
+      rowsRejected: 0,
+    });
+    expect(preview.body.rows).toEqual([
+      expect.objectContaining({ effectiveDate: DATE, outcome: "change" }),
+    ]);
+    expect((await request.post(`/catalog/mrp-revisions/${preview.body.batchId}/discard`)).status).toBe(200);
+  });
+
+  it("scopes competitor revisions to the selected brand and existing period", async () => {
+    const preview = await request.post("/catalog/mrp-revisions/preview")
+      .field("targetType", "competitor")
+      .field("competitor", COMPETITOR)
+      .field("effectiveDate", COMPETITOR_DATE)
+      .field("reason", "Correct an existing competitor period")
+      .attach("file", competitorWorkbook(), { filename: "competitor-revision.xlsx" });
+    expect(preview.status).toBe(200);
+    batchIds.push(preview.body.batchId);
+    expect(preview.body).toMatchObject({
+      competitor: COMPETITOR,
+      effectiveDate: COMPETITOR_DATE,
+      rowsChanged: 1,
+      rowsRejected: 0,
+    });
+    expect((await request.post(`/catalog/mrp-revisions/${preview.body.batchId}/discard`)).status).toBe(200);
+
+    const crossBrandPeriod = await request.post("/catalog/mrp-revisions/preview")
+      .field("targetType", "competitor")
+      .field("competitor", COMPETITOR)
+      .field("effectiveDate", DATE)
+      .field("reason", "A competitor cannot use another brand's period")
+      .attach("file", competitorWorkbook(DATE, COMPETITOR), { filename: "cross-brand-period.xlsx" });
+    expect(crossBrandPeriod.status).toBe(400);
+    expect(crossBrandPeriod.body.error).toContain(`No existing ${COMPETITOR} period found`);
   });
 
   it("exempts confirmed low-price codes without suppressing warnings for other codes", () => {
@@ -255,22 +400,43 @@ describe("MRP revision preview, apply and rollback", () => {
   });
 
   it.runIf(existsSync(SUPPLIED_WORKBOOK))(
-    "classifies the supplied 343-row workbook as a clean no-op preview",
+    "keeps the supplied uniform March workbook in its selected period and prominently rejects it against September",
     async () => {
-      const preview = await request.post("/catalog/mrp-revisions/preview")
+      const matchingPreview = await request.post("/catalog/mrp-revisions/preview")
         .field("targetType", "mrp")
+        .field("effectiveDate", "2026-03-05")
         .field("reason", "Verify the supplied revision workbook after code normalization")
         .attach("file", SUPPLIED_WORKBOOK);
 
-      expect(preview.status).toBe(200);
-      batchIds.push(preview.body.batchId);
-      expect(preview.body).toMatchObject({
+      expect(matchingPreview.status).toBe(200);
+      batchIds.push(matchingPreview.body.batchId);
+      expect(matchingPreview.body).toMatchObject({
         rowsInFile: 343,
         rowsChanged: 0,
         rowsNoop: 343,
         rowsRejected: 0,
         warningCount: 0,
         status: "preview",
+      });
+
+      const mismatchPreview = await request.post("/catalog/mrp-revisions/preview")
+        .field("targetType", "mrp")
+        .field("effectiveDate", "2026-09-01")
+        .field("reason", "Prove the selected period guards against the March workbook")
+        .attach("file", SUPPLIED_WORKBOOK);
+      expect(mismatchPreview.status).toBe(200);
+      batchIds.push(mismatchPreview.body.batchId);
+      expect(mismatchPreview.body).toMatchObject({
+        rowsInFile: 343,
+        rowsChanged: 0,
+        rowsNoop: 0,
+        rowsRejected: 343,
+        dateMismatchCount: 343,
+        dateMismatchDates: ["2026-03-05"],
+      });
+      expect(mismatchPreview.body.rows[0]).toMatchObject({
+        outcome: "rejected",
+        rejectionReason: "Row date 2026-03-05 does not match the selected period 2026-09-01.",
       });
     },
   );

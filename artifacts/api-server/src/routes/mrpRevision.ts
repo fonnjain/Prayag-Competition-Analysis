@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -30,6 +30,25 @@ type ParsedRevision = {
   competitor: string | null;
   newValue: number | null;
   note: string | null;
+};
+
+type ParsedRevisionWorkbook = {
+  rows: ParsedRevision[];
+  hasEffectiveDateColumn: boolean;
+};
+
+type RevisionScopeDate = {
+  effectiveDate: string;
+  rowCount: number;
+  endsOn: string | null;
+};
+
+type MrpRevisionScope = RevisionScopeDate & {
+  division: string | null;
+};
+
+type CompetitorRevisionScope = RevisionScopeDate & {
+  competitor: string;
 };
 
 function textValue(value: unknown): string | null {
@@ -80,7 +99,7 @@ const LEGITIMATE_LOW_PRICE_CODES = new Set([
 export function parseRevisionWorkbook(
   buffer: Buffer,
   targetType: TargetType,
-): ParsedRevision[] {
+): ParsedRevisionWorkbook {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sheet = workbook.Sheets.revision;
   if (!sheet) throw new Error('Workbook must contain a sheet named "revision".');
@@ -100,7 +119,7 @@ export function parseRevisionWorkbook(
   const variantCol = col("variant");
   const competitorCol = col("competitor");
   const noteCol = col("note");
-  const missing = ["item_code", "effective_date", "new_mrp"].filter(
+  const missing = ["item_code", "new_mrp"].filter(
     (name) => col(name) < 0,
   );
   if (targetType === "competitor" && competitorCol < 0) missing.push("competitor");
@@ -108,15 +127,18 @@ export function parseRevisionWorkbook(
     throw new Error(`Missing required revision column(s): ${missing.join(", ")}.`);
   }
 
-  return rows.slice(1).map((row, index) => ({
-    rowNumber: index + 2,
-    itemCode: normCode(textValue(row[codeCol]) ?? ""),
-    effectiveDate: dateValue(row[dateCol]),
-    variant: textValue(row[variantCol]) ?? "Standard",
-    competitor: targetType === "competitor" ? textValue(row[competitorCol]) : null,
-    newValue: numberValue(row[valueCol]),
-    note: textValue(row[noteCol]),
-  }));
+  return {
+    hasEffectiveDateColumn: dateCol >= 0,
+    rows: rows.slice(1).map((row, index) => ({
+      rowNumber: index + 2,
+      itemCode: normCode(textValue(row[codeCol]) ?? ""),
+      effectiveDate: dateCol >= 0 ? dateValue(row[dateCol]) : null,
+      variant: textValue(row[variantCol]) ?? "Standard",
+      competitor: targetType === "competitor" ? textValue(row[competitorCol]) : null,
+      newValue: numberValue(row[valueCol]),
+      note: textValue(row[noteCol]),
+    })),
+  };
 }
 
 function targetTypeValue(value: unknown): TargetType | null {
@@ -150,6 +172,92 @@ function userLabel(req: Parameters<typeof requireAdmin>[0]): string | null {
   return req.user?.email ?? req.user?.id ?? null;
 }
 
+function addDays(value: string, days: number): string {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+router.get("/catalog/mrp-revisions/scopes", requireAdmin, async (_req, res) => {
+  const [mrpGroups, competitorGroups] = await Promise.all([
+    db
+      .select({
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        division: catalogProductsTable.division,
+        rowCount: sql<number>`cast(count(*) as integer)`,
+      })
+      .from(mrpPriceHistoryTable)
+      .leftJoin(
+        catalogProductsTable,
+        eq(catalogProductsTable.itemCode, mrpPriceHistoryTable.itemCode),
+      )
+      .groupBy(mrpPriceHistoryTable.effectiveDate, catalogProductsTable.division)
+      .orderBy(asc(mrpPriceHistoryTable.effectiveDate), asc(catalogProductsTable.division)),
+    db
+      .select({
+        competitor: competitorPricesTable.competitor,
+        effectiveDate: competitorPricesTable.effectiveDate,
+        rowCount: sql<number>`cast(count(*) as integer)`,
+      })
+      .from(competitorPricesTable)
+      .where(isNotNull(competitorPricesTable.effectiveDate))
+      .groupBy(competitorPricesTable.competitor, competitorPricesTable.effectiveDate)
+      .orderBy(
+        asc(competitorPricesTable.competitor),
+        asc(competitorPricesTable.effectiveDate),
+      ),
+  ]);
+
+  const mrpByDate = new Map<string, MrpRevisionScope>();
+  for (const group of mrpGroups) {
+    const existing = mrpByDate.get(group.effectiveDate);
+    if (existing) {
+      existing.rowCount += group.rowCount;
+      if (group.division && !existing.division?.includes(group.division)) {
+        existing.division = existing.division
+          ? `${existing.division} / ${group.division}`
+          : group.division;
+      }
+    } else {
+      mrpByDate.set(group.effectiveDate, {
+        effectiveDate: group.effectiveDate,
+        division: group.division,
+        rowCount: group.rowCount,
+        endsOn: null,
+      });
+    }
+  }
+  const mrpPeriods = [...mrpByDate.values()].sort((a, b) =>
+    a.effectiveDate.localeCompare(b.effectiveDate),
+  );
+  for (let index = 0; index < mrpPeriods.length; index += 1) {
+    mrpPeriods[index]!.endsOn = mrpPeriods[index + 1]
+      ? addDays(mrpPeriods[index + 1]!.effectiveDate, -1)
+      : null;
+  }
+
+  const competitorPeriods: CompetitorRevisionScope[] = competitorGroups
+    .filter(
+      (group): group is typeof group & { effectiveDate: string } =>
+        !!group.effectiveDate,
+    )
+    .map((group) => ({
+      competitor: group.competitor,
+      effectiveDate: group.effectiveDate,
+      rowCount: group.rowCount,
+      endsOn: null,
+    }));
+  for (let index = 0; index < competitorPeriods.length; index += 1) {
+    const current = competitorPeriods[index]!;
+    const next = competitorPeriods[index + 1];
+    current.endsOn =
+      next && next.competitor === current.competitor
+        ? addDays(next.effectiveDate, -1)
+        : null;
+  }
+
+  res.json({ mrpPeriods, competitorPeriods });
+});
+
 router.post(
   "/catalog/mrp-revisions/preview",
   requireAdmin,
@@ -171,8 +279,8 @@ router.post(
       res.status(400).json({ error: "competitor is required for competitor revisions." });
       return;
     }
-    if (targetType === "competitor" && (!lockedDate || !isIsoDate(lockedDate))) {
-      res.status(400).json({ error: "A valid effectiveDate is required for competitor revisions." });
+    if (!lockedDate || !isIsoDate(lockedDate)) {
+      res.status(400).json({ error: "A valid existing effectiveDate is required for revisions." });
       return;
     }
     if (!req.file) {
@@ -181,17 +289,17 @@ router.post(
     }
 
     try {
-      const parsed = parseRevisionWorkbook(req.file.buffer, targetType);
+      const parsedWorkbook = parseRevisionWorkbook(req.file.buffer, targetType);
+      const parsed = parsedWorkbook.rows;
       const fileSha256 = sha256ForBuffer(req.file.buffer);
       // The catalog is small enough that a single read is clearer and safer
       // than relying on database-specific normalization of uploaded codes.
       const products = await db.select().from(catalogProductsTable);
       const productByCode = new Map(products.map((product) => [normCode(product.itemCode), product]));
 
-      const mrpDates = [...new Set(parsed.map((row) => row.effectiveDate).filter((date): date is string => !!date && isIsoDate(date)))];
-      const mrpRows = targetType === "mrp" && mrpDates.length
+      const mrpRows = targetType === "mrp"
         ? await db.select().from(mrpPriceHistoryTable)
-            .where(inArray(mrpPriceHistoryTable.effectiveDate, mrpDates))
+            .where(eq(mrpPriceHistoryTable.effectiveDate, lockedDate))
         : [];
       const competitorRows = targetType === "competitor"
         ? await db.select().from(competitorPricesTable).where(
@@ -201,12 +309,26 @@ router.post(
             ),
           )
         : [];
+      if (targetType === "mrp" && mrpRows.length === 0) {
+        throw Object.assign(
+          new Error(`No existing MRP period found for selected date ${lockedDate}.`),
+          { httpStatus: 400 },
+        );
+      }
+      if (targetType === "competitor" && competitorRows.length === 0) {
+        throw Object.assign(
+          new Error(`No existing ${lockedCompetitor} period found for selected date ${lockedDate}.`),
+          { httpStatus: 400 },
+        );
+      }
 
       const rowsToInsert: Omit<typeof mrpRevisionRowsTable.$inferInsert, "batchId">[] = [];
       let changed = 0;
       let noop = 0;
       let rejected = 0;
       let warningCount = 0;
+      let dateMismatchCount = 0;
+      const dateMismatchDates = new Set<string>();
       const changeTargetIds = new Set<number>();
       const changesByPeriod = new Map<string, number>();
       const periodCounts = new Map<string, number>();
@@ -219,12 +341,15 @@ router.post(
       }
 
       for (const row of parsed) {
+        const rowDate: string | null = parsedWorkbook.hasEffectiveDateColumn
+          ? row.effectiveDate
+          : lockedDate;
         const reject = (reason: string) => {
           rejected++;
           rowsToInsert.push({
             rowNumber: row.rowNumber,
             itemCode: row.itemCode || null,
-            effectiveDate: row.effectiveDate,
+            effectiveDate: rowDate,
             variant: row.variant,
             competitor: row.competitor,
             newValue: row.newValue,
@@ -237,8 +362,14 @@ router.post(
           reject("item_code is blank.");
           continue;
         }
-        if (!row.effectiveDate || !isIsoDate(row.effectiveDate)) {
+        if (!rowDate || !isIsoDate(rowDate)) {
           reject("effective_date must be a valid YYYY-MM-DD date.");
+          continue;
+        }
+        if (rowDate !== lockedDate) {
+          dateMismatchCount++;
+          dateMismatchDates.add(rowDate);
+          reject(`Row date ${rowDate} does not match the selected period ${lockedDate}.`);
           continue;
         }
         if (row.newValue == null) {
@@ -252,10 +383,6 @@ router.post(
         if (targetType === "competitor") {
           if (row.competitor !== lockedCompetitor) {
             reject(`Competitor is locked to "${lockedCompetitor}".`);
-            continue;
-          }
-          if (row.effectiveDate !== lockedDate) {
-            reject(`Effective date is locked to ${lockedDate}.`);
             continue;
           }
         }
@@ -272,11 +399,11 @@ router.post(
           targetRow = mrpRows.find(
             (candidate) =>
               normCode(candidate.itemCode) === normCode(product.itemCode) &&
-              candidate.effectiveDate === row.effectiveDate &&
+              candidate.effectiveDate === rowDate &&
               candidate.variant === row.variant,
           );
           if (!targetRow) {
-            reject(`No existing MRP row for ${product.itemCode}, ${row.effectiveDate}, ${row.variant}. Use the MRP loader for a new period.`);
+            reject(`No existing MRP row for ${product.itemCode}, ${rowDate}, ${row.variant}. Use the MRP loader for a new period.`);
             continue;
           }
           previous = targetRow.mrp;
@@ -284,7 +411,7 @@ router.post(
           const matches = competitorRows.filter(
             (candidate) =>
               normCode(candidate.competitorCode) === normCode(row.itemCode) &&
-              candidate.effectiveDate === row.effectiveDate,
+              candidate.effectiveDate === rowDate,
           );
           if (matches.length !== 1) {
             reject(matches.length === 0
@@ -313,15 +440,15 @@ router.post(
           changed++;
           changeTargetIds.add(targetRow!.id);
           changesByPeriod.set(
-            row.effectiveDate,
-            (changesByPeriod.get(row.effectiveDate) ?? 0) + 1,
+            rowDate,
+            (changesByPeriod.get(rowDate) ?? 0) + 1,
           );
         }
         warningCount += warnings.length;
         rowsToInsert.push({
           rowNumber: row.rowNumber,
           itemCode: targetType === "mrp" ? product!.itemCode : row.itemCode,
-          effectiveDate: row.effectiveDate,
+          effectiveDate: rowDate,
           variant: row.variant,
           competitor: targetType === "competitor" ? lockedCompetitor : null,
           targetRowId: targetRow!.id,
@@ -348,7 +475,7 @@ router.post(
         const inserted = await tx.insert(mrpRevisionBatchesTable).values({
           targetType,
           competitor: targetType === "competitor" ? lockedCompetitor : null,
-          lockedEffectiveDate: targetType === "competitor" ? lockedDate : null,
+          lockedEffectiveDate: lockedDate,
           fileName: req.file!.originalname,
           fileSha256,
           fileSizeBytes: req.file!.size,
@@ -376,6 +503,9 @@ router.post(
         targetType,
         competitor: lockedCompetitor,
         effectiveDate: lockedDate,
+        hasEffectiveDateColumn: parsedWorkbook.hasEffectiveDateColumn,
+        dateMismatchCount,
+        dateMismatchDates: [...dateMismatchDates].sort(),
         fileName: req.file.originalname,
         fileSha256,
         status: "preview",
@@ -386,9 +516,11 @@ router.post(
         warningCount,
         rows: storedRows,
       });
-    } catch (error) {
-      req.log.error({ err: error }, "MRP revision preview failed");
-      res.status(400).json({ error: error instanceof Error ? error.message : "Could not preview revision workbook." });
+    } catch (error: any) {
+      req.log?.error({ err: error }, "MRP revision preview failed");
+      res
+        .status(error.httpStatus ?? 400)
+        .json({ error: error instanceof Error ? error.message : "Could not preview revision workbook." });
     }
   },
 );

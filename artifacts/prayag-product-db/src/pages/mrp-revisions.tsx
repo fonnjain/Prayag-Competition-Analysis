@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,8 +38,30 @@ type RevisionPreview = {
   rowsNoop: number;
   rowsRejected: number;
   warningCount: number;
+  hasEffectiveDateColumn: boolean;
+  dateMismatchCount: number;
+  dateMismatchDates: string[];
   status: "preview" | "applied" | "discarded" | "rolled_back";
   rows: RevisionRow[];
+};
+
+type RevisionScope = {
+  effectiveDate: string;
+  rowCount: number;
+  endsOn: string | null;
+};
+
+type MrpRevisionScope = RevisionScope & {
+  division: string | null;
+};
+
+type CompetitorRevisionScope = RevisionScope & {
+  competitor: string;
+};
+
+type RevisionScopes = {
+  mrpPeriods: MrpRevisionScope[];
+  competitorPeriods: CompetitorRevisionScope[];
 };
 
 function warningText(row: RevisionRow) {
@@ -53,6 +75,16 @@ function warningText(row: RevisionRow) {
 
 function money(value: number | null) {
   return value == null ? "—" : `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+function periodContext(scope: RevisionScope, division?: string | null) {
+  const context = [
+    formatDisplayDate(scope.effectiveDate),
+    division,
+    `${scope.rowCount.toLocaleString("en-IN")} rows`,
+    scope.endsOn ? `in force until ${formatDisplayDate(scope.endsOn)}` : "currently open-ended",
+  ].filter(Boolean);
+  return context.join(" · ");
 }
 
 export default function MrpRevisionsPage() {
@@ -70,6 +102,22 @@ export default function MrpRevisionsPage() {
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const scopes = useQuery<RevisionScopes>({
+    queryKey: ["catalog", "mrp-revisions", "scopes"],
+    queryFn: async () => {
+      const response = await fetch("/api/catalog/mrp-revisions/scopes");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load revision periods.");
+      return data;
+    },
+  });
+  const competitorPeriods = (scopes.data?.competitorPeriods ?? [])
+    .filter((scope) => scope.competitor === competitor)
+    .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+  const selectedScope =
+    targetType === "mrp"
+      ? scopes.data?.mrpPeriods.find((scope) => scope.effectiveDate === effectiveDate)
+      : competitorPeriods.find((scope) => scope.effectiveDate === effectiveDate);
 
   const previewWorkbook = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -78,8 +126,8 @@ export default function MrpRevisionsPage() {
       toast({ title: "Add a reason", description: "A short audit reason is required before previewing.", variant: "destructive" });
       return;
     }
-    if (targetType === "competitor" && (!competitor.trim() || !effectiveDate)) {
-      toast({ title: "Choose the locked scope", description: "Competitor revisions require one competitor and one effective date.", variant: "destructive" });
+    if (!effectiveDate || (targetType === "competitor" && !competitor)) {
+      toast({ title: "Choose a revision scope", description: "Select an existing period before creating a preview.", variant: "destructive" });
       return;
     }
     setIsPreviewing(true);
@@ -89,9 +137,9 @@ export default function MrpRevisionsPage() {
     body.append("file", file);
     body.append("targetType", targetType);
     body.append("reason", reason.trim());
+    body.append("effectiveDate", effectiveDate);
     if (targetType === "competitor") {
       body.append("competitor", competitor.trim());
-      body.append("effectiveDate", effectiveDate);
     }
     try {
       const response = await fetch("/api/catalog/mrp-revisions/preview", { method: "POST", body });
@@ -193,14 +241,18 @@ export default function MrpRevisionsPage() {
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#2d7c78]">Controlled correction</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Price revision upload</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Correct values on existing rows only. This tool cannot create a product or a price period, and it never replaces rows that are absent from your workbook.
+          Choose an existing period before uploading. Workbook dates are checked against that choice, so this tool cannot create a product or a price period.
         </p>
       </div>
 
       <form data-activity="mrp_revision.preview" onSubmit={previewWorkbook} className="grid gap-5 rounded-xl border bg-card p-5 shadow-sm lg:grid-cols-[1fr_1fr]">
         <div className="space-y-2">
           <Label>Revision type</Label>
-          <Select value={targetType} onValueChange={(value) => { setTargetType(value as "mrp" | "competitor"); setPreview(null); }}>
+          <Select value={targetType} onValueChange={(value) => {
+            setTargetType(value as "mrp" | "competitor");
+            setEffectiveDate("");
+            setPreview(null);
+          }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="mrp">Prayag MRP</SelectItem>
@@ -209,21 +261,74 @@ export default function MrpRevisionsPage() {
           </Select>
           <p className="text-xs text-muted-foreground">The workbook must contain only the <span className="font-mono">revision</span> sheet data you intend to correct.</p>
         </div>
-        {targetType === "competitor" ? (
+        {scopes.isLoading ? (
+          <div className="flex items-center gap-3 rounded-lg border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            <FileSpreadsheet className="h-5 w-5 text-[#2d7c78]" />
+            Loading existing revision periods…
+          </div>
+        ) : scopes.isError ? (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Revision periods could not load</AlertTitle>
+            <AlertDescription>{scopes.error instanceof Error ? scopes.error.message : "Reload the page before uploading a revision."}</AlertDescription>
+          </Alert>
+        ) : targetType === "competitor" ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="competitor">Locked competitor</Label>
-              <Input id="competitor" value={competitor} onChange={(event) => setCompetitor(event.target.value)} placeholder="e.g. Sparsh" />
+              <Label>Competitor</Label>
+              <Select value={competitor} onValueChange={(value) => { setCompetitor(value); setEffectiveDate(""); setPreview(null); }}>
+                <SelectTrigger><SelectValue placeholder="Choose a competitor" /></SelectTrigger>
+                <SelectContent>
+                  {[...new Set((scopes.data?.competitorPeriods ?? []).map((scope) => scope.competitor))]
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="effective-date">Locked effective date</Label>
-              <Input id="effective-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
+              <Label>Existing effective period</Label>
+              <Select value={effectiveDate} onValueChange={(value) => { setEffectiveDate(value); setPreview(null); }} disabled={!competitor}>
+                <SelectTrigger><SelectValue placeholder={competitor ? "Choose a period" : "Choose a competitor first"} /></SelectTrigger>
+                <SelectContent>
+                  {competitorPeriods.map((scope) => (
+                    <SelectItem key={scope.effectiveDate} value={scope.effectiveDate}>
+                      {periodContext(scope)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-lg border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-            <FileSpreadsheet className="h-5 w-5 text-[#2d7c78]" />
-            Dates and variants are read per row from the workbook and must already exist.
+          <div className="space-y-2">
+            <Label>Existing effective period</Label>
+            <Select value={effectiveDate} onValueChange={(value) => { setEffectiveDate(value); setPreview(null); }}>
+              <SelectTrigger><SelectValue placeholder="Choose the MRP period to correct" /></SelectTrigger>
+              <SelectContent>
+                {(scopes.data?.mrpPeriods ?? [])
+                  .slice()
+                  .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
+                  .map((scope) => (
+                    <SelectItem key={scope.effectiveDate} value={scope.effectiveDate}>
+                      {periodContext(scope, scope.division)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {selectedScope && (
+          <div className="lg:col-span-2 rounded-lg border border-[#2d7c78]/30 bg-[#2d7c78]/5 px-4 py-3 text-sm">
+            <p className="font-medium text-[#1d5d5a]">Selected revision scope</p>
+            <p className="mt-1 text-muted-foreground">
+              {periodContext(
+                selectedScope,
+                "division" in selectedScope ? selectedScope.division : competitor,
+              )}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Workbook dates must match this period. If the workbook has no effective-date column, this selected period is applied to every uploaded row.
+            </p>
           </div>
         )}
         <div className="space-y-2">
@@ -236,7 +341,7 @@ export default function MrpRevisionsPage() {
         </div>
         <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
           <p className="text-xs text-muted-foreground">Preview does not write prices. Only Apply changes existing values.</p>
-          <Button type="submit" disabled={!file || isPreviewing}>
+          <Button type="submit" disabled={!file || !reason.trim() || !selectedScope || (targetType === "competitor" && !competitor) || scopes.isLoading || scopes.isError || isPreviewing}>
             <Upload className="mr-2 h-4 w-4" />
             {isPreviewing ? "Reading workbook…" : "Create read-only preview"}
           </Button>
@@ -272,6 +377,18 @@ export default function MrpRevisionsPage() {
             <p className="mt-4 text-sm font-semibold text-foreground">
               {preview.rowsInFile} rows · {preview.rowsChanged} will change · {preview.rowsNoop} no-ops · {preview.rowsRejected} rejected
             </p>
+            {preview.dateMismatchCount > 0 && (
+              <Alert variant="destructive" className="mt-5">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>
+                  {preview.dateMismatchCount} row{preview.dateMismatchCount === 1 ? "" : "s"} do not match the selected period {formatDisplayDate(preview.effectiveDate)}
+                </AlertTitle>
+                <AlertDescription>
+                  Workbook date{preview.dateMismatchDates.length === 1 ? "" : "s"} {preview.dateMismatchDates.map(formatDisplayDate).join(", ")} {preview.dateMismatchDates.length === 1 ? "does" : "do"} not match the selected scope. These rows will not be applied.
+                  {preview.dateMismatchCount === preview.rowsInFile && " Every uploaded row was rejected for this mismatch; choose the matching period or upload the matching workbook."}
+                </AlertDescription>
+              </Alert>
+            )}
             {preview.rowsChanged === 0 && preview.rowsRejected === 0 && (
               <p className="mt-1 text-sm text-emerald-700">All stored values already match the file. Nothing needs to be written.</p>
             )}

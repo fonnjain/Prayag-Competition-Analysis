@@ -1810,6 +1810,25 @@ export const LogoutMobileSessionResponse = zod.object({
 
 
 /**
+ * @summary List existing MRP and competitor periods available for controlled revisions
+ */
+export const GetMrpRevisionScopesResponse = zod.object({
+  "mrpPeriods": zod.array(zod.object({
+  "effectiveDate": zod.coerce.date(),
+  "division": zod.string().nullable(),
+  "rowCount": zod.number(),
+  "endsOn": zod.coerce.date().nullable()
+})),
+  "competitorPeriods": zod.array(zod.object({
+  "competitor": zod.string(),
+  "effectiveDate": zod.coerce.date(),
+  "rowCount": zod.number(),
+  "endsOn": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
  * @summary Validate a revision workbook without changing prices
  */
 
@@ -1819,7 +1838,7 @@ export const PreviewMrpRevisionBody = zod.object({
   "file": zod.instanceof(File),
   "targetType": zod.enum(['mrp', 'competitor']),
   "competitor": zod.string().optional(),
-  "effectiveDate": zod.coerce.date().optional(),
+  "effectiveDate": zod.coerce.date(),
   "reason": zod.string().min(1)
 })
 
@@ -1827,7 +1846,7 @@ export const PreviewMrpRevisionResponse = zod.object({
   "batchId": zod.number(),
   "targetType": zod.enum(['mrp', 'competitor']),
   "competitor": zod.string().nullish(),
-  "effectiveDate": zod.coerce.date().nullish(),
+  "effectiveDate": zod.coerce.date().nullable(),
   "fileName": zod.string(),
   "fileSha256": zod.string(),
   "rowsInFile": zod.number(),
@@ -1835,6 +1854,9 @@ export const PreviewMrpRevisionResponse = zod.object({
   "rowsNoop": zod.number(),
   "rowsRejected": zod.number(),
   "warningCount": zod.number(),
+  "hasEffectiveDateColumn": zod.boolean(),
+  "dateMismatchCount": zod.number(),
+  "dateMismatchDates": zod.array(zod.coerce.date()),
   "rows": zod.array(zod.object({
   "id": zod.number(),
   "rowNumber": zod.number(),

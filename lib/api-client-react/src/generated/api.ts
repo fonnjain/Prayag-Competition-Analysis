@@ -110,6 +110,7 @@ import type {
   MrpRevisionDetail,
   MrpRevisionPreview,
   MrpRevisionPreviewInput,
+  MrpRevisionScopes,
   OkResponse,
   PasswordChangeInput,
   PatchCatalogProductMrp200,
@@ -5492,6 +5493,83 @@ export const useLogoutMobileSession = <TError = ErrorType<unknown>,
       return useMutation(getLogoutMobileSessionMutationOptions(options));
     }
 
+export const getGetMrpRevisionScopesUrl = () => {
+
+
+
+
+  return `/api/catalog/mrp-revisions/scopes`
+}
+
+/**
+ * @summary List existing MRP and competitor periods available for controlled revisions
+ */
+export const getMrpRevisionScopes = async ( options?: RequestInit): Promise<MrpRevisionScopes> => {
+
+  return customFetch<MrpRevisionScopes>(getGetMrpRevisionScopesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpRevisionScopesQueryKey = () => {
+    return [
+    `/api/catalog/mrp-revisions/scopes`
+    ] as const;
+    }
+
+
+export const getGetMrpRevisionScopesQueryOptions = <TData = Awaited<ReturnType<typeof getMrpRevisionScopes>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpRevisionScopes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpRevisionScopesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpRevisionScopes>>> = ({ signal }) => getMrpRevisionScopes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpRevisionScopes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpRevisionScopesQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpRevisionScopes>>>
+export type GetMrpRevisionScopesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List existing MRP and competitor periods available for controlled revisions
+ */
+
+export function useGetMrpRevisionScopes<TData = Awaited<ReturnType<typeof getMrpRevisionScopes>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpRevisionScopes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpRevisionScopesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getPreviewMrpRevisionUrl = () => {
 
 
@@ -5510,9 +5588,7 @@ formData.append(`targetType`, mrpRevisionPreviewInput.targetType);
 if(mrpRevisionPreviewInput.competitor !== undefined) {
  formData.append(`competitor`, mrpRevisionPreviewInput.competitor);
  }
-if(mrpRevisionPreviewInput.effectiveDate !== undefined) {
- formData.append(`effectiveDate`, mrpRevisionPreviewInput.effectiveDate);
- }
+formData.append(`effectiveDate`, mrpRevisionPreviewInput.effectiveDate);
 formData.append(`reason`, mrpRevisionPreviewInput.reason);
 
   return customFetch<MrpRevisionPreview>(getPreviewMrpRevisionUrl(),

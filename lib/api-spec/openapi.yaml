@@ -1864,6 +1864,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogoutSuccess'
+  /catalog/mrp-revisions/scopes:
+    get:
+      operationId: getMrpRevisionScopes
+      tags: [catalog]
+      summary: List existing MRP and competitor periods available for controlled revisions
+      responses:
+        "200":
+          description: Existing revision scopes with row-count and validity context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRevisionScopes"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/mrp-revisions/preview:
     post:
       operationId: previewMrpRevision
@@ -3986,7 +4004,7 @@ components:
             $ref: "#/components/schemas/CompetitorBrandPeriod"
     MrpRevisionPreviewInput:
       type: object
-      required: [file, targetType, reason]
+      required: [file, targetType, effectiveDate, reason]
       properties:
         file:
           type: string
@@ -4002,6 +4020,46 @@ components:
         reason:
           type: string
           minLength: 1
+    MrpRevisionScope:
+      type: object
+      required: [effectiveDate, division, rowCount, endsOn]
+      properties:
+        effectiveDate:
+          type: string
+          format: date
+        division:
+          type: ["string", "null"]
+        rowCount:
+          type: integer
+        endsOn:
+          type: ["string", "null"]
+          format: date
+    CompetitorRevisionScope:
+      type: object
+      required: [competitor, effectiveDate, rowCount, endsOn]
+      properties:
+        competitor:
+          type: string
+        effectiveDate:
+          type: string
+          format: date
+        rowCount:
+          type: integer
+        endsOn:
+          type: ["string", "null"]
+          format: date
+    MrpRevisionScopes:
+      type: object
+      required: [mrpPeriods, competitorPeriods]
+      properties:
+        mrpPeriods:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpRevisionScope"
+        competitorPeriods:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorRevisionScope"
     MrpRevisionRow:
       type: object
       required: [id, rowNumber, variant, outcome]
@@ -4036,7 +4094,7 @@ components:
           type: ["string", "null"]
     MrpRevisionPreview:
       type: object
-      required: [batchId, targetType, fileName, fileSha256, rowsInFile, rowsChanged, rowsNoop, rowsRejected, warningCount, rows]
+      required: [batchId, targetType, effectiveDate, fileName, fileSha256, rowsInFile, rowsChanged, rowsNoop, rowsRejected, warningCount, hasEffectiveDateColumn, dateMismatchCount, dateMismatchDates, rows]
       properties:
         batchId:
           type: integer
@@ -4062,6 +4120,15 @@ components:
           type: integer
         warningCount:
           type: integer
+        hasEffectiveDateColumn:
+          type: boolean
+        dateMismatchCount:
+          type: integer
+        dateMismatchDates:
+          type: array
+          items:
+            type: string
+            format: date
         rows:
           type: array
           items:

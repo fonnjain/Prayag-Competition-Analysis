@@ -23,6 +23,7 @@ app.use((req, _res, next) => {
   req.user = {
     id: userId,
     email: `${userId}@example.test`,
+    mustChangePassword: false,
     role,
   };
   next();

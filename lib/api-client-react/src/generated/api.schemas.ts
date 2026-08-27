@@ -1415,9 +1415,31 @@ export interface MrpRevisionPreviewInput {
   file: Blob;
   targetType: MrpRevisionPreviewInputTargetType;
   competitor?: string;
-  effectiveDate?: string;
+  effectiveDate: string;
   /** @minLength 1 */
   reason: string;
+}
+
+export interface MrpRevisionScope {
+  effectiveDate: string;
+  /** @nullable */
+  division: string | null;
+  rowCount: number;
+  /** @nullable */
+  endsOn: string | null;
+}
+
+export interface CompetitorRevisionScope {
+  competitor: string;
+  effectiveDate: string;
+  rowCount: number;
+  /** @nullable */
+  endsOn: string | null;
+}
+
+export interface MrpRevisionScopes {
+  mrpPeriods: MrpRevisionScope[];
+  competitorPeriods: CompetitorRevisionScope[];
 }
 
 export type MrpRevisionRowOutcome = typeof MrpRevisionRowOutcome[keyof typeof MrpRevisionRowOutcome];
@@ -1468,7 +1490,7 @@ export interface MrpRevisionPreview {
   /** @nullable */
   competitor?: string | null;
   /** @nullable */
-  effectiveDate?: string | null;
+  effectiveDate: string | null;
   fileName: string;
   fileSha256: string;
   rowsInFile: number;
@@ -1476,6 +1498,9 @@ export interface MrpRevisionPreview {
   rowsNoop: number;
   rowsRejected: number;
   warningCount: number;
+  hasEffectiveDateColumn: boolean;
+  dateMismatchCount: number;
+  dateMismatchDates: string[];
   rows: MrpRevisionRow[];
 }
 
