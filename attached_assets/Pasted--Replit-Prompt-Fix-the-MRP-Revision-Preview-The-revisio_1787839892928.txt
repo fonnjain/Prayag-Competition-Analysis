@@ -1,0 +1,110 @@
+# Replit Prompt — Fix the MRP Revision Preview
+
+The revision preview works and correctly refuses to insert rows. Four things to fix, found on the first real upload.
+
+---
+
+## 1. There is no Apply and no Discard
+
+The preview renders, and there is no way to act on it. The batch sits in limbo — it cannot be applied and it cannot be dismissed.
+
+Add both:
+
+- **Apply** — writes only the rows marked *Will change*, in one transaction, then shows the result.
+- **Discard** — abandons the batch, recording that it was discarded and by whom. The preview stays viewable afterwards; it does not vanish.
+
+Apply must be disabled when zero rows would change, with the reason stated — *"Nothing to apply: 343 rows, all no-ops."* A disabled button with no explanation reads as a broken page.
+
+Show a confirmation before Apply that repeats the counts: rows changing, no-ops, rejected. This is a bulk price write; the person should see the number one more time before it happens.
+
+---
+
+## 2. Code normalisation is missing on upload
+
+Six rows were rejected with *"No existing MRP row for 322 K, 2026-03-05"*. Those products exist, at exactly the values in the upload.
+
+The Competitor Master writes these codes **with an internal space** — `'322 K'`, `'323 K'`, `'324 K'`, `'325 K'`, `'326 K'`, `'348 K'`. The official workbooks and the database hold them as `322K`, `323K` and so on.
+
+Database values for the rejected rows, all at `2026-03-05`:
+
+```
+322K  ₹89.76      323K  ₹104.04     324K  ₹124.44
+326K  ₹179.52     348K  ₹201.55
+```
+
+Those are the same figures the upload supplied. The rejection is purely a formatting mismatch.
+
+**Apply the project's existing normalisation when reading uploaded codes**: uppercase, strip all whitespace, strip a trailing `.0`. That rule already exists in the matcher — Excel delivers numeric codes as `121.0`, and the matcher handles it. The revision upload skipped it.
+
+Normalise **both sides** of the comparison, so a stored code with stray whitespace also matches.
+
+After this, those six rows should resolve — most likely as no-ops, since the values already agree.
+
+---
+
+## 3. Plausibility warnings are firing on rows that will not change
+
+Row 344, `PH-1`, shows ₹22.44 → ₹22.44, outcome **No-op**, carrying the warning *"New value ₹22.44 is below ₹50 for PTMT & Plastic Fittings."*
+
+Nothing is changing on that row. A warning about a value that is already stored, and will remain stored, is noise — and noise on a screen whose purpose is to make real problems visible.
+
+**Run plausibility checks only on rows marked *Will change*.** Not on no-ops, not on rejected rows.
+
+### The threshold also needs the known exceptions
+
+`PH-1` is a Health Faucet Round Hook at ₹22.44. It is genuinely below ₹50, and it is one of the **11 legitimate sub-₹50 PTMT items** already confirmed in verification:
+
+```
+EPT-01   126   126-SQ   PH-1   TTS-03   PH-2   TTS-01   137   TTS-02   311   302
+```
+
+Suppress the below-₹50 warning for codes on that list. For anything else below ₹50, keep warning — that rule exists because six sink prices once loaded at ₹0.05.
+
+---
+
+## 4. Report the outcome honestly when nothing changes
+
+The first real upload is 343 Prayag corrections at `2026-03-05`, and the preview is showing no-ops throughout — `101`, `103`, `104`, `106`, `107` all matching to the paisa.
+
+**That is the correct result, and the screen should say so.** The decimals were lost in the Competitor Master spreadsheet, never in the database. The application takes Prayag MRP only from the six official workbooks, and this confirms that separation is holding.
+
+Summarise it plainly at the top of the preview:
+
+> 343 rows · 0 will change · 337 no-ops · 6 rejected
+
+and, when everything is a no-op, a line stating that the stored values already match the file. A page full of grey "No-op" rows with no summary reads like a failure. It is the opposite.
+
+---
+
+## Acceptance tests
+
+```
+1.  A preview with rows to change offers Apply and Discard.
+2.  Apply writes only "Will change" rows, in one transaction.
+3.  Apply is disabled with a stated reason when zero rows would change.
+4.  Discard records who discarded it and when; the preview remains viewable.
+5.  Uploading code "322 K" matches the stored code 322K and resolves as a no-op.
+6.  Uploading "121.0" matches stored code 121.
+7.  A no-op row carries no plausibility warning.
+8.  A rejected row carries no plausibility warning.
+9.  PH-1 at 22.44 on a changing row produces no below-₹50 warning; an unlisted
+    PTMT code at 22.44 does.
+10. The 343-row file previews as 0 will change, 343 no-ops, 0 rejected, with a
+    summary line saying the stored values already match.
+11. Row counts are unchanged after any Apply: 13,048 total, 12,750 Standard,
+    298 colour.
+```
+
+Test 10 is the end state for this file. If six rows still reject after the normalisation fix, report which and why rather than adjusting the count.
+
+---
+
+## Report
+
+- Preview counts for the 343-row file, before and after the normalisation fix.
+- The six `nnn K` rows after normalisation — no-op, or a real difference.
+- Confirmation that warnings now appear only on changing rows.
+- Whether Apply was used at all, and if so what it wrote.
+- Row counts before and after.
+
+One clean commit.
