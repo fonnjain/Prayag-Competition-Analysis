@@ -6,141 +6,18 @@ import {
   BarChart3,
   Scale,
   Search,
-  LogOut,
-  Home as HomeIcon,
-  Menu,
-  X,
   Users,
   ShieldCheck,
 } from "lucide-react";
-import React, { useState } from "react";
-import { useAuth } from "@workspace/replit-auth-web";
-import { cn } from "@/lib/utils";
-
-const APP_LINKS = [
-  { href: "/", label: "Home", icon: HomeIcon, adminOnly: false },
-  { href: "/product-db/", label: "Product Database", icon: PackageSearch, adminOnly: false },
-  { href: "/analysis/", label: "Competition Analysis", icon: BarChart3, adminOnly: false },
-  { href: "/price-finder/", label: "Price Finder", icon: Search, adminOnly: false },
-  { href: "/admin", label: "Admin", icon: Users, adminOnly: true },
-] as const;
+import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 
 export default function Home() {
-  const { user, logout } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const isAdmin = (user as any)?.role === "admin";
-
-  const userName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-    user?.email ||
-    "User";
-  const visibleAppLinks = APP_LINKS.filter(
-    (link) => !link.adminOnly || isAdmin,
-  );
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background">
-      {/* ── Workspace header ── */}
-      <header className="border-b bg-card text-card-foreground sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center justify-between px-4 h-14 max-w-[1600px] mx-auto w-full">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-sm">
-              <Hexagon className="w-4 h-4 text-white" strokeWidth={2} />
-            </div>
-            <div className="leading-none">
-              <span className="font-bold text-sm text-foreground">Prayag</span>
-              <span className="text-[10px] text-muted-foreground block">
-                Pricing workspace
-              </span>
-            </div>
-          </div>
-
-          {/* Desktop nav */}
-          <nav
-            className="hidden md:flex items-center gap-1"
-            aria-label="Workspace navigation"
-          >
-            {visibleAppLinks.map((link) => {
-              const Icon = link.icon;
-              const isHome = link.href === "/";
-              return (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  aria-current={isHome ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
-                    isHome
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </a>
-              );
-            })}
-          </nav>
-
-          {/* Right side: user + logout + mobile menu toggle */}
-          <div className="flex items-center gap-2">
-            {user && (
-              <span className="text-sm text-muted-foreground hidden sm:block">
-                {userName}
-              </span>
-            )}
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Log out</span>
-            </button>
-            {/* Mobile menu toggle */}
-            <button
-              className="md:hidden flex items-center justify-center rounded-md p-1.5 text-foreground hover:bg-accent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-              aria-expanded={menuOpen}
-              aria-controls="mobile-nav"
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile nav dropdown */}
-        {menuOpen && (
-          <nav
-            id="mobile-nav"
-            className="md:hidden border-t bg-card px-4 pb-3 pt-2 flex flex-col gap-1"
-            aria-label="Workspace navigation"
-          >
-            {visibleAppLinks.map((link) => {
-              const Icon = link.icon;
-              const isHome = link.href === "/";
-              return (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  aria-current={isHome ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    isHome
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </a>
-              );
-            })}
-          </nav>
-        )}
-      </header>
+      <WorkspaceHeader activeApp="home" />
 
       {/* ── Page body ── */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">

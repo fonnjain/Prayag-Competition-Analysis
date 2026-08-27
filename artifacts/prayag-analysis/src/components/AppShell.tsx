@@ -12,7 +12,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
 
 // ── App-switcher entries (all cross-app = raw <a> links) ──────────────────────
@@ -175,7 +175,9 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
+      <WorkspaceHeader activeApp="competition-analysis" />
+      <div className="flex min-h-[calc(100vh-3.5rem)] flex-1 overflow-hidden">
       {/* ── Desktop sidebar ─────────────────────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-56 border-r bg-card shrink-0 overflow-y-auto">
         <SidebarContent />
@@ -292,6 +294,7 @@ export function AppShell({ children }: AppShellProps) {
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+      </div>
       </div>
     </div>
   );

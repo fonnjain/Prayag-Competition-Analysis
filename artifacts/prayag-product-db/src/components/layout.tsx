@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -128,7 +128,9 @@ export function Layout({ children }: LayoutProps) {
   );
 
   return (
-    <div className="min-h-screen bg-[#f6f8f7] text-foreground lg:flex">
+    <div className="min-h-screen bg-[#f6f8f7] text-foreground">
+      <WorkspaceHeader activeApp="product-database" />
+      <div className="min-h-[calc(100vh-3.5rem)] lg:flex">
       <aside className="hidden w-64 shrink-0 flex-col bg-[#164954] text-white lg:flex">
         <div className="border-b border-white/15 px-5 py-5">
           <a href="/" className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
@@ -174,7 +176,7 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur">
+        <header className="border-b border-border/80 bg-background/95 backdrop-blur">
           <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"
@@ -290,6 +292,7 @@ export function Layout({ children }: LayoutProps) {
           </aside>
         </div>
       )}
+      </div>
     </div>
   );
 }

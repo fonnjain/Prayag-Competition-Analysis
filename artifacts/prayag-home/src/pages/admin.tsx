@@ -6,17 +6,12 @@ import {
   KeyRound,
   Shield,
   ShieldOff,
-  Hexagon,
-  LogOut,
-  Home as HomeIcon,
-  PackageSearch,
-  BarChart3,
   Search,
   X,
   AlertCircle,
   ChevronLeft,
 } from "lucide-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListAdminUsers,
@@ -449,7 +444,7 @@ function UserRow({
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  const { user: currentUser, logout } = useAuth();
+  const { user: currentUser } = useAuth();
   const { data, isLoading, isError } = useListAdminUsers();
   const [showAdd, setShowAdd] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
@@ -462,49 +457,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center justify-between px-4 h-14 max-w-5xl mx-auto w-full">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-sm">
-              <Hexagon className="w-4 h-4 text-white" strokeWidth={2} />
-            </div>
-            <div className="leading-none">
-              <span className="font-bold text-sm">Prayag</span>
-              <span className="text-[10px] text-muted-foreground block">User Management</span>
-            </div>
-          </div>
-          <nav className="hidden md:flex items-center gap-1">
-            {[
-              { href: "/", label: "Home", icon: HomeIcon },
-              { href: "/product-db/", label: "Product DB", icon: PackageSearch },
-              { href: "/analysis/", label: "Analysis", icon: BarChart3 },
-              { href: "/price-finder/", label: "Price Finder", icon: Search },
-            ].map(({ href, label, icon: Icon }) => (
-              <a
-                key={href}
-                href={href}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              {[currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || currentUser?.email}
-            </span>
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Log out</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <WorkspaceHeader activeApp="admin" />
 
       {/* Back link */}
       <div className="max-w-5xl mx-auto w-full px-4 pt-6">
