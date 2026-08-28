@@ -74,3 +74,10 @@ uri = "file://attached_assets/Sparsh_Competitor_Master_Clean_1787823376637.xlsx"
 type = "table"
 title = "Sparsh Competitor Master — Production Import"
 description = "Verified Excel workbook for importing Sparsh Pearl prices for 1 Apr 2024 and 1 Jul 2026. Upload this file through Product Database → Import Competitor; do not enter a manual effective date."
+
+[[outputs]]
+id = "hcoIUUCD1rw_nO7-LVJH_"
+uri = "file://attached_assets/Prayag_Salespeople_Users_1787843162726.xlsx"
+type = "table"
+title = "Prayag Salespeople Users Workbook"
+description = "The 182-row salesperson workbook for the controlled production user import."
