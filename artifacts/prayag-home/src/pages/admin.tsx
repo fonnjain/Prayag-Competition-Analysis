@@ -10,6 +10,10 @@ import {
   X,
   AlertCircle,
   ChevronLeft,
+  FileSpreadsheet,
+  Upload,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,7 +23,13 @@ import {
   useDeleteAdminUser,
   useResetAdminUserPassword,
   useUpdateAdminUserRole,
+  usePreviewAdminUserImport,
+  useImportAdminUsers,
   getListAdminUsersQueryKey,
+} from "@workspace/api-client-react";
+import type {
+  AdminUserImportPreview,
+  AdminUserImportResult,
 } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import { ActivityPanel } from "@/components/activity-panel";
@@ -46,6 +56,197 @@ function initials(u: AdminUser) {
 function displayName(u: AdminUser) {
   const name = [u.firstName, u.lastName].filter(Boolean).join(" ");
   return name || u.email;
+}
+
+function UserImportPanel({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const previewImport = usePreviewAdminUserImport();
+  const importUsers = useImportAdminUsers();
+  const [file, setFile] = useState<File | null>(null);
+  const [password, setPassword] = useState("");
+  const [preview, setPreview] = useState<AdminUserImportPreview | null>(null);
+  const [result, setResult] = useState<AdminUserImportResult | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function chooseFile(nextFile: File | null) {
+    setFile(nextFile);
+    setPreview(null);
+    setResult(null);
+    setConfirmed(false);
+    setError(null);
+  }
+
+  async function runPreview() {
+    if (!file) return;
+    setError(null);
+    try {
+      setPreview(await previewImport.mutateAsync({ data: { file } }));
+      setResult(null);
+      setConfirmed(false);
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? err?.message ?? "Could not preview this workbook.");
+    }
+  }
+
+  async function confirmImport() {
+    if (!file || !preview || !confirmed || password.length < 8) return;
+    setError(null);
+    try {
+      const imported = await importUsers.mutateAsync({
+        data: {
+          file,
+          password,
+          previewToken: preview.previewToken,
+          confirmed: true,
+        },
+      });
+      setResult(imported);
+      setPreview(null);
+      setConfirmed(false);
+      setPassword("");
+      await qc.invalidateQueries({ queryKey: getListAdminUsersQueryKey() });
+    } catch (err: any) {
+      setError(err?.response?.data?.error ?? err?.message ?? "Could not import these users.");
+    }
+  }
+
+  return (
+    <section className="rounded-xl border bg-card overflow-hidden">
+      <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+        <div className="flex gap-3">
+          <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
+            <FileSpreadsheet className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="font-semibold">Import salesperson users</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Preview an Excel or CSV list before creating missing normal-user accounts.
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={onClose} className="rounded-md p-1.5 hover:bg-accent">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close import</span>
+        </button>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Salesperson workbook</label>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
+              className="block w-full rounded-md border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-medium"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              The Users sheet must contain name and email columns.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Temporary password</label>
+            <input
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+              placeholder="Minimum 8 characters"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Applied only to new accounts. Every imported user must replace it at first sign-in.
+            </p>
+          </div>
+        </div>
+
+        {!result && (
+          <button
+            type="button"
+            onClick={runPreview}
+            disabled={!file || previewImport.isPending || importUsers.isPending}
+            data-activity="admin.preview_user_import"
+            className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+          >
+            {previewImport.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {previewImport.isPending ? "Checking workbook…" : preview ? "Preview again" : "Preview users"}
+          </button>
+        )}
+
+        {preview && (
+          <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+            <div>
+              <p className="text-sm font-semibold">Review before import</p>
+              <p className="text-xs text-muted-foreground">{preview.fileName} · {preview.totalRows} populated rows</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                ["New users", preview.newUsers, "text-primary"],
+                ["Already exist", preview.existingUsers, ""],
+                ["Duplicate rows", preview.duplicateRows, preview.duplicateRows ? "text-amber-700" : ""],
+                ["Invalid rows", preview.invalidRows, preview.invalidRows ? "text-destructive" : ""],
+              ].map(([label, value, tone]) => (
+                <div key={String(label)} className="rounded-md border bg-background px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className={cn("text-xl font-bold", tone)}>{value}</p>
+                </div>
+              ))}
+            </div>
+            {preview.issues.length > 0 && (
+              <div className="max-h-44 overflow-auto rounded-md border bg-background">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-muted">
+                    <tr><th className="px-3 py-2">Row</th><th className="px-3 py-2">User</th><th className="px-3 py-2">Reason</th></tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {preview.issues.map((issue) => (
+                      <tr key={`${issue.row}-${issue.email ?? ""}`}>
+                        <td className="px-3 py-2">{issue.row}</td>
+                        <td className="px-3 py-2"><p>{issue.name || "—"}</p><p className="text-muted-foreground">{issue.email || "—"}</p></td>
+                        <td className="px-3 py-2 text-amber-800">{issue.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <label className="flex items-start gap-2 rounded-md border bg-background p-3 text-sm">
+              <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1" />
+              <span>I confirm that only the {preview.newUsers} missing accounts should be created as normal users. Existing accounts must remain unchanged.</span>
+            </label>
+            <button
+              type="button"
+              onClick={confirmImport}
+              disabled={!confirmed || preview.newUsers === 0 || password.length < 8 || importUsers.isPending}
+              data-activity="admin.confirm_user_import"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {importUsers.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {importUsers.isPending ? "Creating accounts…" : `Create ${preview.newUsers} users`}
+            </button>
+          </div>
+        )}
+
+        {result && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-950">
+            <div className="flex items-center gap-2 font-semibold"><CheckCircle2 className="h-5 w-5" />Import complete</div>
+            <p className="mt-2 text-sm">
+              Created {result.created} accounts. Skipped {result.skippedExisting} existing accounts, {result.skippedDuplicates} duplicate rows, and {result.invalidRows} invalid rows.
+            </p>
+            <p className="mt-1 text-xs">New accounts are normal users and must change the temporary password at first sign-in.</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />{error}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 // ── Add-user dialog ────────────────────────────────────────────────────────────
@@ -449,6 +650,7 @@ export default function AdminPage() {
   const { user: currentUser } = useAuth();
   const { data, isLoading, isError } = useListAdminUsers();
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
 
@@ -485,15 +687,27 @@ export default function AdminPage() {
               Manage who has access to Prayag's internal workspace.
             </p>
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            data-activity="admin.open_create_user"
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add user
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              onClick={() => setShowImport((open) => !open)}
+              data-activity="admin.open_user_import"
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Import users
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              data-activity="admin.open_create_user"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add user
+            </button>
+          </div>
         </div>
+
+        {showImport && <UserImportPanel onClose={() => setShowImport(false)} />}
 
         {/* Content */}
         {isLoading ? (

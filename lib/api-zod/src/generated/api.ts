@@ -1546,6 +1546,58 @@ export const CreateAdminUserBody = zod.object({
 
 
 /**
+ * @summary Preview a salesperson user workbook without changing data
+ */
+export const PreviewAdminUserImportBody = zod.object({
+  "file": zod.instanceof(File)
+})
+
+export const PreviewAdminUserImportResponse = zod.object({
+  "fileName": zod.string(),
+  "totalRows": zod.number(),
+  "newUsers": zod.number(),
+  "existingUsers": zod.number(),
+  "duplicateRows": zod.number(),
+  "invalidRows": zod.number(),
+  "issues": zod.array(zod.object({
+  "row": zod.number(),
+  "name": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "reason": zod.string()
+})).describe('Up to 25 invalid or duplicate rows from the workbook.'),
+  "previewToken": zod.string().describe('Short-lived signed receipt required to import this exact workbook.'),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * Existing accounts are skipped and never updated. Imported accounts must change their temporary password after signing in.
+ * @summary Create missing normal users from a reviewed salesperson workbook
+ */
+export const importAdminUsersBodyPasswordMin = 8;
+
+export const importAdminUsersBodyPreviewTokenMin = 20;
+
+
+
+export const ImportAdminUsersBody = zod.object({
+  "file": zod.instanceof(File),
+  "password": zod.string().min(importAdminUsersBodyPasswordMin).describe('Temporary password assigned to newly created accounts only.'),
+  "previewToken": zod.string().min(importAdminUsersBodyPreviewTokenMin).describe('Short-lived signed receipt returned by the preview of this exact workbook.'),
+  "confirmed": zod.boolean().describe('Explicit administrator confirmation that the reviewed missing users should be created.')
+})
+
+export const ImportAdminUsersResponse = zod.object({
+  "fileName": zod.string(),
+  "totalRows": zod.number(),
+  "created": zod.number(),
+  "skippedExisting": zod.number(),
+  "skippedDuplicates": zod.number(),
+  "invalidRows": zod.number()
+})
+
+
+/**
  * Stores page visits, safe action labels, and active/idle heartbeats. Sensitive form values are never accepted.
  * @summary Record batched authenticated workspace activity
  */

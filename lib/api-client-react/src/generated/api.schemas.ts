@@ -1247,6 +1247,58 @@ export interface AdminUserList {
   users: AdminUser[];
 }
 
+export interface AdminUserImportPreviewInput {
+  file: Blob;
+}
+
+export interface AdminUserImportInput {
+  file: Blob;
+  /**
+     * Temporary password assigned to newly created accounts only.
+     * @minLength 8
+     */
+  password: string;
+  /**
+     * Short-lived signed receipt returned by the preview of this exact workbook.
+     * @minLength 20
+     */
+  previewToken: string;
+  /** Explicit administrator confirmation that the reviewed missing users should be created. */
+  confirmed: boolean;
+}
+
+export interface AdminUserImportIssue {
+  row: number;
+  /** @nullable */
+  name: string | null;
+  /** @nullable */
+  email: string | null;
+  reason: string;
+}
+
+export interface AdminUserImportPreview {
+  fileName: string;
+  totalRows: number;
+  newUsers: number;
+  existingUsers: number;
+  duplicateRows: number;
+  invalidRows: number;
+  /** Up to 25 invalid or duplicate rows from the workbook. */
+  issues: AdminUserImportIssue[];
+  /** Short-lived signed receipt required to import this exact workbook. */
+  previewToken: string;
+  expiresAt: string;
+}
+
+export interface AdminUserImportResult {
+  fileName: string;
+  totalRows: number;
+  created: number;
+  skippedExisting: number;
+  skippedDuplicates: number;
+  invalidRows: number;
+}
+
 export type CreateAdminUserBodyRole = typeof CreateAdminUserBodyRole[keyof typeof CreateAdminUserBodyRole];
 
 

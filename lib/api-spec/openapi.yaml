@@ -1447,6 +1447,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/import/preview:
+    post:
+      tags: [admin]
+      operationId: previewAdminUserImport
+      summary: Preview a salesperson user workbook without changing data
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserImportPreviewInput'
+      responses:
+        '200':
+          description: Classified workbook rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserImportPreview'
+        '400':
+          description: Invalid workbook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/users/import:
+    post:
+      tags: [admin]
+      operationId: importAdminUsers
+      summary: Create missing normal users from a reviewed salesperson workbook
+      description: Existing accounts are skipped and never updated. Imported accounts must change their temporary password after signing in.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserImportInput'
+      responses:
+        '200':
+          description: Import completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserImportResult'
+        '400':
+          description: Invalid workbook or temporary password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /activity/events:
     post:
       tags: [activity]
@@ -3790,6 +3851,87 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminUser'
+    AdminUserImportPreviewInput:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+    AdminUserImportInput:
+      type: object
+      required: [file, password, previewToken, confirmed]
+      properties:
+        file:
+          type: string
+          format: binary
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+          description: Temporary password assigned to newly created accounts only.
+        previewToken:
+          type: string
+          minLength: 20
+          description: Short-lived signed receipt returned by the preview of this exact workbook.
+        confirmed:
+          type: boolean
+          description: Explicit administrator confirmation that the reviewed missing users should be created.
+    AdminUserImportIssue:
+      type: object
+      required: [row, name, email, reason]
+      properties:
+        row:
+          type: integer
+        name:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        reason:
+          type: string
+    AdminUserImportPreview:
+      type: object
+      required: [fileName, totalRows, newUsers, existingUsers, duplicateRows, invalidRows, issues, previewToken, expiresAt]
+      properties:
+        fileName:
+          type: string
+        totalRows:
+          type: integer
+        newUsers:
+          type: integer
+        existingUsers:
+          type: integer
+        duplicateRows:
+          type: integer
+        invalidRows:
+          type: integer
+        issues:
+          type: array
+          description: Up to 25 invalid or duplicate rows from the workbook.
+          items:
+            $ref: '#/components/schemas/AdminUserImportIssue'
+        previewToken:
+          type: string
+          description: Short-lived signed receipt required to import this exact workbook.
+        expiresAt:
+          type: string
+          format: date-time
+    AdminUserImportResult:
+      type: object
+      required: [fileName, totalRows, created, skippedExisting, skippedDuplicates, invalidRows]
+      properties:
+        fileName:
+          type: string
+        totalRows:
+          type: integer
+        created:
+          type: integer
+        skippedExisting:
+          type: integer
+        skippedDuplicates:
+          type: integer
+        invalidRows:
+          type: integer
     CreateAdminUserBody:
       type: object
       required: [email, role]

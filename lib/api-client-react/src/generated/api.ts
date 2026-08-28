@@ -28,6 +28,10 @@ import type {
   AdminActivityDetail,
   AdminActivitySummaryList,
   AdminUser,
+  AdminUserImportInput,
+  AdminUserImportPreview,
+  AdminUserImportPreviewInput,
+  AdminUserImportResult,
   AdminUserList,
   AnalysisBrandStat,
   AnalysisCategoryStat,
@@ -4412,6 +4416,156 @@ export const useCreateAdminUser = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateAdminUserMutationOptions(options));
+    }
+
+export const getPreviewAdminUserImportUrl = () => {
+
+
+
+
+  return `/api/admin/users/import/preview`
+}
+
+/**
+ * @summary Preview a salesperson user workbook without changing data
+ */
+export const previewAdminUserImport = async (adminUserImportPreviewInput: AdminUserImportPreviewInput, options?: RequestInit): Promise<AdminUserImportPreview> => {
+    const formData = new FormData();
+formData.append(`file`, adminUserImportPreviewInput.file);
+
+  return customFetch<AdminUserImportPreview>(getPreviewAdminUserImportUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewAdminUserImportMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewAdminUserImport>>, TError,{data: BodyType<AdminUserImportPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewAdminUserImport>>, TError,{data: BodyType<AdminUserImportPreviewInput>}, TContext> => {
+
+const mutationKey = ['previewAdminUserImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewAdminUserImport>>, {data: BodyType<AdminUserImportPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewAdminUserImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewAdminUserImportMutationResult = NonNullable<Awaited<ReturnType<typeof previewAdminUserImport>>>
+    export type PreviewAdminUserImportMutationBody = BodyType<AdminUserImportPreviewInput>
+    export type PreviewAdminUserImportMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Preview a salesperson user workbook without changing data
+ */
+export const usePreviewAdminUserImport = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewAdminUserImport>>, TError,{data: BodyType<AdminUserImportPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewAdminUserImport>>,
+        TError,
+        {data: BodyType<AdminUserImportPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewAdminUserImportMutationOptions(options));
+    }
+
+export const getImportAdminUsersUrl = () => {
+
+
+
+
+  return `/api/admin/users/import`
+}
+
+/**
+ * Existing accounts are skipped and never updated. Imported accounts must change their temporary password after signing in.
+ * @summary Create missing normal users from a reviewed salesperson workbook
+ */
+export const importAdminUsers = async (adminUserImportInput: AdminUserImportInput, options?: RequestInit): Promise<AdminUserImportResult> => {
+    const formData = new FormData();
+formData.append(`file`, adminUserImportInput.file);
+formData.append(`password`, adminUserImportInput.password);
+formData.append(`previewToken`, adminUserImportInput.previewToken);
+formData.append(`confirmed`, adminUserImportInput.confirmed.toString())
+
+  return customFetch<AdminUserImportResult>(getImportAdminUsersUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getImportAdminUsersMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAdminUsers>>, TError,{data: BodyType<AdminUserImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importAdminUsers>>, TError,{data: BodyType<AdminUserImportInput>}, TContext> => {
+
+const mutationKey = ['importAdminUsers'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importAdminUsers>>, {data: BodyType<AdminUserImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importAdminUsers(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportAdminUsersMutationResult = NonNullable<Awaited<ReturnType<typeof importAdminUsers>>>
+    export type ImportAdminUsersMutationBody = BodyType<AdminUserImportInput>
+    export type ImportAdminUsersMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create missing normal users from a reviewed salesperson workbook
+ */
+export const useImportAdminUsers = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAdminUsers>>, TError,{data: BodyType<AdminUserImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importAdminUsers>>,
+        TError,
+        {data: BodyType<AdminUserImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportAdminUsersMutationOptions(options));
     }
 
 export const getRecordActivityEventsUrl = () => {
