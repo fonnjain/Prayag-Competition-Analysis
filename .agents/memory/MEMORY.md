@@ -20,3 +20,4 @@
 - [CP observation preflight](cp-observation-preflight.md) — scanning every CP sheet still leaves eight restored codes with removal-only evidence; retain the manifest until resolved.
 - [Activity tracking accounting](activity-tracking-accounting.md) — charge elapsed time to the prior state; page/action events never advance the heartbeat cursor; protect app telemetry by role.
 - [Forced password replacement](forced-password-replacement.md) — temporary and administrator-reset passwords require replacement before protected workspace access.
+- [GitHub repository](github-repository.md) — use the active Prayag-Competition-Analysis repository; the former “-New” repository no longer exists.
