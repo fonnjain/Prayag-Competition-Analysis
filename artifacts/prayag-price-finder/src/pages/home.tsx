@@ -471,19 +471,19 @@ export default function PriceFinderPage() {
 
   return (
     <div
-      className="max-w-3xl mx-auto p-4 md:p-8 space-y-6"
+      className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-4 md:px-6 md:py-4 space-y-4"
       onPointerDownCapture={cancelSpeech}
     >
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Price Finder</h1>
-        <p className="text-muted-foreground mt-1 text-sm max-w-lg">
+      <div className="mb-4">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Price Finder</h1>
+        <p className="text-muted-foreground mt-0.5 text-sm max-w-lg">
           Fast counter-side lookup for Prayag prices and market position.
         </p>
       </div>
 
       <div
         className={cn(
-          "sticky top-16 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-sm backdrop-blur transition-colors",
+          "sticky top-14 z-30 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border px-3 py-2.5 shadow-sm backdrop-blur transition-colors",
           codes.length
             ? "border-primary/30 bg-primary/5"
             : "border-border bg-card/90",
@@ -491,7 +491,7 @@ export default function PriceFinderPage() {
         data-testid="comparison-selection-bar"
       >
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">
+          <p className="text-sm font-semibold leading-tight">
             {codes.length
               ? `${codes.length} product${codes.length === 1 ? "" : "s"} selected`
               : "Select products to compare"}
@@ -500,11 +500,11 @@ export default function PriceFinderPage() {
             Choose up to 50 products from search results or the catalogue.
           </p>
           {codes.length > 0 && (
-            <div className="mt-2 flex max-w-full flex-wrap gap-1.5" aria-label="Selected products">
+            <div className="mt-1.5 flex max-h-14 max-w-full flex-wrap gap-1 overflow-y-auto pr-1" aria-label="Selected products">
               {codes.map((code) => (
                 <span
                   key={code}
-                  className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-background px-2 py-1 font-mono text-xs text-primary"
+                  className="inline-flex items-center gap-1 rounded border border-primary/20 bg-background px-1.5 py-0.5 font-mono text-[11px] text-primary"
                 >
                   {code}
                   <button
@@ -540,7 +540,7 @@ export default function PriceFinderPage() {
           )}
           {codes.length ? (
             <Link href={`/comparison?${new URLSearchParams(codes.map((code) => ["code", code])).toString()}`}>
-              <Button type="button" size="sm" data-activity="price_finder.compare_selected">Compare selected</Button>
+              <Button type="button" size="sm" className="h-8 px-3 text-xs" data-activity="price_finder.compare_selected">Compare selected</Button>
             </Link>
           ) : (
             <Button type="button" size="sm" disabled>Compare selected</Button>
@@ -563,13 +563,13 @@ export default function PriceFinderPage() {
       )}
 
       {speechAvailable && (
-        <div className="flex items-center justify-end gap-2">
+       <div className="flex items-center justify-end gap-2">
           {speechEnabled ? (
             <Volume2 aria-hidden="true" className="h-4 w-4 text-primary" />
           ) : (
             <VolumeX aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
           )}
-          <Label htmlFor="spoken-output" className="text-sm">
+          <Label htmlFor="spoken-output" className="text-xs font-medium">
             Speak confirmed price
           </Label>
           <Switch
@@ -590,9 +590,9 @@ export default function PriceFinderPage() {
       )}
 
       {/* Progressive voice and text filters */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
       <div className="relative flex items-center shadow-sm group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
         <Input
           value={searchInput}
           onChange={(e) => {
@@ -646,7 +646,7 @@ export default function PriceFinderPage() {
             }
           }}
           placeholder={filters.length ? "Say or type the next narrowing term…" : "Say or type a product term…"}
-          className="pl-12 pr-24 h-14 text-lg bg-card border-2 border-primary/20 focus-visible:ring-primary focus-visible:border-primary rounded-xl"
+          className="pl-10 pr-20 h-12 text-base bg-card border-2 border-primary/20 focus-visible:ring-primary focus-visible:border-primary rounded-lg"
           autoFocus
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -654,7 +654,7 @@ export default function PriceFinderPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="w-10 h-10 text-muted-foreground hover:text-foreground rounded-lg"
+               className="w-8 h-8 text-muted-foreground hover:text-foreground rounded-md"
               onClick={() => {
                 cancelSpeech();
                 setSearchInput("");
@@ -664,7 +664,7 @@ export default function PriceFinderPage() {
               }}
               title="Clear search"
             >
-              <X className="w-5 h-5" />
+               <X className="w-4 h-4" />
             </Button>
           )}
           {voiceSupported && (
@@ -672,7 +672,7 @@ export default function PriceFinderPage() {
               variant={voiceActive ? "default" : "ghost"}
               size="icon"
               className={cn(
-                "w-10 h-10 rounded-lg transition-colors",
+                "w-8 h-8 rounded-md transition-colors",
                 voiceActive ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
               aria-label={voiceActive ? "Stop voice search" : "Start voice search"}
@@ -691,17 +691,17 @@ export default function PriceFinderPage() {
                     : "Voice search"
               }
             >
-              {voiceActive ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              {voiceActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </Button>
           )}
         </div>
 
         {/* ── Predictive suggestions dropdown ── */}
         {isFocused && (isDebouncing || debouncedQ.length >= 2) && searchInput.trim().length >= 2 && (
-          <div className="absolute top-full left-0 right-0 z-50 mt-1.5 rounded-xl border bg-card shadow-xl overflow-hidden">
+          <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border bg-card shadow-xl overflow-hidden">
             {/* Show loading while debounce is pending OR request is in flight */}
             {isDebouncing || isSearchLoading ? (
-              <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground animate-pulse">
+              <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground animate-pulse">
                 <Search className="w-4 h-4 shrink-0" />
                 Searching…
               </div>
@@ -714,7 +714,7 @@ export default function PriceFinderPage() {
                       key={res.itemCode}
                       type="button"
                       className={cn(
-                        "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors border-b last:border-b-0",
+                         "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors border-b last:border-b-0",
                         isActive ? "bg-primary/10" : "hover:bg-muted/50",
                       )}
                       onMouseEnter={() => setActiveSuggestion(idx)}
@@ -736,7 +736,7 @@ export default function PriceFinderPage() {
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-sm text-foreground leading-snug truncate">{res.productName}</p>
+                         <p className="font-semibold text-sm text-foreground leading-snug truncate">{res.productName}</p>
                         <CompetitorLine
                           brand={res.bestCompetitorBrand}
                           price={res.bestCompetitorPrice}
@@ -768,7 +768,7 @@ export default function PriceFinderPage() {
       {/* Results Picker — keep search results immediately below the search field */}
       {!selectedItemCode && (hasSearch || searchInput.trim().length > 0) && (
         <div
-          className="bg-card border rounded-xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none"
+          className="bg-card border rounded-lg overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none"
           data-testid="search-results"
         >
           {isDebouncing || isSearchLoading ? (
@@ -785,7 +785,7 @@ export default function PriceFinderPage() {
           ) : (
             <div className="divide-y divide-border/50">
               {totalCount > results.length && (
-                <p className="px-4 py-3 text-sm text-muted-foreground">
+              <p className="px-3 py-2 text-xs text-muted-foreground">
                   Showing the first {results.length.toLocaleString("en-IN")} of {totalCount.toLocaleString("en-IN")} matching products. Add another filter to narrow the list.
                 </p>
               )}
@@ -798,26 +798,26 @@ export default function PriceFinderPage() {
                   )}
                 >
                   <div
-                    className="w-14 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
+                     className="w-11 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
                   >
                     <Checkbox
                       checked={codes.includes(res.itemCode)}
                       onCheckedChange={() => toggleComparisonCode(res.itemCode)}
                       aria-label={`${codes.includes(res.itemCode) ? "Remove" : "Select"} ${res.itemCode} from comparison`}
-                      className="w-5 h-5 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                       className="w-4 h-4 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
                   </div>
                   <button
                     onClick={() => confirmProduct(res.itemCode)}
-                    className="flex-1 text-left p-4 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between"
+                     className="flex-1 min-w-0 text-left px-3 py-2.5 hover:bg-primary/5 focus:bg-primary/5 focus:outline-none transition-colors flex items-center justify-between gap-3"
                   >
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-sm font-bold text-primary">{res.itemCode}</span>
                     </div>
-                    <p className="text-foreground font-semibold text-lg">{res.productName}</p>
+                     <p className="text-foreground font-semibold text-base leading-snug">{res.productName}</p>
                     <DiscontinuationBadge value={res.discontinuedFrom} />
-                    <p className="text-xs font-medium text-muted-foreground mt-1">
+                       <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
                       {[res.division, res.category].filter(Boolean).join(" • ")}
                     </p>
                     <CompetitorLine
@@ -832,10 +832,10 @@ export default function PriceFinderPage() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-right">
+                     <div className="flex items-center gap-2 text-right">
                     <div className="hidden sm:block">
                       {res.currentMrp != null ? (
-                        <p className="font-black text-xl text-foreground">₹{res.currentMrp.toFixed(2)}</p>
+                         <p className="font-black text-lg text-foreground">₹{res.currentMrp.toFixed(2)}</p>
                       ) : (
                         <p className="text-sm font-bold text-amber-600">Pending</p>
                       )}
@@ -847,10 +847,10 @@ export default function PriceFinderPage() {
                         upcomingPrice={res.upcomingMrp}
                         upcomingEffectiveDate={res.upcomingEffectiveDate}
                         upcomingChangePct={res.upcomingChangePct}
-                        className="mt-1 max-w-[260px]"
+                         className="mt-0.5 max-w-[220px]"
                       />
                     </div>
-                    <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                 </button>
                 </div>
@@ -860,7 +860,7 @@ export default function PriceFinderPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+      <div className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
         {filters.map((filter, index) => (
           <span key={`${filter}-${index}`} className="inline-flex items-center overflow-hidden rounded-full border border-primary/20 bg-primary/5 text-sm text-primary">
             <button
@@ -943,8 +943,8 @@ export default function PriceFinderPage() {
         />
       )}
 
-      <section className="rounded-xl border bg-card p-4 md:p-5">
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <section className="rounded-lg border bg-card p-3.5 md:p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             {browseDivision ? (
               <>
@@ -958,7 +958,7 @@ export default function PriceFinderPage() {
             ) : (
               <>
                 <h2 className="font-semibold">Browse the catalogue</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   Search is fastest. Use division and category when you want to explore.
                 </p>
               </>
@@ -985,7 +985,7 @@ export default function PriceFinderPage() {
           isDivisionsLoading ? (
             <p className="text-sm text-muted-foreground">Loading catalogue…</p>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-1.5 sm:grid-cols-2">
               {(divisionsData?.divisions ?? []).map((item) => (
                 <button
                   key={item.division}
@@ -995,10 +995,10 @@ export default function PriceFinderPage() {
                     setBrowseCategory(null);
                     setSelectedItemCode(null);
                   }}
-                  className="flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex items-center justify-between rounded-md border px-3 py-2.5 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <span className="font-medium">{item.division}</span>
-                  <span className="font-mono text-sm text-muted-foreground">{item.count}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{item.count}</span>
                 </button>
               ))}
             </div>
@@ -1010,8 +1010,8 @@ export default function PriceFinderPage() {
             {isCategoriesLoading ? (
               <p className="text-sm text-muted-foreground mb-4">Loading categories…</p>
             ) : (
-              <div className="relative mb-4">
-                <div className="flex gap-2 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="relative mb-3">
+                <div className="flex gap-1.5 overflow-x-auto pb-1.5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {(categoriesData?.categories ?? []).map((item) => {
                     const key = item.category ?? "__uncategorised__";
                     const isActive = browseCategory === key;
@@ -1024,7 +1024,7 @@ export default function PriceFinderPage() {
                           setSelectedItemCode(null);
                         }}
                         className={cn(
-                          "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary",
+                           "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary",
                           isActive
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -1033,7 +1033,7 @@ export default function PriceFinderPage() {
                         {item.label}
                         <span
                           className={cn(
-                            "rounded-full px-1.5 py-0.5 font-mono text-[11px]",
+                            "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
                             isActive
                               ? "bg-primary-foreground/20 text-primary-foreground"
                               : "bg-background text-muted-foreground",
@@ -1067,27 +1067,27 @@ export default function PriceFinderPage() {
                       )}
                     >
                       <div
-                        className="w-14 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
+                           className="w-11 shrink-0 flex items-center justify-center border-r border-border/50 bg-muted/10 hover:bg-primary/5 transition-colors cursor-pointer"
                       >
                         <Checkbox
                           checked={codes.includes(item.itemCode)}
                           onCheckedChange={() => toggleComparisonCode(item.itemCode)}
                           aria-label={`${codes.includes(item.itemCode) ? "Remove" : "Select"} ${item.itemCode} from comparison`}
-                          className="w-5 h-5 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                           className="w-4 h-4 rounded border-primary/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={() => confirmProduct(item.itemCode)}
-                        className="flex-1 flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                         className="flex-1 min-w-0 flex items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
                       >
                       <span>
-                        <span className="block font-mono text-sm font-semibold text-primary">{item.itemCode}</span>
+                         <span className="block font-mono text-xs font-semibold text-primary">{item.itemCode}</span>
                         <span className="block font-medium">{item.productName ?? "Unnamed product"}</span>
                         <DiscontinuationBadge value={item.discontinuedFrom} />
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className="block font-mono font-semibold">
+                           <span className="block font-mono text-sm font-semibold">
                           {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
                         </span>
                         <PriceWindowDetails
@@ -1163,7 +1163,7 @@ function ProductView({
 
   if (isLoading) {
     return (
-      <div className="mt-6 bg-card border rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center min-h-[300px] animate-pulse">
+      <div className="mt-4 bg-card border rounded-xl p-6 shadow-sm flex flex-col items-center justify-center min-h-[180px] animate-pulse">
         <div className="w-12 h-12 rounded-full bg-muted mb-4" />
         <div className="h-6 w-1/3 bg-muted rounded mb-2" />
         <div className="h-4 w-1/4 bg-muted rounded" />
@@ -1173,7 +1173,7 @@ function ProductView({
   
   if (isError || !data?.product) {
     return (
-      <div className="mt-6 bg-destructive/5 border border-destructive/20 rounded-2xl p-8 flex items-center justify-center gap-2 text-destructive">
+      <div className="mt-4 bg-destructive/5 border border-destructive/20 rounded-xl p-5 flex items-center justify-center gap-2 text-destructive">
         <AlertCircle className="w-5 h-5" />
         <span className="font-medium">Failed to load product details for {itemCode}.</span>
       </div>
@@ -1183,26 +1183,26 @@ function ProductView({
   const { product, competitors, variants } = data;
 
   return (
-    <div className="mt-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
-      <div className="bg-card border rounded-xl p-6 shadow-sm">
+    <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
+      <div className="bg-card border rounded-xl p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono font-medium text-muted-foreground uppercase tracking-widest">
-              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">{product.itemCode}</span>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">{product.itemCode}</span>
               {product.division && <span>• {product.division}</span>}
               {product.category && <span>• {product.category}</span>}
               {product.discontinuedFrom && (
-                <span className="rounded bg-destructive/10 px-2 py-0.5 text-destructive font-semibold">
+                  <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive font-semibold">
                   Discontinued from {formatPriceDate(product.discontinuedFrom)}
                 </span>
               )}
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground mt-2">{product.productName}</h2>
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-foreground mt-1">{product.productName}</h2>
           </div>
           <Button
             type="button"
             variant={isSelected ? "outline" : "default"}
-            className="shrink-0"
+            className="shrink-0 h-8 px-3 text-xs"
             onClick={() => onToggleSelection(product.itemCode)}
             aria-pressed={isSelected}
           >
@@ -1210,16 +1210,16 @@ function ProductView({
           </Button>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-3">
           {/* Prayag MRP Card */}
-          <div className="border bg-muted/20 rounded-lg p-5 flex flex-col justify-center relative">
-            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-widest">Current MRP</p>
+          <div className="border bg-muted/20 rounded-lg p-4 flex flex-col justify-center relative">
+            <p className="text-[11px] font-bold text-muted-foreground mb-1 uppercase tracking-wide">Current MRP</p>
             {product.currentMrp != null ? (
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">₹{product.currentMrp.toFixed(2)}</span>
+                <span className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">₹{product.currentMrp.toFixed(2)}</span>
               </div>
             ) : (
-              <span className="text-2xl font-bold text-muted-foreground">Price Pending</span>
+              <span className="text-xl font-bold text-muted-foreground">Price Pending</span>
             )}
             <PriceWindowDetails
               currentPrice={product.currentMrp}
@@ -1228,28 +1228,28 @@ function ProductView({
               upcomingPrice={product.upcomingMrp}
               upcomingEffectiveDate={product.upcomingEffectiveDate}
               upcomingChangePct={product.upcomingChangePct}
-              className="mt-4"
+               className="mt-3"
             />
           </div>
 
           {/* Competitor Data */}
-          <div className="border rounded-lg p-5 bg-card flex flex-col">
-            <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-widest">Market Context</p>
+          <div className="border rounded-lg p-4 bg-card flex flex-col">
+            <p className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wide">Market Context</p>
             
             {!competitors || competitors.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
                 <Info className="w-8 h-8 text-muted-foreground/40 mb-2" />
                 <p className="text-sm font-semibold text-foreground">No competitor data</p>
                 <p className="text-xs text-muted-foreground mt-1">This product has no mapped rivals.</p>
               </div>
             ) : (
-              <div className="space-y-2 flex-1 overflow-y-auto">
+              <div className="space-y-1.5 flex-1 overflow-y-auto">
                 {competitors.map((comp: PriceFinderCompetitor) => {
                   const isPrayagCheaper = comp.gapPct != null && comp.gapPct > 0;
                   const isCompetitorCheaper = comp.gapPct != null && comp.gapPct < 0;
 
                   return (
-                    <div key={comp.competitor} className="flex items-start justify-between gap-3 p-3 bg-muted/30 border-b last:border-b-0 rounded-md">
+                    <div key={comp.competitor} className="flex items-start justify-between gap-2 p-2.5 bg-muted/30 border-b last:border-b-0 rounded-md">
                       <div className="min-w-0">
                         <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
                           {comp.competitor}
@@ -1265,13 +1265,13 @@ function ProductView({
                           upcomingPrice={comp.upcomingPrice}
                           upcomingEffectiveDate={comp.upcomingEffectiveDate}
                           upcomingChangePct={comp.upcomingChangePct}
-                          className="mt-1 max-w-[300px]"
+                          className="mt-0.5 max-w-[260px]"
                         />
                       </div>
                       <div className="text-right flex flex-col items-end">
                         {comp.gapPct != null ? (
                           <div className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold font-mono",
+                              "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono",
                             isCompetitorCheaper ? "bg-destructive/10 text-destructive" : 
                             isPrayagCheaper ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
                           )}>
@@ -1294,8 +1294,8 @@ function ProductView({
 
         {/* Colour variant pricing table */}
         {variants && variants.length > 0 && (
-          <div className="border-t pt-5">
-            <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-widest flex items-center gap-1.5">
+          <div className="border-t pt-4">
+            <p className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-indigo-500" />
               Colour Variant Pricing
             </p>
@@ -1310,15 +1310,15 @@ function ProductView({
                 </thead>
                 <tbody className="divide-y">
                   {variants.map((v) => (
-                    <tr key={v.variant} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-3 py-2.5 font-medium text-foreground flex items-center gap-1.5">
+                   <tr key={v.variant} className="hover:bg-muted/20 transition-colors">
+                     <td className="px-3 py-2 font-medium text-foreground flex items-center gap-1.5">
                         <Palette className="w-3 h-3 text-indigo-400 shrink-0" />
                         {v.variant}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-semibold">
+                     <td className="px-3 py-2 text-right font-mono font-semibold">
                         {v.currentMrp != null ? `₹${v.currentMrp.toFixed(2)}` : "—"}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono">
+                     <td className="px-3 py-2 text-right font-mono">
                         {v.upcomingMrp != null ? (
                           <span className="text-amber-700 dark:text-amber-400">
                             ₹{v.upcomingMrp.toFixed(2)}
