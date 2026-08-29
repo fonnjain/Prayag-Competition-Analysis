@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useGetPriceFinderComparison, getExportPriceFinderComparisonUrl } from "@workspace/api-client-react";
 import { ChevronLeft, Download, Info, AlertCircle, TrendingDown, TrendingUp, Minus, Search, Trash2 } from "lucide-react";
@@ -7,40 +8,55 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useSelection } from "@/lib/useSelection";
 import { formatPriceDate } from "@/components/price-window";
-
-const COMPETITORS = ["Sparsh Pearl", "Vectus"] as const;
+import {
+  comparisonStateFromParams,
+  hasUnsupportedParams,
+  localPriceFinderUrl,
+  normalizePriceFinderParams,
+  PRICE_FINDER_COMPETITORS,
+  type PriceFinderCompetitor,
+  updateComparisonParams,
+} from "@/lib/priceFinderRouteState";
 
 export default function ComparisonPage() {
   const searchString = useSearch();
   const [, setLocation] = useLocation();
   const { codes, removeCode } = useSelection();
   const params = new URLSearchParams(searchString);
-  const rawCompetitors = params.getAll("competitor");
-  const activeCompetitors = rawCompetitors.length > 0 ? rawCompetitors : ["Sparsh Pearl"];
-  const asOf = params.get("asOf") || "";
+  const { competitors: activeCompetitors, asOf } = comparisonStateFromParams(params);
+  const normalizedParams = normalizePriceFinderParams(params, "comparison");
+  const normalizedSearch = normalizedParams.toString();
 
-  const updateFilters = (newCompetitors: string[], newAsOf: string) => {
-    const p = new URLSearchParams();
-    codes.forEach(c => p.append("code", c));
-    newCompetitors.forEach(c => p.append("competitor", c));
-    if (newAsOf) p.append("asOf", newAsOf);
-    setLocation(`/comparison?${p.toString()}`);
+  useEffect(() => {
+    if (searchString !== normalizedSearch || hasUnsupportedParams(params)) {
+      setLocation(localPriceFinderUrl("/comparison", normalizedParams), {
+        replace: true,
+      });
+    }
+  }, [normalizedSearch, searchString, setLocation]);
+
+  const updateFilters = (
+    newCompetitors: readonly PriceFinderCompetitor[],
+    newAsOf: string,
+  ) => {
+    const next = updateComparisonParams(params, newCompetitors, newAsOf);
+    setLocation(localPriceFinderUrl("/comparison", next));
   };
 
-  const handleCompetitorToggle = (comp: string) => {
+  const handleCompetitorToggle = (comp: PriceFinderCompetitor) => {
     const current = new Set(activeCompetitors);
     if (current.has(comp)) {
       if (current.size === 1) return;
       current.delete(comp);
     }
     else current.add(comp);
-    updateFilters(Array.from(current), asOf);
+    updateFilters(Array.from(current) as PriceFinderCompetitor[], asOf);
   };
 
   const { data, isLoading, isError } = useGetPriceFinderComparison(
     { 
       code: codes, 
-      competitor: activeCompetitors as ("Sparsh Pearl" | "Vectus")[], 
+      competitor: activeCompetitors,
       asOf: asOf || undefined 
     },
     {
@@ -53,7 +69,7 @@ export default function ComparisonPage() {
 
   const exportUrl = getExportPriceFinderComparisonUrl({
     code: codes,
-    competitor: activeCompetitors as ("Sparsh Pearl" | "Vectus")[],
+    competitor: activeCompetitors,
     asOf: asOf || undefined
   });
 
@@ -65,7 +81,7 @@ export default function ComparisonPage() {
         </div>
         <h1 className="text-2xl font-bold mb-2">No Products Selected</h1>
         <p className="text-muted-foreground mb-6">Select products from the Price Finder to compare them.</p>
-        <Link href="/" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 shadow-sm">
+        <Link href={localPriceFinderUrl("/", normalizePriceFinderParams(params, "search"))} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 shadow-sm">
           Go to Price Finder
         </Link>
       </div>
@@ -78,7 +94,7 @@ export default function ComparisonPage() {
         <div className="max-w-[1600px] mx-auto px-4 py-3 md:px-6 md:py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-indigo-300 mb-1">
-              <Link href={`/?${new URLSearchParams(codes.map(c => ['code', c])).toString()}`} className="hover:text-white transition-colors flex items-center gap-1 text-xs font-semibold">
+              <Link href={localPriceFinderUrl("/", normalizePriceFinderParams(params, "search"))} className="hover:text-white transition-colors flex items-center gap-1 text-xs font-semibold">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back to Search
               </Link>
             </div>
@@ -90,7 +106,7 @@ export default function ComparisonPage() {
           
           <div className="flex flex-wrap items-center gap-3 bg-slate-800/80 p-2 rounded-lg border border-white/10 shadow-sm">
             <div className="flex items-center gap-3 border-r border-white/10 pr-3">
-              {COMPETITORS.map(comp => (
+               {PRICE_FINDER_COMPETITORS.map(comp => (
                 <label key={comp} className="flex items-center gap-1.5 cursor-pointer group text-xs font-semibold text-slate-200 hover:text-white transition-colors">
                   <Checkbox 
                     checked={activeCompetitors.includes(comp)}

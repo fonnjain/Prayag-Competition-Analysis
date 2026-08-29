@@ -20,12 +20,16 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { formatPriceDate, PriceWindowDetails } from "@/components/price-window";
 import { buildSpokenPriceSummary } from "@/lib/priceSpeech";
 import { getPriceFinderSearchDisplay } from "@/lib/priceFinderSearchState";
 import { useSelection } from "@/lib/useSelection";
+import {
+  localPriceFinderUrl,
+  normalizePriceFinderParams,
+} from "@/lib/priceFinderRouteState";
 import {
   useGetPriceFinderBrowse,
   useGetPriceFinderProduct,
@@ -238,6 +242,7 @@ function useVoiceSearch(
 }
 
 export default function PriceFinderPage() {
+  const [, navigate] = useLocation();
   const { codes, toggleCode, clearCodes, removeCode } = useSelection();
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
@@ -258,6 +263,13 @@ export default function PriceFinderPage() {
   const [speechRequested, setSpeechRequested] = useState(false);
   const [speechAvailable, setSpeechAvailable] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
+  const comparisonHref = localPriceFinderUrl(
+    "/comparison",
+    normalizePriceFinderParams(
+      new URLSearchParams(window.location.search),
+      "comparison",
+    ),
+  );
 
   const cancelSpeech = useCallback(() => {
     if (
@@ -302,13 +314,13 @@ export default function PriceFinderPage() {
     const params = new URLSearchParams(window.location.search);
     params.delete("filter");
     nextFilters.forEach((filter) => params.append("filter", filter));
-    const query = params.toString();
-    window.history.pushState(
-      null,
-      "",
-      `${window.location.pathname}${query ? `?${query}` : ""}`,
+    navigate(
+      localPriceFinderUrl(
+        "/",
+        normalizePriceFinderParams(params, "search"),
+      ),
     );
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const restoreFiltersFromHistory = () => {
@@ -539,7 +551,7 @@ export default function PriceFinderPage() {
             </Button>
           )}
           {codes.length ? (
-            <Link href={`/comparison?${new URLSearchParams(codes.map((code) => ["code", code])).toString()}`}>
+            <Link href={comparisonHref}>
               <Button type="button" size="sm" className="h-8 px-3 text-xs" data-activity="price_finder.compare_selected">Compare selected</Button>
             </Link>
           ) : (

@@ -1,13 +1,17 @@
 import { useCallback, useState, useEffect } from 'react';
-import { useSearch } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import {
   selectedCodesFromParams,
   toggleSelectedCode,
-  writeSelectedCodes,
 } from "./selectionState";
+import {
+  localPriceFinderUrl,
+  updateSelectedCodes,
+} from "./priceFinderRouteState";
 
 export function useSelection() {
   const searchString = useSearch();
+  const [location, navigate] = useLocation();
   const [codes, setCodes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -19,32 +23,26 @@ export function useSelection() {
     const params = new URLSearchParams(window.location.search);
     const update = toggleSelectedCode(selectedCodesFromParams(params), code);
     if (update.ok) {
-      const next = writeSelectedCodes(params, update.codes);
-      const newUrl = `${window.location.pathname}${next.toString() ? '?' + next.toString() : ''}`;
-      window.history.replaceState(null, "", newUrl);
-      window.dispatchEvent(new Event("popstate"));
+      const next = updateSelectedCodes(params, update.codes);
+      navigate(localPriceFinderUrl(location as "/" | "/comparison", next));
     }
     return update.ok;
-  }, []);
+  }, [location, navigate]);
 
   const clearCodes = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
-    const next = writeSelectedCodes(params, []);
-    const newUrl = `${window.location.pathname}${next.toString() ? '?' + next.toString() : ''}`;
-    window.history.replaceState(null, "", newUrl);
-    window.dispatchEvent(new Event("popstate"));
-  }, []);
+    const next = updateSelectedCodes(params, []);
+    navigate(localPriceFinderUrl(location as "/" | "/comparison", next));
+  }, [location, navigate]);
   
   const removeCode = useCallback((code: string) => {
     const params = new URLSearchParams(window.location.search);
     const update = toggleSelectedCode(selectedCodesFromParams(params), code);
     if (update.ok) {
-        const next = writeSelectedCodes(params, update.codes);
-        const newUrl = `${window.location.pathname}${next.toString() ? '?' + next.toString() : ''}`;
-       window.history.replaceState(null, "", newUrl);
-       window.dispatchEvent(new Event("popstate"));
+      const next = updateSelectedCodes(params, update.codes);
+      navigate(localPriceFinderUrl(location as "/" | "/comparison", next));
     }
-  }, []);
+  }, [location, navigate]);
 
   return { codes, toggleCode, clearCodes, removeCode };
 }
