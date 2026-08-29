@@ -17,17 +17,17 @@ export function PositioningChart({ filters }: { filters: DashboardFilters }) {
   const { data, isLoading } = useGetAnalysisPositioning(filters as any);
 
   if (isLoading || !data) {
-    return <Skeleton className="h-[400px] w-full" />;
+    return <Skeleton className="h-[300px] md:h-[340px] w-full" />;
   }
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader>
+      <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
           Price Positioning Distribution
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[300px]">
+      <CardContent className="flex-1 min-h-[220px] p-3 pt-0 sm:p-4 sm:pt-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data.buckets} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />

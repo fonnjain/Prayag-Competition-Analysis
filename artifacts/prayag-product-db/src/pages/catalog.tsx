@@ -198,10 +198,10 @@ export default function CatalogPage() {
   const exportUrl = `/api/catalog/export?type=catalog&format=xlsx`;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="px-3 py-4 sm:px-5 lg:px-6 max-w-7xl mx-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Product Catalog</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Product Catalog</h1>
           <p className="text-muted-foreground mt-1">
             {productsData?.total ? `${productsData.total} items` : "Loading..."}
           </p>
@@ -214,8 +214,8 @@ export default function CatalogPage() {
         </Button>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
+      <div className="grid grid-cols-1 gap-2 mb-4 sm:grid-cols-2 lg:flex lg:flex-wrap">
+        <div className="relative min-w-0 sm:col-span-2 lg:flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search by code or name..."
@@ -232,7 +232,7 @@ export default function CatalogPage() {
             setCategory("all");
           }}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full lg:w-[180px]">
             <SelectValue placeholder="Division" />
           </SelectTrigger>
           <SelectContent>
@@ -246,7 +246,7 @@ export default function CatalogPage() {
         </Select>
 
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full lg:w-[200px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -260,7 +260,7 @@ export default function CatalogPage() {
         </Select>
 
         <Select value={priceStatus} onValueChange={setPriceStatus}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full lg:w-[180px]">
             <SelectValue placeholder="Price Status" />
           </SelectTrigger>
           <SelectContent>
@@ -272,8 +272,11 @@ export default function CatalogPage() {
       </div>
 
       <div className="border rounded-md bg-card">
+        <p className="border-b px-3 py-2 text-[11px] text-muted-foreground sm:hidden">
+          Scroll sideways to view category, price, and effective date.
+        </p>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full min-w-[760px] text-sm text-left">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 font-medium text-muted-foreground">Item Code</th>
@@ -347,11 +350,11 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between mt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
         <p className="text-sm text-muted-foreground font-mono">
           {total === 0 ? "0 results" : `${rangeStart}–${rangeEnd} of ${total}`}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"

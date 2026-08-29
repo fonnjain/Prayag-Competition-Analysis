@@ -37,8 +37,8 @@ export function OverviewCards({
 
   if (isLoading || !data) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28 w-full" />)}
       </div>
     );
   }
@@ -58,13 +58,13 @@ export function OverviewCards({
   const isPositive = (avgPriceDiffPct || 0) > 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Market Coverage</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-4 sm:pb-1">
+          <CardTitle className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Market Coverage</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-1 sm:p-4 sm:pt-1">
           <div className="text-2xl font-bold">{coveragePct?.toFixed(1) ?? 0}%</div>
           <p className="text-xs text-muted-foreground mt-1">
             {matchedSkus.toLocaleString()} / {totalSkus.toLocaleString()} SKUs matched
@@ -73,11 +73,11 @@ export function OverviewCards({
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Pricing Position</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-4 sm:pb-1">
+          <CardTitle className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Pricing Position</CardTitle>
           <Layers className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-1 sm:p-4 sm:pt-1">
           <div className="text-2xl font-bold text-positive">
             {prayagCheaperPct?.toFixed(1) ?? 0}%
           </div>
@@ -88,11 +88,11 @@ export function OverviewCards({
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Avg Price Gap</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-4 sm:pb-1">
+          <CardTitle className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Avg Price Gap</CardTitle>
           {isPositive ? <TrendingUp className="h-4 w-4 text-positive" /> : <TrendingDown className="h-4 w-4 text-negative" />}
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-1 sm:p-4 sm:pt-1">
           <div className={`text-2xl font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>
             {avgPriceDiffPct != null ? (avgPriceDiffPct > 0 ? "+" : "") + avgPriceDiffPct.toFixed(1) + "%" : "N/A"}
           </div>
@@ -103,11 +103,11 @@ export function OverviewCards({
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Median Gap</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-4 sm:pb-1">
+          <CardTitle className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Median Gap</CardTitle>
           <PackageSearch className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-1 sm:p-4 sm:pt-1">
           <div className="text-2xl font-bold">
             {medianPriceDiffPct != null ? (medianPriceDiffPct > 0 ? "+" : "") + medianPriceDiffPct.toFixed(1) + "%" : "N/A"}
           </div>

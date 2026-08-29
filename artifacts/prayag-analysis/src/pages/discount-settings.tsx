@@ -91,19 +91,19 @@ export default function DiscountSettings() {
   return (
     <div className="flex flex-col min-h-full bg-muted/20">
       {/* Controls bar — global nav owned by AppShell; only page controls here */}
-      <div className="border-b bg-card px-6 py-3 flex items-center justify-between">
+      <div className="border-b bg-card px-3 py-3 sm:px-4 lg:px-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-base font-semibold text-foreground">Discount Settings</h1>
           <p className="text-xs text-muted-foreground font-mono">
             Used only by the Net-to-Net comparison
           </p>
         </div>
-        <Button onClick={handleSave} disabled={update.isPending || hasErrors} data-activity="analysis.save_discounts">
+        <Button className="w-full sm:w-auto" onClick={handleSave} disabled={update.isPending || hasErrors} data-activity="analysis.save_discounts">
           {update.isPending ? "Saving…" : "Save Changes"}
         </Button>
       </div>
 
-      <div className="flex-1 p-6 space-y-6 max-w-3xl mx-auto w-full">
+      <div className="flex-1 p-3 sm:p-4 lg:p-5 space-y-4 max-w-3xl mx-auto w-full">
         <Card>
           <CardHeader>
             <CardTitle>How Net-to-Net works</CardTitle>
@@ -119,7 +119,7 @@ export default function DiscountSettings() {
               <Skeleton className="h-40 w-full" />
             </CardContent>
           ) : (
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="space-y-2 max-w-sm">
                 <Label htmlFor="prayag-discount">Prayag Discount (%)</Label>
                 <Input
@@ -141,8 +141,8 @@ export default function DiscountSettings() {
 
               <div className="space-y-2">
                 <Label>Competitor Discounts (%)</Label>
-                <div className="border rounded-md">
-                  <Table>
+                <div className="border rounded-md overflow-x-auto">
+                  <Table className="min-w-[420px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Competitor</TableHead>

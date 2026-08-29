@@ -126,10 +126,10 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col min-h-full bg-muted/20">
       {/* Controls bar — global nav owned by AppShell; only app controls here */}
-      <div className="border-b bg-card px-6 py-3 flex flex-wrap items-center gap-3">
+      <div className="border-b bg-card px-3 py-2.5 sm:px-4 lg:px-6 flex flex-wrap items-center gap-2">
         <ModeToggle mode={mode} onChange={setMode} />
         <div className="flex-1" />
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex w-full gap-2 sm:w-auto sm:flex-wrap">
           <Button variant="outline" size="sm" onClick={() => handleExport("csv")} disabled={exportLoading} data-activity="analysis.export_csv">
             <Download className="h-4 w-4 mr-2" />
             CSV
@@ -147,30 +147,30 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="flex-1 p-6 space-y-6 max-w-[1600px] mx-auto w-full">
+      <div className="flex-1 p-3 sm:p-4 lg:p-5 space-y-4 max-w-[1600px] mx-auto w-full">
         <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} competitorPeriodDate={competitorPeriodDate} snapshotLabel={snapshotLabel} />
         
         <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} onCompetitorPeriodDate={handleCompetitorPeriodDate} />
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-[400px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="h-[300px] md:h-[340px]">
             <BrandComparison filters={filters} />
           </div>
-          <div className="h-[400px]">
+          <div className="h-[300px] md:h-[340px]">
             <PositioningChart filters={filters} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="min-h-[400px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="min-h-[320px] md:min-h-[360px]">
             <CategoryComparison filters={filters} />
           </div>
-          <div className="min-h-[400px]">
+          <div className="min-h-[320px] md:min-h-[360px]">
             <CoverageMatrix filters={filters} />
           </div>
         </div>
 
-        <div className="min-h-[400px]">
+        <div className="min-h-[340px]">
           <OpportunitiesThreats filters={filters} />
         </div>
       </div>
@@ -246,17 +246,17 @@ function FilterBar({
 
   return (
     <Card className="shadow-xs border-muted">
-      <div className="p-3 flex flex-wrap gap-4 items-end">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mr-2 h-8">
+      <div className="p-3 grid grid-cols-2 gap-2 items-end sm:flex sm:flex-wrap">
+        <div className="col-span-2 flex items-center gap-2 text-sm font-medium text-muted-foreground sm:mr-1 h-8">
           <Filter className="h-4 w-4" />
           Filters
         </div>
 
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Competitors</label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-[180px] h-8 justify-between text-sm font-normal">
+              <Button variant="outline" className="w-full sm:w-[180px] h-8 justify-between text-sm font-normal">
                 {filters.competitor && filters.competitor.length > 0 
                   ? `${filters.competitor.length} Selected` 
                   : "All Competitors"}
@@ -279,13 +279,13 @@ function FilterBar({
           </DropdownMenu>
         </div>
         
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Division</label>
           <Select 
             value={filters.division || "all"} 
             onValueChange={(v) => onChange({ ...filters, division: v === "all" ? undefined : v })}
           >
-            <SelectTrigger className="w-[180px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-full sm:w-[180px] h-8 text-sm bg-background">
               <SelectValue placeholder="All Divisions" />
             </SelectTrigger>
             <SelectContent>
@@ -295,13 +295,13 @@ function FilterBar({
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Category</label>
           <Select 
             value={filters.category || "all"} 
             onValueChange={(v) => onChange({ ...filters, category: v === "all" ? undefined : v })}
           >
-            <SelectTrigger className="w-[180px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-full sm:w-[180px] h-8 text-sm bg-background">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -311,13 +311,13 @@ function FilterBar({
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Confidence</label>
           <Select 
             value={filters.matchConfidence || "all"} 
             onValueChange={(v) => onChange({ ...filters, matchConfidence: v === "all" ? undefined : v })}
           >
-            <SelectTrigger className="w-[150px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-full sm:w-[150px] h-8 text-sm bg-background">
               <SelectValue placeholder="All Confidences" />
             </SelectTrigger>
             <SelectContent>
@@ -327,13 +327,13 @@ function FilterBar({
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Status</label>
           <Select 
             value={filters.matchStatus || "all"} 
             onValueChange={(v) => onChange({ ...filters, matchStatus: v === "all" ? undefined : v })}
           >
-            <SelectTrigger className="w-[150px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-full sm:w-[150px] h-8 text-sm bg-background">
               <SelectValue placeholder="All Statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -344,7 +344,7 @@ function FilterBar({
         </div>
 
         {periodsData && periodsData.periods.length > 1 && (
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Period</label>
             <Select
               value={filters.effectivePeriod || "__latest__"}
@@ -352,7 +352,7 @@ function FilterBar({
                 onChange({ ...filters, effectivePeriod: v === "__latest__" ? undefined : v })
               }
             >
-              <SelectTrigger className="w-[160px] h-8 text-sm bg-background" data-testid="period-select-trigger">
+              <SelectTrigger className="w-full sm:w-[160px] h-8 text-sm bg-background" data-testid="period-select-trigger">
                 <SelectValue placeholder="Latest" />
               </SelectTrigger>
               <SelectContent>
@@ -368,16 +368,16 @@ function FilterBar({
           </div>
         )}
 
-        <div className="flex-1" />
+        <div className="hidden flex-1 lg:block" />
 
         {prayagMrpDate && (
-          <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Prayag MRP revision used for this comparison">
+          <div className="col-span-2 flex min-h-8 items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium sm:col-span-1" title="Prayag MRP revision used for this comparison">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
             MRP revision as of {prayagMrpDate}
           </div>
         )}
         {snapshotLabel && (
-          <div className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap" title="Downloaded source snapshot used for Prayag MRP">
+          <div className="col-span-2 flex min-h-8 items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium sm:col-span-1" title="Downloaded source snapshot used for Prayag MRP">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" />
             {snapshotLabel}
           </div>
@@ -388,7 +388,7 @@ function FilterBar({
         {competitorPeriodDate !== undefined && (
           competitorPeriodDate === null ? (
             <div
-              className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-amber-200 bg-amber-50 text-xs text-amber-700 font-medium whitespace-nowrap dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
+              className="col-span-2 flex min-h-8 items-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-200 bg-amber-50 text-xs text-amber-700 font-medium sm:col-span-1 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
               title="No competitor prices have been imported for this period"
               data-testid="competitor-period-no-data"
             >
@@ -397,7 +397,7 @@ function FilterBar({
             </div>
           ) : (
             <div
-              className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium whitespace-nowrap"
+              className="col-span-2 flex min-h-8 items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-muted/40 text-xs text-muted-foreground font-medium sm:col-span-1"
               title="Latest competitor price date used for this comparison"
               data-testid="competitor-period-date"
             >

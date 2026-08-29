@@ -14,11 +14,11 @@ export default function ProductDetailPage() {
   });
 
   if (isLoading) {
-    return <div className="p-8 text-center">Loading product...</div>;
+    return <div className="p-4 sm:p-6 text-center">Loading product...</div>;
   }
 
   if (!data) {
-    return <div className="p-8 text-center">Product not found</div>;
+    return <div className="p-4 sm:p-6 text-center">Product not found</div>;
   }
 
   const chartData = [...data.history].reverse().map(h => ({
@@ -27,11 +27,11 @@ export default function ProductDetailPage() {
   }));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{data.product.productName || data.product.itemCode}</h1>
-          <p className="text-lg text-muted-foreground mt-2 font-mono">{data.product.itemCode}</p>
+    <div className="px-3 py-4 sm:px-5 lg:px-6 max-w-5xl mx-auto space-y-4">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{data.product.productName || data.product.itemCode}</h1>
+          <p className="text-sm text-muted-foreground mt-1 font-mono">{data.product.itemCode}</p>
         </div>
         <Button variant="outline" asChild>
           <a href={`/api/catalog/export?type=history&format=xlsx&itemCode=${itemCode}`} download>
@@ -41,9 +41,9 @@ export default function ProductDetailPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-1 space-y-6">
-          <div className="bg-card border rounded-lg p-6 space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-1">
+          <div className="bg-card border rounded-lg p-4 space-y-3">
             <h3 className="font-semibold border-b pb-2">Product Details</h3>
             <div className="grid grid-cols-2 gap-y-4 text-sm">
               <div className="text-muted-foreground">Division</div>
@@ -58,11 +58,11 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        <div className="col-span-2 space-y-6">
+        <div className="space-y-4 lg:col-span-2">
           {chartData.length > 1 && (
-            <div className="bg-card border rounded-lg p-6">
-              <h3 className="font-semibold mb-6">Price History</h3>
-              <div className="h-64">
+            <div className="bg-card border rounded-lg p-4">
+              <h3 className="font-semibold mb-3">Price History</h3>
+              <div className="h-56 md:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -76,8 +76,8 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          <div className="bg-card border rounded-lg overflow-hidden">
-            <table className="w-full text-sm text-left">
+          <div className="bg-card border rounded-lg overflow-x-auto">
+            <table className="w-full min-w-[620px] text-sm text-left">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-4 py-3 font-medium text-muted-foreground">Effective Date</th>

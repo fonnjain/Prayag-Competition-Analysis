@@ -16,18 +16,19 @@ export function CoverageMatrix({ filters }: { filters: DashboardFilters }) {
   const { data, isLoading } = useGetAnalysisCoverageMatrix(filters as any);
 
   if (isLoading || !data) {
-    return <Skeleton className="h-[400px] w-full" />;
+    return <Skeleton className="h-[320px] md:h-[360px] w-full" />;
   }
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader>
+      <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
           Competitor Coverage Matrix
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 overflow-auto">
-        <Table>
+      <CardContent className="flex-1 overflow-auto p-3 pt-0 sm:p-4 sm:pt-0">
+        <div className="overflow-x-auto">
+        <Table className="min-w-[680px]">
           <TableHeader>
             <TableRow>
               <TableHead className="font-semibold">Competitor</TableHead>
@@ -55,9 +56,10 @@ export function CoverageMatrix({ filters }: { filters: DashboardFilters }) {
             ))}
           </TableBody>
         </Table>
-        <div className="mt-4 pt-4 border-t flex justify-between items-center text-sm">
+        </div>
+        <div className="mt-3 pt-3 border-t flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center text-sm">
           <div className="font-semibold text-muted-foreground uppercase tracking-wider">Overall Totals</div>
-          <div className="flex gap-4 font-mono">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono">
             <span>Coverage: <span className="font-bold text-foreground">{data.totals.coveragePct?.toFixed(1) ?? 0}%</span></span>
             <span>Matched: <span className="font-bold text-foreground">{data.totals.matched.toLocaleString()}</span></span>
           </div>

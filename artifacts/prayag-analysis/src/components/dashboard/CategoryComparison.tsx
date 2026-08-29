@@ -18,7 +18,7 @@ export function CategoryComparison({ filters }: { filters: DashboardFilters }) {
   const { data, isLoading } = useGetAnalysisByCategory(filters as any);
 
   if (isLoading || !data) {
-    return <Skeleton className="h-[400px] w-full" />;
+    return <Skeleton className="h-[320px] md:h-[360px] w-full" />;
   }
 
   // Sort by avg gap descending
@@ -26,12 +26,12 @@ export function CategoryComparison({ filters }: { filters: DashboardFilters }) {
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader>
+      <CardHeader className="p-4 pb-2">
         <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
           By Category: Avg Price Gap (%)
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-[300px]">
+      <CardContent className="flex-1 min-h-[250px] p-3 pt-0 sm:p-4 sm:pt-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
