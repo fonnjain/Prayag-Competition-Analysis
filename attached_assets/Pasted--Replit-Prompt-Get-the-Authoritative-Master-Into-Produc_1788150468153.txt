@@ -1,0 +1,105 @@
+# Replit Prompt — Get the Authoritative Master Into Production
+
+The authoritative master is loaded and verified in development. Production still holds the old data, and 01 September is days away. This is about getting it across safely.
+
+**Answer section 1 before doing anything else.** The wrong answer there makes the rest of this dangerous.
+
+---
+
+## 1. How does the production Load MRP form handle dates?
+
+The form has two fields:
+
+```
+File Downloaded On          31/08/2026
+New Period Effective Date   31/08/2026
+```
+
+The authoritative file contains **six different effective dates**, one per row:
+
+```
+2026-09-01  2,409     2026-02-01  1,685     2026-05-01    871
+2026-08-01    865     2024-02-15    161     2026-08-10     85
+```
+
+**If "New Period Effective Date" is applied to every row, this file must not be loaded through that form.** All 6,076 rows would land on 31 August — a period that exists in no source, Hardware's September revision would be lost, and it would be batch 154 again with a nicer interface.
+
+Report precisely:
+
+- Does the loader read `effective_date` **per row from the workbook**, or does the form field override it?
+- If the workbook has an `effective_date` column, which wins?
+- Is the form field optional when the workbook supplies dates?
+
+The development load read the dates from the file. Confirm the production path does the same, or say that it does not.
+
+---
+
+## 2. Then choose the safest route, and say which
+
+Three possibilities. Evaluate them and recommend one — do not just pick the easiest.
+
+**A. Single upload through the production Load MRP form.**
+Available only if section 1 confirms per-row dates win. Cleanest: one file, one batch, one provenance record, and it exercises the same validated path development used.
+
+**B. Six uploads, one per period.**
+Fallback if the form overrides dates. Each file holds exactly one period, so the form's date is set to that period and cannot be wrong. Files are prepared:
+
+```
+MRP_2026-09-01_2409rows.xlsx    a06e7047c112abba
+MRP_2026-08-10_85rows.xlsx      83c881b15f0e9f6d
+MRP_2026-08-01_865rows.xlsx     e8f3d2c4f37ab584
+MRP_2026-05-01_871rows.xlsx     04c11937b1af31d0
+MRP_2026-02-01_1685rows.xlsx    be33e8d1cdf80550
+MRP_2024-02-15_161rows.xlsx     0715671285835872
+```
+
+Costs six batches instead of one, and six chances to select a wrong date. Only use it if A is unavailable.
+
+**C. You perform the load against production yourself.**
+Your database access is read-only, but the **application runs on production**. If you can authenticate to the production API — with an admin session or an API key — and POST the workbook to the same endpoint the form uses, that is not a direct database write. It is the app's own validated path, with hash check, provenance, preview and transaction intact.
+
+State plainly whether this is possible, and what it would need. If it is not, say so rather than attempting a workaround.
+
+**Do not consider direct SQL against production.** That bypasses every guard this project has built, and those guards exist because of specific incidents.
+
+---
+
+## 3. The discontinuations are separate
+
+233 signed discontinuations load once, whichever route is chosen — they are not split across periods. 215 take effect immediately because their dates are past; 18 are dated 01 September.
+
+If route B is used, load the discontinuations once, not six times.
+
+---
+
+## 4. Verify against production, not development
+
+A development pass proves the loader works. It says nothing about production, and the two have diverged before on this project.
+
+```
+1.  MRP history rows: 13,048 → 13,594.
+2.  Two new periods exist: 2026-09-01 Hardware, 2026-08-10 Pipes & Fittings.
+3.  No rows dated 2026-08-31. If any exist, the form overrode the dates —
+    stop and report before doing anything else.
+4.  CCL-60-BSK → 1,190 at 2026-09-01.
+5.  PEA-64B → 2,596.  C71 → 244.  WT-4LH-50 → 100,000.
+6.  1179 → 638.  1181 → 578.
+7.  233 codes carry a discontinued_from; 215 already past, 18 on 01 Sep.
+8.  The 8 EMERALD 61 codes are withdrawn from 2026-08-01.
+9.  Colour variants: 118 Ivory, 19 White with Jet, 13 Pink/Green/Blue.
+10. Every row has a load_batch_id.
+11. All 150 Sparsh Pearl mappings still resolve.
+```
+
+Test 3 is the one that catches the failure this prompt exists to prevent. Run it first after loading.
+
+---
+
+## 5. Report
+
+- The answer to section 1, in plain terms.
+- Which route you recommend and why.
+- If you loaded: batch id, rows written, and every check above.
+- If you could not: exactly what is needed and who must do it.
+
+**Stop and report rather than improvising.** Production feeds the public Price Finder and the E-commerce Hub, which reads `currentMrp` from `/api/v1/products`. A wrong load reaches customers, not just a dashboard.
