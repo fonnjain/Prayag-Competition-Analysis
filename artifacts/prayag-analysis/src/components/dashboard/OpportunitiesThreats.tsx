@@ -31,6 +31,16 @@ function validityLabel(from?: string | null, to?: string | null): string | null 
     : `Valid from ${shortDate(from)}`;
 }
 
+function HistoryStatusBadge({ status }: { status: string }) {
+  if (status === "Upcoming") {
+    return <Badge variant="outline" className="text-[10px] h-4 px-1 border-orange-400 text-orange-600">Upcoming</Badge>;
+  }
+  if (status === "Current") {
+    return <Badge variant="secondary" className="text-[10px] h-4 px-1">Current</Badge>;
+  }
+  return <Badge variant="outline" className="text-[10px] h-4 px-1 text-muted-foreground">Superseded</Badge>;
+}
+
 function RevisionLine({
   current,
   next,
@@ -98,11 +108,11 @@ export function OpportunitiesThreats({ filters }: { filters: DashboardFilters })
             </TabsList>
 
             <TabsContent value="opportunities" className="border rounded-md">
-              <OpportunityTable items={data.marginHeadroom} isThreat={false} prayagMrpDate={data.prayagMrpDate} />
+              <OpportunityTable items={data.marginHeadroom} isThreat={false} prayagMrpDate={data.prayagMrpDate} asOf={data.prayagMrpDate} />
             </TabsContent>
 
             <TabsContent value="threats" className="border rounded-md">
-              <OpportunityTable items={data.priceThreats} isThreat={true} prayagMrpDate={data.prayagMrpDate} />
+              <OpportunityTable items={data.priceThreats} isThreat={true} prayagMrpDate={data.prayagMrpDate} asOf={data.prayagMrpDate} />
             </TabsContent>
 
             <TabsContent value="mrp-increases" className="border rounded-md">
@@ -117,7 +127,7 @@ export function OpportunitiesThreats({ filters }: { filters: DashboardFilters })
 
 // ─── Expandable opportunity/threat table ────────────────────────────────────
 
-function OpportunityTable({ items, isThreat, prayagMrpDate }: { items: AnalysisOpportunityItem[]; isThreat: boolean; prayagMrpDate?: string }) {
+function OpportunityTable({ items, isThreat, prayagMrpDate, asOf }: { items: AnalysisOpportunityItem[]; isThreat: boolean; prayagMrpDate?: string; asOf?: string }) {
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
 
   if (items.length === 0) {
@@ -200,7 +210,7 @@ function OpportunityTable({ items, isThreat, prayagMrpDate }: { items: AnalysisO
                 {isExpanded && item.prayagCode && (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={7} className="p-0 border-b">
-                      <PriceHistoryPanel itemCode={item.prayagCode} />
+                      <PriceHistoryPanel itemCode={item.prayagCode} asOf={asOf} />
                     </TableCell>
                   </TableRow>
                 )}
@@ -215,9 +225,8 @@ function OpportunityTable({ items, isThreat, prayagMrpDate }: { items: AnalysisO
 
 // ─── Per-product price history panel ────────────────────────────────────────
 
-function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
-  const { data, isLoading } = useGetPriceHistory(itemCode);
-  const todayStr = new Date().toISOString().slice(0, 10);
+function PriceHistoryPanel({ itemCode, asOf }: { itemCode: string; asOf?: string }) {
+  const { data, isLoading } = useGetPriceHistory(itemCode, { asOf });
 
   if (isLoading || !data) {
     return (
@@ -259,8 +268,8 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.prayagHistory.map((p) => (
-                  <TableRow key={p.effectiveDate} className="text-xs">
+                  {data.prayagHistory.map((p) => (
+                    <TableRow key={p.id} className="text-xs">
                     <TableCell className="py-1.5 font-mono">{formatDisplayDate(p.effectiveDate)}</TableCell>
                     <TableCell className="py-1.5 text-muted-foreground">{p.priceBasis ?? '—'}</TableCell>
                     <TableCell className="py-1.5 text-right font-medium">
@@ -277,11 +286,7 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
                       ) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="py-1.5">
-                      {p.effectiveDate > todayStr ? (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-orange-400 text-orange-600">Upcoming</Badge>
-                      ) : p.isCurrent ? (
-                        <Badge variant="secondary" className="text-[10px] h-4 px-1">Current</Badge>
-                      ) : null}
+                      <HistoryStatusBadge status={p.status} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -316,7 +321,7 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
                     </TableHeader>
                     <TableBody>
                       {comp.periods.map((p) => (
-                        <TableRow key={p.effectiveDate} className="text-xs">
+                        <TableRow key={p.id} className="text-xs">
                           <TableCell className="py-1.5 font-mono">{formatDisplayDate(p.effectiveDate)}</TableCell>
                           <TableCell className="py-1.5 text-right">
                             {p.price != null ? `₹${p.price.toFixed(2)}` : '—'}
@@ -336,9 +341,7 @@ function PriceHistoryPanel({ itemCode }: { itemCode: string }) {
                             ) : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="py-1.5">
-                            {p.isCurrent && (
-                              <Badge variant="secondary" className="text-[10px] h-4 px-1">Current</Badge>
-                            )}
+                            <HistoryStatusBadge status={p.status} />
                           </TableCell>
                         </TableRow>
                       ))}

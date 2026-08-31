@@ -5,6 +5,12 @@ import { Download } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatDisplayDate } from "@/lib/date-format";
 
+function statusBadgeClass(status: string): string {
+  if (status === "Current") return "bg-primary/20 text-primary";
+  if (status === "Upcoming") return "border border-orange-400 text-orange-600";
+  return "bg-muted text-muted-foreground";
+}
+
 export default function ProductDetailPage() {
   const [, params] = useRoute("/product/:itemCode");
   const itemCode = params?.itemCode || "";
@@ -88,14 +94,12 @@ export default function ProductDetailPage() {
               </thead>
               <tbody>
                 {data.history.map((row) => (
-                  <tr key={row.id} className={`border-b last:border-0 ${row.isCurrent ? 'bg-primary/5' : ''}`}>
+                  <tr key={row.id} className={`border-b last:border-0 ${row.status === 'Current' ? 'bg-primary/5' : ''}`}>
                     <td className="px-4 py-3 font-mono">
                       {formatDisplayDate(row.effectiveDate)}
-                      {row.isCurrent && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-primary/20 text-primary">
-                          CURRENT
-                        </span>
-                      )}
+                      <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${statusBadgeClass(row.status)}`}>
+                        {row.status.toUpperCase()}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-medium">₹{row.mrp?.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right font-mono text-muted-foreground">

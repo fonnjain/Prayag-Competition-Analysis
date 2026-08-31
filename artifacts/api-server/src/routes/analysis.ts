@@ -34,6 +34,10 @@ import {
   validToFromNextDate,
   validToFromNextDateOrDiscontinuation,
 } from "../lib/priceWindow.js";
+import {
+  competitorRevisionGroupKey,
+  derivePriceHistoryStatuses,
+} from "../lib/priceHistoryStatus.js";
 
 const router: IRouter = Router();
 
@@ -803,9 +807,14 @@ router.get("/analysis/mrp-increases", async (req, res) => {
 router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: string }>, res) => {
   const { itemCode } = req.params;
   if (!itemCode) { res.status(400).json({ error: "itemCode required" }); return; }
+  const asOf =
+    typeof req.query.asOf === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
+      ? req.query.asOf
+      : todayString();
 
-  type MrpRow = { effective_date: string; mrp: number | null; price_basis: string; is_current: boolean; notes: string | null };
-  type CompRow = { competitor: string; price: number | null; unit: string | null; effective_date: string; is_current: boolean };
+  type MrpRow = { id: number; effective_date: string; mrp: number | null; price_basis: string; variant: string; notes: string | null };
+  type CompRow = { id: number; competitor: string; price: number | null; unit: string | null; effective_date: string; matched_prayag_code: string | null };
 
   const [productRows, mrpRows, compRows] = await Promise.all([
     db
@@ -813,7 +822,7 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
       .from(catalogProductsTable)
       .where(eq(catalogProductsTable.itemCode, itemCode)),
     db.execute<MrpRow>(sql`
-      SELECT effective_date, mrp, price_basis, is_current, notes
+      SELECT id, effective_date, mrp, price_basis, variant, notes
       FROM mrp_price_history
       WHERE item_code = ${itemCode}
         AND review_status = 'approved'
@@ -821,13 +830,40 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
       ORDER BY effective_date ASC, id ASC
     `),
     db.execute<CompRow>(sql`
-      SELECT competitor, price, unit, effective_date, is_current
+      SELECT id, competitor, price, unit, effective_date, matched_prayag_code
       FROM competitor_prices
-      WHERE matched_prayag_code = ${itemCode}
+      WHERE regexp_replace(
+        regexp_replace(upper(trim(matched_prayag_code)), '[[:space:]]+', '', 'g'),
+        '[.]0$',
+        ''
+      ) = ${normCode(itemCode)}
         AND price IS NOT NULL
+        AND effective_date IS NOT NULL
       ORDER BY competitor ASC, effective_date ASC, id ASC
     `),
   ]);
+  const mrpStatuses = derivePriceHistoryStatuses(
+    mrpRows.rows.map((row) => ({
+      ...row,
+      effectiveDate: row.effective_date,
+    })),
+    asOf,
+    (row) => `${itemCode}\u0000${row.variant}`,
+    (row) => row.mrp != null,
+  );
+  const competitorStatuses = derivePriceHistoryStatuses(
+    compRows.rows.map((row) => ({
+      ...row,
+      effectiveDate: row.effective_date,
+    })),
+    asOf,
+    (row) =>
+      competitorRevisionGroupKey({
+        competitor: row.competitor,
+        matchedPrayagCode: row.matched_prayag_code,
+      }),
+    (row) => row.price != null,
+  );
 
   // Compute period-to-period % change for Prayag
   const prayagHistory = mrpRows.rows.map((r, i) => {
@@ -836,7 +872,8 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
       prev?.mrp != null && prev.mrp > 0 && r.mrp != null
         ? round1(((r.mrp - prev.mrp) / prev.mrp) * 100)
         : null;
-    return { effectiveDate: r.effective_date, mrp: r.mrp, priceBasis: r.price_basis, isCurrent: r.is_current, notes: r.notes, changePct };
+    const status = mrpStatuses.get(r.id) ?? "Superseded";
+    return { id: r.id, effectiveDate: r.effective_date, mrp: r.mrp, priceBasis: r.price_basis, status, isCurrent: status === "Current", notes: r.notes, changePct };
   });
 
   // Group competitor rows by brand and compute period-to-period % change
@@ -854,7 +891,8 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
       const prevEff = prev?.price != null ? effectivePrice(prev.unit, prev.price) : null;
       const changePct =
         prevEff != null && prevEff > 0 ? round1(((effPrice - prevEff) / prevEff) * 100) : null;
-      return { effectiveDate: r.effective_date, price: r.price, unit: r.unit, effectivePrice: effPrice, isCurrent: r.is_current, changePct };
+      const status = competitorStatuses.get(r.id) ?? "Superseded";
+      return { id: r.id, effectiveDate: r.effective_date, price: r.price, unit: r.unit, effectivePrice: effPrice, status, isCurrent: status === "Current", changePct };
     }),
   }));
 

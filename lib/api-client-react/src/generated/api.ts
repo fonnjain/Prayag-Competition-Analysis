@@ -103,6 +103,7 @@ import type {
   GetPriceFinderBrowseParams,
   GetPriceFinderComparisonParams,
   GetPriceFinderSearchParams,
+  GetPriceHistoryParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
   LogoutBrowserSessionParams,
@@ -4042,21 +4043,30 @@ export function useGetMrpIncreases<TData = Awaited<ReturnType<typeof getMrpIncre
 
 
 
-export const getGetPriceHistoryUrl = (itemCode: string,) => {
+export const getGetPriceHistoryUrl = (itemCode: string,
+    params?: GetPriceHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/analysis/price-history/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/analysis/price-history/${itemCode}?${stringifiedParams}` : `/api/analysis/price-history/${itemCode}`
 }
 
 /**
- * Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
+ * Standard Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
  * @summary Period-to-period price history for a Prayag SKU
  */
-export const getPriceHistory = async (itemCode: string, options?: RequestInit): Promise<PriceHistory> => {
+export const getPriceHistory = async (itemCode: string,
+    params?: GetPriceHistoryParams, options?: RequestInit): Promise<PriceHistory> => {
 
-  return customFetch<PriceHistory>(getGetPriceHistoryUrl(itemCode),
+  return customFetch<PriceHistory>(getGetPriceHistoryUrl(itemCode,params),
   {
     ...options,
     method: 'GET'
@@ -4069,23 +4079,25 @@ export const getPriceHistory = async (itemCode: string, options?: RequestInit): 
 
 
 
-export const getGetPriceHistoryQueryKey = (itemCode: string,) => {
+export const getGetPriceHistoryQueryKey = (itemCode: string,
+    params?: GetPriceHistoryParams,) => {
     return [
-    `/api/analysis/price-history/${itemCode}`
+    `/api/analysis/price-history/${itemCode}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPriceHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getPriceHistory>>, TError = ErrorType<unknown>>(itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPriceHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getPriceHistory>>, TError = ErrorType<unknown>>(itemCode: string,
+    params?: GetPriceHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPriceHistoryQueryKey(itemCode);
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceHistoryQueryKey(itemCode,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceHistory>>> = ({ signal }) => getPriceHistory(itemCode, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceHistory>>> = ({ signal }) => getPriceHistory(itemCode,params, { signal, ...requestOptions });
 
 
 
@@ -4103,11 +4115,12 @@ export type GetPriceHistoryQueryError = ErrorType<unknown>
  */
 
 export function useGetPriceHistory<TData = Awaited<ReturnType<typeof getPriceHistory>>, TError = ErrorType<unknown>>(
- itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ itemCode: string,
+    params?: GetPriceHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetPriceHistoryQueryOptions(itemCode,options)
+  const queryOptions = getGetPriceHistoryQueryOptions(itemCode,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

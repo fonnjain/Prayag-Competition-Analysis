@@ -97,8 +97,9 @@ export const mrpLoadBatchesTable = pgTable(
 
 // MRP price history is append-only for normal source loads. Source-invalid rows
 // can be removed by a documented correction, and same-date manual corrections
-// retain a dedicated audit batch. is_current is recomputed per item_code after
-// each load or correction.
+// retain a dedicated audit batch. is_current is a recomputed cache only; every
+// price and status resolver must derive truth from effective_date per item and
+// variant instead of reading this stored boolean.
 export const mrpPriceHistoryTable = pgTable(
   "mrp_price_history",
   {
@@ -206,9 +207,9 @@ export const competitorPricesTable = pgTable(
     // mrp_price_history for the selected as-of date so displayed gaps remain
     // consistent with the current period-aware catalog.
     prayagMrpAtCompare: doublePrecision("prayag_mrp_at_compare"),
-    // Append-only period flag. True for the newest effectiveDate per
-    // (competitor, matchedPrayagCode) pair. Recomputed after every import.
-    // Mirrors the same concept as mrp_price_history.isCurrent.
+    // Recomputed cache for the newest effectiveDate per competitor timeline.
+    // Never use this stored boolean as a price or display-status source of truth;
+    // derive Current/Upcoming/Superseded from effectiveDate at the requested date.
     isCurrent: boolean("is_current").notNull().default(true),
     // Price basis: 'MRP' = price is already MRP (use as-is);
     // 'Ex-GST' = price is ex-GST, multiply by (1 + gstPct/100) before comparing.

@@ -32,6 +32,7 @@ import {
   isAuthoritativeMasterBuffer,
   loadAuthoritativeMaster,
 } from "../lib/authoritativeMrpMaster";
+import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -1670,6 +1671,11 @@ router.post("/catalog/mrp-review-batches/:batchId/cancel", requireAdmin, async (
 router.get("/catalog/export", async (req, res) => {
   const type = String(req.query.type ?? "catalog");
   const format = String(req.query.format ?? "xlsx");
+  const asOf =
+    typeof req.query.asOf === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
+      ? req.query.asOf
+      : new Date().toISOString().slice(0, 10);
 
   let aoa: (string | number | null)[][];
   let sheetName: string;
@@ -1685,7 +1691,17 @@ router.get("/catalog/export", async (req, res) => {
       .orderBy(
         asc(mrpPriceHistoryTable.itemCode),
         desc(mrpPriceHistoryTable.effectiveDate),
+        desc(mrpPriceHistoryTable.id),
       );
+    const statuses = derivePriceHistoryStatuses(
+      rows.map((row) => ({
+        ...row,
+        effectiveDate: String(row.effectiveDate),
+      })),
+      asOf,
+      (row) => `${row.itemCode}\u0000${row.variant}`,
+      (row) => row.mrp != null,
+    );
     const header = [
       "Item Code",
       "MRP",
@@ -1707,7 +1723,7 @@ router.get("/catalog/export", async (req, res) => {
       r.effectiveDate,
       r.loadDate,
       r.sourceFile,
-      r.isCurrent ? "Yes" : "No",
+      statuses.get(r.id) === "Current" ? "Yes" : "No",
       r.notes,
     ]);
     aoa = [header, ...body];

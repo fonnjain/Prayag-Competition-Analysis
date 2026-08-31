@@ -149,7 +149,8 @@ export const ExternalGetProductResponse = zod.object({
   "effectiveDate": zod.string(),
   "loadDate": zod.string(),
   "sourceFile": zod.string().nullish(),
-  "isCurrent": zod.boolean(),
+  "isCurrent": zod.boolean().describe('Backward-compatible derived boolean; true only when status is Current.'),
+  "status": zod.enum(['Current', 'Upcoming', 'Superseded']),
   "notes": zod.string().nullish(),
   "reviewStatus": zod.string().optional(),
   "reviewReasons": zod.string().nullish(),
@@ -316,7 +317,8 @@ export const GetCatalogProductResponse = zod.object({
   "effectiveDate": zod.string(),
   "loadDate": zod.string(),
   "sourceFile": zod.string().nullish(),
-  "isCurrent": zod.boolean(),
+  "isCurrent": zod.boolean().describe('Backward-compatible derived boolean; true only when status is Current.'),
+  "status": zod.enum(['Current', 'Upcoming', 'Superseded']),
   "notes": zod.string().nullish(),
   "reviewStatus": zod.string().optional(),
   "reviewReasons": zod.string().nullish(),
@@ -1446,32 +1448,40 @@ export const GetMrpIncreasesResponse = zod.object({
 
 
 /**
- * Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
+ * Standard Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
  * @summary Period-to-period price history for a Prayag SKU
  */
 export const GetPriceHistoryParams = zod.object({
   "itemCode": zod.coerce.string()
 })
 
+export const GetPriceHistoryQueryParams = zod.object({
+  "asOf": zod.date().optional().describe('Derive Current, Upcoming, and Superseded status as of this date. Defaults to today.')
+})
+
 export const GetPriceHistoryResponse = zod.object({
   "itemCode": zod.string(),
   "productName": zod.string().nullish(),
   "prayagHistory": zod.array(zod.object({
+  "id": zod.number(),
   "effectiveDate": zod.string(),
   "mrp": zod.number().nullish(),
   "priceBasis": zod.string().optional(),
-  "isCurrent": zod.boolean(),
+  "isCurrent": zod.boolean().describe('Backward-compatible derived boolean; true only when status is Current.'),
+  "status": zod.enum(['Current', 'Upcoming', 'Superseded']),
   "notes": zod.string().nullish(),
   "changePct": zod.number().nullish()
 })),
   "competitorHistory": zod.array(zod.object({
   "competitor": zod.string(),
   "periods": zod.array(zod.object({
+  "id": zod.number(),
   "effectiveDate": zod.string(),
   "price": zod.number().nullish(),
   "unit": zod.string().nullish(),
   "effectivePrice": zod.number(),
-  "isCurrent": zod.boolean(),
+  "isCurrent": zod.boolean().describe('Backward-compatible derived boolean; true only when status is Current.'),
+  "status": zod.enum(['Current', 'Upcoming', 'Superseded']),
   "changePct": zod.number().nullish()
 }))
 }))

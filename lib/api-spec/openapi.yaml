@@ -1343,13 +1343,20 @@ paths:
       operationId: getPriceHistory
       tags: [analysis]
       summary: Period-to-period price history for a Prayag SKU
-      description: Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
+      description: Standard Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
       parameters:
         - name: itemCode
           in: path
           required: true
           schema:
             type: string
+        - name: asOf
+          in: query
+          required: false
+          description: Derive Current, Upcoming, and Superseded status as of this date. Defaults to today.
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Price history
@@ -2307,9 +2314,12 @@ components:
         discontinuedFrom:
           type: ["string", "null"]
           format: date
+    PriceHistoryStatus:
+      type: string
+      enum: [Current, Upcoming, Superseded]
     MrpPriceRow:
       type: object
-      required: [id, itemCode, effectiveDate, loadDate, priceBasis, isCurrent]
+      required: [id, itemCode, effectiveDate, loadDate, priceBasis, status, isCurrent]
       properties:
         id:
           type: integer
@@ -2331,6 +2341,9 @@ components:
           type: ["string", "null"]
         isCurrent:
           type: boolean
+          description: Backward-compatible derived boolean; true only when status is Current.
+        status:
+          $ref: "#/components/schemas/PriceHistoryStatus"
         notes:
           type: ["string", "null"]
         reviewStatus:
@@ -4035,8 +4048,10 @@ components:
             type: boolean
     PriceHistoryPeriod:
       type: object
-      required: [effectiveDate, isCurrent]
+      required: [id, effectiveDate, status, isCurrent]
       properties:
+        id:
+          type: integer
         effectiveDate:
           type: string
         mrp:
@@ -4045,14 +4060,19 @@ components:
           type: string
         isCurrent:
           type: boolean
+          description: Backward-compatible derived boolean; true only when status is Current.
+        status:
+          $ref: "#/components/schemas/PriceHistoryStatus"
         notes:
           type: ["string", "null"]
         changePct:
           type: ["number", "null"]
     CompetitorPriceHistoryPeriod:
       type: object
-      required: [effectiveDate, effectivePrice, isCurrent]
+      required: [id, effectiveDate, effectivePrice, status, isCurrent]
       properties:
+        id:
+          type: integer
         effectiveDate:
           type: string
         price:
@@ -4063,6 +4083,9 @@ components:
           type: number
         isCurrent:
           type: boolean
+          description: Backward-compatible derived boolean; true only when status is Current.
+        status:
+          $ref: "#/components/schemas/PriceHistoryStatus"
         changePct:
           type: ["number", "null"]
     CompetitorPriceHistory:

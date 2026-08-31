@@ -18,6 +18,7 @@ import {
   ensureOfficialMrpSources,
   sha256ForManualCorrection,
 } from "../lib/mrpProvenance";
+import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 
 const router: IRouter = Router();
 
@@ -425,6 +426,15 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
       desc(mrpPriceHistoryTable.effectiveDate),
       desc(mrpPriceHistoryTable.id),
     );
+  const statuses = derivePriceHistoryStatuses(
+    history.map((row) => ({
+      ...row,
+      effectiveDate: String(row.effectiveDate),
+    })),
+    asOf,
+    (row) => `${row.itemCode}\u0000${row.variant}`,
+    (row) => row.mrp != null,
+  );
 
   res.json({
     product: {
@@ -442,7 +452,14 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
       dataFlag: product.dataFlag,
       discontinuedFrom: product.discontinuedFrom,
     },
-    history,
+    history: history.map((row) => {
+      const status = statuses.get(row.id) ?? "Superseded";
+      return {
+        ...row,
+        status,
+        isCurrent: status === "Current",
+      };
+    }),
   });
 });
 
@@ -574,19 +591,23 @@ router.patch("/catalog/products/:itemCode/mrp", requireAdmin, async (req: Reques
 
   await recomputeCurrentFlags();
 
-  // Read back the row that recomputeCurrentFlags() just promoted to isCurrent=true.
-  // Effective-date ordering may have elected a different row than the one we just
-  // inserted, so we must use the actual current MRP rather than the request body's
-  // value when snapshotting competitor gaps.
+  // Resolve the in-force price directly by date. is_current is only a cache and
+  // must never decide a numeric snapshot, even immediately after recomputation.
   const [currentRow] = await db
     .select()
     .from(mrpPriceHistoryTable)
     .where(
       and(
         eq(mrpPriceHistoryTable.itemCode, itemCode),
-        eq(mrpPriceHistoryTable.isCurrent, true),
         eq(mrpPriceHistoryTable.variant, "Standard"),
+        eq(mrpPriceHistoryTable.reviewStatus, "approved"),
+        sql`${mrpPriceHistoryTable.effectiveDate} <= ${today}`,
+        sql`${mrpPriceHistoryTable.mrp} is not null`,
       ),
+    )
+    .orderBy(
+      desc(mrpPriceHistoryTable.effectiveDate),
+      desc(mrpPriceHistoryTable.id),
     )
     .limit(1);
 

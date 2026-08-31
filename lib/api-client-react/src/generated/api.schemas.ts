@@ -133,6 +133,15 @@ export interface CatalogProduct {
   discontinuedFrom?: string | null;
 }
 
+export type PriceHistoryStatus = typeof PriceHistoryStatus[keyof typeof PriceHistoryStatus];
+
+
+export const PriceHistoryStatus = {
+  Current: 'Current',
+  Upcoming: 'Upcoming',
+  Superseded: 'Superseded',
+} as const;
+
 export interface MrpPriceRow {
   id: number;
   itemCode: string;
@@ -147,7 +156,9 @@ export interface MrpPriceRow {
   loadDate: string;
   /** @nullable */
   sourceFile?: string | null;
+  /** Backward-compatible derived boolean; true only when status is Current. */
   isCurrent: boolean;
+  status: PriceHistoryStatus;
   /** @nullable */
   notes?: string | null;
   reviewStatus?: string;
@@ -1389,11 +1400,14 @@ export interface AnalysisPeriods {
 }
 
 export interface PriceHistoryPeriod {
+  id: number;
   effectiveDate: string;
   /** @nullable */
   mrp?: number | null;
   priceBasis?: string;
+  /** Backward-compatible derived boolean; true only when status is Current. */
   isCurrent: boolean;
+  status: PriceHistoryStatus;
   /** @nullable */
   notes?: string | null;
   /** @nullable */
@@ -1401,13 +1415,16 @@ export interface PriceHistoryPeriod {
 }
 
 export interface CompetitorPriceHistoryPeriod {
+  id: number;
   effectiveDate: string;
   /** @nullable */
   price?: number | null;
   /** @nullable */
   unit?: string | null;
   effectivePrice: number;
+  /** Backward-compatible derived boolean; true only when status is Current. */
   isCurrent: boolean;
+  status: PriceHistoryStatus;
   /** @nullable */
   changePct?: number | null;
 }
@@ -2214,6 +2231,13 @@ category?: string;
  */
 effectivePeriod?: string;
 limit?: number;
+};
+
+export type GetPriceHistoryParams = {
+/**
+ * Derive Current, Upcoming, and Superseded status as of this date. Defaults to today.
+ */
+asOf?: string;
 };
 
 export type GetAdminActivitySummaryParams = {

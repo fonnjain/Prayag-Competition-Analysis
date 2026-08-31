@@ -19,6 +19,10 @@ import {
 } from "../lib/priceNormalize";
 import { priceChangePct, validToFromNextDateOrDiscontinuation, validToFromNextDate } from "../lib/priceWindow";
 import {
+  competitorRevisionGroupKey,
+  derivePriceHistoryStatuses,
+} from "../lib/priceHistoryStatus";
+import {
   effectivePrice,
   marketGapPct,
   prayagCheaperForGap,
@@ -221,16 +225,19 @@ interface PendingRevision {
 }
 
 function competitorWindowKey(row: CompRow): string {
-  const mapping = row.matchedPrayagCode
-    ? `matched:${normCode(row.matchedPrayagCode)}`
-    : `unmatched:${row.competitorCode ?? ""}:${row.description ?? ""}:${row.size ?? ""}`;
-  return `${row.competitor}\u0000${mapping}`;
+  return competitorRevisionGroupKey(row);
 }
 
 function getCompetitorWindows(rows: CompRow[]): Map<number, CompetitorWindow> {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const groups = new Map<string, CompRow[]>();
+  const statuses = derivePriceHistoryStatuses(
+    rows,
+    todayStr,
+    competitorWindowKey,
+    (row) => row.price != null,
+  );
   for (const row of rows) {
     const key = competitorWindowKey(row);
     const list = groups.get(key) ?? [];
@@ -251,9 +258,6 @@ function getCompetitorWindows(rows: CompRow[]): Map<number, CompetitorWindow> {
     const revisions = [...revisionsByDate.values()].sort((a, b) =>
       a.effectiveDate!.localeCompare(b.effectiveDate!),
     );
-    const current =
-      revisions.filter((row) => row.effectiveDate! <= todayStr).at(-1);
-
     for (const row of list) {
       const isWinningRevision =
         row.effectiveDate != null &&
@@ -266,7 +270,7 @@ function getCompetitorWindows(rows: CompRow[]): Map<number, CompetitorWindow> {
               (candidate) => candidate.effectiveDate! > row.effectiveDate!,
             );
       result.set(row.id, {
-        isCurrent: isWinningRevision && row.id === current?.id,
+        isCurrent: statuses.get(row.id) === "Current",
         validTo:
           !isWinningRevision
             ? null
