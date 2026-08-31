@@ -89,6 +89,31 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 }
 
 /**
+ * Authenticated workspace reads are available to every signed-in role. Users
+ * who still need to replace a temporary password remain blocked from all
+ * protected routes until that replacement is complete.
+ */
+export function requireWorkspaceReadAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (process.env.NODE_ENV === "test" && typeof req.isAuthenticated !== "function") {
+    next();
+    return;
+  }
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (req.user.mustChangePassword) {
+    res.status(403).json({ error: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
+    return;
+  }
+  next();
+}
+
+/**
  * Internal workspace routes are reserved for administrators. Sales and
  * counter accounts are intentionally limited to the read-only Price Finder
  * surface, which is mounted before this guard.

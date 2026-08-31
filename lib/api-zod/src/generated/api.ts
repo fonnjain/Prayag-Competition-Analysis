@@ -584,6 +584,8 @@ export const GetCatalogDataHealthResponse = zod.object({
   "count": zod.number()
 })),
   "flaggedMrpCount": zod.number(),
+  "nullLoadBatchCount": zod.number().describe('MRP history rows that are not linked to any load batch'),
+  "preProvenanceLegacyCount": zod.number().describe('Rows linked to an explicitly synthetic pre-provenance legacy batch'),
   "untracedMrpCount": zod.number().describe('Legacy MRP history rows with no official batch or manual correction event'),
   "untracedMrpRows": zod.array(zod.object({
   "itemCode": zod.string(),
@@ -592,6 +594,21 @@ export const GetCatalogDataHealthResponse = zod.object({
   "mrp": zod.number().nullish(),
   "sourceFile": zod.string().nullish()
 }))
+})
+
+
+/**
+ * @summary Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+ */
+export const ClassifyLegacyMrpProvenanceBody = zod.object({
+  "confirmation": zod.string()
+})
+
+export const ClassifyLegacyMrpProvenanceResponse = zod.object({
+  "loadBatchId": zod.number(),
+  "classifiedRows": zod.number(),
+  "distinctCodes": zod.number(),
+  "alreadyClassified": zod.boolean()
 })
 
 

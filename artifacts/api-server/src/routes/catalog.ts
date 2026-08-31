@@ -14,13 +14,14 @@ import {
 } from "@workspace/db";
 import { loadCatalogSeed } from "../lib/catalogSeed";
 import {
+  classifyLegacyMrpRows,
   ensureManualMrpSource,
-  ensureOfficialMrpSources,
   sha256ForManualCorrection,
 } from "../lib/mrpProvenance";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 
 const router: IRouter = Router();
+const LEGACY_MRP_CONFIRMATION = "CLASSIFY 148 PRE-PROVENANCE ROWS";
 
 interface CurrentPrice {
   mrp: number | null;
@@ -54,7 +55,6 @@ type MrpSourceHealthRow = {
 };
 
 export async function getMrpSourceHealth() {
-  await ensureOfficialMrpSources();
   const result = await db.execute<MrpSourceHealthRow>(sql`
     SELECT
       s.id,
@@ -262,7 +262,6 @@ router.get("/catalog/filters", async (_req, res) => {
 
 // GET /catalog/mrp-sources — the six canonical sheets for the MRP loader.
 router.get("/catalog/mrp-sources", async (_req, res) => {
-  await ensureOfficialMrpSources();
   const sources = await getMrpSourceHealth();
   res.json({ sources });
 });
@@ -315,6 +314,13 @@ router.get("/catalog/data-health", async (_req, res) => {
     FROM mrp_price_history
     WHERE load_batch_id IS NULL
   `);
+  const preProvenanceLegacyCountRows = await db.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count
+    FROM mrp_price_history h
+    JOIN mrp_load_batches b ON b.id = h.load_batch_id
+    JOIN mrp_sources s ON s.id = b.source_id
+    WHERE s.source_kind = 'legacy'
+  `);
   const untracedMrpRows = await db.execute<{
     itemCode: string;
     productName: string | null;
@@ -342,6 +348,8 @@ router.get("/catalog/data-health", async (_req, res) => {
   `);
   const untracedMrpCount = untracedMrpCountRows.rows[0]?.count ?? 0;
   const nullLoadBatchCount = nullBatchCountRows.rows[0]?.count ?? 0;
+  const preProvenanceLegacyCount =
+    preProvenanceLegacyCountRows.rows[0]?.count ?? 0;
   const conflictRows = await db
     .select()
     .from(codeConflictsTable)
@@ -383,6 +391,7 @@ router.get("/catalog/data-health", async (_req, res) => {
     pendingProducts,
     flaggedMrpCount,
     nullLoadBatchCount,
+    preProvenanceLegacyCount,
     untracedMrpCount,
     untracedMrpRows: untracedMrpRows.rows,
     conflictCount: conflictRows.length,
@@ -395,6 +404,36 @@ router.get("/catalog/data-health", async (_req, res) => {
     mrpSources,
   });
 });
+
+// POST /catalog/legacy-provenance/classify — attach only the exact, audited
+// pre-provenance Sanitaryware variant rows to an explicitly synthetic legacy
+// batch. This never changes a price or claims an official workbook source.
+router.post(
+  "/catalog/legacy-provenance/classify",
+  requireAdmin,
+  async (req, res) => {
+    if (req.body?.confirmation !== LEGACY_MRP_CONFIRMATION) {
+      res.status(400).json({
+        error: `Type "${LEGACY_MRP_CONFIRMATION}" to confirm the legacy classification.`,
+      });
+      return;
+    }
+    try {
+      const result = await classifyLegacyMrpRows({
+        loadedBy: req.user?.email ?? req.user?.id ?? null,
+      });
+      res.json(result);
+    } catch (error) {
+      req.log?.warn({ err: error }, "legacy MRP provenance classification rejected");
+      res.status(409).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Legacy MRP provenance classification failed.",
+      });
+    }
+  },
+);
 
 // GET /catalog/products/:itemCode — product + full price history (newest first).
 router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string }>, res) => {

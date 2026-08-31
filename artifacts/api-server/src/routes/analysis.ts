@@ -9,6 +9,7 @@ import {
   discountSettingsTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
+import { requireAdmin } from "../middlewares/authMiddleware";
 import {
   buildRow,
   parseFilters,
@@ -923,7 +924,7 @@ router.get("/analysis/discount-settings", async (_req, res) => {
 });
 
 // PUT /analysis/discount-settings — upsert Prayag and/or competitor discounts.
-router.put("/analysis/discount-settings", async (req, res) => {
+router.put("/analysis/discount-settings", requireAdmin, async (req, res) => {
   const body = req.body as {
     prayagDiscountPct?: unknown;
     competitors?: unknown;

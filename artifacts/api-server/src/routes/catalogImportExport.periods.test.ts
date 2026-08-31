@@ -180,6 +180,16 @@ describe("MRP loader period and duplicate safeguards", () => {
       expect.stringMatching(/explicit MRP, price, Net, or rate column/i),
     ]);
     expect(parsed.warnings[0]).toMatch(/pack, weight, quantity, or dimension columns/i);
+    expect(parsed.skippedRows).toEqual([
+      expect.objectContaining({
+        rawCode: "PEA-64B",
+        reason: expect.stringMatching(/left unpriced for review/i),
+      }),
+      expect.objectContaining({
+        rawCode: "PEA-55B",
+        reason: expect.stringMatching(/left unpriced for review/i),
+      }),
+    ]);
   });
 
   it("uses an explicit MRP column for PEA-style rows instead of nearby measurements", () => {

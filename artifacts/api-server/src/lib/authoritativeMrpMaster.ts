@@ -435,9 +435,7 @@ export async function loadAuthoritativeMaster(input: {
       .returning({ id: mrpLoadBatchesTable.id });
     const loadBatchId = batch[0]!.id;
 
-    const newCodes = parsed.productRows
-      .map((row) => row.itemCode)
-      .filter((code) => !existingCodes.has(code));
+    const newCodes: string[] = [];
     for (let index = 0; index < parsed.productRows.length; index += 500) {
       const values = parsed.productRows.slice(index, index + 500).map((row) => ({
         itemCode: row.itemCode,
@@ -455,6 +453,12 @@ export async function loadAuthoritativeMaster(input: {
         dataFlag: "authoritative_master_2026_09_01",
         updatedAt: new Date(),
       }));
+      const inserted = await tx
+        .insert(catalogProductsTable)
+        .values(values)
+        .onConflictDoNothing({ target: catalogProductsTable.itemCode })
+        .returning({ itemCode: catalogProductsTable.itemCode });
+      newCodes.push(...inserted.map((row) => authoritativeCode(row.itemCode)));
       await tx
         .insert(catalogProductsTable)
         .values(values)

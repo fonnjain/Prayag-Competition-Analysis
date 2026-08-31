@@ -475,9 +475,20 @@ export interface CatalogDataHealth {
   missingPrices: CatalogMissingPrice[];
   duplicateSources: CatalogDuplicateSource[];
   flaggedMrpCount: number;
+  /** MRP history rows that are not linked to any load batch */
+  nullLoadBatchCount: number;
+  /** Rows linked to an explicitly synthetic pre-provenance legacy batch */
+  preProvenanceLegacyCount: number;
   /** Legacy MRP history rows with no official batch or manual correction event */
   untracedMrpCount: number;
   untracedMrpRows: CatalogUntracedMrp[];
+}
+
+export interface LegacyMrpClassificationResult {
+  loadBatchId: number;
+  classifiedRows: number;
+  distinctCodes: number;
+  alreadyClassified: boolean;
 }
 
 export interface HealthStatus {
@@ -1913,6 +1924,10 @@ export type PatchCatalogProductMrp200 = {
   itemCode: string;
   mrp: number;
   effectiveDate: string;
+};
+
+export type ClassifyLegacyMrpProvenanceBody = {
+  confirmation: string;
 };
 
 export type GetComparisonParams = {

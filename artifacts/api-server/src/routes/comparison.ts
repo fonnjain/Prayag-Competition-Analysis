@@ -27,6 +27,7 @@ import {
   marketGapPct,
   prayagCheaperForGap,
 } from "../lib/analysis.js";
+import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 
@@ -795,7 +796,7 @@ function snapshotPrayagMrp(
 // PATCH /catalog/competitor-prices/bulk — apply mapping updates to many rows at
 // once (per-row "Accept selected"). Registered before the :id route so "bulk"
 // is never parsed as an id.
-router.patch("/catalog/competitor-prices/bulk", async (req, res) => {
+router.patch("/catalog/competitor-prices/bulk", requireAdmin, async (req, res) => {
   const body = req.body as {
     updates?: Array<{
       id?: number;
@@ -844,7 +845,7 @@ router.patch("/catalog/competitor-prices/bulk", async (req, res) => {
 // current filter, accept its top fuzzy suggestion when that suggestion's tier
 // meets the requested minimum. Computes suggestions server-side so it can clear
 // the whole backlog (all pages), not just what's on screen.
-router.post("/catalog/mapping-review/auto-accept", async (req, res) => {
+router.post("/catalog/mapping-review/auto-accept", requireAdmin, async (req, res) => {
   const body = req.body as {
     competitor?: string | null;
     confidence?: string | null;
@@ -1006,7 +1007,7 @@ router.get("/catalog/mapping-review/accept-batches", async (_req, res) => {
 
 // POST /catalog/mapping-review/accept-batches — record a freshly accepted batch
 // (the exact competitor-price ids) so it can be reverted later.
-router.post("/catalog/mapping-review/accept-batches", async (req, res) => {
+router.post("/catalog/mapping-review/accept-batches", requireAdmin, async (req, res) => {
   const body = req.body as {
     kind?: string;
     competitor?: string | null;
@@ -1031,7 +1032,7 @@ router.post("/catalog/mapping-review/accept-batches", async (req, res) => {
 
 // DELETE /catalog/mapping-review/accept-batches/:id — forget a recorded batch
 // (after it was reverted, or to dismiss it from the recent list).
-router.delete("/catalog/mapping-review/accept-batches/:id", async (req: Request<{ id: string }>, res) => {
+router.delete("/catalog/mapping-review/accept-batches/:id", requireAdmin, async (req: Request<{ id: string }>, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "invalid batch id" });
@@ -1617,7 +1618,7 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
 });
 
 // PATCH /catalog/competitor-prices/:id — assign/correct a row's mapping.
-router.patch("/catalog/competitor-prices/:id", async (req: Request<{ id: string }>, res) => {
+router.patch("/catalog/competitor-prices/:id", requireAdmin, async (req: Request<{ id: string }>, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -1743,7 +1744,7 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
 // DELETE /catalog/competitors/:competitor — remove all price rows for a brand
 // the team no longer tracks. The brand then disappears from comparison filters,
 // By Product columns, and summary KPIs (all computed live from these rows).
-router.delete("/catalog/competitors/:competitor", async (req: Request<{ competitor: string }>, res) => {
+router.delete("/catalog/competitors/:competitor", requireAdmin, async (req: Request<{ competitor: string }>, res) => {
   const competitor = strParam(req.params.competitor);
   if (!competitor) {
     res.status(400).json({ error: "competitor name is required" });
@@ -1769,6 +1770,7 @@ router.delete("/catalog/competitors/:competitor", async (req: Request<{ competit
 // period becomes current.
 router.delete(
   "/catalog/competitors/:competitor/periods/:effectiveDate",
+  requireAdmin,
   async (req, res) => {
     const competitor = strParam(req.params.competitor);
     const effectiveDate = strParam(req.params.effectiveDate);

@@ -219,7 +219,13 @@ describe("catalog sync route guards", () => {
   function appFor(email: string) {
     const app = express();
     app.use((req, _res, next) => {
-      req.user = { id: "test", email } as typeof req.user;
+      req.isAuthenticated = (() => true) as never;
+      req.user = {
+        id: "test",
+        email,
+        role: email === CATALOG_ADMIN_EMAIL ? "admin" : "user",
+        mustChangePassword: false,
+      };
       next();
     });
     app.use(catalogSyncRouter);
@@ -231,7 +237,7 @@ describe("catalog sync route guards", () => {
       "/catalog/sync/export",
     );
     expect(response.status).toBe(403);
-    expect(response.body.error).toMatch(/administrator/i);
+    expect(response.body.error).toMatch(/admin/i);
   });
 
   it("does not export a development bundle from production", async () => {

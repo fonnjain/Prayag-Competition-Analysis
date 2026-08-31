@@ -198,6 +198,9 @@ describe("authoritative MRP master transaction guarantees", () => {
       await expect(
         firstDatabase.transaction(async (tx) => {
           await removeExistingAuthoritativeBatches(tx);
+          await tx
+            .delete(catalogProductsTable)
+            .where(eq(catalogProductsTable.itemCode, "EP-GANESHA"));
           const result = await loadAuthoritativeMaster(
             {
               buffer: MASTER_BUFFER,
@@ -213,6 +216,10 @@ describe("authoritative MRP master transaction guarantees", () => {
           expect(result.priceRows).toBe(6_226);
           expect(result.discontinuedRows).toBe(233);
           expect(result.excludedRows).toBe(142);
+          expect(result.newCodes).toContain("EP-GANESHA");
+          expect(result.newCodes).toHaveLength(
+            result.after.catalog_rows - result.before.catalog_rows,
+          );
           expect(result.periodCounts).toEqual({
             "2024-02-15": 161,
             "2026-02-01": 1_685,

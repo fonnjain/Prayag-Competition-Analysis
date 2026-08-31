@@ -94,6 +94,7 @@ describe("parseSheet: code-column overlap detection", () => {
     const out = parseSheet(grid, known, map);
     expect(out.rows).toEqual([]);
     expect(out.unmatched).toBe(0);
+    expect(out.unpricedCodes).toEqual([]);
   });
 
   it("normalizes whitespace and case so spaced/lowercase codes still match", () => {
@@ -105,6 +106,26 @@ describe("parseSheet: code-column overlap detection", () => {
     ];
     const out = parseSheet(grid, known, map);
     expect(out.rows.map((r) => r.itemCode)).toEqual(["AB12"]);
+  });
+});
+
+describe("parseSheet: unheaded numeric columns", () => {
+  it("does not treat a bare numeric column to the right of a code as a price", () => {
+    const known = codes("PEA-64B", "PEA-325B");
+    const map = prayag({
+      "PEA-64B": { net: null, mrp: 2596 },
+      "PEA-325B": { net: null, mrp: 2248 },
+    });
+    const grid: unknown[][] = [
+      ["Serial", "Item Code", "", "", ""],
+      ["32", "PEA-64B", "723.88", "0.3", "0.552"],
+      ["33", "PEA-325B", "701.12", "0.25", "0.47"],
+    ];
+
+    const out = parseSheet(grid, known, map);
+
+    expect(out.rows).toEqual([]);
+    expect(out.unpricedCodes).toEqual(["PEA-64B", "PEA-325B"]);
   });
 });
 

@@ -6,19 +6,24 @@ import {
   catalogProductsTable,
   db,
   mrpHistoryProvenanceEventsTable,
+  mrpLoadBatchesTable,
   mrpPriceHistoryTable,
+  mrpSourcesTable,
 } from "@workspace/db";
 import catalogRouter from "./catalog";
 import catalogImportExportRouter from "./catalogImportExport";
+import { classifyLegacyMrpRows } from "../lib/mrpProvenance";
 
 const RUN = Date.now();
 const MANUAL_CODE = `__MRP_MANUAL_PROVENANCE_${RUN}__`;
 const LEGACY_CODE = `__MRP_LEGACY_PROVENANCE_${RUN}__`;
 const PERIOD_CODE = `__MRP_PERIOD_PROVENANCE_${RUN}__`;
+const CLASSIFIED_CODE = `__MRP_CLASSIFIED_PROVENANCE_${RUN}__`;
 const EFFECTIVE_DATE = "2026-08-19";
 const PERIOD_DATE = "2039-12-31";
 const PENDING_REVIEW_BATCH = `manual-pending-review-${RUN}`;
-const CODES = [MANUAL_CODE, LEGACY_CODE, PERIOD_CODE];
+const CODES = [MANUAL_CODE, LEGACY_CODE, PERIOD_CODE, CLASSIFIED_CODE];
+const LEGACY_SOURCE_SHEET_ID = `legacy-provenance-test-${RUN}`;
 
 const app = express();
 app.use(express.json());
@@ -51,6 +56,18 @@ afterAll(async () => {
     await tx
       .delete(catalogProductsTable)
       .where(inArray(catalogProductsTable.itemCode, CODES));
+    const source = await tx
+      .select({ id: mrpSourcesTable.id })
+      .from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.sheetId, LEGACY_SOURCE_SHEET_ID));
+    if (source[0]) {
+      await tx
+        .delete(mrpLoadBatchesTable)
+        .where(eq(mrpLoadBatchesTable.sourceId, source[0].id));
+      await tx
+        .delete(mrpSourcesTable)
+        .where(eq(mrpSourcesTable.id, source[0].id));
+    }
   });
 });
 
@@ -155,6 +172,124 @@ describe("manual MRP provenance", () => {
     expect(health.body.untracedMrpRows).not.toContainEqual(
       expect.objectContaining({ itemCode: MANUAL_CODE }),
     );
+  });
+
+  it("classifies an exact legacy scope idempotently without changing price data", async () => {
+    const [legacyRow] = await db
+      .insert(mrpPriceHistoryTable)
+      .values({
+        itemCode: CLASSIFIED_CODE,
+        mrp: 321,
+        netPrice: 222,
+        discountPct: 30,
+        priceBasis: "MRP",
+        effectiveDate: "2026-01-15",
+        loadDate: EFFECTIVE_DATE,
+        sourceFile: "legacy-classification-fixture.xlsx",
+        notes: "Original legacy note",
+        variant: "Ivory",
+      })
+      .returning({ id: mrpPriceHistoryTable.id });
+    const digest = await db.execute<{ identity_digest: string }>(sql`
+      SELECT md5(COALESCE(string_agg(
+        concat_ws(chr(31),
+          id, item_code, variant, effective_date, load_date, source_file,
+          price_basis, review_status, mrp, net_price, discount_pct, notes,
+          import_batch_id
+        ),
+        chr(30) ORDER BY id
+      ), '')) AS identity_digest
+      FROM mrp_price_history
+      WHERE id = ${legacyRow.id}
+    `);
+    const scope = {
+      sourceSheetId: LEGACY_SOURCE_SHEET_ID,
+      sourceDivision: `Legacy provenance test ${RUN}`,
+      sourceFile: "legacy-classification-fixture.xlsx",
+      effectiveDate: "2026-01-15",
+      loadDate: EFFECTIVE_DATE,
+      productDivision: "Test",
+      expectedRows: 1,
+      expectedDistinctCodes: 1,
+      historyRowIds: [legacyRow.id],
+      expectedIdentityMd5: digest.rows[0].identity_digest,
+    };
+
+    await expect(
+      classifyLegacyMrpRows({
+        loadedBy: "legacy-test@example.test",
+        scope: { ...scope, expectedIdentityMd5: "0".repeat(32) },
+      }),
+    ).rejects.toThrow(/audited manifest/i);
+    const [stillUnclassified] = await db
+      .select()
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.id, legacyRow.id));
+    expect(stillUnclassified.loadBatchId).toBeNull();
+
+    const first = await classifyLegacyMrpRows({
+      loadedBy: "legacy-test@example.test",
+      scope,
+    });
+    const second = await classifyLegacyMrpRows({
+      loadedBy: "legacy-test@example.test",
+      scope,
+    });
+
+    expect(first).toMatchObject({
+      classifiedRows: 1,
+      distinctCodes: 1,
+      alreadyClassified: false,
+    });
+    expect(second).toEqual({
+      loadBatchId: first.loadBatchId,
+      classifiedRows: 0,
+      distinctCodes: 1,
+      alreadyClassified: true,
+    });
+    const [history] = await db
+      .select()
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, CLASSIFIED_CODE));
+    expect(history).toMatchObject({
+      mrp: 321,
+      netPrice: 222,
+      discountPct: 30,
+      effectiveDate: "2026-01-15",
+      loadDate: EFFECTIVE_DATE,
+      sourceFile: "legacy-classification-fixture.xlsx",
+      notes: "Original legacy note",
+      variant: "Ivory",
+      loadBatchId: first.loadBatchId,
+    });
+    const events = await db
+      .select()
+      .from(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.historyRowId, history.id));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      action: "pre_provenance_legacy_classified",
+      loadBatchId: first.loadBatchId,
+      mrp: 321,
+    });
+    const [source] = await db
+      .select()
+      .from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.sheetId, LEGACY_SOURCE_SHEET_ID));
+    expect(source).toMatchObject({
+      sourceKind: "legacy",
+      expectedFileName: "legacy-classification-fixture.xlsx",
+    });
+
+    await db
+      .delete(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.historyRowId, history.id));
+    await expect(
+      classifyLegacyMrpRows({
+        loadedBy: "legacy-test@example.test",
+        scope,
+      }),
+    ).rejects.toThrow(/does not exactly match/i);
   });
 
   it("retains a period deletion event after the history row is removed", async () => {

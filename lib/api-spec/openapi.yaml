@@ -623,6 +623,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CatalogDataHealth"
+  /catalog/legacy-provenance/classify:
+    post:
+      operationId: classifyLegacyMrpProvenance
+      tags: [catalog]
+      summary: Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmation]
+              properties:
+                confirmation:
+                  type: string
+      responses:
+        "200":
+          description: Legacy rows classified, or already classified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegacyMrpClassificationResult"
+        "400":
+          description: Confirmation phrase missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Administrator access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Audited row signature no longer matches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/reset:
     post:
       operationId: resetCatalog
@@ -2736,6 +2776,8 @@ components:
           missingPriceCount,
           duplicateSources,
           flaggedMrpCount,
+          nullLoadBatchCount,
+          preProvenanceLegacyCount,
           untracedMrpCount,
           untracedMrpRows,
         ]
@@ -2764,6 +2806,12 @@ components:
             $ref: "#/components/schemas/CatalogDuplicateSource"
         flaggedMrpCount:
           type: integer
+        nullLoadBatchCount:
+          type: integer
+          description: MRP history rows that are not linked to any load batch
+        preProvenanceLegacyCount:
+          type: integer
+          description: Rows linked to an explicitly synthetic pre-provenance legacy batch
         untracedMrpCount:
           type: integer
           description: Legacy MRP history rows with no official batch or manual correction event
@@ -2785,6 +2833,19 @@ components:
           type: ["number", "null"]
         sourceFile:
           type: ["string", "null"]
+    LegacyMrpClassificationResult:
+      type: object
+      required:
+        [loadBatchId, classifiedRows, distinctCodes, alreadyClassified]
+      properties:
+        loadBatchId:
+          type: integer
+        classifiedRows:
+          type: integer
+        distinctCodes:
+          type: integer
+        alreadyClassified:
+          type: boolean
     HealthStatus:
       type: object
       properties:

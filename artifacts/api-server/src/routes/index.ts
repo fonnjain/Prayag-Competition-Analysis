@@ -1,5 +1,8 @@
 import { Router, type IRouter } from "express";
-import { requireAuth, requireWorkspaceAccess } from "../middlewares/authMiddleware";
+import {
+  requireAuth,
+  requireWorkspaceReadAccess,
+} from "../middlewares/authMiddleware";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import catalogRouter from "./catalog";
@@ -28,9 +31,10 @@ router.use(externalV1Router);
 router.use(priceFinderRouter);
 router.use(activityRouter);
 
-// Internal routes: require a valid session
+// Internal routes: every signed-in role may use read endpoints. Each mutation
+// is guarded by requireAdmin at its router or route definition.
 router.use(requireAuth);
-router.use(requireWorkspaceAccess);
+router.use(requireWorkspaceReadAccess);
 router.use(adminUsersRouter);
 router.use(apiKeysRouter);
 router.use(catalogRouter);

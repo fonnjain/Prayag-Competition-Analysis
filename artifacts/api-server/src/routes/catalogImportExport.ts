@@ -50,7 +50,7 @@ const upload = multer({
 });
 
 const NET_KEYWORDS = ["net", "rate", "dealer", "scheme", "billing", "discount"];
-const MRP_KEYWORDS = ["mrp", "list", "retail", "price", "cost"];
+const MRP_KEYWORDS = ["mrp", "list", "retail", "price"];
 
 // Headers that identify packing, quantity, or measurement columns — these must
 // never be used as the price column when loading Prayag MRP. A nearby numeric
@@ -69,6 +69,8 @@ const PACKING_EXCLUDE_KEYWORDS = [
   "qty",
   "count",
   "weight",
+  "kg",
+  "cost",
   "mass",
   "size",
   "dimension",
@@ -549,6 +551,30 @@ function parseSheet(
     warnings.push(
       "No explicit MRP, price, Net, or rate column was found. Numeric pack, weight, quantity, or dimension columns were not selected as prices; add a clearly labelled price column and re-upload.",
     );
+    const skippedRows: SkippedRow[] = [];
+    for (let r = 0; r < grid.length; r++) {
+      if (r === headerRow) continue;
+      const row = grid[r] ?? [];
+      const rawCode = norm(row[codeCol]);
+      const code = normCode(row[codeCol]);
+      if (!code) continue;
+      const numericCandidates = row
+        .map((value, col) => ({ value, col }))
+        .filter(
+          ({ value, col }) =>
+            col !== codeCol &&
+            value != null &&
+            norm(value) !== "" &&
+            Number.isFinite(Number(value)),
+        )
+        .map(({ value }) => norm(value));
+      skippedRows.push({
+        rawCode: rawCode || code,
+        rawPrice: numericCandidates.join(", "),
+        reason:
+          "No accepted price or dated-period header; numeric values were left unpriced for review",
+      });
+    }
     return {
       rows: [],
       sourcePriceObservations: [],
@@ -559,7 +585,7 @@ function parseSheet(
       categoryCol,
       codeColHeader,
       priceColHeader: "",
-      skippedRows: [],
+      skippedRows,
       hasHeaderPeriods: false,
       warnings,
     };

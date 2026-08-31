@@ -539,6 +539,21 @@ export default function DataHealthPage() {
 
       <CatalogSyncPanel onApplied={invalidateCatalog} />
 
+      {data.preProvenanceLegacyCount > 0 && (
+        <div className="bg-card border border-amber-300 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 bg-amber-50">
+            <h2 className="font-semibold text-amber-950">
+              Pre-provenance legacy MRP rows ({data.preProvenanceLegacyCount})
+            </h2>
+            <p className="text-sm text-amber-900 mt-1">
+              These historical rows are linked to an explicitly synthetic legacy batch.
+              Their original workbook checksum, download date, and loader identity are
+              unknown; no official source attribution was inferred and no price was changed.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="bg-card border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b bg-muted/20 font-semibold">
           Prayag MRP loader
@@ -639,7 +654,7 @@ export default function DataHealthPage() {
         <div className="max-h-[360px] overflow-auto">
           {data.untracedMrpRows.length === 0 ? (
             <div className="p-6 text-sm text-green-700">
-              Every MRP history row has a traceable source.
+              No MRP history rows are missing a provenance classification.
             </div>
           ) : (
             <table className="w-full min-w-[680px] text-sm text-left">

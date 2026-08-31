@@ -56,11 +56,18 @@ export interface PrayagPrices {
   net: number | null;
 }
 
+export interface ParsedSheet {
+  rows: ParsedRow[];
+  unmatched: number;
+  basis: "net" | "mrp";
+  unpricedCodes: string[];
+}
+
 export function parseSheet(
   grid: unknown[][],
   knownCodes: Set<string>,
   prayagMap: Map<string, PrayagPrices>,
-): { rows: ParsedRow[]; unmatched: number; basis: "net" | "mrp" } {
+): ParsedSheet {
   // Find the column with the most overlap against known item codes.
   let codeCol = -1;
   let bestOverlap = 0;
@@ -76,7 +83,7 @@ export function parseSheet(
     }
   }
   if (codeCol === -1 || bestOverlap === 0) {
-    return { rows: [], unmatched: 0, basis: "net" };
+    return { rows: [], unmatched: 0, basis: "net", unpricedCodes: [] };
   }
 
   // Identify header row: the first row that has a non-numeric cell in several columns.
@@ -103,26 +110,22 @@ export function parseSheet(
     else if (MRP_KEYWORDS.some((k) => h.includes(k)) && mrpCol === -1) mrpCol = c;
     else if (h.includes("price") && genericCol === -1) genericCol = c;
   }
-  // Fallback: first numeric column other than code col.
-  if (netCol === -1 && mrpCol === -1 && genericCol === -1) {
-    for (let c = 0; c < maxCols; c++) {
-      if (c === codeCol) continue;
-      const numericCount = grid.filter(
-        (row) => row[c] != null && !isNaN(Number(row[c])),
-      ).length;
-      if (numericCount > grid.length / 3) {
-        genericCol = c;
-        break;
-      }
-    }
-  }
-
   const priceCol = netCol !== -1 ? netCol : genericCol !== -1 ? genericCol : mrpCol;
   // Basis is known only when the price column has an explicit net/mrp header.
   // A generic "price"/fallback column must be inferred from value magnitude.
   const explicitBasis: "net" | "mrp" | null =
     netCol !== -1 ? "net" : mrpCol !== -1 && priceCol === mrpCol ? "mrp" : null;
-  if (priceCol === -1) return { rows: [], unmatched: 0, basis: "net" };
+  if (priceCol === -1) {
+    const unpricedCodes = [
+      ...new Set(
+        grid
+          .filter((_row, index) => index !== headerRow)
+          .map((row) => normCode(row[codeCol]))
+          .filter(Boolean),
+      ),
+    ];
+    return { rows: [], unmatched: 0, basis: "net", unpricedCodes };
+  }
 
   const rows: ParsedRow[] = [];
   let unmatched = 0;
@@ -169,5 +172,5 @@ export function parseSheet(
   }
   for (const row of rows) row.basis = basis;
 
-  return { rows, unmatched, basis };
+  return { rows, unmatched, basis, unpricedCodes: [] };
 }

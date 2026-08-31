@@ -7,7 +7,7 @@ import { hashApiKey } from "../middlewares/apiKeyAuth";
 import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
-router.use(requireAdmin);
+router.use("/keys", requireAdmin);
 
 function serializeKey(k: ApiKeyRow) {
   return {

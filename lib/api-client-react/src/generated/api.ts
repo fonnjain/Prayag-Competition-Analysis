@@ -58,6 +58,7 @@ import type {
   CatalogFilters,
   CatalogProductDetail,
   CatalogProductList,
+  ClassifyLegacyMrpProvenanceBody,
   ComparisonFilters,
   ComparisonList,
   ComparisonMatrix,
@@ -106,6 +107,7 @@ import type {
   GetPriceHistoryParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
+  LegacyMrpClassificationResult,
   LogoutBrowserSessionParams,
   LogoutSuccess,
   MappingReviewList,
@@ -1681,6 +1683,77 @@ export function useGetCatalogDataHealth<TData = Awaited<ReturnType<typeof getCat
 
 
 
+
+export const getClassifyLegacyMrpProvenanceUrl = () => {
+
+
+
+
+  return `/api/catalog/legacy-provenance/classify`
+}
+
+/**
+ * @summary Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+ */
+export const classifyLegacyMrpProvenance = async (classifyLegacyMrpProvenanceBody: ClassifyLegacyMrpProvenanceBody, options?: RequestInit): Promise<LegacyMrpClassificationResult> => {
+
+  return customFetch<LegacyMrpClassificationResult>(getClassifyLegacyMrpProvenanceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      classifyLegacyMrpProvenanceBody,)
+  }
+);}
+
+
+
+
+export const getClassifyLegacyMrpProvenanceMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, TError,{data: BodyType<ClassifyLegacyMrpProvenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, TError,{data: BodyType<ClassifyLegacyMrpProvenanceBody>}, TContext> => {
+
+const mutationKey = ['classifyLegacyMrpProvenance'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, {data: BodyType<ClassifyLegacyMrpProvenanceBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  classifyLegacyMrpProvenance(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClassifyLegacyMrpProvenanceMutationResult = NonNullable<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>>
+    export type ClassifyLegacyMrpProvenanceMutationBody = BodyType<ClassifyLegacyMrpProvenanceBody>
+    export type ClassifyLegacyMrpProvenanceMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+ */
+export const useClassifyLegacyMrpProvenance = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, TError,{data: BodyType<ClassifyLegacyMrpProvenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>,
+        TError,
+        {data: BodyType<ClassifyLegacyMrpProvenanceBody>},
+        TContext
+      > => {
+      return useMutation(getClassifyLegacyMrpProvenanceMutationOptions(options));
+    }
 
 export const getResetCatalogUrl = () => {
 
