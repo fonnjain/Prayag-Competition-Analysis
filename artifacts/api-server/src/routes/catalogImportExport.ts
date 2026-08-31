@@ -23,6 +23,7 @@ import { requireAdmin } from "../middlewares/authMiddleware";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
 import {
+  ensureHardwareReplacementSnapshot,
   ensureOfficialMrpSources,
   isIsoDate,
   sha256ForBuffer,
@@ -1218,9 +1219,14 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         downloadedAt,
         loadedBy: req.user?.email ?? req.user?.id ?? null,
       });
+
+      const hardwareSourceReplacement = await ensureHardwareReplacementSnapshot(
+        req.user?.email ?? req.user?.id ?? null,
+      );
       if (result.duplicate) {
         res.status(409).json({
           error: "This authoritative master has already been loaded.",
+          hardwareSourceReplacement,
           duplicate: {
             sourceDivision: "Authoritative multi-division master",
             fileSha256: sha256ForBuffer(file.buffer),
@@ -1238,6 +1244,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           kind: "authoritative-master",
           file: name,
           ...result,
+          hardwareSourceReplacement,
           totalRows: result.productRows,
           matchedProducts: result.productRows - result.newCodes.length,
           newProducts: result.newCodes.length,

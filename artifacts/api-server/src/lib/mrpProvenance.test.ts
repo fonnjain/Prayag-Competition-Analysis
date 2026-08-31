@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  HARDWARE_REPLACEMENT_SNAPSHOT,
+  OFFICIAL_MRP_SOURCES,
   isIsoDate,
   sha256ForBuffer,
   sourceUrl,
@@ -21,5 +23,25 @@ describe("MRP source provenance", () => {
     expect(sourceUrl("sheet-id")).toBe(
       "https://docs.google.com/spreadsheets/d/sheet-id/edit",
     );
+  });
+
+  it("identifies the verified September Hardware replacement exactly", () => {
+    const hardware = OFFICIAL_MRP_SOURCES.find(
+      (source) => source.division === "Hardware",
+    );
+
+    expect(hardware?.expectedFileName).toBe(
+      HARDWARE_REPLACEMENT_SNAPSHOT.fileName,
+    );
+    expect(HARDWARE_REPLACEMENT_SNAPSHOT).toMatchObject({
+      fileSha256:
+        "a6cd9c4d82ab60a1b77644edba5446af90bf9df25174095e791b6c23f773cab2",
+      fileSizeBytes: 379_091,
+      downloadedAt: "2026-08-31",
+      effectiveDate: "2026-09-01",
+      expectedRows: 285,
+      expectedRevisions: 277,
+      expectedAdditions: 8,
+    });
   });
 });

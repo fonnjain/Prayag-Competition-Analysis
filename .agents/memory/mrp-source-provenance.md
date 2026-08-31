@@ -9,6 +9,12 @@ Every MRP-sheet upload must name a source from the six-source register, provide 
 
 **How to apply:** Keep each historical price row linked to a load batch. For retrospective records, map by the embedded original workbook filename in `source_file`. The September 2026 PTMT snapshot's complete SHA-256 is now verified and stored; do not regress it to an abbreviated digest.
 
+When a canonical division sheet is demonstrably older than a later Prayag-returned authoritative master, do not relabel a fresh download of the old sheet as current evidence. Register the verified authoritative slice as that division's replacement batch and relink only the period it replaces.
+
+**Why:** A newly downloaded stale workbook has a recent download date but still does not support the newer prices. Treating its timestamp as freshness would make provenance health actively misleading.
+
+**How to apply:** Verify the authoritative file hash and the division slice's expected row/revision/addition counts, preserve prior-period batch links, and record a separate replacement event for each relinked row.
+
 Manual corrections are not official workbook loads: require a reviewer-supplied reason and record each action in a dedicated internal manual batch. Keep that source out of the six official-source health rows.
 
 **Why:** Reusing an official batch after overwriting its price makes it falsely appear that the workbook contained the correction. A separate manual event preserves both the source record and the reviewer’s accountability.
