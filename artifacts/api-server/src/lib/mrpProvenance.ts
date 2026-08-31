@@ -51,6 +51,16 @@ const MANUAL_MRP_SOURCE = {
   sourceKind: "manual",
 } as const;
 
+export const AUTHORITATIVE_MASTER_SOURCE = {
+  division: "Authoritative multi-division master",
+  sheetId: "authoritative-master-2026-09-01",
+  sheetUrl: "about:blank",
+  expectedFileName: "Prayag_MRP_Authoritative_01Sep2026.xlsx",
+  notes:
+    "Authoritative master returned by Prayag, superseding the compiled 01 Sep list.",
+  sourceKind: "authoritative",
+} as const;
+
 export function sourceUrl(sheetId: string): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
 }

@@ -28,6 +28,51 @@ function datedWorkbookBuffer(): Buffer {
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
+function wrongAuthoritativeWorkbookBuffer(): Buffer {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet([
+      {
+        item_code: "WRONG-HASH",
+        division: "Hardware",
+        series: "Fixture",
+        product_name: "Wrong hash fixture",
+        size: null,
+        mrp: 100,
+        effective_date: "2026-09-01",
+        mrp_ivory: null,
+        mrp_white_with_jet: null,
+        mrp_pink_green_blue: null,
+      },
+    ]),
+    "products",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet([
+      {
+        item_code: "OLD-FIXTURE",
+        discontinued_from: "2026-08-01",
+        checked_by: "Fixture",
+        status_note: "Fixture",
+      },
+    ]),
+    "discontinued",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet([{ item_code: "20", status_note: "Invalid Input", "why excluded": "Fixture" }]),
+    "excluded_do_not_load",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet([{ Item: "Source", Detail: "Fixture" }]),
+    "notes",
+  );
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
 afterAll(async () => {
   if (createdBatchIds.length) {
     await db.delete(mrpLoadBatchesTable).where(
@@ -37,6 +82,24 @@ afterAll(async () => {
 });
 
 describe("MRP loader period and duplicate safeguards", () => {
+  it("rejects an authoritative-shaped workbook when its checksum is wrong", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(router);
+
+    const response = await supertest(app)
+      .post("/catalog/load-mrp")
+      .field("downloadedAt", "2026-08-31")
+      .attach("file", wrongAuthoritativeWorkbookBuffer(), {
+        filename: "Prayag_MRP_Authoritative_01Sep2026.xlsx",
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/checksum mismatch/i);
+  });
+
   it("rejects an impossible competitor workbook effective date before parsing it", async () => {
     const app = express();
     app.use(express.json());

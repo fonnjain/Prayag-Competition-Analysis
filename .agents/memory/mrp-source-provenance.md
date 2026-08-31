@@ -14,3 +14,9 @@ Manual corrections are not official workbook loads: require a reviewer-supplied 
 **Why:** Reusing an official batch after overwriting its price makes it falsely appear that the workbook contained the correction. A separate manual event preserves both the source record and the reviewer’s accountability.
 
 **How to apply:** A same-date manual correction can replace the visible history row because the database permits one row per code and effective date, but it must move that row to the new manual batch and retain the reason. Official batch row counts remain historical facts; show their current linked-row divergence in Data Health instead of rewriting them.
+
+Pinned multi-division authoritative masters are an exception to ordinary duplicate confirmation: identify them by their exact SHA-256 and immutable sheet contract, serialize the load, and never permit a forced duplicate batch. Preserve source item codes exactly apart from trimming/case normalization; internal spaces can distinguish signed rows already present in the catalog.
+
+**Why:** An authoritative master replaces several source periods and the full withdrawal set at once. Replaying it would rewrite provenance, while collapsing internal spaces would merge distinct signed workbook rows and make the withdrawal count disagree with the source.
+
+**How to apply:** Create the provenance source, check for the existing hash, write catalog/history/withdrawal data, and recompute current flags inside one transaction. A concurrent retry must return the original batch without mutations.

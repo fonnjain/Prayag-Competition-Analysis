@@ -22,12 +22,15 @@ import {
 import { requireAdmin } from "../middlewares/authMiddleware";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
-import { discontinuationCorrectionV2 } from "../data/discontinuationCorrectionV2";
 import {
   ensureOfficialMrpSources,
   isIsoDate,
   sha256ForBuffer,
 } from "../lib/mrpProvenance";
+import {
+  isAuthoritativeMasterBuffer,
+  loadAuthoritativeMaster,
+} from "../lib/authoritativeMrpMaster";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -180,38 +183,6 @@ async function applyDiscontinuationCorrection(
     }
   });
   await recomputeCurrentFlags();
-}
-
-/**
- * The versioned correction resolves source-sheet ambiguities that a single
- * workbook cannot see. Reassert only those audited codes after a normal load;
- * leave any unrelated source withdrawal untouched.
- */
-async function reassertVersionedDiscontinuationCorrection(): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx
-      .update(catalogProductsTable)
-      .set({ discontinuedFrom: null, updatedAt: new Date() })
-      .where(
-        inArray(
-          catalogProductsTable.itemCode,
-          [...discontinuationCorrectionV2.unmarkedCodes],
-        ),
-      );
-
-    const confirmedByDate = new Map<string, string[]>();
-    for (const row of discontinuationCorrectionV2.confirmed) {
-      const codes = confirmedByDate.get(row.discontinuedFrom) ?? [];
-      codes.push(row.itemCode);
-      confirmedByDate.set(row.discontinuedFrom, codes);
-    }
-    for (const [discontinuedFrom, itemCodes] of confirmedByDate) {
-      await tx
-        .update(catalogProductsTable)
-        .set({ discontinuedFrom, updatedAt: new Date() })
-        .where(inArray(catalogProductsTable.itemCode, itemCodes));
-    }
-  });
 }
 
 function parsePeriodHeader(value: unknown): string | null {
@@ -1198,6 +1169,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
 
   try {
     const reviewBatchId = randomUUID();
+    let authoritativeWorkbook = false;
     if (ext === "xlsx" || ext === "xls") {
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
       const correction = parseDiscontinuationCorrectionWorkbook(workbook);
@@ -1215,6 +1187,71 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         });
         return;
       }
+      const authoritativeSheets = [
+        "products",
+        "discontinued",
+        "excluded_do_not_load",
+        "notes",
+      ];
+      const looksAuthoritative = authoritativeSheets.every((sheet) =>
+        workbook.SheetNames.includes(sheet),
+      );
+      if (looksAuthoritative && !isAuthoritativeMasterBuffer(file.buffer)) {
+        res.status(400).json({
+          error:
+            "Authoritative master checksum mismatch. The file was not loaded.",
+        });
+        return;
+      }
+      authoritativeWorkbook = looksAuthoritative;
+    }
+    if (ext === "xlsx" && authoritativeWorkbook) {
+      const downloadedAt = req.body.downloadedAt;
+      if (!isIsoDate(downloadedAt)) {
+        res.status(400).json({
+          error: "Enter the date this file was downloaded (YYYY-MM-DD).",
+        });
+        return;
+      }
+      const result = await loadAuthoritativeMaster({
+        buffer: file.buffer,
+        downloadedAt,
+        loadedBy: req.user?.email ?? req.user?.id ?? null,
+      });
+      if (result.duplicate) {
+        res.status(409).json({
+          error: "This authoritative master has already been loaded.",
+          duplicate: {
+            sourceDivision: "Authoritative multi-division master",
+            fileSha256: sha256ForBuffer(file.buffer),
+            matches: result.existingBatches.map((batch) => ({
+              loadBatchId: batch.id,
+              loadedAt: batch.loadedAt,
+              downloadedAt: batch.downloadedAt,
+            })),
+          },
+        });
+        return;
+      }
+      res.json({
+        results: {
+          kind: "authoritative-master",
+          file: name,
+          ...result,
+          totalRows: result.productRows,
+          matchedProducts: result.productRows - result.newCodes.length,
+          newProducts: result.newCodes.length,
+          newHistoryRows: result.priceRows,
+          skippedDuplicates: 0,
+          skippedUnparseable: 0,
+          unmatchedCodes: result.newCodes,
+          lowMrpCount: 0,
+          flaggedMrpCount: 0,
+          flaggedRows: [],
+          reviewBatchId: null,
+        },
+      });
+      return;
     }
     const sourceId = Number(req.body.sourceId);
     const downloadedAt = req.body.downloadedAt;
@@ -1358,7 +1395,6 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         fileSummaries.push(summary);
       }
 
-      await reassertVersionedDiscontinuationCorrection();
       await recomputeCurrentFlags();
 
       // Build aggregate totals across all files.
@@ -1451,7 +1487,6 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           flaggedRows: summaries.flatMap((row) => row.flaggedRows),
         };
 
-    await reassertVersionedDiscontinuationCorrection();
     await recomputeCurrentFlags();
     await db
       .update(mrpLoadBatchesTable)

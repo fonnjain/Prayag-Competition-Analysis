@@ -12,7 +12,6 @@ import {
 } from "@workspace/db";
 import router from "./catalogImportExport";
 import catalogRouter from "./catalog";
-import { discontinuationCorrectionV2 } from "../data/discontinuationCorrectionV2";
 
 const RUN = Date.now();
 const FLAGGED = `__MRP_REVIEW_FLAGGED_${RUN}__`;
@@ -28,14 +27,12 @@ const REVIEW_CANCEL_FILE = `review-cancel-test-${RUN}.csv`;
 const REINTRO_MARKER_FILE = `removal-marker-${RUN}.xlsx`;
 const REINTRO_PRICE_FILE = `removal-reintroduction-${RUN}.xlsx`;
 const WITHDRAWAL_MARKER_FILE = `removal-withdrawal-${RUN}.xlsx`;
-const CORRECTION_PROTECTION_FILE = `correction-protection-${RUN}.xlsx`;
 const TEST_FILES = [
   REVIEW_FILE,
   REVIEW_CANCEL_FILE,
   REINTRO_MARKER_FILE,
   REINTRO_PRICE_FILE,
   WITHDRAWAL_MARKER_FILE,
-  CORRECTION_PROTECTION_FILE,
 ];
 
 const app = express();
@@ -50,28 +47,6 @@ function workbookBuffer(rows: Array<[string, string | number]>): Buffer {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([["Item Code", "MRP"], ...rows]);
   XLSX.utils.book_append_sheet(workbook, sheet, "MASTER");
-  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-}
-
-function correctionWorkbookBuffer(): Buffer {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(
-      discontinuationCorrectionV2.unmarkedCodes.map((item_code) => ({ item_code })),
-    ),
-    "1_UNMARK_not_discontinued",
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(
-      discontinuationCorrectionV2.confirmed.map((row) => ({
-        item_code: row.itemCode,
-        discontinued_from: row.discontinuedFrom,
-      })),
-    ),
-    "2_Confirmed_discontinued",
-  );
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
@@ -462,98 +437,4 @@ describe("MRP import blocking review", () => {
     expect(withdrawn?.discontinuedFrom).toBe("2026-09-01");
   });
 
-  it("applies the versioned 69/90 correction manifest through the correction upload route", async () => {
-    expect(discontinuationCorrectionV2.unmarkedCodes).toHaveLength(69);
-    expect(discontinuationCorrectionV2.confirmed).toHaveLength(90);
-
-    const uploaded = await request
-      .post("/catalog/load-mrp")
-      .attach("file", correctionWorkbookBuffer(), {
-        filename: "Prayag_Discontinued_Correction_v2.xlsx",
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-    expect(uploaded.status).toBe(200);
-    expect(uploaded.body.results).toMatchObject({
-      kind: "discontinuation-correction",
-      unmarkedCodes: 69,
-      confirmedDiscontinuations: 90,
-    });
-
-    const [restored, confirmed] = await Promise.all([
-      db
-        .select({
-          itemCode: catalogProductsTable.itemCode,
-          discontinuedFrom: catalogProductsTable.discontinuedFrom,
-        })
-        .from(catalogProductsTable)
-        .where(
-          inArray(
-            catalogProductsTable.itemCode,
-            [...discontinuationCorrectionV2.unmarkedCodes],
-          ),
-        ),
-      db
-        .select({
-          itemCode: catalogProductsTable.itemCode,
-          discontinuedFrom: catalogProductsTable.discontinuedFrom,
-        })
-        .from(catalogProductsTable)
-        .where(
-          inArray(
-            catalogProductsTable.itemCode,
-            discontinuationCorrectionV2.confirmed.map((row) => row.itemCode),
-          ),
-        ),
-    ]);
-    expect(restored).toHaveLength(69);
-    expect(confirmed).toHaveLength(90);
-    expect(restored.every((product) => product.discontinuedFrom === null)).toBe(true);
-    expect(
-      restored.find((product) => product.itemCode === "WT-3LH-50"),
-    ).toMatchObject({ discontinuedFrom: null });
-    expect(
-      confirmed.every((product) =>
-        discontinuationCorrectionV2.confirmed.some(
-          (row) =>
-            row.itemCode === product.itemCode &&
-            row.discontinuedFrom === product.discontinuedFrom,
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      confirmed.find((product) => product.itemCode === "616-D"),
-    ).toMatchObject({ discontinuedFrom: "2026-09-01" });
-
-    const protectionCheck = await request
-      .post("/catalog/load-mrp")
-      .field("effectiveDate", "2026-08-01")
-      .field("sourceId", String(ptmtSourceId))
-      .field("downloadedAt", "2026-08-19")
-      .attach(
-        "file",
-        workbookBuffer([[discontinuationCorrectionV2.unmarkedCodes[0], "REMOVED"]]),
-        {
-          filename: CORRECTION_PROTECTION_FILE,
-          contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-      );
-    expect(protectionCheck.status).toBe(200);
-    const [stillLive, discontinuedCount] = await Promise.all([
-      db
-        .select({ discontinuedFrom: catalogProductsTable.discontinuedFrom })
-        .from(catalogProductsTable)
-        .where(
-          eq(
-            catalogProductsTable.itemCode,
-            discontinuationCorrectionV2.unmarkedCodes[0],
-          ),
-        ),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(catalogProductsTable)
-        .where(sql`${catalogProductsTable.discontinuedFrom} IS NOT NULL`),
-    ]);
-    expect(stillLive[0]?.discontinuedFrom).toBeNull();
-    expect(Number(discontinuedCount[0]?.count)).toBe(90);
-  });
 });

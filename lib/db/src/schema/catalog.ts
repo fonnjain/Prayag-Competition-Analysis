@@ -30,6 +30,8 @@ export const catalogProductsTable = pgTable(
     // Product remains live through the previous calendar day. Null means there
     // is no scheduled withdrawal.
     discontinuedFrom: date("discontinued_from", { mode: "string" }),
+    discontinuedCheckedBy: text("discontinued_checked_by"),
+    discontinuedStatusNote: text("discontinued_status_note"),
     sourceFiles: text("source_files"),
     dataFlag: text("data_flag"),
     createdAt: timestamp("created_at", { withTimezone: true })
