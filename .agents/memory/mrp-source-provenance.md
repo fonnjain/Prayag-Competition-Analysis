@@ -26,3 +26,9 @@ Authoritative masters are identified by verified content, not by filename or ext
 **Why:** Replaying a multi-period master would rewrite provenance, while collapsing meaningful internal spaces could merge distinct signed rows.
 
 **How to apply:** Route every upload matching the authoritative content identity through the protected load path; ordinary duplicate confirmation must never override it.
+
+Production provenance backfills must run only through a published, administrator-gated endpoint after read-only before/after fingerprints are captured. The receipt must distinguish a normalized payload checksum from an original workbook checksum and prove unaffected batches retain their counts and digests.
+
+**Why:** A retrospective linkage is safe only when it changes provenance metadata, not prices or historical membership. A database-side shortcut would bypass the release and audit controls that establish who confirmed the operation.
+
+**How to apply:** Publish first, authenticate as an administrator, use the exact confirmation phrase, then verify the attached-row count, payload hash, source notes, zero remaining gap, and unchanged neighboring-period fingerprints.
