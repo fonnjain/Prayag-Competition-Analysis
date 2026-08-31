@@ -6,19 +6,35 @@ import {
   catalogProductsTable,
   db,
   mrpHistoryProvenanceEventsTable,
+  mrpLoadBatchesTable,
   mrpPriceHistoryTable,
+  mrpSourcesTable,
 } from "@workspace/db";
 import catalogRouter from "./catalog";
 import catalogImportExportRouter from "./catalogImportExport";
+import {
+  reconcileSanitarywareVariantProvenance,
+  sha256ForBuffer,
+} from "../lib/mrpProvenance";
 
 const RUN = Date.now();
 const MANUAL_CODE = `__MRP_MANUAL_PROVENANCE_${RUN}__`;
-const LEGACY_CODE = `__MRP_LEGACY_PROVENANCE_${RUN}__`;
+const UNTRACED_CODE = `__MRP_UNTRACED_PROVENANCE_${RUN}__`;
 const PERIOD_CODE = `__MRP_PERIOD_PROVENANCE_${RUN}__`;
+const RECONCILED_CODE = `__MRP_RECONCILED_PROVENANCE_${RUN}__`;
+const MAY_CODE = `__MRP_MAY_PROVENANCE_${RUN}__`;
 const EFFECTIVE_DATE = "2026-08-19";
 const PERIOD_DATE = "2039-12-31";
 const PENDING_REVIEW_BATCH = `manual-pending-review-${RUN}`;
-const CODES = [MANUAL_CODE, LEGACY_CODE, PERIOD_CODE];
+const CODES = [
+  MANUAL_CODE,
+  UNTRACED_CODE,
+  PERIOD_CODE,
+  RECONCILED_CODE,
+  MAY_CODE,
+];
+const VARIANT_SOURCE_SHEET_ID = `variant-provenance-test-${RUN}`;
+const MAY_SOURCE_SHEET_ID = `may-authoritative-test-${RUN}`;
 
 const app = express();
 app.use(express.json());
@@ -51,6 +67,23 @@ afterAll(async () => {
     await tx
       .delete(catalogProductsTable)
       .where(inArray(catalogProductsTable.itemCode, CODES));
+    const sources = await tx
+      .select({ id: mrpSourcesTable.id })
+      .from(mrpSourcesTable)
+      .where(
+        inArray(mrpSourcesTable.sheetId, [
+          VARIANT_SOURCE_SHEET_ID,
+          MAY_SOURCE_SHEET_ID,
+        ]),
+      );
+    for (const source of sources) {
+      await tx
+        .delete(mrpLoadBatchesTable)
+        .where(eq(mrpLoadBatchesTable.sourceId, source.id));
+      await tx
+        .delete(mrpSourcesTable)
+        .where(eq(mrpSourcesTable.id, source.id));
+    }
   });
 });
 
@@ -133,12 +166,12 @@ describe("manual MRP provenance", () => {
 
   it("reports rows without an official batch or manual correction event", async () => {
     await db.insert(mrpPriceHistoryTable).values({
-      itemCode: LEGACY_CODE,
+      itemCode: UNTRACED_CODE,
       mrp: 99,
       priceBasis: "MRP",
       effectiveDate: EFFECTIVE_DATE,
       loadDate: EFFECTIVE_DATE,
-      sourceFile: "legacy-workbook.xlsx",
+      sourceFile: "unbatched-workbook.xlsx",
     });
 
     const health = await request.get("/catalog/data-health");
@@ -146,15 +179,206 @@ describe("manual MRP provenance", () => {
     expect(health.body.untracedMrpCount).toBeGreaterThan(0);
     expect(health.body.untracedMrpRows).toContainEqual(
       expect.objectContaining({
-        itemCode: LEGACY_CODE,
+        itemCode: UNTRACED_CODE,
         effectiveDate: EFFECTIVE_DATE,
         mrp: 99,
-        sourceFile: "legacy-workbook.xlsx",
+        sourceFile: "unbatched-workbook.xlsx",
       }),
     );
     expect(health.body.untracedMrpRows).not.toContainEqual(
       expect.objectContaining({ itemCode: MANUAL_CODE }),
     );
+  });
+
+  it("reconciles an exact known-source scope idempotently without changing price data", async () => {
+    const [maySource] = await db
+      .insert(mrpSourcesTable)
+      .values({
+        division: `Authoritative May test ${RUN}`,
+        sheetId: MAY_SOURCE_SHEET_ID,
+        sheetUrl: "about:blank",
+        expectedFileName: "authoritative-may-fixture.xlsx",
+        sourceKind: "authoritative",
+      })
+      .returning({ id: mrpSourcesTable.id });
+    const [mayBatch] = await db
+      .insert(mrpLoadBatchesTable)
+      .values({
+        sourceId: maySource.id,
+        fileName: "authoritative-may-fixture.xlsx",
+        fileSha256: sha256ForBuffer(Buffer.from(`may-${RUN}`)),
+        fileSizeBytes: 123,
+        downloadedAt: EFFECTIVE_DATE,
+        rowCount: 1,
+      })
+      .returning({ id: mrpLoadBatchesTable.id });
+    const [mayRow] = await db
+      .insert(mrpPriceHistoryTable)
+      .values({
+        itemCode: MAY_CODE,
+        mrp: 654,
+        priceBasis: "MRP",
+        effectiveDate: "2026-05-01",
+        loadDate: EFFECTIVE_DATE,
+        sourceFile: "authoritative-may-fixture.xlsx",
+        notes: "Authoritative May row",
+        variant: "Ivory",
+        loadBatchId: mayBatch.id,
+      })
+      .returning();
+    const [sourceRow] = await db
+      .insert(mrpPriceHistoryTable)
+      .values({
+        itemCode: RECONCILED_CODE,
+        mrp: 321,
+        netPrice: 222,
+        discountPct: 30,
+        priceBasis: "MRP",
+        effectiveDate: "2026-01-15",
+        loadDate: EFFECTIVE_DATE,
+        sourceFile: "known-colour-source-fixture.xlsx",
+        notes: "Original known-source note",
+        variant: "Ivory",
+      })
+      .returning({ id: mrpPriceHistoryTable.id });
+    const digest = await db.execute<{ identity_digest: string }>(sql`
+      SELECT md5(COALESCE(string_agg(
+        concat_ws(chr(31),
+          id, item_code, variant, effective_date, load_date, source_file,
+          price_basis, review_status, mrp, net_price, discount_pct, notes,
+          import_batch_id
+        ),
+        chr(30) ORDER BY id
+      ), '')) AS identity_digest
+      FROM mrp_price_history
+      WHERE id = ${sourceRow.id}
+    `);
+    const scope = {
+      sourceSheetId: VARIANT_SOURCE_SHEET_ID,
+      sourceDivision: `Known colour source test ${RUN}`,
+      sourceFile: "known-colour-source-fixture.xlsx",
+      effectiveDate: "2026-01-15",
+      loadDate: EFFECTIVE_DATE,
+      productDivision: "Test",
+      expectedRows: 1,
+      expectedDistinctCodes: 1,
+      historyRowIds: [sourceRow.id],
+      expectedIdentityMd5: digest.rows[0].identity_digest,
+      payloadSha256: sha256ForBuffer(Buffer.from("known source fixture")),
+      payloadBytes: Buffer.byteLength("known source fixture"),
+    };
+
+    await expect(
+      reconcileSanitarywareVariantProvenance({
+        loadedBy: "variant-test@example.test",
+        scope: { ...scope, expectedIdentityMd5: "0".repeat(32) },
+      }),
+    ).rejects.toThrow(/audited manifest/i);
+    const [stillUnclassified] = await db
+      .select()
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.id, sourceRow.id));
+    expect(stillUnclassified.loadBatchId).toBeNull();
+
+    const first = await reconcileSanitarywareVariantProvenance({
+      loadedBy: "variant-test@example.test",
+      scope,
+    });
+    const second = await reconcileSanitarywareVariantProvenance({
+      loadedBy: "variant-test@example.test",
+      scope,
+    });
+    const [batchAfterSecondReconciliation] = await db
+      .select({ notes: mrpLoadBatchesTable.notes })
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, first.loadBatchId));
+    const third = await reconcileSanitarywareVariantProvenance({
+      loadedBy: "variant-test@example.test",
+      scope,
+    });
+    const [batchAfterThirdReconciliation] = await db
+      .select({ notes: mrpLoadBatchesTable.notes })
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, first.loadBatchId));
+
+    expect(first).toMatchObject({
+      attachedRows: 1,
+      distinctCodes: 1,
+      alreadyReconciled: false,
+    });
+    expect(second).toEqual({
+      loadBatchId: first.loadBatchId,
+      attachedRows: 0,
+      distinctCodes: 1,
+      alreadyReconciled: true,
+      payloadSha256: scope.payloadSha256,
+    });
+    expect(third).toEqual(second);
+    expect(batchAfterThirdReconciliation.notes).toBe(
+      batchAfterSecondReconciliation.notes,
+    );
+    const [history] = await db
+      .select()
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, RECONCILED_CODE));
+    expect(history).toMatchObject({
+      mrp: 321,
+      netPrice: 222,
+      discountPct: 30,
+      effectiveDate: "2026-01-15",
+      loadDate: EFFECTIVE_DATE,
+      sourceFile: "known-colour-source-fixture.xlsx",
+      notes: "Original known-source note",
+      variant: "Ivory",
+      loadBatchId: first.loadBatchId,
+    });
+    const events = await db
+      .select()
+      .from(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.historyRowId, history.id));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      action: "known_source_batch_backfilled",
+      loadBatchId: first.loadBatchId,
+      mrp: 321,
+    });
+    const [source] = await db
+      .select()
+      .from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.sheetId, VARIANT_SOURCE_SHEET_ID));
+    expect(source).toMatchObject({
+      sourceKind: "known_source",
+      expectedFileName: "known-colour-source-fixture.xlsx",
+    });
+    const [batch] = await db
+      .select()
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, first.loadBatchId));
+    expect(batch).toMatchObject({
+      fileName: "known-colour-source-fixture.xlsx",
+      fileSha256: scope.payloadSha256,
+      fileSizeBytes: scope.payloadBytes,
+      rowCount: 1,
+    });
+    expect(batch.notes).toMatch(/normalized 2026-01-15 period payload/i);
+    expect(batch.notes).toMatch(/not a hash of the original XLSX bytes/i);
+    expect(batch.notes).toMatch(/historical row load date/i);
+    expect(batch.notes).toMatch(/original XLSX download date is not retained/i);
+    const [unchangedMayRow] = await db
+      .select()
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.id, mayRow.id));
+    expect(unchangedMayRow).toEqual(mayRow);
+
+    await db
+      .delete(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.historyRowId, history.id));
+    await expect(
+      reconcileSanitarywareVariantProvenance({
+        loadedBy: "variant-test@example.test",
+        scope,
+      }),
+    ).rejects.toThrow(/does not exactly match/i);
   });
 
   it("retains a period deletion event after the history row is removed", async () => {
