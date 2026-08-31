@@ -1,0 +1,101 @@
+# Replit Prompt — Retire `is_current` as a Source of Truth
+
+Your audit found that no price calculation reads the stored flag. Prices, gaps, rankings, exports and the external feed all resolve by `effective_date`. **Four consumers show a wrong label, none show a wrong number.**
+
+Your own recommendation is the right one, and this task is that:
+
+> The stronger long-term fix is for those four consumers to derive status from `effective_date` too. Then `is_current` becomes a cache rather than a source of truth.
+
+Do that instead of building a refresh endpoint. An endpoint keeps the flag authoritative and needs re-running at every future revision date — 01 Sep, then the next CP revision, then the next. Four small changes remove the problem permanently.
+
+This also finishes something the project decided months ago: *`is_current` as a stored boolean goes stale and must not be the price resolution source of truth.* These four are the places that never got the message.
+
+---
+
+## 1. The four consumers
+
+Derive status from `effective_date`, not from the stored flag:
+
+| Location | Currently |
+|---|---|
+| Product Database product-detail history table | `row.isCurrent` drives the CURRENT badge |
+| Competition Analysis expanded price-history panel, `OpportunitiesThreats.tsx` | `isCurrent` drives MRP history status badges |
+| `/analysis/price-history/:itemCode` | Returns stored `isCurrent` per row |
+| MRP history export in `catalogImportExport.ts` | Exports the stored flag as Current Yes/No |
+
+The rule is the same one the catalogue and Price Finder already use:
+
+- **Current** — the latest row with `effective_date <= asOf`
+- **Upcoming** — a row with `effective_date > asOf`
+- **Superseded** — anything earlier than the current row
+
+Compute it per item, per variant. Sanitaryware colour rows have their own timelines and must not compete with Standard.
+
+The API response should carry the derived status. Do not have four callers each work it out separately — that is how the four diverge again.
+
+---
+
+## 2. The fifth one, in the competitor table
+
+Your audit notes:
+
+> *Competition Analysis competitor-history badges — could mislabel competitor history if competitor flags are independently stale.*
+
+The MRP load did not make competitor flags stale, but **Sparsh Vol 6.2 sits at effective date 01 July 2026** and competitor flags have gone stale on this project before.
+
+Report, before changing anything: are the competitor `is_current` flags correct today, and does the competitor-history badge read them? If it does, apply the same date-derived treatment. Comparison already derives competitor status in memory from dates — reuse that rather than writing a second implementation.
+
+It would be a poor outcome to fix four consumers and leave the fifth with the identical defect.
+
+---
+
+## 3. What happens to the flag
+
+Keep the column. It is written correctly by `recomputeCurrentFlags()` after every mutation and it costs nothing.
+
+But once nothing reads it for status, **add a comment on the schema field recording that it is a cache and not a source of truth**, so the next person to reach for it in a query knows. That single line is worth more than the code change.
+
+Do not add a scheduled job. Do not add a refresh endpoint. If the flag drifts and nothing reads it, nothing breaks.
+
+---
+
+## 4. Acceptance tests
+
+```
+1.  A product with a 2026-09-01 row shows that row as Upcoming when asOf is
+    2026-08-31, and as Current when asOf is 2026-09-01 — with the stored
+    is_current flag left deliberately stale in both cases.
+2.  CCL-60-BSK product detail shows the 1,190 row as CURRENT on 01 Sep 2026,
+    with its stored flag still false.
+3.  /analysis/price-history/CCL-60-BSK returns derived status, and the
+    response does not depend on the stored flag.
+4.  The MRP history export's Current column is derived, and matches the
+    product-detail badge for the same item.
+5.  A sanitaryware item with Ivory rows shows Standard and Ivory statuses
+    independently — the Ivory row is not marked superseded by a Standard row.
+6.  Competition Analysis history badges agree with product detail for the
+    same item and date.
+7.  Deliberately corrupting is_current on a row changes no badge, no export
+    column and no API response.
+8.  No price, gap, ranking or export value changes anywhere. This task alters
+    labels only.
+```
+
+Test 7 is the one that proves the job is done. Test 8 is the guard: if any number moves, something was resolving by flag that the audit did not find, and that is worth knowing.
+
+---
+
+## 5. Report
+
+- The four consumers changed, and the shared function they now use.
+- The competitor-flag answer from section 2, and whether a fifth change was needed.
+- Confirmation that no price, gap or ranking value changed.
+- The result of test 7 — a corrupted flag with no visible effect.
+
+One clean commit.
+
+---
+
+## Note
+
+Nothing here is needed before 01 September. The customer-facing routes are already correct by date, so tomorrow works without intervention. This is the tidy-up that stops the question recurring at every future revision.
