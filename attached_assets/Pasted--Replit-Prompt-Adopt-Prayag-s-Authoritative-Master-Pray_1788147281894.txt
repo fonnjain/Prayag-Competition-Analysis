@@ -1,0 +1,122 @@
+# Replit Prompt — Adopt Prayag's Authoritative Master
+
+Prayag has reviewed the compiled 01 September master and returned a corrected version. **It is now authoritative.** Every difference below is settled in its favour.
+
+Input file: `Master_-_MRP_01st_Sep__2026.xlsx`
+SHA-256: `161b0fa4f644859840fa734768eea6fa90d5570f55d26fedc7338d9ddb6a6c1e`
+
+| Sheet | Rows | Use |
+|---|---:|---|
+| `MRP_01Sep2026` | 6,218 | Products live on 01 Sep 2026 with their in-force price |
+| `Revised_on_01Sep` | 2,145 | Subset revised that day |
+| `Discontinued` | 229 | Withdrawn codes, all signed off by Preeti |
+| `Newly-Add-on (By Preeti)` | 0 | Empty — ignore |
+
+---
+
+## 1. What changed, and why it matters that they differ in kind
+
+664 differences against the previous compilation. They are **not** one problem:
+
+| Cause | Rows | Nature |
+|---|---:|---|
+| Hardware, new 01 Sep period | 277 | **Missing source** — not an extraction fault |
+| PE-AL-PE (`PEA-`) codes | 70 | **Extraction fault** — weight columns read as prices |
+| C-series CPVC fittings | 28 | Brass / without-brass conflict, resolved by Prayag |
+| Water tanks `WT-4LH` | 7 | **Genuine price revision** by Prayag |
+| Rounding under ₹1 | 59 | Precision |
+| Other price differences | ~210 | Adopt as given |
+| Added by Prayag | 13 | `PEA-`, `SSB-`, `EP-`, `LLD-` codes |
+| Removed by Prayag | 8 | `PS-` series Prayag does not carry |
+
+Adopt all of them. The distinction matters for §4, not for the load.
+
+---
+
+## 2. Load the master
+
+### Products and prices
+
+`MRP_01Sep2026`, 6,218 rows: `Cat No.`, `Division`, `Series / Range`, `Product Name`, `Size`, `MRP w.e.f. 01 Sep 2026`, `Price in force since`, `Previous MRP`, plus sanitaryware colour columns `Ivory`, `White with Jet`, `Pink / Green / Blue`.
+
+**`Price in force since` is the effective date for each row** — it varies by division and must be read per row, never assumed. A Hardware row reading `2026-09-01` is a new period for that division; a Pipes & Fittings row reading `2026-02-01` is an existing one.
+
+Where `Price in force since` is a period that does not yet exist for that division, create it — this is a load, not a revision. Report every new period created, with its row count.
+
+### Colour variants
+
+Colour prices go to `variant = 'Ivory'`, `'White with Jet'`, `'Pink / Green / Blue'`. A blank cell means that colour is not offered — write no row, and do not fall back to the Standard price.
+
+### Discontinued
+
+`Discontinued`, 229 rows with a per-row `Withdrawn from` date: 01 Aug 2026 (126), 20 Jan 2026 (43), 05 Mar 2026 (24), 01 Feb 2026 (18), 01 Sep 2026 (18).
+
+**Set `discontinued_from` from the row, not from a division default.** Withdrawals on 20 Jan and 01 Feb are already past, so those products disappear immediately on load. Report how many that is.
+
+### The eight EMERALD 61 codes are now resolved
+
+`BB-61`, `DB-61-N`, `DB-61-H-N`, `DB-61-H-ON-OFF-N`, `DB-61-3IN-N`, `DB-61-3IN-ON-OFF-N`, `6192-ON-OFF-N`, `6193-ON-OFF-N` appear in the discontinued list, marked *"Removed from 01st Aug"* by Preeti.
+
+That answers the question the manifest reassertion was holding open. **After this load, verify the loader derives the correct discontinuation set unaided, then remove the manifest reassertion.** If it still needs the manifest, report that instead of removing it.
+
+---
+
+## 3. Provenance
+
+Register this as a source with its own load batch: file name, the SHA-256 above, download date, and the reason — *"Authoritative master returned by Prayag, superseding the compiled 01 Sep list."*
+
+Every row must carry a `load_batch_id`. This file supersedes parts of six workbooks without being one of them, so the batch record is the only thing that will explain a later divergence between a price and its original workbook.
+
+Record `Check By` and status notes from the discontinued sheet against those rows — the sign-off is evidence and should not be discarded on load.
+
+---
+
+## 4. Two things to fix in the loader, separately
+
+These are the causes behind the differences. Do them **after** the load, as their own work — the load should not wait.
+
+**The PE-AL-PE extraction reads weight columns as prices.** `PEA-64B` produced ₹0.55 against a true ₹2,596; the source row is `['32','PEA-64B','723.88','0.3','0.552']` and the loader took `0.552`. Any sheet where a numeric column sits to the right of a code without a price header is exposed. Report which other sheets share that shape.
+
+**Hardware has a 01 Sep 2026 revision that is not in the workbook on file.** The held workbook has only `01st June, 2024` and `01st Mar, 2026` columns. Either a newer Hardware workbook exists and has not been supplied, or these prices live somewhere else. Report which, and flag the Hardware source as out of date in provenance until a matching workbook arrives.
+
+---
+
+## 5. Acceptance tests
+
+```
+1.  6,218 products resolve to a price at asOf = 2026-09-01.
+2.  CCL-60-BSK resolves to 1,190 with effective date 2026-09-01 — the new
+    Hardware period exists.
+3.  CB-1171-BL resolves to 1,190 at 2026-09-01.
+4.  PEA-64B resolves to 2,596, not 0.55.
+5.  PEA-55B resolves to 3,440; C71 resolves to 244.
+6.  WT-4LH-50 resolves to 100,000; WT-4LH-05 to 10,000 and is live.
+7.  1179 resolves to 638 and 1181 to 578.
+8.  229 codes carry a discontinued_from; the set matches the sheet exactly.
+9.  A code withdrawn from 2026-01-20 returns no price today.
+10. The 8 EMERALD 61 codes are discontinued from 2026-08-01.
+11. Sanitaryware colour rows are unchanged at 298, and no colour row was
+    written where the source cell is blank.
+12. Every mrp_price_history row has a non-null load_batch_id.
+13. The 150 Sparsh Pearl mappings still resolve to a catalog_products row.
+```
+
+Test 13 is the collateral guard. Eight `PS-` codes are being removed and thirteen added; confirm no competitor mapping points at a code that no longer exists.
+
+---
+
+## 6. Report
+
+Read every figure from the database:
+
+- Rows and distinct codes before and after.
+- New periods created, with row counts — Hardware 2026-09-01 expected among them.
+- Codes deactivated because Prayag no longer carries them: the 8 `PS-` codes.
+- Codes newly created: the 13.
+- Discontinued count, and how many took effect immediately because their date is past.
+- Whether the manifest reassertion could be removed, and on what evidence.
+- Any Sparsh mapping left pointing at a missing code.
+
+**If a row cannot be loaded, report it and stop rather than defaulting anything.** This file is authoritative, so a row it contains that the application cannot accept is a finding about the application.
+
+One clean commit.
