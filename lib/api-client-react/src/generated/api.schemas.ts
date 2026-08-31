@@ -304,6 +304,23 @@ export type PriceFinderComparisonCompetitor = PriceFinderComparisonPrice & ({
      * @nullable
      */
   cheaperSide: string | null;
+  /**
+     * Earliest future effective date on either price stream.
+     * @nullable
+     */
+  upcomingGapDate: string | null;
+  /** @nullable */
+  upcomingGapPrayagPrice: number | null;
+  /** @nullable */
+  upcomingGapCompetitorPrice: number | null;
+  /**
+     * Date-aligned future gap; positive means Prayag is cheaper.
+     * @nullable
+     */
+  upcomingGapPct: number | null;
+  /** @nullable */
+  upcomingGapDirection: string | null;
+  upcomingGapIsReversal: boolean;
 });
 
 export interface PriceFinderComparisonRow {
@@ -396,6 +413,23 @@ export interface PriceFinderCompetitor {
   gapPct: number | null;
   /** @nullable */
   message: string | null;
+  /**
+     * Earliest future effective date on either price stream.
+     * @nullable
+     */
+  upcomingGapDate: string | null;
+  /** @nullable */
+  upcomingGapPrayagPrice: number | null;
+  /** @nullable */
+  upcomingGapCompetitorPrice: number | null;
+  /**
+     * Date-aligned future gap; positive means Prayag is cheaper.
+     * @nullable
+     */
+  upcomingGapPct: number | null;
+  /** @nullable */
+  upcomingGapDirection: string | null;
+  upcomingGapIsReversal: boolean;
 }
 
 export interface PriceFinderVariant {
@@ -588,6 +622,20 @@ export interface ComparisonRow {
   diffPct: number | null;
   /** @nullable */
   prayagCheaper: boolean | null;
+  /** @nullable */
+  upcomingGapDate: string | null;
+  /** @nullable */
+  upcomingGapPrayagPrice: number | null;
+  /** @nullable */
+  upcomingGapCompetitorPrice: number | null;
+  /**
+     * Date-aligned future gap; positive means Prayag is cheaper.
+     * @nullable
+     */
+  upcomingGapPct: number | null;
+  /** @nullable */
+  upcomingGapDirection: string | null;
+  upcomingGapIsReversal: boolean;
   /**
      * Competitor price reduced to ₹/metre, when length-normalizable.
      * @nullable
@@ -644,6 +692,20 @@ export interface ProductComparisonCell {
   upcomingEffectiveDate: string | null;
   /** @nullable */
   upcomingChangePct: number | null;
+  /** @nullable */
+  upcomingGapDate: string | null;
+  /** @nullable */
+  upcomingGapPrayagPrice: number | null;
+  /** @nullable */
+  upcomingGapCompetitorPrice: number | null;
+  /**
+     * Date-aligned future gap; positive means Prayag is cheaper.
+     * @nullable
+     */
+  upcomingGapPct: number | null;
+  /** @nullable */
+  upcomingGapDirection: string | null;
+  upcomingGapIsReversal: boolean;
   /** True when this confirmed cell still drives the official gap while a newer revision awaits review. */
   newerRevisionAwaitingReview?: boolean;
   /**

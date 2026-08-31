@@ -13,6 +13,7 @@ import {
   MARKET_GAP_DEFINITION,
   marketGapPct,
   prayagCheaperForGap,
+  resolveUpcomingCompetitiveGap,
   resolveCompetitorPeriodDate,
   type PrayagInfo,
   type CompInput,
@@ -85,6 +86,60 @@ describe("canonical market-gap definition", () => {
     expect(prayagCheaperForGap(0.01)).toBe(true);
     expect(prayagCheaperForGap(0)).toBe(false);
     expect(prayagCheaperForGap(-0.01)).toBe(false);
+  });
+});
+
+describe("upcoming competitive gap", () => {
+  it("uses the earliest future date and keeps the other side's in-force price", () => {
+    const result = resolveUpcomingCompetitiveGap({
+      currentPrayagPrice: 100,
+      currentCompetitorPrice: 110,
+      currentGapPct: 10,
+      upcomingPrayagPrice: 120,
+      upcomingPrayagEffectiveDate: "2026-09-01",
+      upcomingCompetitorPrice: 130,
+      upcomingCompetitorEffectiveDate: "2026-08-15",
+    });
+    expect(result).toMatchObject({
+      effectiveDate: "2026-08-15",
+      prayagPrice: 100,
+      competitorPrice: 130,
+      gapPct: 30,
+      direction: "Prayag remains cheaper",
+      isReversal: false,
+    });
+  });
+
+  it("marks opposite signs as a reversal and returns nothing without a future date", () => {
+    const reversal = resolveUpcomingCompetitiveGap({
+      currentPrayagPrice: 100,
+      currentCompetitorPrice: 105,
+      currentGapPct: 5,
+      upcomingPrayagPrice: 120,
+      upcomingPrayagEffectiveDate: "2026-09-01",
+      upcomingCompetitorPrice: null,
+      upcomingCompetitorEffectiveDate: null,
+    });
+    expect(reversal).toMatchObject({
+      effectiveDate: "2026-09-01",
+      prayagPrice: 120,
+      competitorPrice: 105,
+      gapPct: -12.5,
+      direction: "Prayag becomes more expensive",
+      isReversal: true,
+    });
+
+    expect(
+      resolveUpcomingCompetitiveGap({
+        currentPrayagPrice: 100,
+        currentCompetitorPrice: 105,
+        currentGapPct: 5,
+        upcomingPrayagPrice: null,
+        upcomingPrayagEffectiveDate: null,
+        upcomingCompetitorPrice: null,
+        upcomingCompetitorEffectiveDate: null,
+      }),
+    ).toBeNull();
   });
 });
 

@@ -18,8 +18,22 @@ const OPEN = `PF-OPEN-${RUN}`;
 const FUTURE_ONLY = `PF-FUTURE-${RUN}`;
 const INACTIVE = `PF-INACTIVE-${RUN}`;
 const WITHDRAWING = `PF-WITHDRAWING-${RUN}`;
+const REVERSAL = `PF-REVERSAL-${RUN}`;
+const NARROWING = `PF-NARROW-${RUN}`;
+const NO_FUTURE_GAP = `PF-NO-FUTURE-GAP-${RUN}`;
 const COMPETITOR = `PF Competitor ${RUN}`;
-const ITEM_CODES = [CHANGING, UNCHANGED, OPEN, FUTURE_ONLY, INACTIVE, WITHDRAWING];
+const PUBLIC_COMPETITOR = "Vectus";
+const ITEM_CODES = [
+  CHANGING,
+  UNCHANGED,
+  OPEN,
+  FUTURE_ONLY,
+  INACTIVE,
+  WITHDRAWING,
+  REVERSAL,
+  NARROWING,
+  NO_FUTURE_GAP,
+];
 const LEGACY_MRP_TABLE = `mrp_price_history_pf_test_${process.pid}_${RUN}`;
 
 function dateOffset(days: number): string {
@@ -77,6 +91,24 @@ beforeAll(async () => {
       division: "Test",
       category: "Price Finder",
       discontinuedFrom: NEXT_DATE,
+    },
+    {
+      itemCode: REVERSAL,
+      productName: "Upcoming Reversal Fixture",
+      division: "Test",
+      category: "Price Finder",
+    },
+    {
+      itemCode: NARROWING,
+      productName: "Upcoming Narrowing Fixture",
+      division: "Test",
+      category: "Price Finder",
+    },
+    {
+      itemCode: NO_FUTURE_GAP,
+      productName: "No Future Gap Fixture",
+      division: "Test",
+      category: "Price Finder",
     },
   ]);
 
@@ -161,6 +193,46 @@ beforeAll(async () => {
       loadDate: NEXT_DATE,
       isCurrent: false,
     },
+    {
+      itemCode: REVERSAL,
+      mrp: 100,
+      priceBasis: "MRP",
+      effectiveDate: CURRENT_DATE,
+      loadDate: CURRENT_DATE,
+      isCurrent: true,
+    },
+    {
+      itemCode: REVERSAL,
+      mrp: 120,
+      priceBasis: "MRP",
+      effectiveDate: NEXT_DATE,
+      loadDate: NEXT_DATE,
+      isCurrent: false,
+    },
+    {
+      itemCode: NARROWING,
+      mrp: 100,
+      priceBasis: "MRP",
+      effectiveDate: CURRENT_DATE,
+      loadDate: CURRENT_DATE,
+      isCurrent: true,
+    },
+    {
+      itemCode: NARROWING,
+      mrp: 120,
+      priceBasis: "MRP",
+      effectiveDate: NEXT_DATE,
+      loadDate: NEXT_DATE,
+      isCurrent: false,
+    },
+    {
+      itemCode: NO_FUTURE_GAP,
+      mrp: 100,
+      priceBasis: "MRP",
+      effectiveDate: CURRENT_DATE,
+      loadDate: CURRENT_DATE,
+      isCurrent: true,
+    },
   ]);
 
   // The parent table's unique index prevents new same-day duplicates. An
@@ -203,6 +275,54 @@ beforeAll(async () => {
       isCurrent: true,
       priceBasis: "MRP",
     },
+    {
+      competitor: PUBLIC_COMPETITOR,
+      description: "Current reversal competitor fixture",
+      price: 105,
+      matchedPrayagCode: REVERSAL,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      prayagMrpAtCompare: 100,
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: PUBLIC_COMPETITOR,
+      description: "Pending future reversal competitor fixture",
+      price: 140,
+      matchedPrayagCode: REVERSAL,
+      matchStatus: "needs_review",
+      matchConfidence: "Medium",
+      prayagMrpAtCompare: 100,
+      effectiveDate: NEXT_DATE,
+      isCurrent: false,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: PUBLIC_COMPETITOR,
+      description: "Current narrowing competitor fixture",
+      price: 130,
+      matchedPrayagCode: NARROWING,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      prayagMrpAtCompare: 100,
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: PUBLIC_COMPETITOR,
+      description: "No future competitor fixture",
+      price: 110,
+      matchedPrayagCode: NO_FUTURE_GAP,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      prayagMrpAtCompare: 100,
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
   ]);
 });
 
@@ -210,7 +330,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db
     .delete(competitorPricesTable)
-    .where(eq(competitorPricesTable.competitor, COMPETITOR));
+    .where(inArray(competitorPricesTable.matchedPrayagCode, ITEM_CODES));
   await db.execute(sql.raw(`DROP TABLE IF EXISTS ${LEGACY_MRP_TABLE}`));
   await db
     .delete(mrpPriceHistoryTable)
@@ -251,6 +371,76 @@ describe("Price Finder date-driven validity", () => {
       upcomingEffectiveDate: NEXT_DATE,
       upcomingChangePct: 10,
       gapPct: 50,
+      upcomingGapDate: NEXT_DATE,
+      upcomingGapPrayagPrice: 130,
+      upcomingGapCompetitorPrice: 165,
+      upcomingGapIsReversal: false,
+    });
+  });
+
+  it("resolves a one-sided future change at one date and marks only a sign reversal", async () => {
+    const [detail, comparison] = await Promise.all([
+      request.get(`/price-finder/product/${encodeURIComponent(REVERSAL)}`),
+      request.get("/price-finder/comparison").query({
+        code: REVERSAL,
+        competitor: PUBLIC_COMPETITOR,
+      }),
+    ]);
+    expect(detail.status).toBe(200);
+    const detailCompetitor = detail.body.competitors.find(
+      (row: { competitor: string }) => row.competitor === PUBLIC_COMPETITOR,
+    );
+    expect(detailCompetitor.gapPct).toBe(5);
+    expect(detailCompetitor).toMatchObject({
+      upcomingPrice: null,
+      upcomingEffectiveDate: null,
+      upcomingGapDate: NEXT_DATE,
+      upcomingGapPrayagPrice: 120,
+      upcomingGapCompetitorPrice: 105,
+      upcomingGapDirection: "Prayag becomes more expensive",
+      upcomingGapIsReversal: true,
+    });
+    expect(detailCompetitor.upcomingGapPct).toBeCloseTo(-12.5);
+
+    expect(comparison.status).toBe(200);
+    const comparisonCompetitor = comparison.body.rows[0].competitors[0];
+    expect(comparisonCompetitor.differencePct).toBe(5);
+    expect(comparisonCompetitor).toMatchObject({
+      upcomingGapDate: NEXT_DATE,
+      upcomingGapPrayagPrice: 120,
+      upcomingGapCompetitorPrice: 105,
+      upcomingGapDirection: "Prayag becomes more expensive",
+      upcomingGapIsReversal: true,
+    });
+    expect(comparisonCompetitor.upcomingGapPct).toBeCloseTo(-12.5);
+  });
+
+  it("does not mark same-sign narrowing as a reversal and omits absent future gaps", async () => {
+    const [narrowing, noFuture] = await Promise.all([
+      request.get(`/price-finder/product/${encodeURIComponent(NARROWING)}`),
+      request.get(`/price-finder/product/${encodeURIComponent(NO_FUTURE_GAP)}`),
+    ]);
+    const narrowingCompetitor = narrowing.body.competitors.find(
+      (row: { competitor: string }) => row.competitor === PUBLIC_COMPETITOR,
+    );
+    expect(narrowingCompetitor.gapPct).toBe(30);
+    expect(narrowingCompetitor.upcomingGapPct).toBeCloseTo(8.333333);
+    expect(narrowingCompetitor.upcomingGapDirection).toBe(
+      "Prayag remains cheaper",
+    );
+    expect(narrowingCompetitor.upcomingGapIsReversal).toBe(false);
+
+    const noFutureCompetitor = noFuture.body.competitors.find(
+      (row: { competitor: string }) => row.competitor === PUBLIC_COMPETITOR,
+    );
+    expect(noFutureCompetitor).toMatchObject({
+      gapPct: 10,
+      upcomingGapDate: null,
+      upcomingGapPrayagPrice: null,
+      upcomingGapCompetitorPrice: null,
+      upcomingGapPct: null,
+      upcomingGapDirection: null,
+      upcomingGapIsReversal: false,
     });
   });
 

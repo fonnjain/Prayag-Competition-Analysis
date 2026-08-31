@@ -132,3 +132,65 @@ export function PriceWindowDetails({
     </div>
   );
 }
+
+type UpcomingGapDetailsProps = {
+  effectiveDate?: string | null;
+  prayagPrice?: number | null;
+  competitorPrice?: number | null;
+  gapPct?: number | null;
+  direction?: string | null;
+  isReversal?: boolean;
+  compact?: boolean;
+  className?: string;
+};
+
+export function UpcomingGapDetails({
+  effectiveDate,
+  prayagPrice,
+  competitorPrice,
+  gapPct,
+  direction,
+  isReversal = false,
+  compact = false,
+  className,
+}: UpcomingGapDetailsProps) {
+  if (
+    !effectiveDate ||
+    prayagPrice == null ||
+    competitorPrice == null ||
+    gapPct == null ||
+    !direction
+  ) {
+    return null;
+  }
+  const signedGap = `${gapPct > 0 ? "+" : ""}${gapPct.toFixed(1)}%`;
+  return (
+    <div
+      className={cn(
+        "border border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100",
+        compact
+          ? "mt-1 rounded px-2 py-1 text-[10px]"
+          : "mt-2 rounded-lg p-2.5 text-xs",
+        className,
+      )}
+      data-testid="upcoming-competitive-gap"
+    >
+      <div className="font-semibold">
+        From {formatPriceDate(effectiveDate)}: ₹{prayagPrice.toFixed(2)} vs ₹
+        {competitorPrice.toFixed(2)} → {signedGap}
+      </div>
+      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+        <span>{direction}</span>
+        {isReversal && (
+          <span
+            className="inline-flex items-center gap-1 rounded bg-amber-200 px-1.5 py-0.5 font-bold uppercase tracking-wide text-amber-900 dark:bg-amber-800 dark:text-amber-100"
+            data-testid="competitive-gap-reversal"
+          >
+            <AlertTriangle aria-hidden="true" className="h-3 w-3" />
+            Reversal
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}

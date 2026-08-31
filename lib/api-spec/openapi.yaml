@@ -2555,7 +2555,17 @@ components:
       allOf:
         - $ref: "#/components/schemas/PriceFinderComparisonPrice"
         - type: object
-          required: [competitor, difference, differencePct, cheaperSide]
+          required:
+            - competitor
+            - difference
+            - differencePct
+            - cheaperSide
+            - upcomingGapDate
+            - upcomingGapPrayagPrice
+            - upcomingGapCompetitorPrice
+            - upcomingGapPct
+            - upcomingGapDirection
+            - upcomingGapIsReversal
           properties:
             competitor:
               type: string
@@ -2569,6 +2579,21 @@ components:
             cheaperSide:
               type: ["string", "null"]
               description: Prayag, the competitor name, parity, or null when no dated price is available.
+            upcomingGapDate:
+              type: ["string", "null"]
+              format: date
+              description: Earliest future effective date on either price stream.
+            upcomingGapPrayagPrice:
+              type: ["number", "null"]
+            upcomingGapCompetitorPrice:
+              type: ["number", "null"]
+            upcomingGapPct:
+              type: ["number", "null"]
+              description: Date-aligned future gap; positive means Prayag is cheaper.
+            upcomingGapDirection:
+              type: ["string", "null"]
+            upcomingGapIsReversal:
+              type: boolean
     PriceFinderComparisonRow:
       type: object
       required: [itemCode, productName, division, category, prayag, competitors]
@@ -2657,6 +2682,12 @@ components:
         - upcomingChangePct
         - gapPct
         - message
+        - upcomingGapDate
+        - upcomingGapPrayagPrice
+        - upcomingGapCompetitorPrice
+        - upcomingGapPct
+        - upcomingGapDirection
+        - upcomingGapIsReversal
       properties:
         competitor:
           type: string
@@ -2682,6 +2713,21 @@ components:
           type: ["number", "null"]
         message:
           type: ["string", "null"]
+        upcomingGapDate:
+          type: ["string", "null"]
+          format: date
+          description: Earliest future effective date on either price stream.
+        upcomingGapPrayagPrice:
+          type: ["number", "null"]
+        upcomingGapCompetitorPrice:
+          type: ["number", "null"]
+        upcomingGapPct:
+          type: ["number", "null"]
+          description: Date-aligned future gap; positive means Prayag is cheaper.
+        upcomingGapDirection:
+          type: ["string", "null"]
+        upcomingGapIsReversal:
+          type: boolean
     PriceFinderVariant:
       type: object
       required: [variant, currentMrp, currentEffectiveDate, upcomingMrp, upcomingEffectiveDate, upcomingChangePct]
@@ -2907,6 +2953,12 @@ components:
         - upcomingPrayagChangePct
         - diffPct
         - prayagCheaper
+        - upcomingGapDate
+        - upcomingGapPrayagPrice
+        - upcomingGapCompetitorPrice
+        - upcomingGapPct
+        - upcomingGapDirection
+        - upcomingGapIsReversal
       properties:
         id:
           type: integer
@@ -2978,6 +3030,20 @@ components:
             Prayag MRP × 100. Positive means Prayag is cheaper.
         prayagCheaper:
           type: ["boolean", "null"]
+        upcomingGapDate:
+          type: ["string", "null"]
+          format: date
+        upcomingGapPrayagPrice:
+          type: ["number", "null"]
+        upcomingGapCompetitorPrice:
+          type: ["number", "null"]
+        upcomingGapPct:
+          type: ["number", "null"]
+          description: Date-aligned future gap; positive means Prayag is cheaper.
+        upcomingGapDirection:
+          type: ["string", "null"]
+        upcomingGapIsReversal:
+          type: boolean
         compPerMetre:
           type: ["number", "null"]
           description: Competitor price reduced to ₹/metre, when length-normalizable.
@@ -3032,6 +3098,12 @@ components:
         - upcomingChangePct
         - diffPct
         - isCheapest
+        - upcomingGapDate
+        - upcomingGapPrayagPrice
+        - upcomingGapCompetitorPrice
+        - upcomingGapPct
+        - upcomingGapDirection
+        - upcomingGapIsReversal
       properties:
         competitor:
           type: string
@@ -3047,6 +3119,20 @@ components:
           type: ["string", "null"]
         upcomingChangePct:
           type: ["number", "null"]
+        upcomingGapDate:
+          type: ["string", "null"]
+          format: date
+        upcomingGapPrayagPrice:
+          type: ["number", "null"]
+        upcomingGapCompetitorPrice:
+          type: ["number", "null"]
+        upcomingGapPct:
+          type: ["number", "null"]
+          description: Date-aligned future gap; positive means Prayag is cheaper.
+        upcomingGapDirection:
+          type: ["string", "null"]
+        upcomingGapIsReversal:
+          type: boolean
         newerRevisionAwaitingReview:
           type: boolean
           description: True when this confirmed cell still drives the official gap while a newer revision awaits review.

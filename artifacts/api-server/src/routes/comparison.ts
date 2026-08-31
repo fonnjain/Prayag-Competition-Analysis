@@ -26,6 +26,7 @@ import {
   effectivePrice,
   marketGapPct,
   prayagCheaperForGap,
+  resolveUpcomingCompetitiveGap,
 } from "../lib/analysis.js";
 import { requireAdmin } from "../middlewares/authMiddleware";
 
@@ -217,6 +218,8 @@ interface CompetitorWindow {
   validTo: string | null;
   upcomingPrice: number | null;
   upcomingEffectiveDate: string | null;
+  upcomingPriceBasis: string | null;
+  upcomingGstPct: number | null;
   upcomingChangePct: number | null;
 }
 
@@ -279,6 +282,10 @@ function getCompetitorWindows(rows: CompRow[]): Map<number, CompetitorWindow> {
         upcomingPrice: !isWinningRevision ? null : (next?.price ?? null),
         upcomingEffectiveDate:
           !isWinningRevision ? null : (next?.effectiveDate ?? null),
+        upcomingPriceBasis:
+          !isWinningRevision ? null : (next?.priceBasis ?? null),
+        upcomingGstPct:
+          !isWinningRevision ? null : (next?.gstPct ?? null),
         upcomingChangePct:
           !isWinningRevision
             ? null
@@ -396,6 +403,60 @@ function buildComparisonRow(
       ? norm.perMetreDiffPct
       : diffPct;
   const effectivePrayagCheaper = prayagCheaperForGap(effectiveDiffPct);
+  const effectiveRawGapPct =
+    rawGapPct == null || norm.unitAmbiguous
+      ? null
+      : norm.lengthNormalized
+        ? marketGapPct(norm.prayagPerMetre, norm.compPerMetre)
+        : rawGapPct;
+  const upcomingCompetitorEffectivePrice =
+    matchedWindow?.upcomingPrice != null
+      ? effectivePrice(
+          c.unit,
+          matchedWindow.upcomingPrice,
+          matchedWindow.upcomingPriceBasis,
+          matchedWindow.upcomingGstPct,
+        )
+      : null;
+  const upcomingPrayagBasis =
+    prayag?.upcomingMrp == null
+      ? null
+      : norm.lengthNormalized
+        ? normalizePerMetre({
+            description: prayag.productName,
+            size: null,
+            unit: null,
+            price: prayag.upcomingMrp,
+          }).perMetre
+        : prayag.upcomingMrp;
+  const upcomingCompetitorBasis =
+    upcomingCompetitorEffectivePrice == null
+      ? null
+      : norm.lengthNormalized
+        ? (() => {
+            const normalized = normalizePerMetre({
+              description: c.description,
+              size: c.size,
+              unit: c.unit,
+              price: upcomingCompetitorEffectivePrice,
+            });
+            return normalized.status === "normalized"
+              ? normalized.perMetre
+              : null;
+          })()
+        : upcomingCompetitorEffectivePrice;
+  const upcomingGap = resolveUpcomingCompetitiveGap({
+    currentPrayagPrice:
+      norm.lengthNormalized ? norm.prayagPerMetre : prayagMrp,
+    currentCompetitorPrice:
+      norm.lengthNormalized ? norm.compPerMetre : competitorEffectivePrice,
+    currentGapPct: effectiveRawGapPct,
+    upcomingPrayagPrice: upcomingPrayagBasis,
+    upcomingPrayagEffectiveDate: prayag?.upcomingEffectiveDate ?? null,
+    upcomingCompetitorPrice: upcomingCompetitorBasis,
+    upcomingCompetitorEffectiveDate:
+      matchedWindow?.upcomingEffectiveDate ?? null,
+  });
 
   return {
     id: c.id,
@@ -434,6 +495,13 @@ function buildComparisonRow(
     normalizationNote: norm.normalizationNote,
     effectiveDiffPct,
     effectivePrayagCheaper,
+    upcomingGapDate: upcomingGap?.effectiveDate ?? null,
+    upcomingGapPrayagPrice: upcomingGap?.prayagPrice ?? null,
+    upcomingGapCompetitorPrice: upcomingGap?.competitorPrice ?? null,
+    upcomingGapPct:
+      upcomingGap == null ? null : Math.round(upcomingGap.gapPct * 10) / 10,
+    upcomingGapDirection: upcomingGap?.direction ?? null,
+    upcomingGapIsReversal: upcomingGap?.isReversal ?? false,
   };
 }
 
@@ -832,11 +900,22 @@ router.patch("/catalog/competitor-prices/bulk", requireAdmin, async (req, res) =
     if (result[0]) updatedRows.push(result[0]);
   }
 
-  const windows = await getAllCompetitorWindows();
+  const revisionRows = await db.select().from(competitorPricesTable);
+  const windows = getCompetitorWindows(revisionRows);
+  const matchedWindows = getCompetitorWindows(
+    revisionRows.filter((row) => row.matchStatus === "matched"),
+  );
+  const pendingRevisions = getPendingRevisions(revisionRows);
   res.json({
     updated: updatedRows.length,
     rows: updatedRows.map((r) =>
-      buildComparisonRow(r, maps, windows.get(r.id)),
+      buildComparisonRow(
+        r,
+        maps,
+        windows.get(r.id),
+        matchedWindows.get(r.id),
+        pendingRevisions.get(r.id),
+      ),
     ),
   });
 });
@@ -1094,6 +1173,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     validTo: string | null;
     upcomingPrice: number | null;
     upcomingEffectiveDate: string | null;
+    upcomingPriceBasis: string | null;
+    upcomingGstPct: number | null;
     upcomingChangePct: number | null;
     newerRevisionAwaitingReview: boolean;
     newerRevisionEffectiveDate: string | null;
@@ -1134,6 +1215,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       validTo: priceWindow?.validTo ?? null,
       upcomingPrice: priceWindow?.upcomingPrice ?? null,
       upcomingEffectiveDate: priceWindow?.upcomingEffectiveDate ?? null,
+      upcomingPriceBasis: priceWindow?.upcomingPriceBasis ?? null,
+      upcomingGstPct: priceWindow?.upcomingGstPct ?? null,
       upcomingChangePct: priceWindow?.upcomingChangePct ?? null,
       newerRevisionAwaitingReview: pendingRevisions.has(c.id),
       newerRevisionEffectiveDate: pendingRevisions.get(c.id)?.effectiveDate ?? null,
@@ -1174,6 +1257,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       validTo: string | null;
       upcomingPrice: number | null;
       upcomingEffectiveDate: string | null;
+      upcomingBasisPrice: number | null;
       upcomingChangePct: number | null;
       newerRevisionAwaitingReview: boolean;
       newerRevisionEffectiveDate: string | null;
@@ -1219,6 +1303,32 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           validTo: cand.validTo,
           upcomingPrice: cand.upcomingPrice,
           upcomingEffectiveDate: cand.upcomingEffectiveDate,
+          upcomingBasisPrice:
+            cand.upcomingPrice == null
+              ? null
+              : isLenRow
+                ? (() => {
+                    const upcomingNormalized = normalizePerMetre({
+                      description: cand.description,
+                      size: cand.size,
+                      unit: cand.unit,
+                      price: effectivePrice(
+                        cand.unit,
+                        cand.upcomingPrice,
+                        cand.upcomingPriceBasis,
+                        cand.upcomingGstPct,
+                      ),
+                    });
+                    return upcomingNormalized.status === "normalized"
+                      ? upcomingNormalized.perMetre
+                      : null;
+                  })()
+                : effectivePrice(
+                    cand.unit,
+                    cand.upcomingPrice,
+                    cand.upcomingPriceBasis,
+                    cand.upcomingGstPct,
+                  ),
           upcomingChangePct: cand.upcomingChangePct,
           newerRevisionAwaitingReview: cand.newerRevisionAwaitingReview,
           newerRevisionEffectiveDate: cand.newerRevisionEffectiveDate,
@@ -1252,6 +1362,27 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
         let diffPct: number | null = null;
         const rawGap = marketGapPct(prayagBasis, p.basisPrice);
         diffPct = rawGap == null ? null : Math.round(rawGap * 10) / 10;
+        const upcomingPrayagBasis =
+          prayag?.upcomingMrp == null
+            ? null
+            : isLenRow
+              ? normalizePerMetre({
+                  description: prayag.productName,
+                  size: null,
+                  unit: null,
+                  price: prayag.upcomingMrp,
+                }).perMetre
+              : prayag.upcomingMrp;
+        const upcomingGap = resolveUpcomingCompetitiveGap({
+          currentPrayagPrice: prayagBasis,
+          currentCompetitorPrice: p.basisPrice,
+          currentGapPct: rawGap,
+          upcomingPrayagPrice: upcomingPrayagBasis,
+          upcomingPrayagEffectiveDate:
+            prayag?.upcomingEffectiveDate ?? null,
+          upcomingCompetitorPrice: p.upcomingBasisPrice,
+          upcomingCompetitorEffectiveDate: p.upcomingEffectiveDate,
+        });
         return {
           competitor: p.competitor,
           price: p.price,
@@ -1264,6 +1395,16 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           upcomingPrice: p.upcomingPrice,
           upcomingEffectiveDate: p.upcomingEffectiveDate,
           upcomingChangePct: p.upcomingChangePct,
+          upcomingGapDate: upcomingGap?.effectiveDate ?? null,
+          upcomingGapPrayagPrice: upcomingGap?.prayagPrice ?? null,
+          upcomingGapCompetitorPrice:
+            upcomingGap?.competitorPrice ?? null,
+          upcomingGapPct:
+            upcomingGap == null
+              ? null
+              : Math.round(upcomingGap.gapPct * 10) / 10,
+          upcomingGapDirection: upcomingGap?.direction ?? null,
+          upcomingGapIsReversal: upcomingGap?.isReversal ?? false,
           newerRevisionAwaitingReview: p.newerRevisionAwaitingReview,
           newerRevisionEffectiveDate: p.newerRevisionEffectiveDate,
           newerRevisionReviewStatus: p.newerRevisionReviewStatus,
@@ -1650,8 +1791,21 @@ router.patch("/catalog/competitor-prices/:id", requireAdmin, async (req: Request
     return;
   }
 
-  const windows = await getAllCompetitorWindows();
-  res.json(buildComparisonRow(row, maps, windows.get(row.id)));
+  const revisionRows = await db.select().from(competitorPricesTable);
+  const windows = getCompetitorWindows(revisionRows);
+  const matchedWindows = getCompetitorWindows(
+    revisionRows.filter((revision) => revision.matchStatus === "matched"),
+  );
+  const pendingRevisions = getPendingRevisions(revisionRows);
+  res.json(
+    buildComparisonRow(
+      row,
+      maps,
+      windows.get(row.id),
+      matchedWindows.get(row.id),
+      pendingRevisions.get(row.id),
+    ),
+  );
 });
 
 // GET /catalog/mapping-review/export — full filtered review list as CSV/XLSX.

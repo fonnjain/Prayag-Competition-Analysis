@@ -78,6 +78,87 @@ export function prayagCheaperForGap(gapPct: number | null): boolean | null {
   return gapPct == null ? null : gapPct > 0;
 }
 
+export type UpcomingGapDirection =
+  | "Prayag becomes cheaper"
+  | "Prayag remains cheaper"
+  | "Prayag becomes more expensive"
+  | "Prayag remains more expensive"
+  | "Prayag reaches parity";
+
+export interface UpcomingCompetitiveGap {
+  effectiveDate: string;
+  prayagPrice: number;
+  competitorPrice: number;
+  gapPct: number;
+  direction: UpcomingGapDirection;
+  isReversal: boolean;
+}
+
+/**
+ * Resolve both prices at the nearest future date on either stream.
+ *
+ * The unchanged side deliberately keeps its current in-force price. This avoids
+ * the invalid comparison of one side's future price against the other side at
+ * a different date.
+ */
+export function resolveUpcomingCompetitiveGap(input: {
+  currentPrayagPrice: number | null;
+  currentCompetitorPrice: number | null;
+  currentGapPct: number | null;
+  upcomingPrayagPrice: number | null;
+  upcomingPrayagEffectiveDate: string | null;
+  upcomingCompetitorPrice: number | null;
+  upcomingCompetitorEffectiveDate: string | null;
+}): UpcomingCompetitiveGap | null {
+  const dates = [
+    input.upcomingPrayagEffectiveDate,
+    input.upcomingCompetitorEffectiveDate,
+  ].filter((date): date is string => date != null);
+  if (
+    dates.length === 0 ||
+    input.currentPrayagPrice == null ||
+    input.currentCompetitorPrice == null ||
+    input.currentGapPct == null
+  ) {
+    return null;
+  }
+
+  const effectiveDate = dates.sort()[0]!;
+  const prayagPrice =
+    input.upcomingPrayagEffectiveDate === effectiveDate &&
+    input.upcomingPrayagPrice != null
+      ? input.upcomingPrayagPrice
+      : input.currentPrayagPrice;
+  const competitorPrice =
+    input.upcomingCompetitorEffectiveDate === effectiveDate &&
+    input.upcomingCompetitorPrice != null
+      ? input.upcomingCompetitorPrice
+      : input.currentCompetitorPrice;
+  const gapPct = marketGapPct(prayagPrice, competitorPrice);
+  if (gapPct == null) return null;
+
+  const isReversal = input.currentGapPct * gapPct < 0;
+  const direction: UpcomingGapDirection =
+    Math.abs(gapPct) < 0.05
+      ? "Prayag reaches parity"
+      : gapPct > 0
+        ? input.currentGapPct <= 0
+          ? "Prayag becomes cheaper"
+          : "Prayag remains cheaper"
+        : input.currentGapPct >= 0
+          ? "Prayag becomes more expensive"
+          : "Prayag remains more expensive";
+
+  return {
+    effectiveDate,
+    prayagPrice,
+    competitorPrice,
+    gapPct,
+    direction,
+    isReversal,
+  };
+}
+
 export interface PrayagInfo {
   mrp: number | null;
   division: string | null;

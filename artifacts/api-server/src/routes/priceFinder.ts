@@ -7,6 +7,10 @@ import {
   validToFromNextDate,
   validToFromNextDateOrDiscontinuation,
 } from "../lib/priceWindow.js";
+import {
+  marketGapPct,
+  resolveUpcomingCompetitiveGap,
+} from "../lib/analysis.js";
 
 const router: IRouter = Router();
 
@@ -189,6 +193,17 @@ async function buildPriceFinderComparison(
         difference != null && prayagPrice && prayagPrice > 0
           ? (difference / prayagPrice) * 100
           : null;
+      const upcomingGap = resolveUpcomingCompetitiveGap({
+        currentPrayagPrice: prayagPrice,
+        currentCompetitorPrice: price,
+        currentGapPct: differencePct,
+        upcomingPrayagPrice: prayagNextPrice,
+        upcomingPrayagEffectiveDate: product.prayag_next_date,
+        upcomingCompetitorPrice: normalizeComparisonPrice(
+          priceRow?.next_price ?? null,
+        ),
+        upcomingCompetitorEffectiveDate: priceRow?.next_date ?? null,
+      });
       return {
         competitor,
         price,
@@ -200,6 +215,12 @@ async function buildPriceFinderComparison(
         differencePct,
         cheaperSide:
           difference == null ? null : Math.abs(difference) < 0.005 ? "parity" : difference > 0 ? "Prayag" : competitor,
+        upcomingGapDate: upcomingGap?.effectiveDate ?? null,
+        upcomingGapPrayagPrice: upcomingGap?.prayagPrice ?? null,
+        upcomingGapCompetitorPrice: upcomingGap?.competitorPrice ?? null,
+        upcomingGapPct: upcomingGap?.gapPct ?? null,
+        upcomingGapDirection: upcomingGap?.direction ?? null,
+        upcomingGapIsReversal: upcomingGap?.isReversal ?? false,
       };
     });
     return {
@@ -910,6 +931,7 @@ router.get(
         SELECT DISTINCT cp.competitor
         FROM competitor_prices cp
         WHERE cp.matched_prayag_code = ${product.item_code}
+          AND cp.match_status = 'matched'
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
       ) brands
@@ -918,6 +940,7 @@ router.get(
         FROM competitor_prices cp
         WHERE cp.competitor = brands.competitor
           AND cp.matched_prayag_code = ${product.item_code}
+          AND cp.match_status = 'matched'
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
         ORDER BY cp.effective_date DESC, cp.id DESC
@@ -928,6 +951,7 @@ router.get(
         FROM competitor_prices cp
         WHERE cp.competitor = brands.competitor
           AND cp.matched_prayag_code = ${product.item_code}
+          AND cp.match_status = 'matched'
           AND cp.price IS NOT NULL
           AND cp.effective_date > CURRENT_DATE
         ORDER BY cp.effective_date ASC, cp.id DESC
@@ -939,10 +963,16 @@ router.get(
     const prayagMrp = product.current_mrp;
     const competitorItems = competitors.rows
       .map((row) => {
-        const gapPct =
-          prayagMrp != null && prayagMrp > 0
-            ? ((row.price - prayagMrp) / prayagMrp) * 100
-            : null;
+        const gapPct = marketGapPct(prayagMrp, row.price);
+        const upcomingGap = resolveUpcomingCompetitiveGap({
+          currentPrayagPrice: prayagMrp,
+          currentCompetitorPrice: row.price,
+          currentGapPct: gapPct,
+          upcomingPrayagPrice: product.upcoming_mrp,
+          upcomingPrayagEffectiveDate: product.upcoming_effective_date,
+          upcomingCompetitorPrice: row.upcoming_price,
+          upcomingCompetitorEffectiveDate: row.upcoming_effective_date,
+        });
         let message: string | null = null;
         if (gapPct != null) {
           const absGap = Math.abs(gapPct);
@@ -964,6 +994,12 @@ router.get(
           upcomingChangePct: priceChangePct(row.price, row.upcoming_price),
           gapPct,
           message,
+          upcomingGapDate: upcomingGap?.effectiveDate ?? null,
+          upcomingGapPrayagPrice: upcomingGap?.prayagPrice ?? null,
+          upcomingGapCompetitorPrice: upcomingGap?.competitorPrice ?? null,
+          upcomingGapPct: upcomingGap?.gapPct ?? null,
+          upcomingGapDirection: upcomingGap?.direction ?? null,
+          upcomingGapIsReversal: upcomingGap?.isReversal ?? false,
         };
       })
       .sort((a, b) => (a.gapPct ?? Number.POSITIVE_INFINITY) - (b.gapPct ?? Number.POSITIVE_INFINITY));

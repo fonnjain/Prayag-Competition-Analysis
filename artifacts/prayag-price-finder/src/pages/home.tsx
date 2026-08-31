@@ -22,7 +22,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { formatPriceDate, PriceWindowDetails } from "@/components/price-window";
+import {
+  formatPriceDate,
+  PriceWindowDetails,
+  UpcomingGapDetails,
+} from "@/components/price-window";
 import { buildSpokenPriceSummary } from "@/lib/priceSpeech";
 import { getPriceFinderSearchDisplay } from "@/lib/priceFinderSearchState";
 import { useSelection } from "@/lib/useSelection";
@@ -1295,6 +1299,16 @@ function ProductView({
                         <p className="text-[10px] text-muted-foreground mt-1">
                           Current gap
                         </p>
+                        <UpcomingGapDetails
+                          compact
+                          effectiveDate={comp.upcomingGapDate}
+                          prayagPrice={comp.upcomingGapPrayagPrice}
+                          competitorPrice={comp.upcomingGapCompetitorPrice}
+                          gapPct={comp.upcomingGapPct}
+                          direction={comp.upcomingGapDirection}
+                          isReversal={comp.upcomingGapIsReversal}
+                          className="max-w-[260px] text-left"
+                        />
                       </div>
                     </div>
                   );

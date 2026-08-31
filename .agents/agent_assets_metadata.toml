@@ -88,3 +88,10 @@ uri = "file://reports/legacy-mrp-provenance-audit-2026-08-31.csv"
 type = "table"
 title = "Legacy MRP provenance audit"
 description = "Read-only production inventory of all 148 pre-provenance MRP rows, including item code, variant, dates, division, source file, review state, and existing event evidence. Prices are intentionally omitted."
+
+[[outputs]]
+id = "WmiwWSPl6hOrZly6RcfuQ"
+uri = "file://reports/upcoming-competitive-gap-2026-09-01.md"
+type = "text"
+title = "Upcoming Competitive Gap — 01 September 2026"
+description = "Read-only production report covering 150 Sparsh Pearl mappings, 31 unfavourable reversals, and representative products."

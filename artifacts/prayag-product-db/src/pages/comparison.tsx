@@ -19,7 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { formatDisplayDate } from "@/lib/date-format";
-import { PriceWindowDetails } from "@/components/price-window";
+import { PriceWindowDetails, UpcomingGapDetails } from "@/components/price-window";
 
 const PAGE_SIZE = 50;
 
@@ -596,6 +596,16 @@ export default function ComparisonPage() {
                                   <DiffBadge diffPct={cell.diffPct} prayagCheaper={cell.diffPct != null ? cell.diffPct > 0 : null} />
                                 )}
                               </div>
+                               <UpcomingGapDetails
+                                 compact
+                                 effectiveDate={cell.upcomingGapDate}
+                                 prayagPrice={cell.upcomingGapPrayagPrice}
+                                 competitorPrice={cell.upcomingGapCompetitorPrice}
+                                 gapPct={cell.upcomingGapPct}
+                                 direction={cell.upcomingGapDirection}
+                                 isReversal={cell.upcomingGapIsReversal}
+                                 className="ml-auto max-w-[240px] text-left"
+                               />
                             </td>
                           );
                         })}
@@ -770,6 +780,16 @@ export default function ComparisonPage() {
                               prayagCheaper={row.effectivePrayagCheaper}
                             />
                           )}
+                           <UpcomingGapDetails
+                             compact
+                             effectiveDate={row.upcomingGapDate}
+                             prayagPrice={row.upcomingGapPrayagPrice}
+                             competitorPrice={row.upcomingGapCompetitorPrice}
+                             gapPct={row.upcomingGapPct}
+                             direction={row.upcomingGapDirection}
+                             isReversal={row.upcomingGapIsReversal}
+                             className="ml-auto max-w-[240px] text-left"
+                           />
                         </td>
                       </tr>
                     );

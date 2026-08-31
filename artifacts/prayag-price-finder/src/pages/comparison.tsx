@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useSelection } from "@/lib/useSelection";
-import { formatPriceDate } from "@/components/price-window";
+import { formatPriceDate, UpcomingGapDetails } from "@/components/price-window";
 import {
   comparisonStateFromParams,
   hasUnsupportedParams,
@@ -244,6 +244,16 @@ export default function ComparisonPage() {
                                    <div className="text-muted-foreground mt-0.5 font-medium">from {formatPriceDate(compData.upcomingEffectiveDate)}</div>
                                </div>
                              )}
+                              <UpcomingGapDetails
+                                compact
+                                effectiveDate={compData.upcomingGapDate}
+                                prayagPrice={compData.upcomingGapPrayagPrice}
+                                competitorPrice={compData.upcomingGapCompetitorPrice}
+                                gapPct={compData.upcomingGapPct}
+                                direction={compData.upcomingGapDirection}
+                                isReversal={compData.upcomingGapIsReversal}
+                                className="ml-auto max-w-[240px] text-left"
+                              />
                            </td>
                          )
                        })}

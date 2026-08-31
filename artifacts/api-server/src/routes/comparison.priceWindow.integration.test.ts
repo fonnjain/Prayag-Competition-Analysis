@@ -19,6 +19,10 @@ const COMPETITOR = `Comparison Window ${RUN}`;
 const WITHDRAWN_COMPETITOR = `Withdrawn Comparison Window ${RUN}`;
 const REVIEW_COMPETITOR = `Review Window ${RUN}`;
 const EDGE_COMPETITOR = `Comparison Edge Window ${RUN}`;
+const REVERSAL_COMPETITOR = `Comparison Reversal ${RUN}`;
+const PENDING_COMPETITOR = `Comparison Pending ${RUN}`;
+const TINY_GAP_COMPETITOR = `Comparison Tiny Gap ${RUN}`;
+const MUTATION_COMPETITOR = `Comparison Mutation ${RUN}`;
 
 function dateOffset(days: number): string {
   const date = new Date();
@@ -32,6 +36,7 @@ const PLACEHOLDER_DATE = dateOffset(-5);
 const NEXT_DATE = dateOffset(10);
 let historicalCompetitorRowId = 0;
 let futureCompetitorRowId = 0;
+let mutationCurrentRowId = 0;
 
 const app = express();
 app.use(express.json());
@@ -241,6 +246,102 @@ beforeAll(async () => {
       effectiveDate: NEXT_DATE,
       isCurrent: false,
     },
+    {
+      competitor: REVERSAL_COMPETITOR,
+      description: "Current reversal price",
+      category: "Comparison",
+      price: 160,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: REVERSAL_COMPETITOR,
+      description: "Future reversal price",
+      category: "Comparison",
+      price: 140,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      effectiveDate: NEXT_DATE,
+      isCurrent: false,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: PENDING_COMPETITOR,
+      description: "Confirmed current price before pending revision",
+      category: "Comparison",
+      price: 170,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: PENDING_COMPETITOR,
+      description: "Pending future price must not drive upcoming gap",
+      category: "Comparison",
+      price: 100,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "needs_review",
+      matchConfidence: "Medium",
+      effectiveDate: NEXT_DATE,
+      isCurrent: false,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: TINY_GAP_COMPETITOR,
+      description: "Tiny positive current gap",
+      category: "Comparison",
+      price: 150.06,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: TINY_GAP_COMPETITOR,
+      description: "Negative future gap after tiny positive gap",
+      category: "Comparison",
+      price: 160,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "matched",
+      matchConfidence: "High",
+      effectiveDate: NEXT_DATE,
+      isCurrent: false,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: MUTATION_COMPETITOR,
+      description: "Current mapping awaiting acceptance",
+      category: "Comparison",
+      price: 170,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "needs_review",
+      matchConfidence: "Medium",
+      effectiveDate: CURRENT_DATE,
+      isCurrent: true,
+      priceBasis: "MRP",
+    },
+    {
+      competitor: MUTATION_COMPETITOR,
+      description: "Later mapping remains pending",
+      category: "Comparison",
+      price: 100,
+      matchedPrayagCode: ITEM_CODE,
+      matchStatus: "needs_review",
+      matchConfidence: "Medium",
+      effectiveDate: NEXT_DATE,
+      isCurrent: false,
+      priceBasis: "MRP",
+    },
   ]).returning();
   historicalCompetitorRowId = insertedCompetitorRows.find(
     (row) =>
@@ -253,6 +354,11 @@ beforeAll(async () => {
       row.competitor === COMPETITOR &&
       row.effectiveDate === NEXT_DATE &&
       row.matchedPrayagCode === ITEM_CODE,
+  )!.id;
+  mutationCurrentRowId = insertedCompetitorRows.find(
+    (row) =>
+      row.competitor === MUTATION_COMPETITOR &&
+      row.effectiveDate === CURRENT_DATE,
   )!.id;
 });
 
@@ -269,6 +375,18 @@ afterAll(async () => {
   await db
     .delete(competitorPricesTable)
     .where(eq(competitorPricesTable.competitor, EDGE_COMPETITOR));
+  await db
+    .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, REVERSAL_COMPETITOR));
+  await db
+    .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, PENDING_COMPETITOR));
+  await db
+    .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, TINY_GAP_COMPETITOR));
+  await db
+    .delete(competitorPricesTable)
+    .where(eq(competitorPricesTable.competitor, MUTATION_COMPETITOR));
   await db
     .delete(mrpPriceHistoryTable)
     .where(eq(mrpPriceHistoryTable.itemCode, ITEM_CODE));
@@ -321,6 +439,21 @@ describe("comparison current price windows", () => {
         }),
       ]),
     );
+    expect(row.competitors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          competitor: REVERSAL_COMPETITOR,
+          price: 160,
+          diffPct: 6.7,
+          upcomingGapDate: NEXT_DATE,
+          upcomingGapPrayagPrice: 165,
+          upcomingGapCompetitorPrice: 140,
+          upcomingGapPct: -15.2,
+          upcomingGapDirection: "Prayag becomes more expensive",
+          upcomingGapIsReversal: true,
+        }),
+      ]),
+    );
   });
 
   it("does not surface a product whose first Prayag MRP is still future-dated", async () => {
@@ -329,6 +462,56 @@ describe("comparison current price windows", () => {
     );
     expect(response.status).toBe(200);
     expect(response.body.rows).toEqual([]);
+  });
+
+  it("keeps pending competitor revisions out of the official upcoming gap", async () => {
+    const response = await request.get(
+      `/catalog/comparison?competitor=${encodeURIComponent(PENDING_COMPETITOR)}&pageSize=20`,
+    );
+    expect(response.status).toBe(200);
+    const row = response.body.rows.find(
+      (candidate: { competitor: string; matchStatus: string }) =>
+        candidate.competitor === PENDING_COMPETITOR &&
+        candidate.matchStatus === "matched",
+    );
+    expect(row).toMatchObject({
+      competitorPrice: 170,
+      diffPct: 13.3,
+      upcomingGapDate: NEXT_DATE,
+      upcomingGapPrayagPrice: 165,
+      upcomingGapCompetitorPrice: 170,
+      upcomingGapPct: 3,
+      upcomingGapDirection: "Prayag remains cheaper",
+      upcomingGapIsReversal: false,
+      newerRevisionAwaitingReview: true,
+    });
+  });
+
+  it("detects a real reversal before rounding a tiny current gap for display", async () => {
+    const response = await request.get(
+      `/catalog/comparison?competitor=${encodeURIComponent(TINY_GAP_COMPETITOR)}&pageSize=20`,
+    );
+    expect(response.status).toBe(200);
+    const row = response.body.rows.find(
+      (candidate: {
+        competitor: string;
+        matchStatus: string;
+        competitorPrice: number;
+      }) =>
+        candidate.competitor === TINY_GAP_COMPETITOR &&
+        candidate.matchStatus === "matched" &&
+        candidate.competitorPrice === 150.06,
+    );
+    expect(row).toMatchObject({
+      competitorPrice: 150.06,
+      diffPct: 0,
+      upcomingGapDate: NEXT_DATE,
+      upcomingGapPrayagPrice: 165,
+      upcomingGapCompetitorPrice: 160,
+      upcomingGapPct: -3,
+      upcomingGapDirection: "Prayag becomes more expensive",
+      upcomingGapIsReversal: true,
+    });
   });
 
   it("does not surface a product on or after its scheduled withdrawal date", async () => {
@@ -557,6 +740,30 @@ describe("comparison current price windows", () => {
       upcomingCompetitorPrice: null,
     });
     expect(response.body.diffPct).toBeNull();
+  });
+
+  it("keeps a later pending revision out of a newly accepted mapping response", async () => {
+    const response = await request
+      .patch(`/catalog/competitor-prices/${mutationCurrentRowId}`)
+      .send({
+        matchedPrayagCode: ITEM_CODE,
+        matchStatus: "matched",
+        matchConfidence: "High",
+      });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      id: mutationCurrentRowId,
+      competitorPrice: 170,
+      diffPct: 13.3,
+      upcomingGapDate: NEXT_DATE,
+      upcomingGapPrayagPrice: 165,
+      upcomingGapCompetitorPrice: 170,
+      upcomingGapPct: 3,
+      upcomingGapDirection: "Prayag remains cheaper",
+      upcomingGapIsReversal: false,
+      newerRevisionAwaitingReview: true,
+      newerRevisionEffectiveDate: NEXT_DATE,
+    });
   });
 
   it("returns the actual window when historical mappings are bulk-updated", async () => {
