@@ -81,3 +81,10 @@ uri = "file://attached_assets/Prayag_Salespeople_Users_1787843162726.xlsx"
 type = "table"
 title = "Prayag Salespeople Users Workbook"
 description = "The 182-row salesperson workbook for the controlled production user import."
+
+[[outputs]]
+id = "7y2rw9yYKeFQ0gKCqSCJu"
+uri = "file://reports/legacy-mrp-provenance-audit-2026-08-31.csv"
+type = "table"
+title = "Legacy MRP provenance audit"
+description = "Read-only production inventory of all 148 pre-provenance MRP rows, including item code, variant, dates, division, source file, review state, and existing event evidence. Prices are intentionally omitted."
