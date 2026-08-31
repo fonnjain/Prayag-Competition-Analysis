@@ -51,9 +51,36 @@ const upload = multer({
 const NET_KEYWORDS = ["net", "rate", "dealer", "scheme", "billing", "discount"];
 const MRP_KEYWORDS = ["mrp", "list", "retail", "price", "cost"];
 
-// Headers that identify packing-quantity columns — these must never be used as
-// the price column when loading Prayag MRP (they hold pcs/box, not ₹/item).
-const PACKING_EXCLUDE_KEYWORDS = ["box", " pcs", "s.box", "m.box", "packing", "carton", "pcs/", "/pcs"];
+// Headers that identify packing, quantity, or measurement columns — these must
+// never be used as the price column when loading Prayag MRP. A nearby numeric
+// weight or pcs/box value is a particularly dangerous fallback because it
+// looks like a valid price to the spreadsheet parser.
+const PACKING_EXCLUDE_KEYWORDS = [
+  "pack",
+  "packing",
+  "box",
+  "pcs",
+  "piece",
+  "pieces",
+  "carton",
+  "case",
+  "quantity",
+  "qty",
+  "count",
+  "weight",
+  "mass",
+  "size",
+  "dimension",
+  "dimensions",
+  "length",
+  "width",
+  "height",
+  "depth",
+  "diameter",
+  "dia",
+  "capacity",
+  "volume",
+];
 
 // Sheet names that hold packing data — skip entirely when loading Prayag MRP.
 const PACKING_SHEET_RE = /\bpacking\b/i;
@@ -99,6 +126,7 @@ interface ParseResult {
   priceColHeader: string;
   skippedRows: SkippedRow[];
   hasHeaderPeriods: boolean;
+  warnings: string[];
 }
 
 interface DiscontinuationCorrectionManifest {
@@ -316,13 +344,23 @@ function parseSheet(
       priceColHeader: "",
       skippedRows: [],
       hasHeaderPeriods: false,
+      warnings: [],
     };
   }
 
-  // Price column: header keyword, else first mostly-numeric column.
-  // Columns whose headers indicate packing quantities are always excluded.
-  const isPackingHeader = (h: string) =>
-    PACKING_EXCLUDE_KEYWORDS.some((k) => h.includes(k));
+  // Price column: require an explicit price header. Never fall back to the
+  // first mostly-numeric column: in PEA-style sheets that is often weight,
+  // pack size, or pcs/box rather than MRP.
+  // Columns whose headers indicate packing quantities or measurements are
+  // always excluded, even when they also contain a price-like word.
+  const isPackingHeader = (h: string) => {
+    const normalizedHeader = h.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const headerTokens = new Set(normalizedHeader.split(/\s+/).filter(Boolean));
+    return PACKING_EXCLUDE_KEYWORDS.some((keyword) =>
+      headerTokens.has(keyword),
+    );
+  };
+  const warnings: string[] = [];
 
   let netCol = -1;
   // Two-pass MRP scan: pass 1 looks for "new mrp" / "new" + mrp keyword (preferred);
@@ -350,39 +388,6 @@ function parseSheet(
   const bestMrpCol = newMrpCol !== -1 ? newMrpCol : mrpCol !== -1 ? mrpCol : oldMrpCol;
   let priceCol = bestMrpCol !== -1 ? bestMrpCol : netCol;
   let basis = bestMrpCol !== -1 ? "MRP" : netCol !== -1 ? "Net" : "Verify";
-  if (priceCol === -1) {
-    for (let c = 0; c < maxCols; c++) {
-      if (c === codeCol) continue;
-      if (isPackingHeader(headers[c] ?? "")) continue;  // skip packing columns in fallback too
-      let numericCount = 0;
-      for (let r = 0; r < grid.length; r++) {
-        if (r === headerRow) continue;
-        const v = grid[r]?.[c];
-        if (v != null && v !== "" && !isNaN(Number(v))) numericCount++;
-      }
-      if (numericCount > grid.length / 3) {
-        priceCol = c;
-        basis = "Verify";
-        break;
-      }
-    }
-  }
-  if (priceCol === -1) {
-    return {
-      rows: [],
-      sourcePriceObservations: [],
-      basis: "Verify",
-      codeCol,
-      priceCol: -1,
-      nameCol: -1,
-      categoryCol: -1,
-      codeColHeader: rawHeaders[codeCol] ?? String(codeCol),
-      priceColHeader: "",
-      skippedRows: [],
-      hasHeaderPeriods: false,
-    };
-  }
-
   // Name column: look for description/product-name keywords.
   const NAME_KEYWORDS = ["description", "product name", "product", "name", "item name", "particulars", "article", "details", "item description"];
   let nameCol = -1;
@@ -466,6 +471,7 @@ function parseSheet(
       priceColHeader: datedPriceCols.map(({ col }) => rawHeaders[col]).join(", "),
       skippedRows: datedSkipped,
       hasHeaderPeriods: true,
+      warnings,
     };
   }
 
@@ -534,6 +540,27 @@ function parseSheet(
       priceColHeader: "Variant MRP",
       skippedRows: variantSkipped,
       hasHeaderPeriods: false,
+      warnings,
+    };
+  }
+
+  if (priceCol === -1) {
+    warnings.push(
+      "No explicit MRP, price, Net, or rate column was found. Numeric pack, weight, quantity, or dimension columns were not selected as prices; add a clearly labelled price column and re-upload.",
+    );
+    return {
+      rows: [],
+      sourcePriceObservations: [],
+      basis: "Verify",
+      codeCol,
+      priceCol: -1,
+      nameCol,
+      categoryCol,
+      codeColHeader,
+      priceColHeader: "",
+      skippedRows: [],
+      hasHeaderPeriods: false,
+      warnings,
     };
   }
 
@@ -602,6 +629,7 @@ function parseSheet(
     priceColHeader,
     skippedRows,
     hasHeaderPeriods: false,
+    warnings,
   };
 }
 
@@ -618,6 +646,7 @@ interface LoadSummary {
   skippedDuplicates: number;
   skippedUnparseable: number;
   unmatchedCodes: string[];
+  warnings: string[];
   /** Number of rows whose MRP is below ₹50 — near zero is expected for most categories;
    *  a high count almost certainly means a packing-quantity column was imported. */
   lowMrpCount: number;
@@ -682,6 +711,7 @@ export function parseWorkbookBuffer(
   skippedUnparseable: number;
   skippedRows: SkippedRow[];
   hasHeaderPeriods: boolean;
+  warnings: string[];
 } {
   const wb = XLSX.read(buffer, { type: "buffer" });
   let rows: ParsedRow[] = [];
@@ -692,6 +722,7 @@ export function parseWorkbookBuffer(
   let hasCategoryCol = false;
   let skippedUnparseable = 0;
   const skippedRows: SkippedRow[] = [];
+  const warnings = new Set<string>();
   const sourcePriceObservations: SourcePriceObservation[] = [];
   const workbookHasHeaderPeriods = wb.SheetNames
     .filter((name) => !PACKING_SHEET_RE.test(name))
@@ -721,6 +752,7 @@ export function parseWorkbookBuffer(
     const parsed = parseSheet(grid, knownCodes, workbookHasHeaderPeriods);
     skippedUnparseable += parsed.skippedRows.length;
     skippedRows.push(...parsed.skippedRows);
+    parsed.warnings.forEach((warning) => warnings.add(warning));
     sourcePriceObservations.push(...parsed.sourcePriceObservations);
     if (parsed.nameCol !== -1) hasNameCol = true;
     if (parsed.categoryCol !== -1) hasCategoryCol = true;
@@ -747,6 +779,7 @@ export function parseWorkbookBuffer(
     skippedUnparseable,
     skippedRows,
     hasHeaderPeriods: workbookHasHeaderPeriods,
+    warnings: [...warnings],
   };
 }
 
@@ -877,6 +910,7 @@ async function persistParsedRows(
   codeColHeader: string,
   priceColHeader: string,
   skippedUnparseable: number,
+  warnings: string[],
   reviewBatchId: string,
   loadBatchId: number,
 ): Promise<LoadSummary> {
@@ -917,6 +951,7 @@ async function persistParsedRows(
       skippedDuplicates: 0,
       skippedUnparseable,
       unmatchedCodes: [],
+      warnings,
       lowMrpCount: 0,
       flaggedMrpCount: 0,
       flaggedRows: [],
@@ -943,6 +978,7 @@ async function persistParsedRows(
     skippedDuplicates: 0,
     skippedUnparseable,
     unmatchedCodes: [],
+    warnings,
     lowMrpCount,
     flaggedMrpCount: 0,
     flaggedRows: [],
@@ -1396,6 +1432,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           parsed.codeColHeader,
           parsed.priceColHeader,
           parsed.skippedUnparseable,
+          parsed.warnings,
           reviewBatchId,
           loadBatchId,
         );
@@ -1418,6 +1455,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         skippedDuplicates: fileSummaries.reduce((s, f) => s + f.skippedDuplicates, 0),
         skippedUnparseable: fileSummaries.reduce((s, f) => s + f.skippedUnparseable, 0),
         unmatchedCodes: fileSummaries.flatMap((f) => f.unmatchedCodes),
+        warnings: [...new Set(fileSummaries.flatMap((f) => f.warnings))],
         lowMrpCount: fileSummaries.reduce((s, f) => s + f.lowMrpCount, 0),
         flaggedMrpCount: fileSummaries.reduce((s, f) => s + f.flaggedMrpCount, 0),
         flaggedRows: fileSummaries.flatMap((f) => f.flaggedRows),
@@ -1472,6 +1510,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           parsed.codeColHeader,
           parsed.priceColHeader,
           parsed.skippedUnparseable,
+          parsed.warnings,
           reviewBatchId,
           loadBatchId,
         ),
@@ -1489,6 +1528,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           skippedDuplicates: summaries.reduce((total, row) => total + row.skippedDuplicates, 0),
           skippedUnparseable: summaries.reduce((total, row) => total + row.skippedUnparseable, 0),
           unmatchedCodes: summaries.flatMap((row) => row.unmatchedCodes),
+          warnings: [...new Set(summaries.flatMap((row) => row.warnings))],
           lowMrpCount: summaries.reduce((total, row) => total + row.lowMrpCount, 0),
           flaggedMrpCount: summaries.reduce((total, row) => total + row.flaggedMrpCount, 0),
           flaggedRows: summaries.flatMap((row) => row.flaggedRows),

@@ -170,12 +170,16 @@ export default function LoadMrpPage() {
         title:
           data.results.kind === "discontinuation-correction"
             ? "Correction applied"
+            : data.results.warnings?.length > 0
+            ? "Upload needs attention"
             : data.results.flaggedMrpCount > 0
             ? "Review required"
             : "Upload successful",
         description:
           data.results.kind === "discontinuation-correction"
             ? data.results.message
+            : data.results.warnings?.length > 0
+            ? data.results.warnings[0]
             : data.results.flaggedMrpCount > 0
             ? `${data.results.flaggedMrpCount} suspicious price row(s) are blocked until you confirm them.`
             : `Imported ${data.results.totalRows} rows successfully.`,
@@ -541,6 +545,18 @@ export default function LoadMrpPage() {
               <div className="bg-muted/40 rounded px-3 py-2">
                 <span className="text-muted-foreground">Basis: </span>
                 <span className="font-medium">{result.basis || "—"}</span>
+              </div>
+            </div>
+          )}
+
+          {result.warnings?.length > 0 && (
+            <div className="flex items-start gap-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold">Price column needs attention</p>
+                {result.warnings.map((warning: string) => (
+                  <p key={warning} className="mt-1">{warning}</p>
+                ))}
               </div>
             </div>
           )}

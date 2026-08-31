@@ -28,6 +28,29 @@ function datedWorkbookBuffer(): Buffer {
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
+function peaWorkbookBuffer(includeExplicitMrp: boolean): Buffer {
+  const workbook = XLSX.utils.book_new();
+  const headers = [
+    "Item Code",
+    "Product Name",
+    "Pack",
+    "Weight (kg)",
+    "Quantity",
+    "Dimension (mm)",
+    ...(includeExplicitMrp ? ["MRP"] : []),
+  ];
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      headers,
+      ["PEA-64B", "PEA fixture 64B", 8, 0.64, 24, 64, ...(includeExplicitMrp ? [1480] : [])],
+      ["PEA-55B", "PEA fixture 55B", 10, 0.55, 20, 55, ...(includeExplicitMrp ? [1320] : [])],
+    ]),
+    "PRICES",
+  );
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
 function wrongAuthoritativeWorkbookBuffer(): Buffer {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
@@ -124,6 +147,36 @@ describe("MRP loader period and duplicate safeguards", () => {
     expect([...new Set(parsed.rows.map((row) => row.effectiveDate))].sort()).toEqual([
       "2026-03-05",
       "2026-09-01",
+    ]);
+  });
+
+  it("rejects PEA-style pack, weight, quantity, and dimension columns as prices", () => {
+    const parsed = parseWorkbookBuffer(
+      peaWorkbookBuffer(false),
+      new Set(["PEA-64B", "PEA-55B"]),
+    );
+
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.priceColHeader).toBe("");
+    expect(parsed.warnings).toEqual([
+      expect.stringMatching(/explicit MRP, price, Net, or rate column/i),
+    ]);
+    expect(parsed.warnings[0]).toMatch(/pack, weight, quantity, or dimension columns/i);
+  });
+
+  it("uses an explicit MRP column for PEA-style rows instead of nearby measurements", () => {
+    const parsed = parseWorkbookBuffer(
+      peaWorkbookBuffer(true),
+      new Set(["PEA-64B", "PEA-55B"]),
+    );
+
+    expect(parsed.priceColHeader).toBe("MRP");
+    expect(parsed.warnings).toEqual([]);
+    expect(
+      parsed.rows.map((row) => ({ itemCode: row.itemCode, mrp: row.price })),
+    ).toEqual([
+      { itemCode: "PEA-64B", mrp: 1480 },
+      { itemCode: "PEA-55B", mrp: 1320 },
     ]);
   });
 
