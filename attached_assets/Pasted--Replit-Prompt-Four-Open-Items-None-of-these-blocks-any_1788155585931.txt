@@ -1,0 +1,107 @@
+# Replit Prompt — Four Open Items
+
+None of these blocks anything. All four have been deferred while the September load took priority, and all four are small. Do them in the order given — the first is the only one with real exposure.
+
+Task #140, the upcoming-gap display, is a separate piece of work with its own prompt and is not part of this.
+
+---
+
+## 1. The catalogue import has no admin restriction
+
+`routes/index.ts` mounts every router behind a single `requireAuth` that checks only `req.isAuthenticated()`. `adminUsers.ts` has its own `requireAdmin` testing `role !== "admin"`. The import routes do not.
+
+**Verify the current state first** — commits have landed since this was last looked at. Report what actually guards each router today before changing anything.
+
+If the gap is still open, apply the existing `requireAdmin` pattern to the routes that **write** catalogue or price data:
+
+- `catalogImportExportRouter` — MRP and catalogue import
+- `catalogSyncRouter`
+- `importBatchesRouter` — approve and commit
+- `apiKeysRouter` — issuing keys is an administrative act
+
+### Why this matters more than it did last month
+
+The Load MRP form is now the **official production data-load path**. Yesterday it wrote 6,226 rows to production. That reach currently belongs to every account with a login.
+
+This is about blast radius from an ordinary mistake, not distrust. Batch 154 showed what one wrong import does — 1,828 rows dated the upload day, correct prices silently overridden. That was development. The same form now writes production.
+
+### Two things to get right
+
+`catalogRouter` serves reads as well as writes. Do not put a blanket admin guard on it — that locks ordinary users out of the catalogue they need. Guard the write endpoints only, and **list which endpoints you classified as writes and which as reads** so the split can be checked.
+
+Enforce **server-side at the router**. A hidden menu item is not a control. Verify with a direct request from a non-admin session, no UI involved.
+
+---
+
+## 2. The PE-AL-PE extraction reads weight columns as prices
+
+`PEA-64B` loaded at **₹0.55** against a true ₹2,596. The source row is:
+
+```
+['32', 'PEA-64B', '723.88', '0.3', '0.552']
+```
+
+The loader took `0.552` — a weight. `PEA-325B` came out at 0.47 against 2,248. Seventy codes were affected.
+
+Prayag's authoritative file corrected the values, so the data is right today. **The loader is not.** The next Pipes & Fittings workbook will do it again.
+
+The exposure is any sheet where a numeric column sits to the right of a code column without a price header. Report which other sheets share that shape before fixing, so the fix covers them rather than just this one.
+
+The rule the MRP loader already applies elsewhere: a column is a price column only when its header says so or a dated header identifies the period. A bare numeric column adjacent to a code is not a price. And the existing guard rejecting `weight`, `kg`, `cost`, `packing` headers should have caught this — report why it did not.
+
+---
+
+## 3. `newCodes` undercounts by one
+
+Both the development and production loads reported **10 new products** where **11** were created. `EP-GANESHA` was created correctly but omitted from the summary.
+
+The list is computed from a catalog snapshot taken before the final write, so a code created in that window never appears. The data was right; the report was wrong.
+
+A code created without appearing in the summary is a **silent addition** — the wrong direction to err. Derive `newCodes` from the same final state as the before/after count, so the two cannot disagree.
+
+Same shape as the `row_count` versus live-linked-rows issue: a figure taken at the wrong point in the sequence.
+
+---
+
+## 4. 148 production rows have no `load_batch_id`
+
+Every one of the 6,226 rows from batch 15 is traced. **148 pre-existing rows are not** — they predate the provenance work.
+
+They are not from any recent load and nothing is wrong with their prices. But `nullLoadBatchCount` on Data Health should be reporting them, and while it reads non-zero it is not a useful alarm — a permanently non-zero counter gets ignored, and then a genuinely untraced row arrives and nobody notices.
+
+Report what those 148 are: which codes, which periods, which divisions, when they were created. Then either attach them to a synthetic "pre-provenance legacy" batch with a clear note, or state why they cannot be identified well enough to do so.
+
+Do not delete them and do not invent provenance. A batch honestly labelled *"origin unknown, predates provenance tracking"* is worth more than a fabricated one.
+
+---
+
+## Acceptance tests
+
+```
+1.  A non-admin authenticated session receives 403 from the MRP import,
+    catalogue sync, import-batch approve, and API key endpoints.
+2.  An admin session succeeds on all of the above.
+3.  A non-admin session can still read the catalogue, run a comparison and
+    use analysis — no regression for ordinary users.
+4.  An anonymous request returns 401, not 403.
+5.  A sheet with a bare numeric column to the right of a code column does not
+    produce a price from it; the row is reported instead.
+6.  A load creating N products reports exactly N in newCodes.
+7.  nullLoadBatchCount is zero, or the remaining rows are attached to a
+    clearly labelled legacy batch.
+8.  No price, gap or ranking value changes anywhere in this task.
+```
+
+Test 3 catches over-correction — locking ordinary users out of the catalogue would be worse than the gap. Test 8 is the guard: none of this should move a number.
+
+---
+
+## Report
+
+- What guards each router today, before and after.
+- Which endpoints you classified as writes, and which as reads.
+- Which other sheets share the bare-numeric-column shape, and why the existing header guard missed it.
+- What the 148 rows are, and how they were handled.
+- Confirmation that no price changed.
+
+One clean commit.
