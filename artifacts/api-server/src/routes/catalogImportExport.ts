@@ -1181,26 +1181,30 @@ async function persistParsedRows(
 }
 
 router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req, res) => {
-    const file = req.file;
+  const file = req.file;
   if (!file) {
     res.status(400).json({ error: "No file uploaded" });
     return;
   }
 
-      const effectiveDate = effectiveDateBody;
+  const effectiveDate =
+    typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
+      ? req.body.effectiveDate.trim()
+      : null;
 
   if (effectiveDate && !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
     res.status(400).json({ error: "effectiveDate must be YYYY-MM-DD" });
     return;
   }
 
-    const name = file.originalname;
-    const ext = name.toLowerCase().split(".").pop() ?? "";
+  const name = file.originalname;
+  const ext = name.toLowerCase().split(".").pop() ?? "";
   if (!["xlsx", "xls", "csv", "zip"].includes(ext)) {
     res.status(400).json({ error: "Upload an .xlsx, .xls, .csv, or .zip file" });
     return;
   }
 
+  let loadBatchId: number | null = null;
   try {
     const reviewBatchId = randomUUID();
     let authoritativeWorkbook = false;
@@ -1240,7 +1244,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
       authoritativeWorkbook = looksAuthoritative;
     }
     if (authoritativeWorkbook) {
-    const downloadedAt = req.body.downloadedAt;
+      const downloadedAt = req.body.downloadedAt;
       if (!isIsoDate(downloadedAt)) {
         res.status(400).json({
           error: "Enter the date this file was downloaded (YYYY-MM-DD).",
@@ -1365,7 +1369,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           : null,
       })
       .returning({ id: mrpLoadBatchesTable.id });
-    const loadBatchId = createdBatch[0]!.id;
+    loadBatchId = createdBatch[0]!.id;
     const provenance = {
       sourceDivision: source.division,
       sourceUrl: source.sheetUrl,
@@ -1374,15 +1378,13 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
       loadBatchId,
     };
 
-      const existingProducts = await db
-        .select({ itemCode: catalogProductsTable.itemCode })
-        .from(catalogProductsTable);
-      const knownCodes = new Set(
-        existingProducts.map((p) => normCode(p.itemCode)),
-      );
-      const canonical = new Map<string, string>(
-        existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
-      );
+    const existingProducts = await db
+      .select({ itemCode: catalogProductsTable.itemCode })
+      .from(catalogProductsTable);
+    const knownCodes = new Set(existingProducts.map((p) => normCode(p.itemCode)));
+    const canonical = new Map<string, string>(
+      existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
+    );
 
     // ------------------------------------------------------------------
     // ZIP: process every xlsx/xls/csv entry inside the archive, one at a
@@ -1410,6 +1412,9 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         .sort((a, b) => a.name.localeCompare(b.name));
 
       if (entries.length === 0) {
+        await db
+          .delete(mrpLoadBatchesTable)
+          .where(eq(mrpLoadBatchesTable.id, loadBatchId));
         res.status(400).json({
           error: "The ZIP file contains no .xlsx / .xls / .csv files.",
         });
@@ -1418,25 +1423,23 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
 
       const fileSummaries: LoadSummary[] = [];
       for (const entry of entries) {
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-      let parsed: ParsedCompetitorRow[] = [];
-    const summary: LoadSummary = summaries.length === 1
-      ? summaries[0]!
-      : {
-          ...summaries[0]!,
-          effectiveDate: periods.join(", "),
-          totalRows: summaries.reduce((total, row) => total + row.totalRows, 0),
-          matchedProducts: summaries.reduce((total, row) => total + row.matchedProducts, 0),
-          newProducts: summaries.reduce((total, row) => total + row.newProducts, 0),
-          newHistoryRows: summaries.reduce((total, row) => total + row.newHistoryRows, 0),
-          skippedDuplicates: summaries.reduce((total, row) => total + row.skippedDuplicates, 0),
-          skippedUnparseable: summaries.reduce((total, row) => total + row.skippedUnparseable, 0),
-          unmatchedCodes: summaries.flatMap((row) => row.unmatchedCodes),
-          warnings: [...new Set(summaries.flatMap((row) => row.warnings))],
-          lowMrpCount: summaries.reduce((total, row) => total + row.lowMrpCount, 0),
-          flaggedMrpCount: summaries.reduce((total, row) => total + row.flaggedMrpCount, 0),
-          flaggedRows: summaries.flatMap((row) => row.flaggedRows),
-        };
+        const buf = entry.getData();
+        const parsed = parseWorkbookBuffer(buf, knownCodes);
+        const summary = await persistParsedRows(
+          parsed.rows,
+          parsed.sourcePriceObservations,
+          entry.name,
+          effectiveDate,
+          knownCodes,
+          canonical,
+          parsed.basis,
+          parsed.codeColHeader,
+          parsed.priceColHeader,
+          parsed.skippedUnparseable,
+          parsed.warnings,
+          reviewBatchId,
+          loadBatchId,
+        );
         fileSummaries.push(summary);
       }
 
@@ -1465,10 +1468,16 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         provenance,
         files: fileSummaries,
       };
-      await db
-        .update(mrpLoadBatchesTable)
-        .set({ rowCount: aggregate.newHistoryRows })
-        .where(eq(mrpLoadBatchesTable.id, loadBatchId));
+      if (aggregate.newHistoryRows === 0) {
+        await db
+          .delete(mrpLoadBatchesTable)
+          .where(eq(mrpLoadBatchesTable.id, loadBatchId));
+      } else {
+        await db
+          .update(mrpLoadBatchesTable)
+          .set({ rowCount: aggregate.newHistoryRows })
+          .where(eq(mrpLoadBatchesTable.id, loadBatchId));
+      }
 
       res.json({ results: aggregate });
       return;
@@ -1477,7 +1486,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
     // ------------------------------------------------------------------
     // Single spreadsheet file (existing behaviour)
     // ------------------------------------------------------------------
-      let parsed: ParsedCompetitorRow[] = [];
+    const parsed = parseWorkbookBuffer(file.buffer, knownCodes);
     if (!parsed.hasHeaderPeriods && !effectiveDate) {
       await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
       res.status(400).json({
@@ -1536,13 +1545,37 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         };
 
     await recomputeCurrentFlags();
-    await db
-      .update(mrpLoadBatchesTable)
-      .set({ rowCount: summary.newHistoryRows })
-      .where(eq(mrpLoadBatchesTable.id, loadBatchId));
+    if (summary.newHistoryRows === 0) {
+      await db
+        .delete(mrpLoadBatchesTable)
+        .where(eq(mrpLoadBatchesTable.id, loadBatchId));
+    } else {
+      await db
+        .update(mrpLoadBatchesTable)
+        .set({ rowCount: summary.newHistoryRows })
+        .where(eq(mrpLoadBatchesTable.id, loadBatchId));
+    }
 
     res.json({ results: { ...summary, provenance } });
   } catch (err) {
+    if (loadBatchId !== null) {
+      try {
+        await db.execute(sql`
+          DELETE FROM mrp_load_batches AS batch
+          WHERE batch.id = ${loadBatchId}
+            AND NOT EXISTS (
+              SELECT 1
+              FROM mrp_price_history AS history
+              WHERE history.load_batch_id = batch.id
+            )
+        `);
+      } catch (cleanupErr) {
+        req.log.error(
+          { err: cleanupErr, file: name, loadBatchId },
+          "failed to clean up empty MRP load batch",
+        );
+      }
+    }
     req.log.error({ err, file: name }, "load-mrp failed");
     res.status(500).json({ error: "Failed to parse and load file" });
   }
@@ -1645,47 +1678,38 @@ router.get("/catalog/export", async (req, res) => {
   if (type === "history") {
     sheetName = "MRP History";
     fileBase = "prayag-mrp-history";
-  const rows = await db
-    .select({
-      effectiveDate: mrpPriceHistoryTable.effectiveDate,
-      count: sql<number>`cast(count(*) as integer)`,
-    })
-    .from(mrpPriceHistoryTable)
-    .groupBy(mrpPriceHistoryTable.effectiveDate)
-    .orderBy(desc(mrpPriceHistoryTable.effectiveDate));
+    const rows = await db
+      .select()
+      .from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.reviewStatus, "approved"))
+      .orderBy(
+        asc(mrpPriceHistoryTable.itemCode),
+        desc(mrpPriceHistoryTable.effectiveDate),
+      );
     const header = [
       "Item Code",
-      "Product Name",
-      "Division",
-      "Category",
-      "Series/Range",
-      "Size",
-      "UOM",
-      "Current MRP",
+      "MRP",
+      "Net Price",
+      "Discount %",
       "Basis",
       "Effective Date",
-      "Active",
-      "Data Flag",
-      "Discontinued From",
+      "Load Date",
+      "Source File",
+      "Is Current",
+      "Notes",
     ];
-    const body = products.map((p) => {
-      const cur = curMap.get(p.itemCode);
-      return [
-        p.itemCode,
-        p.productName,
-        p.division,
-        p.category,
-        p.seriesRange,
-        p.size,
-        p.uom,
-        cur?.mrp ?? null,
-        cur?.price_basis ?? null,
-        cur?.effective_date ?? null,
-        p.isActive ? "Yes" : "No",
-        p.dataFlag,
-        p.discontinuedFrom,
-      ];
-    });
+    const body = rows.map((r) => [
+      r.itemCode,
+      r.mrp,
+      r.netPrice,
+      r.discountPct,
+      r.priceBasis,
+      r.effectiveDate,
+      r.loadDate,
+      r.sourceFile,
+      r.isCurrent ? "Yes" : "No",
+      r.notes,
+    ]);
     aoa = [header, ...body];
   } else {
     sheetName = "Catalog";
@@ -1765,7 +1789,7 @@ router.get("/catalog/export", async (req, res) => {
     return;
   }
 
-      const wb = XLSX.read(file.buffer, { type: "buffer" });
+  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   res.setHeader(
@@ -2093,13 +2117,15 @@ function parseCompetitorSheet(
 // GET /catalog/competitor-brands — distinct brand names + their price periods.
 router.get("/catalog/competitor-brands", async (_req, res) => {
   const rows = await db
-    .select({
-      effectiveDate: mrpPriceHistoryTable.effectiveDate,
-      count: sql<number>`cast(count(*) as integer)`,
+    .selectDistinct({
+      competitor: competitorPricesTable.competitor,
+      effectiveDate: competitorPricesTable.effectiveDate,
     })
-    .from(mrpPriceHistoryTable)
-    .groupBy(mrpPriceHistoryTable.effectiveDate)
-    .orderBy(desc(mrpPriceHistoryTable.effectiveDate));
+    .from(competitorPricesTable)
+    .orderBy(
+      asc(competitorPricesTable.competitor),
+      asc(competitorPricesTable.effectiveDate),
+    );
 
   // Group into brand → sorted effectiveDates
   const periodMap = new Map<string, string[]>();
@@ -2129,9 +2155,9 @@ router.post(
       res.status(400).json({ error: "No file uploaded" });
       return;
     }
-    const ext = name.toLowerCase().split(".").pop() ?? "";
+    const ext = file.originalname.toLowerCase().split(".").pop() ?? "";
     if (!["xlsx", "xls", "csv"].includes(ext)) {
-      res.status(400).json({ error: "Upload an .xlsx, .xls, or .csv file" });
+      res.json({ isSparshMaster: false });
       return;
     }
 
@@ -2140,10 +2166,10 @@ router.post(
         .select({ itemCode: catalogProductsTable.itemCode })
         .from(catalogProductsTable);
       const canonical = new Map<string, string>(
-        existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
+        existingProducts.map((product) => [normCode(product.itemCode), product.itemCode]),
       );
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
-      const sparshMaster = parseSparshCompetitorMaster(wb, canonical);
+      const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
 
       res.json({
         isSparshMaster: Boolean(sparshMaster),
@@ -2172,7 +2198,10 @@ router.post(
       res.status(400).json({ error: "No file uploaded" });
       return;
     }
-  const competitor = String(req.body?.competitor ?? "").trim();
+    const competitor =
+      typeof req.body.competitor === "string" && req.body.competitor.trim()
+        ? req.body.competitor.trim()
+        : null;
     if (!competitor) {
       res.status(400).json({ error: "competitor name is required" });
       return;
@@ -2221,47 +2250,28 @@ router.post(
 
         const sourceHash = sha256ForBuffer(file.buffer);
         const directMatchCount = sparshMaster.rows.length;
-      const values = parsed.map((r) => {
-        const norm = r.matchedPrayagCode;
-        let isMatched = !!norm && knownCodes.has(norm);
-        // Snapshot of the catalog's current MRP at import time. Raw competitor
-        // sheets carry no Prayag MRP, so we persist this onto the row so the
-        // analysis gap can use it directly (never a later catalog lookup).
-        let prayagMrpSnapshot: number | null = null;
-        // Price-gap guardrail: even a code that exists is sent to review when
-        // the gap vs Prayag's current MRP is unrealistically large — that
-        // almost always means the wrong products were linked.
-        if (isMatched) {
-          const prayagMrp = currentMrp.get(norm!);
-          if (prayagMrp != null && prayagMrp > 0) {
-            prayagMrpSnapshot = prayagMrp;
-            const eff = effectivePrice(r.unit, r.price);
-            const gapPct = ((eff - prayagMrp) / prayagMrp) * 100;
-            if (gapPct < GAP_MIN_PCT || gapPct > GAP_MAX_PCT) {
-              isMatched = false;
-              rejectedByGap++;
-            }
-          }
-        }
-        if (!isMatched) prayagMrpSnapshot = null;
-        if (isMatched) matched++;
-        return {
-          competitor,
-          category: r.category,
-          description: r.description,
-          size: r.size,
-          price: r.price,
-          unit: r.unit,
-          // Use the form's effectiveDate — more reliable than parsing from the sheet
-          effectiveDate,
-          matchedPrayagCode: isMatched ? (canonical.get(norm!) ?? norm) : null,
-          matchStatus: isMatched ? "matched" : "no match (review)",
-          matchConfidence: isMatched ? "High" : null,
-          prayagMrpAtCompare: prayagMrpSnapshot,
-          // All new rows start as not current; recompute below sets the flag.
-          isCurrent: false,
-        };
-      });
+        const values = sparshMaster.periods.flatMap((period, periodIndex) =>
+          sparshMaster.rows.map((row) => ({
+            competitor: SPARSH_MASTER_COMPETITOR,
+            category: row.series,
+            description: row.description,
+            size: null,
+            price: row.prices[period.sourceEffectiveDate],
+            unit: "MRP",
+            competitorCode: row.competitorCode,
+            effectiveDate: effectiveDates[periodIndex]!,
+            matchedPrayagCode: row.prayagCode,
+            matchStatus: "matched",
+            // The workbook carries a verified direct mapping, rather than a
+            // guessed description/size result, so the generic gap guardrail
+            // intentionally does not demote these audited rows.
+            matchConfidence: "High",
+            prayagMrpAtCompare: null,
+            isCurrent: false,
+            priceBasis: "MRP",
+            gstPct: null,
+          })),
+        );
 
         await db.transaction(async (tx) => {
           // The master is the authoritative full Sparsh mapping. Remove only
@@ -2272,7 +2282,7 @@ router.post(
             .where(eq(competitorPricesTable.competitor, SPARSH_MASTER_COMPETITOR));
 
           for (const [periodIndex, period] of sparshMaster.periods.entries()) {
-      const effectiveDate = effectiveDateBody;
+            const effectiveDate = effectiveDates[periodIndex]!;
             const periodValues = values.filter(
               (value) => value.effectiveDate === effectiveDate,
             );
@@ -2595,7 +2605,7 @@ router.delete("/catalog/mrp-period/:date", requireAdmin, async (req, res) => {
       `);
     });
   } catch (err: any) {
-    const status = err.httpStatus ?? 500;
+    const status: number = err.httpStatus ?? 500;
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
@@ -2613,37 +2623,65 @@ router.delete("/catalog/mrp-period/:date", requireAdmin, async (req, res) => {
 router.patch("/catalog/mrp-period-date", requireAdmin, async (req, res) => {
   const currentEffectiveDate = String(req.body?.currentEffectiveDate ?? "").trim();
   const newEffectiveDate = String(req.body?.newEffectiveDate ?? "").trim();
-  if (!competitor || !isIsoDate(currentEffectiveDate) || !isIsoDate(newEffectiveDate)) {
-    res.status(400).json({ error: "competitor and both YYYY-MM-DD effective dates are required" });
+  if (!isIsoDate(currentEffectiveDate) || !isIsoDate(newEffectiveDate)) {
+    res.status(400).json({ error: "Both effective dates must be YYYY-MM-DD" });
     return;
   }
   if (currentEffectiveDate === newEffectiveDate) {
-    res.json({ moved: 0, competitor, effectiveDate: currentEffectiveDate });
+    res.json({ moved: 0, effectiveDate: currentEffectiveDate });
     return;
   }
+
   try {
     const moved = await db.transaction(async (tx) => {
-      await tx.execute(sql`LOCK TABLE competitor_prices IN SHARE ROW EXCLUSIVE MODE`);
+      await tx.execute(sql`LOCK TABLE mrp_price_history IN SHARE ROW EXCLUSIVE MODE`);
       const [source, destination] = await Promise.all([
-        tx.select({ id: competitorPricesTable.id }).from(competitorPricesTable)
-          .where(and(eq(competitorPricesTable.competitor, competitor), eq(competitorPricesTable.effectiveDate, currentEffectiveDate))).limit(1),
-        tx.select({ id: competitorPricesTable.id }).from(competitorPricesTable)
-          .where(and(eq(competitorPricesTable.competitor, competitor), eq(competitorPricesTable.effectiveDate, newEffectiveDate))).limit(1),
+        tx.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+          .where(eq(mrpPriceHistoryTable.effectiveDate, currentEffectiveDate)).limit(1),
+        tx.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+          .where(eq(mrpPriceHistoryTable.effectiveDate, newEffectiveDate)).limit(1),
       ]);
       if (source.length === 0) {
-        throw Object.assign(new Error(`No ${competitor} period found for ${currentEffectiveDate}`), { httpStatus: 404 });
+        throw Object.assign(new Error(`No MRP period found for date ${currentEffectiveDate}`), { httpStatus: 404 });
       }
       if (destination.length > 0) {
-        throw Object.assign(new Error(`${competitor} already has a period for ${newEffectiveDate}. Choose an unused date.`), { httpStatus: 409 });
+        throw Object.assign(new Error(`An MRP period already exists for ${newEffectiveDate}. Choose an unused date.`), { httpStatus: 409 });
       }
-      const result = await tx.update(competitorPricesTable)
-        .set({ effectiveDate: newEffectiveDate, isCurrent: false, updatedAt: new Date() })
-        .where(and(eq(competitorPricesTable.competitor, competitor), eq(competitorPricesTable.effectiveDate, currentEffectiveDate)))
-        .returning({ id: competitorPricesTable.id });
-      await recomputeCompetitorCurrentFlagsInTransaction(competitor, tx);
-      return result.length;
+      const rows = await tx.select({
+        id: mrpPriceHistoryTable.id,
+        itemCode: mrpPriceHistoryTable.itemCode,
+        sourceFile: mrpPriceHistoryTable.sourceFile,
+        loadBatchId: mrpPriceHistoryTable.loadBatchId,
+        mrp: mrpPriceHistoryTable.mrp,
+      }).from(mrpPriceHistoryTable)
+        .where(eq(mrpPriceHistoryTable.effectiveDate, currentEffectiveDate));
+      await tx.insert(mrpHistoryProvenanceEventsTable).values(rows.map((row) => ({
+        historyRowId: row.id,
+        itemCode: row.itemCode,
+        effectiveDate: newEffectiveDate,
+        action: "period_effective_date_changed",
+        reason: `Effective date corrected from ${currentEffectiveDate} to ${newEffectiveDate}`,
+        sourceFile: row.sourceFile,
+        loadBatchId: row.loadBatchId,
+        mrp: row.mrp,
+      })));
+      await tx.update(mrpPriceHistoryTable)
+        .set({ effectiveDate: newEffectiveDate, isCurrent: false })
+        .where(eq(mrpPriceHistoryTable.effectiveDate, currentEffectiveDate));
+      await tx.execute(sql`
+        UPDATE mrp_price_history m SET is_current = true
+        FROM (
+          SELECT DISTINCT ON (h.item_code, h.variant) h.id
+          FROM mrp_price_history h JOIN catalog_products p ON p.item_code = h.item_code
+          WHERE h.effective_date <= CURRENT_DATE AND h.review_status = 'approved'
+            AND p.is_active IS TRUE
+            AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+          ORDER BY h.item_code, h.variant, h.effective_date DESC, h.id DESC
+        ) latest WHERE m.id = latest.id
+      `);
+      return rows.length;
     });
-    res.json({ moved, competitor, previousEffectiveDate: currentEffectiveDate, effectiveDate: newEffectiveDate });
+    res.json({ moved, previousEffectiveDate: currentEffectiveDate, effectiveDate: newEffectiveDate });
   } catch (err: any) {
     const status = err.httpStatus ?? 500;
     if (status < 500) res.status(status).json({ error: err.message });
