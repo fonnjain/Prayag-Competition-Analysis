@@ -288,6 +288,18 @@ describe("manual MRP provenance", () => {
       loadedBy: "variant-test@example.test",
       scope,
     });
+    const [batchAfterSecondReconciliation] = await db
+      .select({ notes: mrpLoadBatchesTable.notes })
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, first.loadBatchId));
+    const third = await reconcileSanitarywareVariantProvenance({
+      loadedBy: "variant-test@example.test",
+      scope,
+    });
+    const [batchAfterThirdReconciliation] = await db
+      .select({ notes: mrpLoadBatchesTable.notes })
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, first.loadBatchId));
 
     expect(first).toMatchObject({
       attachedRows: 1,
@@ -301,6 +313,10 @@ describe("manual MRP provenance", () => {
       alreadyReconciled: true,
       payloadSha256: scope.payloadSha256,
     });
+    expect(third).toEqual(second);
+    expect(batchAfterThirdReconciliation.notes).toBe(
+      batchAfterSecondReconciliation.notes,
+    );
     const [history] = await db
       .select()
       .from(mrpPriceHistoryTable)

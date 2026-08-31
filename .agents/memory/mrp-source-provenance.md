@@ -32,3 +32,9 @@ Production provenance backfills must run only through a published, administrator
 **Why:** A retrospective linkage is safe only when it changes provenance metadata, not prices or historical membership. A database-side shortcut would bypass the release and audit controls that establish who confirmed the operation.
 
 **How to apply:** Publish first, authenticate as an administrator, use the exact confirmation phrase, then verify the attached-row count, payload hash, source notes, zero remaining gap, and unchanged neighboring-period fingerprints.
+
+Every batch note must name the checksum domain. A source-file checksum identifies the original workbook bytes; a retrospective normalized-payload checksum intentionally will not match a later upload of that workbook.
+
+**Why:** Equal-looking data can have different byte identities, and treating a normalized payload digest as a workbook digest would make duplicate detection and source verification misleading.
+
+**How to apply:** State the domain and intentional mismatch behavior in the batch record itself. Never compare a normalized-payload checksum with uploaded XLSX bytes or imply that such a mismatch signals changed prices.

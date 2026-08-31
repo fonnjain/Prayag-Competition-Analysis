@@ -90,8 +90,17 @@ export const AUTHORITATIVE_MASTER_SOURCE = {
   sheetUrl: "about:blank",
   expectedFileName: "Prayag_MRP_Authoritative_01Sep2026.xlsx",
   notes:
-    "Authoritative master returned by Prayag, superseding the compiled 01 Sep list.",
+    "Authoritative master returned by Prayag, superseding the compiled 01 Sep list. SHA-256 and size identify the original source XLSX file bytes; a future upload whose bytes differ, including a normalized payload, will not match by design.",
   sourceKind: "authoritative",
+} as const;
+
+export const AUTHORITATIVE_MASTER_BATCH = {
+  fileName: "Prayag_MRP_Authoritative_01Sep2026.xlsx",
+  fileSha256:
+    "a6cd9c4d82ab60a1b77644edba5446af90bf9df25174095e791b6c23f773cab2",
+  expectedRows: 6_226,
+  checksumNote:
+    "SHA-256 and size identify the original source XLSX file bytes; a future upload whose bytes differ, including a normalized payload, will not match by design.",
 } as const;
 
 export interface SanitarywareVariantBackfillScope {
@@ -131,6 +140,88 @@ export const AUDITED_JANUARY_VARIANT_SCOPE: SanitarywareVariantBackfillScope = {
 const VARIANT_BACKFILL_ACTION = "known_source_batch_backfilled";
 const VARIANT_BACKFILL_REASON =
   "Completed the missing 2026-01-15 batch linkage for the known Prayag sanitaryware colour-variant source. Prices and history values were not changed.";
+
+function appendNoteOnce(existing: string | null, addition: string): string {
+  const current = existing?.trim() ?? "";
+  return current.includes(addition)
+    ? current
+    : [current, addition].filter(Boolean).join(" ");
+}
+
+async function recordChecksumProvenanceNotes(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  variantBatchId: number,
+  scope: SanitarywareVariantBackfillScope,
+): Promise<void> {
+  const batches = await tx
+    .select({
+      id: mrpLoadBatchesTable.id,
+      fileName: mrpLoadBatchesTable.fileName,
+      fileSha256: mrpLoadBatchesTable.fileSha256,
+      rowCount: mrpLoadBatchesTable.rowCount,
+      notes: mrpLoadBatchesTable.notes,
+    })
+    .from(mrpLoadBatchesTable)
+    .where(eq(mrpLoadBatchesTable.id, variantBatchId));
+  const variantBatch = batches[0];
+  if (
+    !variantBatch ||
+    variantBatch.fileName !== scope.sourceFile ||
+    variantBatch.fileSha256 !== scope.payloadSha256 ||
+    variantBatch.rowCount !== scope.expectedRows
+  ) {
+    throw new Error(
+      "The known-source colour batch is missing or has an unexpected row count; no notes were changed.",
+    );
+  }
+
+  const authoritativeBatches = await tx
+    .select({
+      id: mrpLoadBatchesTable.id,
+      rowCount: mrpLoadBatchesTable.rowCount,
+      notes: mrpLoadBatchesTable.notes,
+    })
+    .from(mrpLoadBatchesTable)
+    .where(
+      and(
+        eq(mrpLoadBatchesTable.fileName, AUTHORITATIVE_MASTER_BATCH.fileName),
+        eq(mrpLoadBatchesTable.fileSha256, AUTHORITATIVE_MASTER_BATCH.fileSha256),
+      ),
+    );
+  if (authoritativeBatches.length > 1) {
+    throw new Error(
+      "Multiple authoritative master batches share the same checksum; no notes were changed.",
+    );
+  }
+
+  const variantNotes = appendNoteOnce(
+    variantBatch.notes,
+    `SHA-256 and size identify the checked-in normalized ${scope.effectiveDate} period payload; they are not a hash of the original XLSX bytes. A future upload of the original XLSX file will not match this checksum by design.`,
+  );
+
+  if (variantNotes !== variantBatch.notes) {
+    await tx
+      .update(mrpLoadBatchesTable)
+      .set({ notes: variantNotes })
+      .where(eq(mrpLoadBatchesTable.id, variantBatch.id));
+  }
+  const authoritativeBatch = authoritativeBatches[0];
+  if (
+    authoritativeBatch &&
+    authoritativeBatch.rowCount === AUTHORITATIVE_MASTER_BATCH.expectedRows
+  ) {
+    const authoritativeNotes = appendNoteOnce(
+      authoritativeBatch.notes,
+      AUTHORITATIVE_MASTER_BATCH.checksumNote,
+    );
+    if (authoritativeNotes !== authoritativeBatch.notes) {
+      await tx
+        .update(mrpLoadBatchesTable)
+        .set({ notes: authoritativeNotes })
+        .where(eq(mrpLoadBatchesTable.id, authoritativeBatch.id));
+    }
+  }
+}
 
 async function variantIdentityDigest(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
@@ -503,6 +594,7 @@ export async function reconcileSanitarywareVariantProvenance(input: {
           "The existing sanitaryware colour backfill batch does not exactly match the audited row manifest. No rows were changed.",
         );
       }
+      await recordChecksumProvenanceNotes(tx, existingBatch.id, scope);
       return {
         loadBatchId: existingBatch.id,
         attachedRows: 0,
@@ -533,7 +625,7 @@ export async function reconcileSanitarywareVariantProvenance(input: {
           downloadedAt: scope.loadDate,
           loadedBy: input.loadedBy,
           rowCount: scope.expectedRows,
-          notes: `${VARIANT_BACKFILL_REASON} SHA-256 and size identify the checked-in normalized ${scope.effectiveDate} period payload; they are not a hash of the original XLSX bytes. The required downloaded_at field records the historical row load date ${scope.loadDate}; the original XLSX download date is not retained.`,
+            notes: `${VARIANT_BACKFILL_REASON} SHA-256 and size identify the checked-in normalized ${scope.effectiveDate} period payload; they are not a hash of the original XLSX bytes. A future upload of the original XLSX file will not match this checksum by design. The required downloaded_at field records the historical row load date ${scope.loadDate}; the original XLSX download date is not retained.`,
         })
         .returning({ id: mrpLoadBatchesTable.id })
     )[0]!.id;

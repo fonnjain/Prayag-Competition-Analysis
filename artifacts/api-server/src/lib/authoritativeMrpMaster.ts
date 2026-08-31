@@ -13,21 +13,20 @@ import {
   type DatabaseTransaction,
 } from "./catalog";
 import {
+  AUTHORITATIVE_MASTER_BATCH,
   AUTHORITATIVE_MASTER_SOURCE,
   isIsoDate,
   sha256ForBuffer,
 } from "./mrpProvenance";
 
-export const AUTHORITATIVE_MASTER_SHA256 =
-  "a6cd9c4d82ab60a1b77644edba5446af90bf9df25174095e791b6c23f773cab2";
-export const AUTHORITATIVE_MASTER_FILE_NAME =
-  "Prayag_MRP_Authoritative_01Sep2026.xlsx";
+export const AUTHORITATIVE_MASTER_SHA256 = AUTHORITATIVE_MASTER_BATCH.fileSha256;
+export const AUTHORITATIVE_MASTER_FILE_NAME = AUTHORITATIVE_MASTER_BATCH.fileName;
 
 const EXPECTED_PRODUCT_ROWS = 6_076;
 const EXPECTED_DISCONTINUED_ROWS = 233;
 const EXPECTED_EXCLUDED_ROWS = 142;
 const LOAD_REASON =
-  "Authoritative master returned by Prayag, superseding the compiled 01 Sep list.";
+  `${AUTHORITATIVE_MASTER_SOURCE.notes}`;
 const DEACTIVATED_CODES = [
   "PS1106",
   "PS1606",
