@@ -1,7 +1,7 @@
 // Exact production row identities captured by the read-only 2026-08-31 audit.
-// The classifier also verifies a digest that includes every price/history value,
-// so these IDs cannot authorize a changed or substituted row set.
-export const AUDITED_LEGACY_MRP_HISTORY_IDS = [
+// The reconciliation also verifies a digest containing every price/history
+// value, so these IDs cannot authorize a changed or substituted row set.
+export const AUDITED_JANUARY_VARIANT_HISTORY_IDS = [
   64750, 64752, 64753, 64756, 64757, 64760, 64762, 64763, 64766, 64767,
   64770, 64772, 64774, 64776, 64778, 64780, 64782, 64784, 64786, 64787,
   64790, 64792, 64793, 64796, 64797, 64800, 64802, 64804, 64806, 64808,
@@ -19,5 +19,5 @@ export const AUDITED_LEGACY_MRP_HISTORY_IDS = [
   65034, 65036, 65038, 65040, 65042, 65044, 65046, 65048,
 ] as const;
 
-export const AUDITED_LEGACY_MRP_IDENTITY_MD5 =
+export const AUDITED_JANUARY_VARIANT_IDENTITY_MD5 =
   "70c6e1a55bfd0c294bf79284367c00cf";

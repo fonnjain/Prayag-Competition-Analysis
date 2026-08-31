@@ -1,5 +1,4 @@
 import { eq, sql } from "drizzle-orm";
-import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import {
   catalogProductsTable,
@@ -12,10 +11,13 @@ import {
 } from "@workspace/db";
 import catalogSeedData from "../seed/catalog-seed.json";
 import competitorSeedData from "../seed/competitor-seed.json";
-import sanitarywareVariantSeedData from "../data/sanitaryware-variant-seed.json";
 import { logger } from "./logger";
 import { recomputeCurrentFlags, normCode } from "./catalog";
 import { parseSizeFromName } from "./suggest";
+import {
+  getSanitarywareVariantSourceAudit,
+  SANITARYWARE_VARIANT_SOURCE,
+} from "./sanitarywareVariantSource";
 
 interface SeedCatalogProduct {
   itemCode: string;
@@ -269,11 +271,19 @@ export async function backfillCatalogSizes(): Promise<void> {
 }
 
 /**
- * One-time idempotent seed for sanitaryware colour-variant prices
- * (Ivory / White with Jet / Pink-Green-Blue across 123 items, two periods).
- * Skips gracefully if any non-Standard rows already exist.
+ * Seed a fresh database, or audit an existing database, against the complete
+ * sanitaryware colour source. Existing rows are never silently retrofitted:
+ * provenance reconciliation requires the explicit admin workflow.
  */
-export async function seedVariantPricesIfEmpty(): Promise<void> {
+export async function seedVariantPricesIfEmpty(): Promise<{
+  sourceRows: number;
+  uniqueRows: number;
+  duplicateRows: number;
+  missingRows: number;
+  unbatchedRows: number;
+  insertedRows: number;
+}> {
+  const audit = getSanitarywareVariantSourceAudit();
   const existing = await db.execute<{ cnt: string }>(sql`
     SELECT COUNT(*) AS cnt
     FROM mrp_price_history
@@ -281,66 +291,124 @@ export async function seedVariantPricesIfEmpty(): Promise<void> {
   `);
   const count = Number(existing.rows[0]?.cnt ?? 0);
   if (count > 0) {
-    logger.info({ count }, "Variant prices already seeded — skipping");
-    return;
+    const existingRows = await db
+      .select({
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        variant: mrpPriceHistoryTable.variant,
+        loadBatchId: mrpPriceHistoryTable.loadBatchId,
+      })
+      .from(mrpPriceHistoryTable)
+      .where(sql`${mrpPriceHistoryTable.variant} != 'Standard'`);
+    const sourceKeys = new Set(
+      audit.uniqueRows.map(
+        (row) => `${row.itemCode}\u001f${row.effectiveDate}\u001f${row.variant}`,
+      ),
+    );
+    const existingByKey = new Map(
+      existingRows.map((row) => [
+        `${row.itemCode}\u001f${row.effectiveDate}\u001f${row.variant}`,
+        row,
+      ]),
+    );
+    const missingRows = [...sourceKeys].filter(
+      (key) => !existingByKey.has(key),
+    ).length;
+    const unbatchedRows = [...sourceKeys].filter(
+      (key) => existingByKey.get(key)?.loadBatchId == null,
+    ).length;
+    const report = {
+      sourceRows: audit.rawRows.length,
+      uniqueRows: audit.uniqueRows.length,
+      duplicateRows: audit.duplicateKeys.length,
+      missingRows,
+      unbatchedRows,
+      insertedRows: 0,
+    };
+    const details = {
+        ...report,
+        periodRows: Object.fromEntries(
+          audit.periods.map((period) => [
+            period.effectiveDate,
+            period.rowCount,
+          ]),
+        ),
+        duplicateKeys: audit.duplicateKeys,
+      };
+    const message =
+      "Audited existing sanitaryware colour rows; explicit admin reconciliation is required for gaps";
+    if (missingRows > 0 || unbatchedRows > 0) {
+      logger.warn(details, message);
+    } else {
+      logger.info(details, message);
+    }
+    return report;
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const rows = (sanitarywareVariantSeedData as Array<{ itemCode: string; mrp: number; effectiveDate: string; variant: string }>);
-  const source = await db
-    .select({ id: mrpSourcesTable.id })
-    .from(mrpSourcesTable)
-    .where(eq(mrpSourcesTable.division, "Ceramic Sanitaryware"))
-    .limit(1);
-  const sourceId = source[0]?.id;
-  if (!sourceId) {
-    throw new Error("Ceramic Sanitaryware source must exist before variant seed data is loaded.");
-  }
-  const seedPayload = JSON.stringify(rows);
-  const batch = await db
-    .insert(mrpLoadBatchesTable)
-    .values({
-      sourceId,
-      fileName: "Prayag_Sanitaryware_Variant_Prices.xlsx",
-      fileSha256: createHash("sha256").update(seedPayload).digest("hex"),
-      fileSizeBytes: Buffer.byteLength(seedPayload),
-      downloadedAt: today,
-      rowCount: rows.length,
-      notes: "Application seed: sanitaryware colour-variant prices",
-    })
-    .returning({ id: mrpLoadBatchesTable.id });
-  const loadBatchId = batch[0]?.id;
-  if (!loadBatchId) {
-    throw new Error("Unable to create provenance batch for sanitaryware variant seed.");
-  }
-
   let inserted = 0;
-  const BATCH = 50;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
-    const result = await db
-      .insert(mrpPriceHistoryTable)
-      .values(
-        batch.map((r) => ({
-          itemCode: r.itemCode,
-          mrp: r.mrp,
-          priceBasis: "MRP" as const,
-          effectiveDate: r.effectiveDate,
-          loadDate: today,
-          sourceFile: "Prayag_Sanitaryware_Variant_Prices.xlsx",
-          isCurrent: false,
-          reviewStatus: "approved" as const,
-          loadBatchId,
-          variant: r.variant,
-        })),
-      )
-      .onConflictDoNothing()
-      .returning({ id: mrpPriceHistoryTable.id });
-    inserted += result.length;
-  }
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(mrpSourcesTable)
+      .values(SANITARYWARE_VARIANT_SOURCE)
+      .onConflictDoNothing({ target: mrpSourcesTable.sheetId });
+    const [source] = await tx
+      .select({ id: mrpSourcesTable.id })
+      .from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.sheetId, SANITARYWARE_VARIANT_SOURCE.sheetId))
+      .limit(1);
+    if (!source) throw new Error("Sanitaryware colour source could not be created.");
+
+    for (const period of audit.periods) {
+      const [loadBatch] = await tx
+        .insert(mrpLoadBatchesTable)
+        .values({
+          sourceId: source.id,
+          fileName: SANITARYWARE_VARIANT_SOURCE.expectedFileName,
+          fileSha256: period.payloadSha256,
+          fileSizeBytes: period.payloadBytes,
+          downloadedAt: today,
+          rowCount: period.rowCount,
+          notes:
+            `Application seed for the ${period.effectiveDate} period. SHA-256 and size identify the checked-in normalized period payload, not original XLSX bytes. The required downloaded_at field records the application seed date.`,
+        })
+        .returning({ id: mrpLoadBatchesTable.id });
+      for (let index = 0; index < period.rows.length; index += 50) {
+        const rows = period.rows.slice(index, index + 50);
+        const result = await tx
+          .insert(mrpPriceHistoryTable)
+          .values(
+            rows.map((row) => ({
+              itemCode: row.itemCode,
+              mrp: row.mrp,
+              priceBasis: "MRP" as const,
+              effectiveDate: row.effectiveDate,
+              loadDate: today,
+              sourceFile: SANITARYWARE_VARIANT_SOURCE.expectedFileName,
+              isCurrent: false,
+              reviewStatus: "approved" as const,
+              loadBatchId: loadBatch.id,
+              variant: row.variant,
+            })),
+          )
+          .onConflictDoNothing()
+          .returning({ id: mrpPriceHistoryTable.id });
+        inserted += result.length;
+      }
+    }
+  });
 
   if (inserted > 0) {
     await recomputeCurrentFlags();
   }
-  logger.info({ inserted, total: rows.length }, "Sanitaryware variant prices seeded");
+  const report = {
+    sourceRows: audit.rawRows.length,
+    uniqueRows: audit.uniqueRows.length,
+    duplicateRows: audit.duplicateKeys.length,
+    missingRows: 0,
+    unbatchedRows: 0,
+    insertedRows: inserted,
+  };
+  logger.info(report, "Sanitaryware variant prices seeded with period provenance");
+  return report;
 }

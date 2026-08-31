@@ -623,11 +623,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CatalogDataHealth"
-  /catalog/legacy-provenance/classify:
+  /catalog/variant-provenance/reconcile:
     post:
-      operationId: classifyLegacyMrpProvenance
+      operationId: reconcileSanitarywareVariantProvenance
       tags: [catalog]
-      summary: Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+      summary: Attach the exact audited January colour rows to their known-source period batch
       requestBody:
         required: true
         content:
@@ -638,13 +638,14 @@ paths:
               properties:
                 confirmation:
                   type: string
+                  example: ATTACH 148 JANUARY COLOUR ROWS
       responses:
         "200":
-          description: Legacy rows classified, or already classified
+          description: Known-source rows attached, or already attached
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LegacyMrpClassificationResult"
+                $ref: "#/components/schemas/SanitarywareVariantReconciliationResult"
         "400":
           description: Confirmation phrase missing
           content:
@@ -658,7 +659,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: Audited row signature no longer matches
+          description: Audited row or payload signature no longer matches
           content:
             application/json:
               schema:
@@ -2777,7 +2778,7 @@ components:
           duplicateSources,
           flaggedMrpCount,
           nullLoadBatchCount,
-          preProvenanceLegacyCount,
+          knownSourceBackfillCount,
           untracedMrpCount,
           untracedMrpRows,
         ]
@@ -2809,12 +2810,12 @@ components:
         nullLoadBatchCount:
           type: integer
           description: MRP history rows that are not linked to any load batch
-        preProvenanceLegacyCount:
+        knownSourceBackfillCount:
           type: integer
-          description: Rows linked to an explicitly synthetic pre-provenance legacy batch
+          description: Rows linked by a known-source provenance reconciliation
         untracedMrpCount:
           type: integer
-          description: Legacy MRP history rows with no official batch or manual correction event
+          description: MRP history rows with no source batch or manual correction event
         untracedMrpRows:
           type: array
           items:
@@ -2833,19 +2834,22 @@ components:
           type: ["number", "null"]
         sourceFile:
           type: ["string", "null"]
-    LegacyMrpClassificationResult:
+    SanitarywareVariantReconciliationResult:
       type: object
       required:
-        [loadBatchId, classifiedRows, distinctCodes, alreadyClassified]
+        [loadBatchId, attachedRows, distinctCodes, alreadyReconciled, payloadSha256]
       properties:
         loadBatchId:
           type: integer
-        classifiedRows:
+        attachedRows:
           type: integer
         distinctCodes:
           type: integer
-        alreadyClassified:
+        alreadyReconciled:
           type: boolean
+        payloadSha256:
+          type: string
+          description: SHA-256 of the normalized January period payload, not the original XLSX bytes
     HealthStatus:
       type: object
       properties:

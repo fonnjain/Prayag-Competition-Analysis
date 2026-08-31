@@ -585,8 +585,8 @@ export const GetCatalogDataHealthResponse = zod.object({
 })),
   "flaggedMrpCount": zod.number(),
   "nullLoadBatchCount": zod.number().describe('MRP history rows that are not linked to any load batch'),
-  "preProvenanceLegacyCount": zod.number().describe('Rows linked to an explicitly synthetic pre-provenance legacy batch'),
-  "untracedMrpCount": zod.number().describe('Legacy MRP history rows with no official batch or manual correction event'),
+  "knownSourceBackfillCount": zod.number().describe('Rows linked by a known-source provenance reconciliation'),
+  "untracedMrpCount": zod.number().describe('MRP history rows with no source batch or manual correction event'),
   "untracedMrpRows": zod.array(zod.object({
   "itemCode": zod.string(),
   "productName": zod.string().nullish(),
@@ -598,17 +598,18 @@ export const GetCatalogDataHealthResponse = zod.object({
 
 
 /**
- * @summary Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+ * @summary Attach the exact audited January colour rows to their known-source period batch
  */
-export const ClassifyLegacyMrpProvenanceBody = zod.object({
+export const ReconcileSanitarywareVariantProvenanceBody = zod.object({
   "confirmation": zod.string()
 })
 
-export const ClassifyLegacyMrpProvenanceResponse = zod.object({
+export const ReconcileSanitarywareVariantProvenanceResponse = zod.object({
   "loadBatchId": zod.number(),
-  "classifiedRows": zod.number(),
+  "attachedRows": zod.number(),
   "distinctCodes": zod.number(),
-  "alreadyClassified": zod.boolean()
+  "alreadyReconciled": zod.boolean(),
+  "payloadSha256": zod.string().describe('SHA-256 of the normalized January period payload, not the original XLSX bytes')
 })
 
 

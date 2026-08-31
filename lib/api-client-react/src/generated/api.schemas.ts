@@ -477,18 +477,20 @@ export interface CatalogDataHealth {
   flaggedMrpCount: number;
   /** MRP history rows that are not linked to any load batch */
   nullLoadBatchCount: number;
-  /** Rows linked to an explicitly synthetic pre-provenance legacy batch */
-  preProvenanceLegacyCount: number;
-  /** Legacy MRP history rows with no official batch or manual correction event */
+  /** Rows linked by a known-source provenance reconciliation */
+  knownSourceBackfillCount: number;
+  /** MRP history rows with no source batch or manual correction event */
   untracedMrpCount: number;
   untracedMrpRows: CatalogUntracedMrp[];
 }
 
-export interface LegacyMrpClassificationResult {
+export interface SanitarywareVariantReconciliationResult {
   loadBatchId: number;
-  classifiedRows: number;
+  attachedRows: number;
   distinctCodes: number;
-  alreadyClassified: boolean;
+  alreadyReconciled: boolean;
+  /** SHA-256 of the normalized January period payload, not the original XLSX bytes */
+  payloadSha256: string;
 }
 
 export interface HealthStatus {
@@ -1926,7 +1928,7 @@ export type PatchCatalogProductMrp200 = {
   effectiveDate: string;
 };
 
-export type ClassifyLegacyMrpProvenanceBody = {
+export type ReconcileSanitarywareVariantProvenanceBody = {
   confirmation: string;
 };
 

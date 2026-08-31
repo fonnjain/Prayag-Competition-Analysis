@@ -58,7 +58,6 @@ import type {
   CatalogFilters,
   CatalogProductDetail,
   CatalogProductList,
-  ClassifyLegacyMrpProvenanceBody,
   ComparisonFilters,
   ComparisonList,
   ComparisonMatrix,
@@ -107,7 +106,6 @@ import type {
   GetPriceHistoryParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
-  LegacyMrpClassificationResult,
   LogoutBrowserSessionParams,
   LogoutSuccess,
   MappingReviewList,
@@ -128,9 +126,11 @@ import type {
   PriceFinderSearchResponse,
   PriceHistory,
   ProductComparisonList,
+  ReconcileSanitarywareVariantProvenanceBody,
   RecordAcceptBatch,
   ResetUserPasswordBody,
   RollbackMrpRevisionResult,
+  SanitarywareVariantReconciliationResult,
   UpdateUserRoleBody
 } from './api.schemas';
 
@@ -1684,37 +1684,37 @@ export function useGetCatalogDataHealth<TData = Awaited<ReturnType<typeof getCat
 
 
 
-export const getClassifyLegacyMrpProvenanceUrl = () => {
+export const getReconcileSanitarywareVariantProvenanceUrl = () => {
 
 
 
 
-  return `/api/catalog/legacy-provenance/classify`
+  return `/api/catalog/variant-provenance/reconcile`
 }
 
 /**
- * @summary Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+ * @summary Attach the exact audited January colour rows to their known-source period batch
  */
-export const classifyLegacyMrpProvenance = async (classifyLegacyMrpProvenanceBody: ClassifyLegacyMrpProvenanceBody, options?: RequestInit): Promise<LegacyMrpClassificationResult> => {
+export const reconcileSanitarywareVariantProvenance = async (reconcileSanitarywareVariantProvenanceBody: ReconcileSanitarywareVariantProvenanceBody, options?: RequestInit): Promise<SanitarywareVariantReconciliationResult> => {
 
-  return customFetch<LegacyMrpClassificationResult>(getClassifyLegacyMrpProvenanceUrl(),
+  return customFetch<SanitarywareVariantReconciliationResult>(getReconcileSanitarywareVariantProvenanceUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      classifyLegacyMrpProvenanceBody,)
+      reconcileSanitarywareVariantProvenanceBody,)
   }
 );}
 
 
 
 
-export const getClassifyLegacyMrpProvenanceMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, TError,{data: BodyType<ClassifyLegacyMrpProvenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, TError,{data: BodyType<ClassifyLegacyMrpProvenanceBody>}, TContext> => {
+export const getReconcileSanitarywareVariantProvenanceMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconcileSanitarywareVariantProvenance>>, TError,{data: BodyType<ReconcileSanitarywareVariantProvenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reconcileSanitarywareVariantProvenance>>, TError,{data: BodyType<ReconcileSanitarywareVariantProvenanceBody>}, TContext> => {
 
-const mutationKey = ['classifyLegacyMrpProvenance'];
+const mutationKey = ['reconcileSanitarywareVariantProvenance'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1724,10 +1724,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, {data: BodyType<ClassifyLegacyMrpProvenanceBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reconcileSanitarywareVariantProvenance>>, {data: BodyType<ReconcileSanitarywareVariantProvenanceBody>}> = (props) => {
           const {data} = props ?? {};
 
-          return  classifyLegacyMrpProvenance(data,requestOptions)
+          return  reconcileSanitarywareVariantProvenance(data,requestOptions)
         }
 
 
@@ -1737,22 +1737,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ClassifyLegacyMrpProvenanceMutationResult = NonNullable<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>>
-    export type ClassifyLegacyMrpProvenanceMutationBody = BodyType<ClassifyLegacyMrpProvenanceBody>
-    export type ClassifyLegacyMrpProvenanceMutationError = ErrorType<ErrorResponse>
+    export type ReconcileSanitarywareVariantProvenanceMutationResult = NonNullable<Awaited<ReturnType<typeof reconcileSanitarywareVariantProvenance>>>
+    export type ReconcileSanitarywareVariantProvenanceMutationBody = BodyType<ReconcileSanitarywareVariantProvenanceBody>
+    export type ReconcileSanitarywareVariantProvenanceMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Classify the exact audited pre-provenance MRP rows under a synthetic legacy batch
+ * @summary Attach the exact audited January colour rows to their known-source period batch
  */
-export const useClassifyLegacyMrpProvenance = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>, TError,{data: BodyType<ClassifyLegacyMrpProvenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useReconcileSanitarywareVariantProvenance = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconcileSanitarywareVariantProvenance>>, TError,{data: BodyType<ReconcileSanitarywareVariantProvenanceBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof classifyLegacyMrpProvenance>>,
+        Awaited<ReturnType<typeof reconcileSanitarywareVariantProvenance>>,
         TError,
-        {data: BodyType<ClassifyLegacyMrpProvenanceBody>},
+        {data: BodyType<ReconcileSanitarywareVariantProvenanceBody>},
         TContext
       > => {
-      return useMutation(getClassifyLegacyMrpProvenanceMutationOptions(options));
+      return useMutation(getReconcileSanitarywareVariantProvenanceMutationOptions(options));
     }
 
 export const getResetCatalogUrl = () => {

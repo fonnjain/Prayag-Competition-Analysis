@@ -1,5 +1,6 @@
 import {
   useGetCatalogDataHealth,
+  useReconcileSanitarywareVariantProvenance,
   useResetCatalog,
   getGetCatalogDataHealthQueryKey,
   getGetCatalogProductsQueryKey,
@@ -488,6 +489,33 @@ export default function DataHealthPage() {
       },
     },
   });
+  const reconcileVariantMutation =
+    useReconcileSanitarywareVariantProvenance({
+      mutation: {
+        onSuccess: (result) => {
+          invalidateCatalog();
+          queryClient.invalidateQueries({
+            queryKey: ["catalog", "mrp-provenance"],
+          });
+          toast({
+            title: result.alreadyReconciled
+              ? "Colour provenance already complete"
+              : "Colour provenance reconciled",
+            description: result.alreadyReconciled
+              ? `The ${result.distinctCodes} January product codes were already linked to batch ${result.loadBatchId}.`
+              : `${result.attachedRows} January colour rows were linked to known-source batch ${result.loadBatchId}.`,
+          });
+        },
+        onError: () => {
+          toast({
+            title: "Reconciliation blocked",
+            description:
+              "The audited January row or source-payload signature did not match. No rows were changed.",
+            variant: "destructive",
+          });
+        },
+      },
+    });
   const invalidateCatalog = () => {
     queryClient.invalidateQueries({ queryKey: getGetCatalogDataHealthQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetCatalogProductsQueryKey() });
@@ -501,6 +529,11 @@ export default function DataHealthPage() {
   if (!data) {
     return <div className="p-8 text-center">No data available</div>;
   }
+  const januaryColourGapCount = data.untracedMrpRows.filter(
+    (row) =>
+      row.effectiveDate === "2026-01-15" &&
+      row.sourceFile === "Prayag_Sanitaryware_Variant_Prices.xlsx",
+  ).length;
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
@@ -539,16 +572,66 @@ export default function DataHealthPage() {
 
       <CatalogSyncPanel onApplied={invalidateCatalog} />
 
-      {data.preProvenanceLegacyCount > 0 && (
+      {januaryColourGapCount > 0 && (
         <div className="bg-card border border-amber-300 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 bg-amber-50">
-            <h2 className="font-semibold text-amber-950">
-              Pre-provenance legacy MRP rows ({data.preProvenanceLegacyCount})
+          <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 bg-amber-50">
+            <div>
+              <h2 className="font-semibold text-amber-950">
+                Known January colour source needs reconciliation ({januaryColourGapCount})
+              </h2>
+              <p className="text-sm text-amber-900 mt-1">
+                These rows are from the known sanitaryware colour workbook. Reconciliation
+                attaches the exact audited rows to a period-payload batch without changing prices.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={reconcileVariantMutation.isPending}>
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  {reconcileVariantMutation.isPending
+                    ? "Reconciling..."
+                    : "Reconcile source"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Attach the January colour rows?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This creates a known-source sibling batch for the 2026-01-15
+                    period and attaches only the 148 audited rows. It does not
+                    change prices, dates, variants, rankings, or comparison gaps.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() =>
+                      reconcileVariantMutation.mutate({
+                        data: {
+                          confirmation: "ATTACH 148 JANUARY COLOUR ROWS",
+                        },
+                      })
+                    }
+                  >
+                    Attach 148 rows
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+
+      {data.knownSourceBackfillCount > 0 && (
+        <div className="bg-card border border-green-300 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 bg-green-50">
+            <h2 className="font-semibold text-green-950">
+              Known-source colour rows reconciled ({data.knownSourceBackfillCount})
             </h2>
-            <p className="text-sm text-amber-900 mt-1">
-              These historical rows are linked to an explicitly synthetic legacy batch.
-              Their original workbook checksum, download date, and loader identity are
-              unknown; no official source attribution was inferred and no price was changed.
+            <p className="text-sm text-green-900 mt-1">
+              These January sanitaryware colour rows are linked to their known source
+              through a period-specific payload batch. The payload checksum is not
+              presented as an original XLSX checksum, and no price was changed.
             </p>
           </div>
         </div>
@@ -648,7 +731,7 @@ export default function DataHealthPage() {
         <div className="px-4 py-3 border-b bg-muted/20">
           <h2 className="font-semibold">MRP rows without provenance ({data.untracedMrpCount})</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            These legacy rows have neither an official workbook batch nor a recorded manual-correction reason. Verify their source before relying on them.
+            These rows have neither a source batch nor a recorded manual-correction reason. Verify their source before relying on them.
           </p>
         </div>
         <div className="max-h-[360px] overflow-auto">
@@ -664,7 +747,7 @@ export default function DataHealthPage() {
                   <th className="px-4 py-2 font-medium">Product</th>
                   <th className="px-4 py-2 font-medium">Effective</th>
                   <th className="px-4 py-2 font-medium text-right">MRP</th>
-                  <th className="px-4 py-2 font-medium">Legacy source</th>
+                  <th className="px-4 py-2 font-medium">Recorded source</th>
                 </tr>
               </thead>
               <tbody>

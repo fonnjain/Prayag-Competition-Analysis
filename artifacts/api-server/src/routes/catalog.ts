@@ -12,16 +12,16 @@ import {
   mrpLoadBatchesTable,
   mrpHistoryProvenanceEventsTable,
 } from "@workspace/db";
-import { loadCatalogSeed } from "../lib/catalogSeed";
+import { loadCatalogSeed, seedVariantPricesIfEmpty } from "../lib/catalogSeed";
 import {
-  classifyLegacyMrpRows,
   ensureManualMrpSource,
+  reconcileSanitarywareVariantProvenance,
   sha256ForManualCorrection,
 } from "../lib/mrpProvenance";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 
 const router: IRouter = Router();
-const LEGACY_MRP_CONFIRMATION = "CLASSIFY 148 PRE-PROVENANCE ROWS";
+const VARIANT_BACKFILL_CONFIRMATION = "ATTACH 148 JANUARY COLOUR ROWS";
 
 interface CurrentPrice {
   mrp: number | null;
@@ -314,12 +314,12 @@ router.get("/catalog/data-health", async (_req, res) => {
     FROM mrp_price_history
     WHERE load_batch_id IS NULL
   `);
-  const preProvenanceLegacyCountRows = await db.execute<{ count: number }>(sql`
+  const knownSourceBackfillCountRows = await db.execute<{ count: number }>(sql`
     SELECT count(*)::int AS count
     FROM mrp_price_history h
     JOIN mrp_load_batches b ON b.id = h.load_batch_id
     JOIN mrp_sources s ON s.id = b.source_id
-    WHERE s.source_kind = 'legacy'
+    WHERE s.source_kind = 'known_source'
   `);
   const untracedMrpRows = await db.execute<{
     itemCode: string;
@@ -348,8 +348,8 @@ router.get("/catalog/data-health", async (_req, res) => {
   `);
   const untracedMrpCount = untracedMrpCountRows.rows[0]?.count ?? 0;
   const nullLoadBatchCount = nullBatchCountRows.rows[0]?.count ?? 0;
-  const preProvenanceLegacyCount =
-    preProvenanceLegacyCountRows.rows[0]?.count ?? 0;
+  const knownSourceBackfillCount =
+    knownSourceBackfillCountRows.rows[0]?.count ?? 0;
   const conflictRows = await db
     .select()
     .from(codeConflictsTable)
@@ -391,7 +391,7 @@ router.get("/catalog/data-health", async (_req, res) => {
     pendingProducts,
     flaggedMrpCount,
     nullLoadBatchCount,
-    preProvenanceLegacyCount,
+    knownSourceBackfillCount,
     untracedMrpCount,
     untracedMrpRows: untracedMrpRows.rows,
     conflictCount: conflictRows.length,
@@ -405,31 +405,33 @@ router.get("/catalog/data-health", async (_req, res) => {
   });
 });
 
-// POST /catalog/legacy-provenance/classify — attach only the exact, audited
-// pre-provenance Sanitaryware variant rows to an explicitly synthetic legacy
-// batch. This never changes a price or claims an official workbook source.
+// POST /catalog/variant-provenance/reconcile — complete the known-source
+// January colour-period backfill without changing any price/history values.
 router.post(
-  "/catalog/legacy-provenance/classify",
+  "/catalog/variant-provenance/reconcile",
   requireAdmin,
   async (req, res) => {
-    if (req.body?.confirmation !== LEGACY_MRP_CONFIRMATION) {
+    if (req.body?.confirmation !== VARIANT_BACKFILL_CONFIRMATION) {
       res.status(400).json({
-        error: `Type "${LEGACY_MRP_CONFIRMATION}" to confirm the legacy classification.`,
+        error: `Type "${VARIANT_BACKFILL_CONFIRMATION}" to confirm the known-source backfill.`,
       });
       return;
     }
     try {
-      const result = await classifyLegacyMrpRows({
+      const result = await reconcileSanitarywareVariantProvenance({
         loadedBy: req.user?.email ?? req.user?.id ?? null,
       });
       res.json(result);
     } catch (error) {
-      req.log?.warn({ err: error }, "legacy MRP provenance classification rejected");
+      req.log?.warn(
+        { err: error },
+        "sanitaryware colour provenance reconciliation rejected",
+      );
       res.status(409).json({
         error:
           error instanceof Error
             ? error.message
-            : "Legacy MRP provenance classification failed.",
+            : "Sanitaryware colour provenance reconciliation failed.",
       });
     }
   },
@@ -684,46 +686,9 @@ router.patch("/catalog/products/:itemCode/mrp", requireAdmin, async (req: Reques
 // Safe to call multiple times; ON CONFLICT DO NOTHING skips existing rows.
 router.post("/catalog/seed-variant-prices", requireAdmin, async (req, res) => {
   try {
-    // Inline seed data — 300 rows across 123 sanitaryware items, two periods.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const seedRows: Array<{ itemCode: string; mrp: number; effectiveDate: string; variant: string }> =
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require("../data/sanitaryware-variant-seed.json");
-
-    const today = new Date().toISOString().slice(0, 10);
-    let inserted = 0;
-    let skipped = 0;
-
-    // Insert in batches of 50 to avoid oversized statements
-    const BATCH = 50;
-    for (let i = 0; i < seedRows.length; i += BATCH) {
-      const batch = seedRows.slice(i, i + BATCH);
-      const values = batch.map((r) => ({
-        itemCode: r.itemCode,
-        mrp: r.mrp,
-        priceBasis: "MRP" as const,
-        effectiveDate: r.effectiveDate,
-        loadDate: today,
-        sourceFile: "Prayag_Sanitaryware_Variant_Prices.xlsx",
-        isCurrent: false,
-        reviewStatus: "approved" as const,
-        variant: r.variant,
-      }));
-      const result = await db
-        .insert(mrpPriceHistoryTable)
-        .values(values)
-        .onConflictDoNothing()
-        .returning({ id: mrpPriceHistoryTable.id });
-      inserted += result.length;
-      skipped += batch.length - result.length;
-    }
-
-    if (inserted > 0) {
-      await recomputeCurrentFlags();
-    }
-
-    req.log.info({ inserted, skipped }, "sanitaryware variant seed complete");
-    res.json({ ok: true, inserted, skipped, total: seedRows.length });
+    const report = await seedVariantPricesIfEmpty();
+    req.log.info(report, "sanitaryware variant seed audit complete");
+    res.json({ ok: true, ...report });
   } catch (err) {
     req.log.error({ err }, "variant seed failed");
     res.status(500).json({ error: "Seed failed" });

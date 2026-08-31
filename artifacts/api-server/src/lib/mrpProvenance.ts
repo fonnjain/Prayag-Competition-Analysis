@@ -9,9 +9,13 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import {
-  AUDITED_LEGACY_MRP_HISTORY_IDS,
-  AUDITED_LEGACY_MRP_IDENTITY_MD5,
-} from "./legacyMrpAuditManifest";
+  AUDITED_JANUARY_VARIANT_HISTORY_IDS,
+  AUDITED_JANUARY_VARIANT_IDENTITY_MD5,
+} from "./sanitarywareVariantAuditManifest";
+import {
+  getSanitarywareVariantSourceAudit,
+  SANITARYWARE_VARIANT_SOURCE,
+} from "./sanitarywareVariantSource";
 
 const HARDWARE_SOURCE_SHEET_ID =
   "1YxBT9NUfLD0mK0d1T2DbLRTkYwXZct5frrJkZnCXhIA";
@@ -90,7 +94,7 @@ export const AUTHORITATIVE_MASTER_SOURCE = {
   sourceKind: "authoritative",
 } as const;
 
-export interface LegacyMrpClassificationScope {
+export interface SanitarywareVariantBackfillScope {
   sourceSheetId: string;
   sourceDivision: string;
   sourceFile: string;
@@ -101,26 +105,34 @@ export interface LegacyMrpClassificationScope {
   expectedDistinctCodes: number;
   historyRowIds: readonly number[];
   expectedIdentityMd5: string;
+  payloadSha256: string;
+  payloadBytes: number;
 }
 
-export const AUDITED_LEGACY_MRP_SCOPE: LegacyMrpClassificationScope = {
-  sourceSheetId: "pre-provenance-sanitaryware-variant-prices-2026-01-15",
-  sourceDivision: "Ceramic Sanitaryware — pre-provenance legacy",
+const januaryVariantPayload = getSanitarywareVariantSourceAudit().periods.find(
+  (period) => period.effectiveDate === "2026-01-15",
+)!;
+
+export const AUDITED_JANUARY_VARIANT_SCOPE: SanitarywareVariantBackfillScope = {
+  sourceSheetId: SANITARYWARE_VARIANT_SOURCE.sheetId,
+  sourceDivision: SANITARYWARE_VARIANT_SOURCE.division,
   sourceFile: "Prayag_Sanitaryware_Variant_Prices.xlsx",
   effectiveDate: "2026-01-15",
   loadDate: "2026-08-19",
   productDivision: "Ceramic Sanitaryware",
   expectedRows: 148,
   expectedDistinctCodes: 121,
-  historyRowIds: AUDITED_LEGACY_MRP_HISTORY_IDS,
-  expectedIdentityMd5: AUDITED_LEGACY_MRP_IDENTITY_MD5,
+  historyRowIds: AUDITED_JANUARY_VARIANT_HISTORY_IDS,
+  expectedIdentityMd5: AUDITED_JANUARY_VARIANT_IDENTITY_MD5,
+  payloadSha256: januaryVariantPayload.payloadSha256,
+  payloadBytes: januaryVariantPayload.payloadBytes,
 };
 
-const LEGACY_CLASSIFICATION_ACTION = "pre_provenance_legacy_classified";
-const LEGACY_CLASSIFICATION_REASON =
-  "Origin unknown: historical row predates provenance tracking. Synthetic classification only; no official workbook attribution inferred.";
+const VARIANT_BACKFILL_ACTION = "known_source_batch_backfilled";
+const VARIANT_BACKFILL_REASON =
+  "Completed the missing 2026-01-15 batch linkage for the known Prayag sanitaryware colour-variant source. Prices and history values were not changed.";
 
-async function legacyIdentityDigest(
+async function variantIdentityDigest(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   historyRowIds: readonly number[],
 ): Promise<string> {
@@ -337,28 +349,17 @@ export async function ensureManualMrpSource(): Promise<number> {
   return rows[0].id;
 }
 
-export async function classifyLegacyMrpRows(input: {
+export async function reconcileSanitarywareVariantProvenance(input: {
   loadedBy: string | null;
-  scope?: LegacyMrpClassificationScope;
+  scope?: SanitarywareVariantBackfillScope;
 }): Promise<{
   loadBatchId: number;
-  classifiedRows: number;
+  attachedRows: number;
   distinctCodes: number;
-  alreadyClassified: boolean;
+  alreadyReconciled: boolean;
+  payloadSha256: string;
 }> {
-  const scope = input.scope ?? AUDITED_LEGACY_MRP_SCOPE;
-  const classificationHash = sha256ForBuffer(
-    Buffer.from(
-      JSON.stringify({
-        kind: "pre-provenance-legacy-classification",
-        sourceFile: scope.sourceFile,
-        effectiveDate: scope.effectiveDate,
-        loadDate: scope.loadDate,
-        productDivision: scope.productDivision,
-        expectedRows: scope.expectedRows,
-      }),
-    ),
-  );
+  const scope = input.scope ?? AUDITED_JANUARY_VARIANT_SCOPE;
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(917_903)`);
@@ -370,9 +371,8 @@ export async function classifyLegacyMrpRows(input: {
         sheetId: scope.sourceSheetId,
         sheetUrl: "about:blank",
         expectedFileName: scope.sourceFile,
-        notes:
-          "Synthetic source for audited rows that predate provenance tracking. The original workbook checksum, download date, and loader identity are unknown.",
-        sourceKind: "legacy",
+        notes: SANITARYWARE_VARIANT_SOURCE.notes,
+        sourceKind: SANITARYWARE_VARIANT_SOURCE.sourceKind,
       })
       .onConflictDoUpdate({
         target: mrpSourcesTable.sheetId,
@@ -380,9 +380,8 @@ export async function classifyLegacyMrpRows(input: {
           division: scope.sourceDivision,
           sheetUrl: "about:blank",
           expectedFileName: scope.sourceFile,
-          notes:
-            "Synthetic source for audited rows that predate provenance tracking. The original workbook checksum, download date, and loader identity are unknown.",
-          sourceKind: "legacy",
+          notes: SANITARYWARE_VARIANT_SOURCE.notes,
+          sourceKind: SANITARYWARE_VARIANT_SOURCE.sourceKind,
         },
       });
     const [source] = await tx
@@ -391,7 +390,7 @@ export async function classifyLegacyMrpRows(input: {
       .where(eq(mrpSourcesTable.sheetId, scope.sourceSheetId))
       .limit(1);
     if (!source) {
-      throw new Error("The pre-provenance legacy source could not be created.");
+      throw new Error("The known sanitaryware colour source could not be created.");
     }
 
     const [existingBatch] = await tx
@@ -403,7 +402,7 @@ export async function classifyLegacyMrpRows(input: {
       .where(
         and(
           eq(mrpLoadBatchesTable.sourceId, source.id),
-          eq(mrpLoadBatchesTable.fileSha256, classificationHash),
+          eq(mrpLoadBatchesTable.fileSha256, scope.payloadSha256),
         ),
       )
       .limit(1);
@@ -456,7 +455,7 @@ export async function classifyLegacyMrpRows(input: {
       [...auditedIds].every((id) => candidateIds.has(id)) &&
       signatureMatches.length === scope.expectedRows &&
       signatureMatches.every((row) => auditedIds.has(row.id)) &&
-      (await legacyIdentityDigest(tx, scope.historyRowIds)) ===
+      (await variantIdentityDigest(tx, scope.historyRowIds)) ===
         scope.expectedIdentityMd5;
 
     if (existingBatch) {
@@ -485,7 +484,7 @@ export async function classifyLegacyMrpRows(input: {
              WHERE load_batch_id = ${existingBatch.id}) AS history_count,
             (SELECT COUNT(*)::int FROM mrp_history_provenance_events
              WHERE load_batch_id = ${existingBatch.id}
-               AND action = ${LEGACY_CLASSIFICATION_ACTION}) AS event_count
+               AND action = ${VARIANT_BACKFILL_ACTION}) AS event_count
         `)
       ).rows;
       const existingIsExact =
@@ -497,18 +496,19 @@ export async function classifyLegacyMrpRows(input: {
         [...auditedIds].every((id) => linkedIds.has(id)) &&
         membershipCount?.history_count === scope.expectedRows &&
         membershipCount?.event_count === scope.expectedRows &&
-        (await legacyIdentityDigest(tx, scope.historyRowIds)) ===
+        (await variantIdentityDigest(tx, scope.historyRowIds)) ===
           scope.expectedIdentityMd5;
       if (!existingIsExact) {
         throw new Error(
-          "The existing synthetic legacy batch does not exactly match the audited row manifest. No rows were changed.",
+          "The existing sanitaryware colour backfill batch does not exactly match the audited row manifest. No rows were changed.",
         );
       }
       return {
         loadBatchId: existingBatch.id,
-        classifiedRows: 0,
+        attachedRows: 0,
         distinctCodes: scope.expectedDistinctCodes,
-        alreadyClassified: true,
+        alreadyReconciled: true,
+        payloadSha256: scope.payloadSha256,
       };
     }
     const distinctCodes = new Set(candidates.map((row) => row.itemCode)).size;
@@ -518,7 +518,7 @@ export async function classifyLegacyMrpRows(input: {
       !candidateIdentityMatches
     ) {
       throw new Error(
-        `Legacy classification did not exactly match the audited manifest of ${scope.expectedRows} rows across ${scope.expectedDistinctCodes} codes. No rows were changed.`,
+        `Sanitaryware colour reconciliation did not exactly match the audited manifest of ${scope.expectedRows} rows across ${scope.expectedDistinctCodes} codes. No rows were changed.`,
       );
     }
 
@@ -528,15 +528,12 @@ export async function classifyLegacyMrpRows(input: {
         .values({
           sourceId: source.id,
           fileName: scope.sourceFile,
-          fileSha256: classificationHash,
-          fileSizeBytes: 0,
-          // The original download date is unavailable. This required field
-          // records the historical row load date, as disclosed in notes.
+          fileSha256: scope.payloadSha256,
+          fileSizeBytes: scope.payloadBytes,
           downloadedAt: scope.loadDate,
           loadedBy: input.loadedBy,
           rowCount: scope.expectedRows,
-          notes:
-            `${LEGACY_CLASSIFICATION_REASON} The required downloaded_at field records the legacy row load date ${scope.loadDate}; file size and original checksum are unavailable.`,
+          notes: `${VARIANT_BACKFILL_REASON} SHA-256 and size identify the checked-in normalized ${scope.effectiveDate} period payload; they are not a hash of the original XLSX bytes. The required downloaded_at field records the historical row load date ${scope.loadDate}; the original XLSX download date is not retained.`,
         })
         .returning({ id: mrpLoadBatchesTable.id })
     )[0]!.id;
@@ -551,8 +548,8 @@ export async function classifyLegacyMrpRows(input: {
           historyRowId: row.id,
           itemCode: row.itemCode,
           effectiveDate: row.effectiveDate,
-          action: LEGACY_CLASSIFICATION_ACTION,
-          reason: LEGACY_CLASSIFICATION_REASON,
+          action: VARIANT_BACKFILL_ACTION,
+          reason: VARIANT_BACKFILL_REASON,
           sourceFile: row.sourceFile,
           loadBatchId,
           mrp: row.mrp,
@@ -562,9 +559,10 @@ export async function classifyLegacyMrpRows(input: {
 
     return {
       loadBatchId,
-      classifiedRows: candidates.length,
+      attachedRows: candidates.length,
       distinctCodes,
-      alreadyClassified: false,
+      alreadyReconciled: false,
+      payloadSha256: scope.payloadSha256,
     };
   });
 }

@@ -75,7 +75,7 @@ describe("admin-only catalogue writes", () => {
       user.patch("/catalog/products/TEST/mrp").send({ mrp: 100, reason: "test" }),
       user.patch("/catalog/competitor-prices/bulk").send({ updates: [] }),
       user.put("/analysis/discount-settings").send({ prayagDiscountPct: 40 }),
-      user.post("/catalog/legacy-provenance/classify").send({ confirmation: "no" }),
+      user.post("/catalog/variant-provenance/reconcile").send({ confirmation: "no" }),
     ]);
     expect(finder.status).toBe(200);
     for (const response of [
@@ -108,7 +108,7 @@ describe("admin-only catalogue writes", () => {
       syncAttempt,
       batchAttempt,
       keyAttempt,
-      legacyAttempt,
+      reconciliationAttempt,
     ] = await Promise.all([
       admin.post("/catalog/load-mrp"),
       admin
@@ -116,13 +116,13 @@ describe("admin-only catalogue writes", () => {
         .set("x-catalog-sync-test-environment", "production"),
       admin.post("/catalog/import-batches/999999/approve"),
       admin.post("/keys").send({ name: "" }),
-      admin.post("/catalog/legacy-provenance/classify").send({ confirmation: "" }),
+      admin.post("/catalog/variant-provenance/reconcile").send({ confirmation: "" }),
     ]);
     expect(importAttempt.status).toBe(400);
     expect(syncAttempt.status).toBe(400);
     expect(batchAttempt.status).toBe(404);
     expect(keyAttempt.status).toBe(400);
-    expect(legacyAttempt.status).toBe(400);
+    expect(reconciliationAttempt.status).toBe(400);
   });
 
   it("allows counter accounts to read workspace data but not issue API keys", async () => {

@@ -35,3 +35,17 @@ Changed from `byCode` (Map keyed by item_code) to `byCodeVariant` (Map keyed by 
 - Total rows: 13,048 (12,750 Standard + 298 colour)
 - Distinct codes: 6,303 (unchanged)
 - analysis_products: 140, comparison_rows: 6,222, price_finder_products: 10,522 (all unchanged)
+
+## Source completeness
+Measure colour-source completeness by unique
+`(item_code, effective_date, variant)` keys across every represented period,
+not by raw row count or the existence of any non-Standard row.
+
+**Why:** Checking only whether any non-Standard row exists allowed a
+provenance retrofit to skip the complete source. A later period-scoped
+authoritative upsert attached the May rows while leaving January unbatched.
+
+**How to apply:** Audit every unique `(item_code, effective_date, variant)` key
+across both periods. Existing-database repairs require an explicit admin
+reconciliation. When original workbook bytes are unavailable, label a checksum
+as a normalized period-payload checksum rather than an XLSX checksum.
