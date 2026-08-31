@@ -8,7 +8,10 @@ import {
   mrpPriceHistoryTable,
   mrpSourcesTable,
 } from "@workspace/db";
-import { recomputeCurrentFlagsInTransaction } from "./catalog";
+import {
+  recomputeCurrentFlagsInTransaction,
+  type DatabaseTransaction,
+} from "./catalog";
 import {
   AUTHORITATIVE_MASTER_SOURCE,
   isIsoDate,
@@ -65,6 +68,12 @@ export interface ParsedAuthoritativeMaster {
   periodCounts: Record<string, number>;
   periodDivisionCounts: Record<string, number>;
   variantCounts: Record<Variant, number>;
+}
+
+export interface AuthoritativeTransactionExecutor {
+  transaction<T>(
+    callback: (tx: DatabaseTransaction) => Promise<T>,
+  ): Promise<T>;
 }
 
 function text(value: unknown): string {
@@ -329,13 +338,15 @@ export async function loadAuthoritativeMaster(input: {
   buffer: Buffer;
   downloadedAt: string;
   loadedBy: string | null;
+  transaction?: DatabaseTransaction;
+  database?: AuthoritativeTransactionExecutor;
 }) {
   if (!isIsoDate(input.downloadedAt)) {
     throw new Error("downloadedAt must be a valid YYYY-MM-DD date.");
   }
   const parsed = parseAuthoritativeMasterBuffer(input.buffer);
 
-  const result = await db.transaction(async (tx) => {
+  const load = async (tx: DatabaseTransaction) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(917_901)`);
     await tx
       .insert(mrpSourcesTable)
@@ -604,6 +615,9 @@ export async function loadAuthoritativeMaster(input: {
       periodDivisionCounts: parsed.periodDivisionCounts,
       variantCounts: parsed.variantCounts,
     };
-  });
+  };
+  const result = input.transaction
+    ? await input.transaction.transaction(load)
+    : await (input.database ?? db).transaction(load);
   return result;
 }
