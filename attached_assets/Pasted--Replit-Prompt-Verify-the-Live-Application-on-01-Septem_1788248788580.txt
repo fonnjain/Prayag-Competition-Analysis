@@ -1,0 +1,127 @@
+# Replit Prompt — Verify the Live Application on 01 September 2026
+
+The September revision is the first date-driven price change this application has had to handle unaided. 2,409 rows were loaded ahead of time and **nothing was scheduled to activate them** — they take effect because prices resolve by date.
+
+This verifies that in the **running production application**, page by page, as a user sees it. Not by querying the database.
+
+**Read-only. Change nothing.** If a check fails, record what the screen shows and move on. A verification pass that repairs its own failures verifies nothing.
+
+Run on or after 01 September 2026, against `https://prayag-price.com`.
+
+---
+
+## 1. Did the revision take effect on its own?
+
+The headline check. Nobody ran anything; these should simply be true today.
+
+| Product | Was on 31 Aug | Should now show |
+|---|---:|---:|
+| `CCL-60-BSK` Euro Cylinder Lock 60mm | 1,080 | **1,190** |
+| `CB-1171-BL` Coboard Lock | 990 | **1,190** |
+| `1179` O.H. Shower Square 5" | 590 | **638** |
+| `1181` O.H. Shower Round 5" | 534 | **578** |
+| `148-LS` Erosa Concealed Stop Cock | 386 | **416** |
+| `123-Q` | 376 | **406** |
+| `911-D` Solo Regular Single Bowl | 3,240 | **3,490** |
+| `151` Ball Cock with Rod & Ball 15mm | 318 | **336** |
+
+Look these up in **Price Finder**, not in the database. If they still show the old values, resolution is not working and nothing below matters.
+
+Also confirm `148-LS` at 416 is **cheaper** than `148-LSB` at 442. That inversion has been a real defect twice; it is the fastest way to spot a period problem.
+
+---
+
+## 2. Products that should have disappeared
+
+233 codes carry a withdrawal date — 215 already past, 18 falling today.
+
+Search Price Finder and confirm **no price is returned**:
+
+```
+616-D   618-D   625-D        (600 series, withdrawn 01 Aug)
+BB-61   DB-61-N              (EMERALD 61, withdrawn 01 Aug)
+```
+
+And confirm these **do** still return prices — each was wrongly marked discontinued at some point and restored:
+
+```
+WT-3LH-50  → 100,000     WT-4LH-05 → 10,000     BD-40 → 3,990
+```
+
+---
+
+## 3. The history labels
+
+Status now derives from `effective_date` rather than the stored `is_current` flag, and the flag was never refreshed. Today is the first day that distinction shows.
+
+On the **product detail** page for `CCL-60-BSK`:
+
+- The 01 Sep 2026 row carries the **CURRENT** badge
+- The 01 Mar 2026 row does not
+
+Then open the same item in **Competition Analysis**, expanded price history. The badges must agree. Two screens disagreeing about which price is current is worse than either being wrong alone.
+
+Check a sanitaryware item with Ivory pricing too — Standard and Ivory have separate timelines and must not mark each other superseded.
+
+---
+
+## 4. The competitor comparison
+
+Sparsh Pearl Vol 6.2 took effect 01 July, so it was already current. What changes today is the Prayag side.
+
+For `151` Ball Cock with Rod & Ball 15mm:
+
+```
+Prayag  336   (was 318)
+Sparsh  330
+Gap     −1.8%  ·  Prayag now more expensive
+```
+
+Yesterday Prayag was 3.8% cheaper. Confirm the direction is stated **in words**, not left to a minus sign.
+
+Across the mapped set the median gap should now be about **+2.9%** with Prayag cheaper on roughly **98 of 150**, down from +10.8% and 130 yesterday. **31 products cross from cheaper to dearer today, none the other way.** Report the figures from the Comparison or Competition Analysis screen.
+
+---
+
+## 5. What an anonymous visitor sees
+
+Sign out entirely, then visit the public site.
+
+Report exactly what is reachable without logging in — which pages render, what data they show, what a signed-out visitor can retrieve, and any API route that answers without credentials.
+
+`public-price-finder-access.md` describes intent; report what the running application does. Where they differ, the code is the fact.
+
+---
+
+## 6. The external feed
+
+`/api/v1/products` is what the E-commerce Hub consumes, using `currentMrp`.
+
+Confirm it returns the September values — `CCL-60-BSK` at 1,190 — and that it still requires an API key. This is the path by which a pricing error reaches the storefront, so it matters more than the internal screens.
+
+---
+
+## 7. Role access
+
+With a non-admin session, attempt directly, without the UI:
+
+- The MRP import endpoint
+- Catalogue sync
+- Import-batch approve
+- API key creation
+
+Expected **403**. Anonymous should give **401**, not 403 — if the two are indistinguishable it is unclear which control fired.
+
+Then confirm a non-admin can still read the catalogue, run a comparison and use analysis. Locking ordinary users out would be worse than the gap.
+
+---
+
+## 8. Report
+
+One line per check: what was checked, what was expected, what the screen showed, pass or fail.
+
+Then, separately, anything that failed — with a screenshot or the exact response, not a description.
+
+Answer plainly: **did the September revision take effect without intervention?** That is the question this whole exercise was built to answer, and it deserves a direct yes or no rather than being buried in a table.
+
+**Make no commits and change no data.** If something is wrong it will still be wrong after it is reported, and reporting it accurately is worth more than fixing it quickly.
