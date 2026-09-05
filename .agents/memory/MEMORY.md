@@ -21,3 +21,4 @@
 - [Activity tracking accounting](activity-tracking-accounting.md) — charge elapsed time to the prior state; page/action events never advance the heartbeat cursor; protect app telemetry by role.
 - [Forced password replacement](forced-password-replacement.md) — temporary and administrator-reset passwords require replacement before protected workspace access.
 - [GitHub repository](github-repository.md) — use the active Prayag-Competition-Analysis repository; the former “-New” repository no longer exists.
+- [CH concealed-valve naming](ch-valve-naming.md) — use TRIANGULAR; 82–90 repeat the confirmed 72–80 range order across valve types and size bands.

@@ -500,6 +500,28 @@ export const catalogSyncAuditsTable = pgTable(
   ],
 );
 
+// Durable, per-product audit trail for narrowly scoped catalogue-name repairs.
+// Price corrections belong in MRP provenance instead and must never be written
+// through this table.
+export const catalogProductNameCorrectionsTable = pgTable(
+  "catalog_product_name_corrections",
+  {
+    id: serial("id").primaryKey(),
+    correctionKey: text("correction_key").notNull(),
+    itemCode: text("item_code").notNull(),
+    previousName: text("previous_name"),
+    correctedName: text("corrected_name").notNull(),
+    reason: text("reason").notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("catalog_product_name_corrections_key_idx").on(t.correctionKey),
+    index("catalog_product_name_corrections_item_idx").on(t.itemCode),
+  ],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 
@@ -513,3 +535,5 @@ export type ImportBatch = typeof importBatchesTable.$inferSelect;
 export type CompetitorPriceStaging = typeof competitorPriceStagingTable.$inferSelect;
 export type CompetitorCodeAlias = typeof competitorCodeAliasesTable.$inferSelect;
 export type CatalogSyncAudit = typeof catalogSyncAuditsTable.$inferSelect;
+export type CatalogProductNameCorrection =
+  typeof catalogProductNameCorrectionsTable.$inferSelect;
