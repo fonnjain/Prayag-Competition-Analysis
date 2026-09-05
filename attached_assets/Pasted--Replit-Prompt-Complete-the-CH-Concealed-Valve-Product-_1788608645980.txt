@@ -1,0 +1,108 @@
+# Replit Prompt — Complete the CH Concealed Valve Product Names
+
+Twelve CPVC concealed valve products are missing their range name, and six of them are missing the size too. This corrects **names only** — no MRP value changes.
+
+Input file: `CH_Valve_Name_Corrections.xlsx`, sheet `name_corrections`.
+
+---
+
+## The pattern
+
+In the CH concealed valve series the **numeric part identifies the range** and the **suffix identifies the valve type**:
+
+| Number | Range | | Suffix | Valve type |
+|---|---|---|---|---|
+| 72 | TRIANGULER | | *(none)* | Long Concealed Valve (Quarter Turn) |
+| 74 | GRACIA | | `F` | Full Turn Concealed Valve |
+| 76 | MACASA | | `QS` | Short Concealed Valve (Quarter Turn) |
+| 78 | URBONA |
+| 79 | SAGA |
+| 80 | VIVA |
+
+`CH72`, `CH72F` and `CH72QS` are all TRIANGULER. All eighteen ¾ inch entries follow this and are already correct.
+
+The 1 inch series — `CH82`, `CH84`, `CH86`, `CH88`, `CH89`, `CH90` — occupies the same six positions one size up, and **the prices confirm it**:
+
+```
+¾ inch   cheap: CH72, CH79, CH80      dearer: CH74, CH76, CH78
+1 inch   cheap: CH82, CH89, CH90      dearer: CH84, CH86, CH88
+```
+
+Same pattern, same positions, both size bands.
+
+---
+
+## The corrections
+
+**Six `F` codes** — Full Turn Concealed Valve, currently reading only *"Full Turn Concealed Valve"*:
+
+```
+CH82F → Full Turn Concealed Valve 1 inch TRIANGULER
+CH84F → Full Turn Concealed Valve 1 inch GRACIA
+CH86F → Full Turn Concealed Valve 1 inch MACASA
+CH88F → Full Turn Concealed Valve 1 inch URBONA
+CH89F → Full Turn Concealed Valve 1 inch SAGA
+CH90F → Full Turn Concealed Valve 1 inch VIVA
+```
+
+**Six base codes** — not in the original request, but carrying the same defect. Currently `1" Long Concealed Valve (Quarter Turn)`:
+
+```
+CH82 → Long Concealed Valve (Quarter Turn) 1 inch TRIANGULER
+CH84 → Long Concealed Valve (Quarter Turn) 1 inch GRACIA
+CH86 → Long Concealed Valve (Quarter Turn) 1 inch MACASA
+CH88 → Long Concealed Valve (Quarter Turn) 1 inch URBONA
+CH89 → Long Concealed Valve (Quarter Turn) 1 inch SAGA
+CH90 → Long Concealed Valve (Quarter Turn) 1 inch VIVA
+```
+
+These also move the size from `1"` to `1 inch`, matching how the ¾ inch entries are written.
+
+The `QS` series needs nothing — all six already carry their range names.
+
+---
+
+## Two points the requester should confirm
+
+**Spelling.** The catalogue uses **TRIANGULER**; the original request wrote *Triangular*. This file keeps the catalogue spelling so all eighteen `CH72*` entries stay consistent. If Prayag wants *Triangular*, that is a separate change across all of them, not just these two.
+
+**The order.** The supplied list read *Saga, Urbona, Saga, Macasa, Gracia, Triangular* — which lines up against codes **90 down to 82**, not 82 up to 90, and has SAGA where VIVA belongs. This file uses the order derived from the base series and the price tiers. Flag it in your report so it is confirmed rather than assumed.
+
+---
+
+## Applying
+
+These are **product name** changes on `catalog_products`, not price changes. Do not route them through the MRP revision upload, which corrects `mrp` values on `mrp_price_history`.
+
+Every affected row keeps its existing MRP and effective date unchanged. Record the change with a reason so the names can be traced later.
+
+---
+
+## Acceptance tests
+
+```
+1.  All 12 codes show their corrected names in Price Finder and Product
+    Database search results.
+2.  No MRP value changed for any of the 12 — CH82F still 1,390, CH84F still
+    1,480, CH82 still 1,380, CH84 still 1,490.
+3.  No effective date changed.
+4.  Searching "URBONA" returns CH78, CH78F, CH78QS, CH88 and CH88F — five
+    products across both sizes.
+5.  Searching "1 inch" returns the six base codes alongside the existing
+    1-inch products; none still reads 1".
+6.  The 18 ¾ inch entries and the 6 QS entries are untouched.
+7.  mrp_price_history row count is unchanged at its current value.
+```
+
+Test 4 is the one that shows the point of this work. Before the change, searching a range name returns only the ¾ inch products — the 1 inch equivalents are invisible to anyone searching by range.
+
+---
+
+## Report
+
+- The 12 names before and after.
+- Confirmation that no MRP, effective date or row count changed.
+- Result of test 4, listing what a search for URBONA returns.
+- Whether the TRIANGULER spelling and the derived order were confirmed.
+
+One clean commit.
