@@ -40,9 +40,9 @@ async function prepareCatalog() {
 
   try {
     const result = await applyChValveNameCorrections();
-    logger.info(result, "Applied audited CH concealed-valve name corrections");
+    logger.info(result, "Applied audited concealed-valve name corrections");
   } catch (correctionErr) {
-    throw new Error("Failed to apply CH concealed-valve name corrections", {
+    throw new Error("Failed to apply concealed-valve name corrections", {
       cause: correctionErr,
     });
   }

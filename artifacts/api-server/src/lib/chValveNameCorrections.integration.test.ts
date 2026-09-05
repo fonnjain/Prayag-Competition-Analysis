@@ -31,8 +31,12 @@ describe("CH concealed-valve name corrections", () => {
     const first = await applyChValveNameCorrections();
     const second = await applyChValveNameCorrections();
 
-    expect(first.total).toBe(17);
-    expect(second).toEqual({ total: 17, changed: 0, alreadyCorrect: 17 });
+    expect(first.total).toBe(CH_VALVE_NAME_CORRECTIONS.length);
+    expect(second).toEqual({
+      total: CH_VALVE_NAME_CORRECTIONS.length,
+      changed: 0,
+      alreadyCorrect: CH_VALVE_NAME_CORRECTIONS.length,
+    });
 
     const products = await db
       .select({
@@ -56,7 +60,7 @@ describe("CH concealed-valve name corrections", () => {
       })
       .from(catalogProductNameCorrectionsTable)
       .where(inArray(catalogProductNameCorrectionsTable.itemCode, CODES));
-    expect(audits).toHaveLength(17);
+    expect(audits).toHaveLength(CH_VALVE_NAME_CORRECTIONS.length);
     expect(new Set(audits.map(({ itemCode }) => itemCode))).toEqual(
       new Set(CODES),
     );

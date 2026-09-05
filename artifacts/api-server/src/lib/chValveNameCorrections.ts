@@ -6,7 +6,7 @@ import {
 } from "@workspace/db";
 
 export const CH_VALVE_NAME_CORRECTION_REASON =
-  "Correct CH concealed-valve range names and the confirmed TRIANGULAR spelling; source workbook CH_Valve_Name_Corrections.xlsx.";
+  "Correct concealed-valve range names and the confirmed TRIANGULAR spelling; TRIANGULER is a source spelling error.";
 
 type NameCorrection = {
   itemCode: string;
@@ -110,6 +110,38 @@ export const CH_VALVE_NAME_CORRECTIONS: readonly NameCorrection[] = [
     correctedName:
       "Short Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR",
   },
+  {
+    itemCode: "UH-72",
+    expectedNames: [
+      "Long Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULER mm",
+    ],
+    correctedName:
+      "Long Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR mm",
+  },
+  {
+    itemCode: "UH72-S",
+    expectedNames: [
+      "Short Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULER mm",
+    ],
+    correctedName:
+      "Short Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR mm",
+  },
+  {
+    itemCode: "UH82",
+    expectedNames: [
+      "Long Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULER mm",
+    ],
+    correctedName:
+      "Long Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm",
+  },
+  {
+    itemCode: "UH82-S",
+    expectedNames: [
+      "Short Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULER mm",
+    ],
+    correctedName:
+      "Short Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm",
+  },
 ] as const;
 
 export async function applyChValveNameCorrections() {
@@ -169,7 +201,11 @@ export async function applyChValveNameCorrections() {
       await tx
         .insert(catalogProductNameCorrectionsTable)
         .values({
-          correctionKey: `ch-concealed-valve-names-2026-09:${correction.itemCode}`,
+          correctionKey: `${
+            correction.itemCode.startsWith("UH")
+              ? "uh-triangular-spelling-2026-09"
+              : "ch-concealed-valve-names-2026-09"
+          }:${correction.itemCode}`,
           itemCode: correction.itemCode,
           previousName: currentName,
           correctedName: correction.correctedName,
