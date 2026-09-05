@@ -123,3 +123,31 @@ mtime_ms = 1788603139921
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/669cd61e-6f63-4c85-b080-5419c7691bc4/ba1e2815-95e9-4574-ade6-5a055d731ca7"
 storage_version_token = "1788603148859932"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "kz4hURhj56dxdrfyIEGgC"
+uri = "file://.agents/outputs/Prayag_MRP_List_In_Force_01_Sep_2026.xlsx"
+type = "table"
+title = "Prayag MRP List In Force — 01 Sep 2026"
+description = "The latest approved Standard MRP on or before 01 September 2026 for every live product in the production snapshot (6,079 rows)."
+logical_id = "08f7f000-2b58-4bc9-a40f-51aea1c9b09e"
+content_hash = "sha256:fb57a0edf693c887e72bc3632c4de3a8612d48f61244b1b4266a408674007580"
+size = 742731
+mtime_ms = 1788603830041
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/08f7f000-2b58-4bc9-a40f-51aea1c9b09e/cd5f8140-3e19-43b9-bce5-89b849065384"
+storage_version_token = "1788604033980595"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "sE77hYEJEpFuIGAMPCo2p"
+uri = "file://.agents/outputs/Prayag_MRP_Revisions_Effective_01_Sep_2026.xlsx"
+type = "table"
+title = "Prayag MRP Revisions — 01 Sep 2026"
+description = "Approved Standard MRP revisions effective exactly 01 September 2026 (2,435 rows)."
+logical_id = "50b3ea89-871b-4a81-a30c-c3abe96e4c09"
+content_hash = "sha256:11c0ca6ec65400c802154b46f13ca7d7c8e1439901ce4ac4d940572816615d29"
+size = 297877
+mtime_ms = 1788603830209
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/50b3ea89-871b-4a81-a30c-c3abe96e4c09/fd367132-9c78-4a8b-aa80-35577b262e1e"
+storage_version_token = "1788604035669348"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

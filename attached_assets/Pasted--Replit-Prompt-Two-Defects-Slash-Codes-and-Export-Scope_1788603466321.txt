@@ -1,0 +1,122 @@
+# Replit Prompt — Two Defects: Slash Codes and Export Scope
+
+Two separate problems, both found in production today.
+
+---
+
+## 1. Product codes containing `/` cannot be opened
+
+Price Finder shows:
+
+```
+Failed to load product details for HLR-7013-SS/E
+```
+
+That product exists — Door Handle Rose 7013 With Ec Cy Lock Set, MRP ₹4,890, Hardware division.
+
+The code contains a **forward slash**. When it goes into a URL path the slash is read as a path separator, the route fails to match, and the detail view never loads.
+
+```
+/product/HLR-7013-SS/E     →  parsed as /product/HLR-7013-SS  +  /E
+```
+
+Search finds these products, because search matches on text. Opening them fails. That is why they appear reachable but are not.
+
+### Scope
+
+**66 codes are affected** — 60 Hardware, 6 PTMT & Plastic Fittings. All are Door Handle with Lock Set variants:
+
+```
+HLR-7002-SS/E    HLB-0324-AB/P    HLB-0402-SSM/P   HLB-1747-SS/E
+HLB-2521-SS/E    HLB-2527-SS/E    HLB-7006-SS/E    HLB-7009-SS/E
+HLB-7011-SS/E    HLB-7028-SS/E    HLR-7013-SS/E    …
+```
+
+Report the full list once found; the sample above is not complete.
+
+### Fix
+
+Encode the code when building any URL that carries it, and decode it server-side. Or carry it as a query parameter rather than a path segment.
+
+**Check every route that takes an item code in a path**, not only product detail. Likely candidates: product detail, price history, comparison deep links, and any export or share URL. A fix applied to one route while another still breaks is worse than the current state, because the failure becomes intermittent.
+
+Also check the **client** side. If the frontend builds these URLs, encoding must happen there too, and a code arriving from search results must survive being put into a link and read back out.
+
+### Related
+
+Codes may contain other characters that behave badly in a URL — `#`, `%`, `+`, spaces. Report which other characters appear in `catalog_products.item_code` across the whole table, so the fix covers them rather than just the slash.
+
+---
+
+## 2. The exported "Complete MRP List" is not complete
+
+The export titled **Prayag Complete MRP List — Effective 01 Sep 2026** contains **2,435 rows**. There are **6,076 live products**.
+
+It includes only products whose price row is *dated* 01 Sep 2026. Products carrying a price forward from an earlier period are absent:
+
+| Division | In the export | Actually live | Missing |
+|---|---:|---:|---:|
+| PTMT & Plastic Fittings | 2,071 | 2,071 | 0 |
+| Hardware | 285 | 285 | 0 |
+| Pipes & Fittings | 24 | 2,245 | **2,221** |
+| CP Fittings / Faucets | 0 | 1,040 | **1,040** |
+| Ceramic Sanitaryware | 0 | 217 | **217** |
+| CP (QUAA / FERN) | 0 | 161 | **161** |
+
+Roughly **3,640 products missing**, including every CP Fittings / Faucets item.
+
+The summary compounds it: *"Approved Standard MRP rows: 2435"* and *"Products with an increase: 2392"* read as statements about the catalogue. They are statements about one period.
+
+### The distinction
+
+These are two different things and the export conflates them:
+
+- **Revised on 01 Sep** — products whose price *changed* that day. 2,435.
+- **In force on 01 Sep** — every live product's applicable price, whenever it was set. 6,076.
+
+A complete MRP list is the second. Anyone reading this file would conclude Prayag has no CP Fittings prices.
+
+### Fix
+
+Resolve by date, as the catalogue and Price Finder already do: for each live product, the latest row with `effective_date <= 01 Sep 2026`, excluding anything with `discontinued_from` on or before that date.
+
+Then either offer both exports with unambiguous names, or make the scope explicit in the title and summary:
+
+```
+Prayag MRP List — In Force on 01 Sep 2026        6,076 products
+Prayag MRP Revisions — Effective 01 Sep 2026     2,435 products
+```
+
+The summary must state which it is on the first line. A file that gets emailed and read weeks later cannot rely on the reader knowing.
+
+---
+
+## Acceptance tests
+
+```
+1.  Opening HLR-7013-SS/E from search results loads its detail page showing
+    ₹4,890.
+2.  All 66 slash-containing codes open successfully from search.
+3.  A shared or bookmarked URL for a slash-containing code resolves.
+4.  Price history and comparison deep links work for the same codes.
+5.  The in-force export contains 6,076 products including CP Fittings /
+    Faucets, Ceramic Sanitaryware and CP (QUAA / FERN).
+6.  The in-force export excludes all 233 discontinued codes.
+7.  The revisions export still contains 2,435 and is titled so its scope is
+    unmistakable.
+8.  Both exports state their scope on the summary sheet's first line.
+9.  No price value changes in either export.
+```
+
+Test 3 matters — a code that works when clicked but breaks when the URL is shared is still broken, and that is exactly how a salesperson would hit it.
+
+---
+
+## Report
+
+- The full list of affected codes, and which other characters appear in item codes.
+- Every route changed, and confirmation that each was tested rather than assumed.
+- Row counts for both exports, by division.
+- Confirmation that no price changed.
+
+One clean commit.
