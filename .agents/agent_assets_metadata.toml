@@ -151,3 +151,31 @@ mtime_ms = 1788603830209
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/50b3ea89-871b-4a81-a30c-c3abe96e4c09/fd367132-9c78-4a8b-aa80-35577b262e1e"
 storage_version_token = "1788604035669348"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "SmNiPjVBIINKY0w2eGz9l"
+uri = "file://.agents/outputs/Spaced_Code_Canonical_Audit_01_Sep_2026.xlsx"
+type = "table"
+title = "Spaced Code Canonical Audit — 01 Sep 2026"
+description = "Complete 260-row audit showing each spaced code, whitespace-stripped form, canonical MRP-history code, comparison result, status, and normalized lookup key."
+logical_id = "c1aa561f-cdfd-4e6e-9f09-b5755b0314f2"
+content_hash = "sha256:4025406f145b0ffada1bf4648dc3cdf99afe4f7fd7048ad6bf18c55be6dc45c9"
+size = 33952
+mtime_ms = 1788604562081
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c1aa561f-cdfd-4e6e-9f09-b5755b0314f2/5ae3b947-2cc7-4d2e-95eb-33ddf972ff01"
+storage_version_token = "1788604571033431"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "DxuP5DSLB6QrL3y4RuUXN"
+uri = "file://.agents/outputs/Spaced_Code_Canonical_Audit_01_Sep_2026.csv"
+type = "table"
+title = "Spaced Code Canonical Audit — CSV"
+description = "Machine-readable version of the complete 260-row canonical mapping audit."
+logical_id = "cf980641-4d03-4f77-8363-4cdb26d0ce6e"
+content_hash = "sha256:3b864926170d292bd780b3e32902bf6793ddbfcb01c0a944ca487679f146ea08"
+size = 19736
+mtime_ms = 1788604548937
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/cf980641-4d03-4f77-8363-4cdb26d0ce6e/74b1541c-a8fb-44fe-b199-7cad1e150aa3"
+storage_version_token = "1788604572320278"
+content_type = "text/csv"
