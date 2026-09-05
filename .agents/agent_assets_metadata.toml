@@ -6,18 +6,21 @@ id = "zlDYvtweiXJbOEVqYWDPM"
 uri = "file://Prayag_Project_Architecture.xlsx"
 type = "table"
 title = "Prayag Project Architecture"
+logical_id = "5a32a685-d337-4498-aad3-e3a986de0c9f"
 
 [[outputs]]
 id = "nHONQ6y6ExkiddGDSLTJ5"
 uri = "file://deliverables/Prayag_Web_App_Data_Structure.xlsx"
 type = "table"
 title = "Prayag Web App — Full Data Structure (Excel)"
+logical_id = "b56f663c-98cc-44e1-91bc-7bd9b478fe5b"
 
 [[outputs]]
 id = "tQNrUnwyJGUPb821dMSD5"
 uri = "file://deliverables/How_Supplier_Prices_Are_Read.docx"
 type = "word_document"
 title = "How Individual Supplier Prices Are Read (Word)"
+logical_id = "eb97efee-8f6f-4443-8cd5-542f0090c613"
 
 [[outputs]]
 id = "xSFWjZuAVb2G93xilVzkq"
@@ -25,6 +28,7 @@ uri = "file://reports/mrp-full-rebuild-report.md"
 type = "text"
 title = "MRP full rebuild report"
 description = "Database-readback acceptance report for the official full MRP history rebuild."
+logical_id = "c6192e9c-8d13-4dd4-85f1-5ef9123091e5"
 
 [[outputs]]
 id = "SBGxgH-7glyUyeDRvuGfd"
@@ -32,6 +36,7 @@ uri = "file://reports/mrp-full-rebuild-inactive-codes.csv"
 type = "table"
 title = "Inactive codes after MRP rebuild"
 description = "The 556 catalog products absent from the authoritative rebuild catalog sheet; they were retained and marked inactive."
+logical_id = "1b14828a-03f8-46ea-8920-203d9c87893f"
 
 [[outputs]]
 id = "xrtrSNS72kEKGWlqgIQT3"
@@ -39,6 +44,7 @@ uri = "file://reports/post-rebuild-corrections-report.md"
 type = "text"
 title = "Post-rebuild corrections report"
 description = "Database-readback report for the discontinuation correction, live gap trace, and inactive-code review."
+logical_id = "3edb4a91-7cf1-48ee-989c-3f6d0bdb7e89"
 
 [[outputs]]
 id = "73o8ALjT_-7zdbAyXpQcB"
@@ -46,6 +52,7 @@ uri = "file://attached_assets/prayag-verified-catalog-sync.json"
 type = "unspecified"
 title = "Download: prayag-verified-catalog-sync.json"
 description = "Click the download control on this attachment first. Then choose the downloaded JSON file from your Windows Downloads folder in the production Data Health page."
+logical_id = "8e5d644f-7cca-45cf-8cda-e8b90bdce212"
 
 [[outputs]]
 id = "NoQbcYUQfptWOFCyBuFPP"
@@ -53,6 +60,7 @@ uri = "file://.agents/outputs/Sparsh-Pearl-review-2026-08-20-batch-12.xlsx"
 type = "table"
 title = "Sparsh Pearl review workbook — batch 12"
 description = "Production review export captured before discard; 150 mapped rows from batch 12 dated 20 August 2026."
+logical_id = "a2e3198a-2473-4bd7-b5c0-4645b9f3461e"
 
 [[outputs]]
 id = "-9ICB0yybPhgCTIJb_Qs6"
@@ -60,6 +68,7 @@ uri = "file://.agents/outputs/Sparsh-Pearl-review-2026-08-20-batch-13.xlsx"
 type = "table"
 title = "Sparsh Pearl review workbook — batch 13"
 description = "Production review export captured before discard; 150 mapped rows from batch 13 dated 20 August 2026."
+logical_id = "eecc21e5-9373-4dba-a91a-6cb81e0be1a9"
 
 [[outputs]]
 id = "9QMXDPStfvVSTJEjijZcj"
@@ -67,6 +76,7 @@ uri = "file://.agents/outputs/Sparsh-Pearl-batch-13-new-products.xlsx"
 type = "table"
 title = "Sparsh Pearl — 101 new products (batch 13)"
 description = "Production staging export with product code, extracted name, MRP, catalogue page, series mapping, blank Prayag review columns, and 15 batch-13-only codes marked."
+logical_id = "f8022baf-6b82-4507-8117-00a8e348a7fd"
 
 [[outputs]]
 id = "kfq4ZbDhB9zh5lAgDCuzE"
@@ -74,6 +84,7 @@ uri = "file://attached_assets/Sparsh_Competitor_Master_Clean_1787823376637.xlsx"
 type = "table"
 title = "Sparsh Competitor Master — Production Import"
 description = "Verified Excel workbook for importing Sparsh Pearl prices for 1 Apr 2024 and 1 Jul 2026. Upload this file through Product Database → Import Competitor; do not enter a manual effective date."
+logical_id = "173c3505-fd0a-462c-aa87-88dc5d554797"
 
 [[outputs]]
 id = "hcoIUUCD1rw_nO7-LVJH_"
@@ -81,6 +92,7 @@ uri = "file://attached_assets/Prayag_Salespeople_Users_1787843162726.xlsx"
 type = "table"
 title = "Prayag Salespeople Users Workbook"
 description = "The 182-row salesperson workbook for the controlled production user import."
+logical_id = "4e2b4aea-bc4d-48a9-93dd-568daf9fb809"
 
 [[outputs]]
 id = "7y2rw9yYKeFQ0gKCqSCJu"
@@ -88,6 +100,7 @@ uri = "file://reports/legacy-mrp-provenance-audit-2026-08-31.csv"
 type = "table"
 title = "Legacy MRP provenance audit"
 description = "Read-only production inventory of all 148 pre-provenance MRP rows, including item code, variant, dates, division, source file, review state, and existing event evidence. Prices are intentionally omitted."
+logical_id = "cebd6152-ae1e-4e95-bb78-d518ebda1a2b"
 
 [[outputs]]
 id = "WmiwWSPl6hOrZly6RcfuQ"
@@ -95,3 +108,18 @@ uri = "file://reports/upcoming-competitive-gap-2026-09-01.md"
 type = "text"
 title = "Upcoming Competitive Gap — 01 September 2026"
 description = "Read-only production report covering 150 Sparsh Pearl mappings, 31 unfavourable reversals, and representative products."
+logical_id = "b6590762-ff9a-4996-aac2-d49653c205b3"
+
+[[outputs]]
+id = "RurngFkWUWpGOdb6XpLIW"
+uri = "file://.agents/outputs/Prayag_Complete_MRP_List_Effective_01_Sep_2026.xlsx"
+type = "table"
+title = "Prayag Complete MRP List — Effective 01 Sep 2026"
+description = "Excel workbook containing 2,435 active, production-approved Standard MRP rows effective 01 September 2026, with product details, previous MRP/date, and price changes."
+logical_id = "669cd61e-6f63-4c85-b080-5419c7691bc4"
+content_hash = "sha256:3ed646fac83272a755aedfe01da8157ffbdb109b3781da91437bf3d5297ded5f"
+size = 211053
+mtime_ms = 1788603139921
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/669cd61e-6f63-4c85-b080-5419c7691bc4/ba1e2815-95e9-4574-ade6-5a055d731ca7"
+storage_version_token = "1788603148859932"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
