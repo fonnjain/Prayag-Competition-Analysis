@@ -166,7 +166,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /v1/products/{itemCode}:
+  /v1/product:
     get:
       operationId: externalGetProduct
       tags: [external]
@@ -175,7 +175,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - name: itemCode
-          in: path
+          in: query
           required: true
           schema:
             type: string
@@ -317,14 +317,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CatalogProductList"
-  /catalog/products/{itemCode}:
+  /catalog/product:
     get:
       operationId: getCatalogProduct
       tags: [catalog]
       summary: Get a product with its full MRP price history
       parameters:
         - name: itemCode
-          in: path
+          in: query
           required: true
           schema:
             type: string
@@ -417,14 +417,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PriceFinderBrowseResponse"
-  /price-finder/product/{itemCode}:
+  /price-finder/product:
     get:
       operationId: getPriceFinderProduct
       tags: [catalog]
       summary: Get current Prayag and competitor prices for one product
       parameters:
         - name: itemCode
-          in: path
+          in: query
           required: true
           schema:
             type: string
@@ -541,14 +541,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /catalog/products/{itemCode}/mrp:
+  /catalog/product/mrp:
     patch:
       operationId: patchCatalogProductMrp
       tags: [catalog]
       summary: Set a new current MRP for a product (inline edit, no file upload required)
       parameters:
         - name: itemCode
-          in: path
+          in: query
           required: true
           schema:
             type: string
@@ -1379,7 +1379,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MrpIncreaseList"
-  /analysis/price-history/{itemCode}:
+  /analysis/price-history:
     get:
       operationId: getPriceHistory
       tags: [analysis]
@@ -1387,7 +1387,7 @@ paths:
       description: Standard Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
       parameters:
         - name: itemCode
-          in: path
+          in: query
           required: true
           schema:
             type: string

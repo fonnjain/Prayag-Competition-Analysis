@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { formatDisplayDate } from "@/lib/date-format";
+import {
+  itemCodeFromLocation,
+  productHistoryExportHref,
+} from "@/lib/product-links";
 
 function statusBadgeClass(status: string): string {
   if (status === "Current") return "bg-primary/20 text-primary";
@@ -13,10 +17,14 @@ function statusBadgeClass(status: string): string {
 
 export default function ProductDetailPage() {
   const [, params] = useRoute("/product/:itemCode");
-  const itemCode = params?.itemCode || "";
+  const itemCode = itemCodeFromLocation(window.location.search, params?.itemCode);
+  const productParams = { itemCode };
   
-  const { data, isLoading } = useGetCatalogProduct(itemCode, undefined, {
-    query: { enabled: !!itemCode, queryKey: getGetCatalogProductQueryKey(itemCode) }
+  const { data, isLoading } = useGetCatalogProduct(productParams, {
+    query: {
+      enabled: !!itemCode,
+      queryKey: getGetCatalogProductQueryKey(productParams),
+    },
   });
 
   if (isLoading) {
@@ -40,7 +48,7 @@ export default function ProductDetailPage() {
           <p className="text-sm text-muted-foreground mt-1 font-mono">{data.product.itemCode}</p>
         </div>
         <Button variant="outline" asChild>
-          <a href={`/api/catalog/export?type=history&format=xlsx&itemCode=${itemCode}`} download>
+          <a href={productHistoryExportHref(itemCode)} download>
             <Download className="w-4 h-4 mr-2" />
             Export History
           </a>

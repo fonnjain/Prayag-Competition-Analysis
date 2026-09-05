@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { formatDisplayDate } from "@/lib/date-format";
+import { productDetailHref } from "@/lib/product-links";
 import { PriceWindowDetails, UpcomingGapDetails } from "@/components/price-window";
 
 const PAGE_SIZE = 50;
@@ -517,7 +518,7 @@ export default function ComparisonPage() {
                     return (
                       <tr key={row.itemCode} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                         <td className="px-4 py-3 sticky left-0 bg-card z-10">
-                          <Link href={`/product/${row.itemCode}`}>
+                          <Link href={productDetailHref(row.itemCode)}>
                             <span className="font-medium text-primary hover:underline cursor-pointer">{row.itemCode}</span>
                           </Link>
                           <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={row.prayagProductName || ""}>
@@ -727,7 +728,7 @@ export default function ComparisonPage() {
                           {isMapped ? (
                             <div>
                               <div className="flex items-center gap-2">
-                                <Link href={`/product/${row.matchedPrayagCode}`}>
+                                <Link href={productDetailHref(row.matchedPrayagCode!)}>
                                   <span className="font-medium text-primary hover:underline cursor-pointer">
                                     {row.matchedPrayagCode}
                                   </span>

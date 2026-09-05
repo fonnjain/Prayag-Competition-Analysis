@@ -226,7 +226,7 @@ function OpportunityTable({ items, isThreat, prayagMrpDate, asOf }: { items: Ana
 // ─── Per-product price history panel ────────────────────────────────────────
 
 function PriceHistoryPanel({ itemCode, asOf }: { itemCode: string; asOf?: string }) {
-  const { data, isLoading } = useGetPriceHistory(itemCode, { asOf });
+  const { data, isLoading } = useGetPriceHistory({ itemCode, asOf });
 
   if (isLoading || !data) {
     return (

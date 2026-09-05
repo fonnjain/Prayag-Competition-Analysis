@@ -109,6 +109,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={CatalogPage} />
+      <Route path="/product" component={ProductDetailPage} />
       <Route path="/product/:itemCode" component={ProductDetailPage} />
       <Route path="/load-mrp" component={LoadMrpPage} />
       <Route path="/data-health" component={DataHealthPage} />
@@ -138,6 +139,28 @@ function PriceFinderRedirect() {
 }
 
 function App() {
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const legacyProductPrefix = `${basePath}/product/`;
+  if (window.location.pathname.startsWith(legacyProductPrefix)) {
+    const encodedRemainder = window.location.pathname.slice(
+      legacyProductPrefix.length,
+    );
+    let itemCode = encodedRemainder;
+    try {
+      itemCode = decodeURIComponent(encodedRemainder);
+    } catch {
+      // Preserve the literal path remainder; the query route treats item codes
+      // as opaque values and can still show a useful not-found response.
+    }
+    const search = new URLSearchParams(window.location.search);
+    search.set("itemCode", itemCode);
+    window.history.replaceState(
+      null,
+      "",
+      `${basePath}/product?${search.toString()}${window.location.hash}`,
+    );
+  }
+
   const isLegacyPriceFinderUrl =
     window.location.pathname.replace(/\/+$/, "") ===
     "/product-db/price-finder";
@@ -148,7 +171,7 @@ function App() {
     <AuthProvider appSlug="product-db">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter base={basePath}>
             <AuthGate>
               <Layout>
                 <Router />

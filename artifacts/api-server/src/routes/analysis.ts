@@ -803,10 +803,17 @@ router.get("/analysis/mrp-increases", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /analysis/price-history/:itemCode — period-to-period MRP history.
+// GET /analysis/price-history?itemCode=... — period-to-period MRP history.
+// The query form safely carries opaque item codes containing reserved URL
+// characters. The path form remains for path-safe legacy callers.
 // ---------------------------------------------------------------------------
-router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: string }>, res) => {
-  const { itemCode } = req.params;
+async function getAnalysisPriceHistory(req: Request, res: Response) {
+  const itemCode =
+    typeof req.query.itemCode === "string"
+      ? req.query.itemCode.trim()
+      : typeof req.params.itemCode === "string"
+        ? req.params.itemCode.trim()
+        : "";
   if (!itemCode) { res.status(400).json({ error: "itemCode required" }); return; }
   const asOf =
     typeof req.query.asOf === "string" &&
@@ -903,7 +910,10 @@ router.get("/analysis/price-history/:itemCode", async (req: Request<{ itemCode: 
     prayagHistory,
     competitorHistory,
   });
-});
+}
+
+router.get("/analysis/price-history", getAnalysisPriceHistory);
+router.get("/analysis/price-history/:itemCode", getAnalysisPriceHistory);
 
 // ---------------------------------------------------------------------------
 // Discount settings (Net-to-Net mode)

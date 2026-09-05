@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Download, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDisplayDate } from "@/lib/date-format";
+import { productDetailHref } from "@/lib/product-links";
 
 const PAGE_SIZE = 50;
 interface InlineEditState {
@@ -76,7 +77,7 @@ function MrpCell({
       return;
     }
     mutate({
-      itemCode,
+      params: { itemCode },
       data: { mrp: val, effectiveDate: dateInput, reason: reasonInput.trim() },
     });
   };
@@ -195,7 +196,9 @@ export default function CatalogPage() {
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
-  const exportUrl = `/api/catalog/export?type=catalog&format=xlsx`;
+  const today = new Date().toISOString().slice(0, 10);
+  const inForceExportUrl = `/api/catalog/export?type=catalog&scope=in-force&format=xlsx&asOf=${today}`;
+  const revisionsExportUrl = `/api/catalog/export?type=catalog&scope=revisions&format=xlsx&asOf=${today}`;
 
   return (
     <div className="px-3 py-4 sm:px-5 lg:px-6 max-w-7xl mx-auto">
@@ -206,12 +209,20 @@ export default function CatalogPage() {
             {productsData?.total ? `${productsData.total} items` : "Loading..."}
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <a href={exportUrl} download>
-            <Download className="w-4 h-4 mr-2" />
-            Export Catalog
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <a href={inForceExportUrl} download>
+              <Download className="w-4 h-4 mr-2" />
+              Export MRP In Force
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href={revisionsExportUrl} download>
+              <Download className="w-4 h-4 mr-2" />
+              Export Today&apos;s Revisions
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2 mb-4 sm:grid-cols-2 lg:flex lg:flex-wrap">
@@ -310,7 +321,7 @@ export default function CatalogPage() {
                     className="border-b last:border-0 hover:bg-muted/50 transition-colors"
                   >
                     <td className="px-4 py-3 font-medium">
-                      <Link href={`/product/${product.itemCode}`}>
+                      <Link href={productDetailHref(product.itemCode)}>
                         <div className="text-primary hover:underline cursor-pointer">
                           {product.itemCode}
                         </div>

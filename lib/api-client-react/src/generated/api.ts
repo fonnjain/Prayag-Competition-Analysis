@@ -102,6 +102,7 @@ import type {
   GetMrpIncreasesParams,
   GetPriceFinderBrowseParams,
   GetPriceFinderComparisonParams,
+  GetPriceFinderProductParams,
   GetPriceFinderSearchParams,
   GetPriceHistoryParams,
   HandleBrowserLoginCallbackParams,
@@ -120,6 +121,7 @@ import type {
   PasswordChangeInput,
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
+  PatchCatalogProductMrpParams,
   PriceFinderBrowseResponse,
   PriceFinderComparisonResponse,
   PriceFinderProductResponse,
@@ -596,8 +598,7 @@ export function useExternalListProducts<TData = Awaited<ReturnType<typeof extern
 
 
 
-export const getExternalGetProductUrl = (itemCode: string,
-    params?: ExternalGetProductParams,) => {
+export const getExternalGetProductUrl = (params: ExternalGetProductParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -609,16 +610,15 @@ export const getExternalGetProductUrl = (itemCode: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/v1/products/${itemCode}?${stringifiedParams}` : `/api/v1/products/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/v1/product?${stringifiedParams}` : `/api/v1/product`
 }
 
 /**
  * @summary External API: product detail with MRP history (requires X-API-Key header)
  */
-export const externalGetProduct = async (itemCode: string,
-    params?: ExternalGetProductParams, options?: RequestInit): Promise<CatalogProductDetail> => {
+export const externalGetProduct = async (params: ExternalGetProductParams, options?: RequestInit): Promise<CatalogProductDetail> => {
 
-  return customFetch<CatalogProductDetail>(getExternalGetProductUrl(itemCode,params),
+  return customFetch<CatalogProductDetail>(getExternalGetProductUrl(params),
   {
     ...options,
     method: 'GET'
@@ -631,31 +631,29 @@ export const externalGetProduct = async (itemCode: string,
 
 
 
-export const getExternalGetProductQueryKey = (itemCode: string,
-    params?: ExternalGetProductParams,) => {
+export const getExternalGetProductQueryKey = (params?: ExternalGetProductParams,) => {
     return [
-    `/api/v1/products/${itemCode}`, ...(params ? [params] : [])
+    `/api/v1/product`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getExternalGetProductQueryOptions = <TData = Awaited<ReturnType<typeof externalGetProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string,
-    params?: ExternalGetProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getExternalGetProductQueryOptions = <TData = Awaited<ReturnType<typeof externalGetProduct>>, TError = ErrorType<ErrorResponse>>(params: ExternalGetProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getExternalGetProductQueryKey(itemCode,params);
+  const queryKey =  queryOptions?.queryKey ?? getExternalGetProductQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetProduct>>> = ({ signal }) => externalGetProduct(itemCode,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof externalGetProduct>>> = ({ signal }) => externalGetProduct(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData> & { queryKey: QueryKey }
 }
 
 export type ExternalGetProductQueryResult = NonNullable<Awaited<ReturnType<typeof externalGetProduct>>>
@@ -667,12 +665,11 @@ export type ExternalGetProductQueryError = ErrorType<ErrorResponse>
  */
 
 export function useExternalGetProduct<TData = Awaited<ReturnType<typeof externalGetProduct>>, TError = ErrorType<ErrorResponse>>(
- itemCode: string,
-    params?: ExternalGetProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params: ExternalGetProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof externalGetProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getExternalGetProductQueryOptions(itemCode,params,options)
+  const queryOptions = getExternalGetProductQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -930,8 +927,7 @@ export function useGetCatalogProducts<TData = Awaited<ReturnType<typeof getCatal
 
 
 
-export const getGetCatalogProductUrl = (itemCode: string,
-    params?: GetCatalogProductParams,) => {
+export const getGetCatalogProductUrl = (params: GetCatalogProductParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -943,16 +939,15 @@ export const getGetCatalogProductUrl = (itemCode: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/catalog/products/${itemCode}?${stringifiedParams}` : `/api/catalog/products/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/catalog/product?${stringifiedParams}` : `/api/catalog/product`
 }
 
 /**
  * @summary Get a product with its full MRP price history
  */
-export const getCatalogProduct = async (itemCode: string,
-    params?: GetCatalogProductParams, options?: RequestInit): Promise<CatalogProductDetail> => {
+export const getCatalogProduct = async (params: GetCatalogProductParams, options?: RequestInit): Promise<CatalogProductDetail> => {
 
-  return customFetch<CatalogProductDetail>(getGetCatalogProductUrl(itemCode,params),
+  return customFetch<CatalogProductDetail>(getGetCatalogProductUrl(params),
   {
     ...options,
     method: 'GET'
@@ -965,31 +960,29 @@ export const getCatalogProduct = async (itemCode: string,
 
 
 
-export const getGetCatalogProductQueryKey = (itemCode: string,
-    params?: GetCatalogProductParams,) => {
+export const getGetCatalogProductQueryKey = (params?: GetCatalogProductParams,) => {
     return [
-    `/api/catalog/products/${itemCode}`, ...(params ? [params] : [])
+    `/api/catalog/product`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetCatalogProductQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string,
-    params?: GetCatalogProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCatalogProductQueryOptions = <TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(params: GetCatalogProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductQueryKey(itemCode,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetCatalogProductQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProduct>>> = ({ signal }) => getCatalogProduct(itemCode,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCatalogProduct>>> = ({ signal }) => getCatalogProduct(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData> & { queryKey: QueryKey }
 }
 
 export type GetCatalogProductQueryResult = NonNullable<Awaited<ReturnType<typeof getCatalogProduct>>>
@@ -1001,12 +994,11 @@ export type GetCatalogProductQueryError = ErrorType<ErrorResponse>
  */
 
 export function useGetCatalogProduct<TData = Awaited<ReturnType<typeof getCatalogProduct>>, TError = ErrorType<ErrorResponse>>(
- itemCode: string,
-    params?: GetCatalogProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params: GetCatalogProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCatalogProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCatalogProductQueryOptions(itemCode,params,options)
+  const queryOptions = getGetCatalogProductQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1195,20 +1187,27 @@ export function useGetPriceFinderBrowse<TData = Awaited<ReturnType<typeof getPri
 
 
 
-export const getGetPriceFinderProductUrl = (itemCode: string,) => {
+export const getGetPriceFinderProductUrl = (params: GetPriceFinderProductParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/price-finder/product/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/price-finder/product?${stringifiedParams}` : `/api/price-finder/product`
 }
 
 /**
  * @summary Get current Prayag and competitor prices for one product
  */
-export const getPriceFinderProduct = async (itemCode: string, options?: RequestInit): Promise<PriceFinderProductResponse> => {
+export const getPriceFinderProduct = async (params: GetPriceFinderProductParams, options?: RequestInit): Promise<PriceFinderProductResponse> => {
 
-  return customFetch<PriceFinderProductResponse>(getGetPriceFinderProductUrl(itemCode),
+  return customFetch<PriceFinderProductResponse>(getGetPriceFinderProductUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1221,29 +1220,29 @@ export const getPriceFinderProduct = async (itemCode: string, options?: RequestI
 
 
 
-export const getGetPriceFinderProductQueryKey = (itemCode: string,) => {
+export const getGetPriceFinderProductQueryKey = (params?: GetPriceFinderProductParams,) => {
     return [
-    `/api/price-finder/product/${itemCode}`
+    `/api/price-finder/product`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPriceFinderProductQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderProduct>>, TError = ErrorType<ErrorResponse>>(itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPriceFinderProductQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderProduct>>, TError = ErrorType<ErrorResponse>>(params: GetPriceFinderProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderProductQueryKey(itemCode);
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderProductQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderProduct>>> = ({ signal }) => getPriceFinderProduct(itemCode, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderProduct>>> = ({ signal }) => getPriceFinderProduct(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData> & { queryKey: QueryKey }
 }
 
 export type GetPriceFinderProductQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderProduct>>>
@@ -1255,11 +1254,11 @@ export type GetPriceFinderProductQueryError = ErrorType<ErrorResponse>
  */
 
 export function useGetPriceFinderProduct<TData = Awaited<ReturnType<typeof getPriceFinderProduct>>, TError = ErrorType<ErrorResponse>>(
- itemCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params: GetPriceFinderProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetPriceFinderProductQueryOptions(itemCode,options)
+  const queryOptions = getGetPriceFinderProductQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1458,21 +1457,28 @@ export function useExportPriceFinderComparison<TData = Awaited<ReturnType<typeof
 
 
 
-export const getPatchCatalogProductMrpUrl = (itemCode: string,) => {
+export const getPatchCatalogProductMrpUrl = (params: PatchCatalogProductMrpParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/catalog/products/${itemCode}/mrp`
+  return stringifiedParams.length > 0 ? `/api/catalog/product/mrp?${stringifiedParams}` : `/api/catalog/product/mrp`
 }
 
 /**
  * @summary Set a new current MRP for a product (inline edit, no file upload required)
  */
-export const patchCatalogProductMrp = async (itemCode: string,
-    patchCatalogProductMrpBody: PatchCatalogProductMrpBody, options?: RequestInit): Promise<PatchCatalogProductMrp200> => {
+export const patchCatalogProductMrp = async (patchCatalogProductMrpBody: PatchCatalogProductMrpBody,
+    params: PatchCatalogProductMrpParams, options?: RequestInit): Promise<PatchCatalogProductMrp200> => {
 
-  return customFetch<PatchCatalogProductMrp200>(getPatchCatalogProductMrpUrl(itemCode),
+  return customFetch<PatchCatalogProductMrp200>(getPatchCatalogProductMrpUrl(params),
   {
     ...options,
     method: 'PATCH',
@@ -1486,8 +1492,8 @@ export const patchCatalogProductMrp = async (itemCode: string,
 
 
 export const getPatchCatalogProductMrpMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{data: BodyType<PatchCatalogProductMrpBody>;params: PatchCatalogProductMrpParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{data: BodyType<PatchCatalogProductMrpBody>;params: PatchCatalogProductMrpParams}, TContext> => {
 
 const mutationKey = ['patchCatalogProductMrp'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1499,10 +1505,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCatalogProductMrp>>, {itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}> = (props) => {
-          const {itemCode,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchCatalogProductMrp>>, {data: BodyType<PatchCatalogProductMrpBody>;params: PatchCatalogProductMrpParams}> = (props) => {
+          const {data,params} = props ?? {};
 
-          return  patchCatalogProductMrp(itemCode,data,requestOptions)
+          return  patchCatalogProductMrp(data,params,requestOptions)
         }
 
 
@@ -1520,11 +1526,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Set a new current MRP for a product (inline edit, no file upload required)
  */
 export const usePatchCatalogProductMrp = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{itemCode: string;data: BodyType<PatchCatalogProductMrpBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchCatalogProductMrp>>, TError,{data: BodyType<PatchCatalogProductMrpBody>;params: PatchCatalogProductMrpParams}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof patchCatalogProductMrp>>,
         TError,
-        {itemCode: string;data: BodyType<PatchCatalogProductMrpBody>},
+        {data: BodyType<PatchCatalogProductMrpBody>;params: PatchCatalogProductMrpParams},
         TContext
       > => {
       return useMutation(getPatchCatalogProductMrpMutationOptions(options));
@@ -4116,8 +4122,7 @@ export function useGetMrpIncreases<TData = Awaited<ReturnType<typeof getMrpIncre
 
 
 
-export const getGetPriceHistoryUrl = (itemCode: string,
-    params?: GetPriceHistoryParams,) => {
+export const getGetPriceHistoryUrl = (params: GetPriceHistoryParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -4129,17 +4134,16 @@ export const getGetPriceHistoryUrl = (itemCode: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/analysis/price-history/${itemCode}?${stringifiedParams}` : `/api/analysis/price-history/${itemCode}`
+  return stringifiedParams.length > 0 ? `/api/analysis/price-history?${stringifiedParams}` : `/api/analysis/price-history`
 }
 
 /**
  * Standard Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
  * @summary Period-to-period price history for a Prayag SKU
  */
-export const getPriceHistory = async (itemCode: string,
-    params?: GetPriceHistoryParams, options?: RequestInit): Promise<PriceHistory> => {
+export const getPriceHistory = async (params: GetPriceHistoryParams, options?: RequestInit): Promise<PriceHistory> => {
 
-  return customFetch<PriceHistory>(getGetPriceHistoryUrl(itemCode,params),
+  return customFetch<PriceHistory>(getGetPriceHistoryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4152,31 +4156,29 @@ export const getPriceHistory = async (itemCode: string,
 
 
 
-export const getGetPriceHistoryQueryKey = (itemCode: string,
-    params?: GetPriceHistoryParams,) => {
+export const getGetPriceHistoryQueryKey = (params?: GetPriceHistoryParams,) => {
     return [
-    `/api/analysis/price-history/${itemCode}`, ...(params ? [params] : [])
+    `/api/analysis/price-history`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPriceHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getPriceHistory>>, TError = ErrorType<unknown>>(itemCode: string,
-    params?: GetPriceHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetPriceHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getPriceHistory>>, TError = ErrorType<unknown>>(params: GetPriceHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPriceHistoryQueryKey(itemCode,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceHistoryQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceHistory>>> = ({ signal }) => getPriceHistory(itemCode,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceHistory>>> = ({ signal }) => getPriceHistory(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(itemCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData> & { queryKey: QueryKey }
 }
 
 export type GetPriceHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceHistory>>>
@@ -4188,12 +4190,11 @@ export type GetPriceHistoryQueryError = ErrorType<unknown>
  */
 
 export function useGetPriceHistory<TData = Awaited<ReturnType<typeof getPriceHistory>>, TError = ErrorType<unknown>>(
- itemCode: string,
-    params?: GetPriceHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params: GetPriceHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetPriceHistoryQueryOptions(itemCode,params,options)
+  const queryOptions = getGetPriceHistoryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -115,11 +115,8 @@ export const ExternalListProductsResponse = zod.object({
 /**
  * @summary External API: product detail with MRP history (requires X-API-Key header)
  */
-export const ExternalGetProductParams = zod.object({
-  "itemCode": zod.coerce.string()
-})
-
 export const ExternalGetProductQueryParams = zod.object({
+  "itemCode": zod.coerce.string(),
   "asOf": zod.date().optional().describe('Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.')
 })
 
@@ -289,11 +286,8 @@ export const GetCatalogProductsResponse = zod.object({
 /**
  * @summary Get a product with its full MRP price history
  */
-export const GetCatalogProductParams = zod.object({
-  "itemCode": zod.coerce.string()
-})
-
 export const GetCatalogProductQueryParams = zod.object({
+  "itemCode": zod.coerce.string(),
   "asOf": zod.date().optional().describe('Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.')
 })
 
@@ -428,7 +422,7 @@ export const GetPriceFinderBrowseResponse = zod.object({
 /**
  * @summary Get current Prayag and competitor prices for one product
  */
-export const GetPriceFinderProductParams = zod.object({
+export const GetPriceFinderProductQueryParams = zod.object({
   "itemCode": zod.coerce.string()
 })
 
@@ -544,7 +538,7 @@ export const ExportPriceFinderComparisonQueryParams = zod.object({
 /**
  * @summary Set a new current MRP for a product (inline edit, no file upload required)
  */
-export const PatchCatalogProductMrpParams = zod.object({
+export const PatchCatalogProductMrpQueryParams = zod.object({
   "itemCode": zod.coerce.string()
 })
 
@@ -1511,11 +1505,8 @@ export const GetMrpIncreasesResponse = zod.object({
  * Standard Prayag MRP history and competitor price history for a given item code, with % change between consecutive periods.
  * @summary Period-to-period price history for a Prayag SKU
  */
-export const GetPriceHistoryParams = zod.object({
-  "itemCode": zod.coerce.string()
-})
-
 export const GetPriceHistoryQueryParams = zod.object({
+  "itemCode": zod.coerce.string(),
   "asOf": zod.date().optional().describe('Derive Current, Upcoming, and Superseded status as of this date. Defaults to today.')
 })
 

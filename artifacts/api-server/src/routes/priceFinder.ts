@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import XLSX from "xlsx";
@@ -803,10 +803,17 @@ type CompetitorRow = {
   upcoming_effective_date: string | null;
 };
 
-router.get(
-  "/price-finder/product/:itemCode",
-  async (req: Request<{ itemCode: string }>, res) => {
-    const itemCode = req.params.itemCode;
+async function getPriceFinderProduct(req: Request, res: Response) {
+    const itemCode =
+      typeof req.query.itemCode === "string"
+        ? req.query.itemCode.trim()
+        : typeof req.params.itemCode === "string"
+          ? req.params.itemCode.trim()
+          : "";
+    if (!itemCode) {
+      res.status(400).json({ error: "itemCode required" });
+      return;
+    }
     const products = await db.execute<ProductRow>(sql`
       SELECT
         p.item_code,
@@ -1024,8 +1031,10 @@ router.get(
       competitors: competitorItems,
       variants: variantItems,
     });
-  },
-);
+}
+
+router.get("/price-finder/product", getPriceFinderProduct);
+router.get("/price-finder/product/:itemCode", getPriceFinderProduct);
 
 router.get("/price-finder/comparison", async (req, res) => {
   const codes = [...new Set(queryArray(req.query.code ?? req.query.codes))];

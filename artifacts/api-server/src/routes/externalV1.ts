@@ -39,6 +39,21 @@ router.get("/v1/products/:itemCode", apiKeyAuth, (req: Request<{ itemCode: strin
     catalogRouter,
   ),
 );
+router.get("/v1/product", apiKeyAuth, (req, res, next) => {
+  const itemCode =
+    typeof req.query.itemCode === "string" ? req.query.itemCode.trim() : "";
+  if (!itemCode) {
+    res.status(400).json({ error: "itemCode required" });
+    return;
+  }
+  forward(
+    req,
+    res,
+    next,
+    `/catalog/product?itemCode=${encodeURIComponent(itemCode)}`,
+    catalogRouter,
+  );
+});
 router.get("/v1/comparison", apiKeyAuth, (req, res, next) =>
   forward(req, res, next, "/catalog/comparison", comparisonRouter),
 );

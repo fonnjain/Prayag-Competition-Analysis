@@ -1693,10 +1693,11 @@ router.post("/catalog/mrp-review-batches/:batchId/cancel", requireAdmin, async (
   res.json({ ok: true, cancelled: removed.length });
 });
 
-// GET /catalog/export — current catalog with current MRP, or full history.
+// GET /catalog/export — dated MRP list/revisions, or full history.
 router.get("/catalog/export", async (req, res) => {
   const type = String(req.query.type ?? "catalog");
   const format = String(req.query.format ?? "xlsx");
+  const scope = req.query.scope === "revisions" ? "revisions" : "in-force";
   const asOf =
     typeof req.query.asOf === "string" &&
     /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
@@ -1706,6 +1707,7 @@ router.get("/catalog/export", async (req, res) => {
   let aoa: (string | number | null)[][];
   let sheetName: string;
   let fileBase: string;
+  let summaryAoa: (string | number | null)[][] | null = null;
 
   if (type === "history") {
     sheetName = "MRP History";
@@ -1754,34 +1756,81 @@ router.get("/catalog/export", async (req, res) => {
     ]);
     aoa = [header, ...body];
   } else {
-    sheetName = "Catalog";
-    fileBase = "prayag-catalog";
-    const products = await db
-      .select()
-      .from(catalogProductsTable)
-      .where(and(
-        eq(catalogProductsTable.isActive, true),
-        sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > CURRENT_DATE)`,
-      ))
-      .orderBy(asc(catalogProductsTable.itemCode));
-    const currentResult = await db.execute<{
+    sheetName = scope === "revisions" ? "MRP Revisions" : "MRP In Force";
+    fileBase =
+      scope === "revisions"
+        ? `prayag-mrp-revisions-effective-${asOf}`
+        : `prayag-mrp-list-in-force-${asOf}`;
+    type CatalogExportRow = {
       item_code: string;
+      product_name: string | null;
+      division: string | null;
+      category: string | null;
+      series_range: string | null;
+      size: string | null;
+      uom: string | null;
       mrp: number | null;
       price_basis: string | null;
       effective_date: string;
-    }>(sql`
-      SELECT DISTINCT ON (h.item_code)
-        h.item_code, h.mrp, h.price_basis, h.effective_date
-      FROM mrp_price_history h
-      JOIN catalog_products p ON p.item_code = h.item_code
-      WHERE h.effective_date <= CURRENT_DATE
-        AND h.review_status = 'approved'
-        AND h.variant = 'Standard'
-        AND p.is_active IS TRUE
-        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
-      ORDER BY h.item_code, h.effective_date DESC, h.id DESC
-    `);
-    const curMap = new Map(currentResult.rows.map((row) => [row.item_code, row]));
+      load_date: string | null;
+      source_file: string | null;
+      data_flag: string | null;
+      discontinued_from: string | null;
+    };
+    const result =
+      scope === "revisions"
+        ? await db.execute<CatalogExportRow>(sql`
+            SELECT
+              h.item_code,
+              p.product_name,
+              p.division,
+              p.category,
+              p.series_range,
+              p.size,
+              p.uom,
+              h.mrp,
+              h.price_basis,
+              h.effective_date,
+              h.load_date,
+              h.source_file,
+              p.data_flag,
+              p.discontinued_from
+            FROM mrp_price_history h
+            JOIN catalog_products p ON p.item_code = h.item_code
+            WHERE h.effective_date = ${asOf}
+              AND h.review_status = 'approved'
+              AND h.variant = 'Standard'
+              AND h.mrp IS NOT NULL
+              AND p.is_active IS TRUE
+              AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
+            ORDER BY h.item_code, h.id DESC
+          `)
+        : await db.execute<CatalogExportRow>(sql`
+            SELECT DISTINCT ON (h.item_code)
+              h.item_code,
+              p.product_name,
+              p.division,
+              p.category,
+              p.series_range,
+              p.size,
+              p.uom,
+              h.mrp,
+              h.price_basis,
+              h.effective_date,
+              h.load_date,
+              h.source_file,
+              p.data_flag,
+              p.discontinued_from
+            FROM mrp_price_history h
+            JOIN catalog_products p ON p.item_code = h.item_code
+            WHERE h.effective_date <= ${asOf}
+              AND h.review_status = 'approved'
+              AND h.variant = 'Standard'
+              AND h.mrp IS NOT NULL
+              AND p.is_active IS TRUE
+              AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
+            ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+          `);
     const header = [
       "Item Code",
       "Product Name",
@@ -1790,32 +1839,51 @@ router.get("/catalog/export", async (req, res) => {
       "Series/Range",
       "Size",
       "UOM",
-      "Current MRP",
+      scope === "revisions" ? "Revised MRP" : "MRP In Force",
       "Basis",
       "Effective Date",
-      "Active",
+      "Load Date",
+      "Source File",
       "Data Flag",
       "Discontinued From",
     ];
-    const body = products.map((p) => {
-      const cur = curMap.get(p.itemCode);
-      return [
-        p.itemCode,
-        p.productName,
-        p.division,
-        p.category,
-        p.seriesRange,
-        p.size,
-        p.uom,
-        cur?.mrp ?? null,
-        cur?.price_basis ?? null,
-        cur?.effective_date ?? null,
-        p.isActive ? "Yes" : "No",
-        p.dataFlag,
-        p.discontinuedFrom,
-      ];
-    });
+    const body = result.rows.map((row) => [
+      row.item_code,
+      row.product_name,
+      row.division,
+      row.category,
+      row.series_range,
+      row.size,
+      row.uom,
+      row.mrp,
+      row.price_basis,
+      row.effective_date,
+      row.load_date,
+      row.source_file,
+      row.data_flag,
+      row.discontinued_from,
+    ]);
     aoa = [header, ...body];
+    summaryAoa = [
+      [
+        "Scope",
+        scope === "revisions"
+          ? `Prayag MRP revisions effective exactly ${asOf}`
+          : `Prayag MRP list in force on ${asOf}`,
+      ],
+      ["Product count", body.length],
+      ["Requested date", asOf],
+      [
+        "Resolution rule",
+        scope === "revisions"
+          ? "Approved Standard MRP rows whose effective date equals the requested date."
+          : "Latest approved Standard MRP on or before the requested date for each live product.",
+      ],
+      [
+        "Availability rule",
+        "Active catalogue products excluding products discontinued on or before the requested date.",
+      ],
+    ];
   }
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -1832,6 +1900,10 @@ router.get("/catalog/export", async (req, res) => {
   }
 
   const wb = XLSX.utils.book_new();
+  if (summaryAoa) {
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryAoa);
+    XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
+  }
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   res.setHeader(

@@ -1149,7 +1149,7 @@ function ProductView({
   isSelected: boolean;
   onToggleSelection: (itemCode: string) => void;
 }) {
-  const { data, isLoading, isError } = useGetPriceFinderProduct(itemCode, {
+  const { data, isLoading, isError } = useGetPriceFinderProduct({ itemCode }, {
     query: {
       queryKey: ["price-finder-product", itemCode],
       enabled: !!itemCode,

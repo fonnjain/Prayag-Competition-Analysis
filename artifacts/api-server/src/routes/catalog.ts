@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { sql, eq, asc, desc, and } from "drizzle-orm";
 import { recomputeCurrentFlags } from "../lib/catalog";
 import { requireAdmin } from "../middlewares/authMiddleware";
@@ -34,6 +34,16 @@ function dateParam(value: unknown): string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? value
     : new Date().toISOString().slice(0, 10);
+}
+
+function requestedItemCode(req: Request): string | null {
+  const value =
+    typeof req.query.itemCode === "string"
+      ? req.query.itemCode
+      : typeof req.params.itemCode === "string"
+        ? req.params.itemCode
+        : null;
+  return value?.trim() || null;
 }
 
 type MrpSourceHealthRow = {
@@ -437,9 +447,15 @@ router.post(
   },
 );
 
-// GET /catalog/products/:itemCode — product + full price history (newest first).
-router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string }>, res) => {
-  const itemCode = req.params.itemCode;
+// Query form is canonical because item codes are opaque and may contain URL
+// path delimiters such as "/", "#", "%", "+", or spaces. Keep the legacy path
+// route for existing bookmarks that contain path-safe codes.
+async function getCatalogProduct(req: Request, res: Response) {
+  const itemCode = requestedItemCode(req);
+  if (!itemCode) {
+    res.status(400).json({ error: "itemCode required" });
+    return;
+  }
   const asOf = dateParam(req.query.asOf);
   const products = await db
     .select()
@@ -502,13 +518,20 @@ router.get("/catalog/products/:itemCode", async (req: Request<{ itemCode: string
       };
     }),
   });
-});
+}
+
+router.get("/catalog/product", getCatalogProduct);
+router.get("/catalog/products/:itemCode", getCatalogProduct);
 
 // PATCH /catalog/products/:itemCode/mrp — apply a reviewed MRP correction
 // without uploading a workbook. It requires a reason and creates a dedicated
 // manual provenance batch before updating the period's visible MRP.
-router.patch("/catalog/products/:itemCode/mrp", requireAdmin, async (req: Request<{ itemCode: string }>, res) => {
-  const { itemCode } = req.params;
+async function patchCatalogProductMrp(req: Request, res: Response) {
+  const itemCode = requestedItemCode(req);
+  if (!itemCode) {
+    res.status(400).json({ error: "itemCode required" });
+    return;
+  }
   const body = req.body as { mrp?: unknown; effectiveDate?: unknown; reason?: unknown };
 
   const mrp = Number(body.mrp);
@@ -679,7 +702,10 @@ router.patch("/catalog/products/:itemCode/mrp", requireAdmin, async (req: Reques
     provenanceBatchId: loadBatchId,
     competitorRowsRefreshed: refreshed.length,
   });
-});
+}
+
+router.patch("/catalog/product/mrp", requireAdmin, patchCatalogProductMrp);
+router.patch("/catalog/products/:itemCode/mrp", requireAdmin, patchCatalogProductMrp);
 
 // POST /catalog/seed-variant-prices — idempotent one-time load of sanitaryware
 // colour-variant prices (Ivory / White with Jet / Pink-Green-Blue).

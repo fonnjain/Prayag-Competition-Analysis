@@ -1863,6 +1863,7 @@ asOf?: string;
 };
 
 export type ExternalGetProductParams = {
+itemCode: string;
 /**
  * Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.
  */
@@ -1893,6 +1894,7 @@ asOf?: string;
 };
 
 export type GetCatalogProductParams = {
+itemCode: string;
 /**
  * Resolve product availability as of this date (YYYY-MM-DD). Defaults to today.
  */
@@ -1926,6 +1928,10 @@ category?: string;
  * @maximum 300
  */
 limit?: number;
+};
+
+export type GetPriceFinderProductParams = {
+itemCode: string;
 };
 
 export type GetPriceFinderComparisonParams = {
@@ -1970,6 +1976,10 @@ export const ExportPriceFinderComparisonCompetitorItem = {
   Sparsh_Pearl: 'Sparsh Pearl',
   Vectus: 'Vectus',
 } as const;
+
+export type PatchCatalogProductMrpParams = {
+itemCode: string;
+};
 
 export type PatchCatalogProductMrpBody = {
   /** New MRP value (must be positive) */
@@ -2313,6 +2323,7 @@ limit?: number;
 };
 
 export type GetPriceHistoryParams = {
+itemCode: string;
 /**
  * Derive Current, Upcoming, and Superseded status as of this date. Defaults to today.
  */
