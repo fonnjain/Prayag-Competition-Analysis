@@ -193,3 +193,17 @@ mtime_ms = 1788787105642
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b19b6d3f-c95d-4627-9329-9940efed0060/7e072290-fb1c-4524-a280-7bf97f2287b7"
 storage_version_token = "1788787339171266"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "SGti3PytbHEoX47zWeBSP"
+uri = "file://reports/four-open-items-2026-09-07.md"
+type = "text"
+title = "Four Open Items Report"
+description = "Guard audit, endpoint classification, PE-AL-PE parser findings, exact newCodes fix, provenance closure, and price-invariance verification."
+logical_id = "792ed16d-9c3d-4150-a52e-7bdf85495aca"
+content_hash = "sha256:ff85c082a41e989e0ebc83d60358c05ebf536915cec1c454586bc6b68b892a34"
+size = 7022
+mtime_ms = 1788791493358
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/792ed16d-9c3d-4150-a52e-7bdf85495aca/11daff82-739e-4ea6-9296-5e53c765bf2e"
+storage_version_token = "1788791544743384"
+content_type = "text/markdown"

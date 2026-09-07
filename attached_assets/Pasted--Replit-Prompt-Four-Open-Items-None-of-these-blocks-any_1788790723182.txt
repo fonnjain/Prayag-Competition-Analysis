@@ -1,0 +1,111 @@
+# Replit Prompt — Four Open Items
+
+None of these blocks anything. All four were deferred while the September load took priority, and all four are small. Do them in the order given — the first is the only one with real exposure, and the second is the only one with a deadline.
+
+Task #140, the upcoming-gap display, is a separate piece of work with its own prompt and is not part of this.
+
+---
+
+## 1. The catalogue import has no admin restriction
+
+`routes/index.ts` mounts every router behind a single `requireAuth` that checks only `req.isAuthenticated()`. `adminUsers.ts` has its own `requireAdmin` testing `role !== "admin"`. The import routes do not.
+
+**Verify the current state first** — commits have landed since this was last looked at. Report what actually guards each router today before changing anything.
+
+If the gap is still open, apply the existing `requireAdmin` pattern to the routes that **write** catalogue or price data:
+
+- `catalogImportExportRouter` — MRP and catalogue import
+- `catalogSyncRouter`
+- `importBatchesRouter` — approve and commit
+- `apiKeysRouter` — issuing keys is an administrative act
+
+### Why this matters more than it did
+
+The Load MRP form is the **official production data-load path**. It has now written three master loads to production, most recently 6,256 rows as batch 17. That reach currently belongs to every account with a login.
+
+A preview and Apply gate was added on 07 September, which helps — but a preview only protects you if the person looking at it is meant to be there.
+
+This is about blast radius from an ordinary mistake, not distrust. Batch 154 showed what one wrong import does — 1,828 rows dated the upload day, correct prices silently overridden. That was development. The same form now writes production.
+
+### Two things to get right
+
+`catalogRouter` serves reads as well as writes. Do not put a blanket admin guard on it — that locks ordinary users out of the catalogue they need. Guard the write endpoints only, and **list which endpoints you classified as writes and which as reads** so the split can be checked.
+
+Enforce **server-side at the router**. A hidden menu item is not a control. Verify with a direct request from a non-admin session, no UI involved.
+
+---
+
+## 2. The PE-AL-PE extraction reads weight columns as prices
+
+`PEA-64B` loaded at **₹0.55** against a true ₹2,596. The source row is:
+
+```
+['32', 'PEA-64B', '723.88', '0.3', '0.552']
+```
+
+The loader took `0.552` — a weight. `PEA-325B` came out at 0.47 against 2,248. Seventy codes were affected.
+
+Prayag's authoritative files corrected the values, so the data is right today. **The loader is not.**
+
+This is the item with a deadline. Prayag has sent three master workbooks in two weeks, and the most recent one moved 495 Pipes & Fittings rows into a new period. The next Pipes & Fittings sheet will hit the same fallback.
+
+The exposure is any sheet where a numeric column sits to the right of a code column without a price header. Report which other sheets share that shape before fixing, so the fix covers them rather than just this one.
+
+The rule the MRP loader already applies elsewhere: a column is a price column only when its header says so or a dated header identifies the period. A bare numeric column adjacent to a code is not a price. And the existing guard rejecting `weight`, `kg`, `cost`, `packing` headers should have caught this — report why it did not.
+
+---
+
+## 3. `newCodes` undercounts by one
+
+Both the development and production loads of batch 15 reported **10 new products** where **11** were created. `EP-GANESHA` was created correctly but omitted from the summary.
+
+The list is computed from a catalog snapshot taken before the final write, so a code created in that window never appears. The data was right; the report was wrong.
+
+A code created without appearing in the summary is a **silent addition** — the wrong direction to err. Derive `newCodes` from the same final state as the before/after count, so the two cannot disagree.
+
+Same shape as the `row_count` versus live-linked-rows issue: a figure taken at the wrong point in the sequence.
+
+---
+
+## 4. Confirm nothing is still writing without provenance
+
+The 148 January colour rows were reconciled into batch 16, and `nullLoadBatchCount` reached zero. Since then two separate loads have reported **test-sentinel rows without provenance** appearing and being removed — five during the v2 development load, and earlier the eleven `MKT-GAP-*` and `__MRP_REVIEW_*__` fixtures.
+
+The fixture-batch work was supposed to have closed that path. It has not.
+
+Report which test or path creates unbatched rows, and close it. A counter that reads zero only because someone deletes rows before checking is not a control.
+
+Then confirm `nullLoadBatchCount` is zero in both development and production, and stays zero after the test suite runs.
+
+---
+
+## Acceptance tests
+
+```
+1.  A non-admin authenticated session receives 403 from the MRP import,
+    catalogue sync, import-batch approve, and API key endpoints.
+2.  An admin session succeeds on all of the above.
+3.  A non-admin session can still read the catalogue, run a comparison and
+    use analysis — no regression for ordinary users.
+4.  An anonymous request returns 401, not 403.
+5.  A sheet with a bare numeric column to the right of a code column does not
+    produce a price from it; the row is reported instead.
+6.  A load creating N products reports exactly N in newCodes.
+7.  nullLoadBatchCount is zero in development and production, and remains
+    zero after the test suite runs.
+8.  No price, gap or ranking value changes anywhere in this task.
+```
+
+Test 3 catches over-correction — locking ordinary users out of the catalogue would be worse than the gap. Test 8 is the guard: none of this should move a number.
+
+---
+
+## Report
+
+- What guards each router today, before and after.
+- Which endpoints you classified as writes, and which as reads.
+- Which other sheets share the bare-numeric-column shape, and why the existing header guard missed it.
+- Which test or path creates unbatched rows, and how it was closed.
+- Confirmation that no price changed.
+
+One clean commit.
