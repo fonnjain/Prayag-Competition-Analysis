@@ -1,0 +1,146 @@
+# Replit Prompt — Load the Revised Authoritative Master (v2)
+
+Prayag has revised the 01 September master again. **It supersedes the file loaded as batch 15.**
+
+---
+
+## Input file
+
+**`Prayag_MRP_Authoritative_v2_01Sep2026.xlsx`**
+
+```
+SHA-256   e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e
+```
+
+Verify the hash before loading. Derived from Prayag's `Prayag - MRP - Master - MRP 01st Sep, 2026.xlsx` (`5b28687945…`) with dates normalised, columns renamed, and prices rounded to two decimals. No value otherwise altered.
+
+| Sheet | Rows | Use |
+|---|---:|---|
+| `products` | 6,106 | Load |
+| `discontinued` | 233 | Load — unchanged from the previous master |
+| `excluded_do_not_load` | 142 | Reference only |
+| `notes` | — | Provenance |
+
+---
+
+## 1. What changed against batch 15
+
+| | Batch 15 | This file |
+|---|---:|---:|
+| Loadable products | 6,076 | **6,106** |
+| MRP changed | — | **395** |
+| Effective date changed | — | **465** |
+| New loadable products | — | **30** |
+| Discontinued | 233 | 233, unchanged |
+
+### The 465 date moves all go one way
+
+```
+2026-05-01  →  2026-08-10     396
+2026-02-01  →  2026-08-10      69
+```
+
+The **10 August 2026** Pipes & Fittings period grows from 85 products to **580**. Nothing moved out of it; no other period changed.
+
+**That date has passed**, so these prices take effect the moment they load — they are not future-dated. Report how many products change price today as a result.
+
+### The price changes are substantial, not rounding
+
+```
+P10A12   5,913 → 7,354   (+1,441)      P10A04    186 →   168   (−18)
+BOS-108  1,190 → 1,990   (+800)        P10A03    116 →   108   (−8)
+BEA-45   1,680 → 2,090   (+410)        P10A10  1,728 → 1,722   (−6)
+```
+
+Mostly the `P10`, `PF`, `PG`, `PP` pipe families. Both directions. Adopt as given.
+
+### The 30 additions
+
+All Pipes & Fittings at 10 August — the `PF`, `PG`, `PP` families. They are genuinely new products with prices, unlike the 142 excluded rows.
+
+---
+
+## 2. Rounding was applied, deliberately
+
+Prayag's file carries floating-point artefacts from spreadsheet formulas:
+
+```
+PF326   515.1999999999999      →  515.20
+PF525   436.99999999999994     →  437.00
+PF71  10060.199999999999       →  10,060.20
+```
+
+These are computed values, not typed ones. Stored at two decimals. **Report any row where the rounded value differs from the source by more than half a paisa** — there should be none, and a hit would mean something other than a formula artefact.
+
+---
+
+## 3. Fifteen `-VB` codes are not in this file
+
+`121-VB`, `124-VB`, `127-VB`, `129-VB`, `130-VB` and ten more appear in Prayag's sheet with **no price and no effective date**. They look like a new Bib Cock variant being set up but not yet priced.
+
+They are held out of the load. Report them so they can be confirmed with Prayag; do not create products from them.
+
+The other 142 excluded rows are as before — 139 already in the discontinued sheet, and the three `Invalid Input` codes `20`, `25`, `32`.
+
+---
+
+## 4. Loading
+
+Same rules as batch 15.
+
+**Read `effective_date` per row.** Six periods are present:
+
+```
+2026-09-01  2,409     2026-08-01    865     2026-02-01  1,616
+2026-08-10    580     2026-05-01    475     2024-02-15    161
+```
+
+Never infer the date from the division or from the file title.
+
+Colour columns map to `variant = 'Ivory'`, `'White with Jet'`, `'Pink / Green / Blue'`. A blank cell means that colour is not offered — write no row, never fall back to the standard price.
+
+Discontinuations are unchanged at 233, each with its own date. Set `discontinued_from` from the row.
+
+Register a load batch with the file name, the SHA-256 above, the download date, and the reason: *"Revised authoritative master from Prayag, superseding batch 15."*
+
+Load in development first, verify, then production through the Load MRP form as before.
+
+---
+
+## 5. Acceptance tests
+
+```
+1.  6,106 product rows load; the 142 excluded rows do not appear.
+2.  The 2026-08-10 period holds 580 rows, up from 85.
+3.  P10A12 resolves to 7,354; BOS-108 to 1,990; P10A04 to 168.
+4.  PF326 resolves to exactly 515.20, not 515.1999999999999.
+5.  PF71 and the other 29 new Pipes & Fittings codes exist and resolve.
+6.  No -VB code was created.
+7.  233 codes carry a discontinued_from, matching the sheet.
+8.  CCL-60-BSK still resolves to 1,190 at 2026-09-01 — the Hardware period
+    is untouched by this load.
+9.  Every mrp_price_history row has a load_batch_id.
+10. All 150 Sparsh Pearl mappings still resolve to a catalog_products row.
+11. The 12 CH valve name corrections survive — CH82F still reads
+    "Full Turn Concealed Valve 1 inch TRIANGULAR".
+```
+
+Test 11 matters. This file comes from Prayag's master, which still carries the old names and the TRIANGULER spelling. **The load must not undo the name corrections.** If it would, report that before loading rather than after.
+
+---
+
+## 6. Report
+
+Read every figure from the database:
+
+- Rows and distinct codes, before and after.
+- Rows per period, confirming 2026-08-10 at 580.
+- How many products change price **today** because of the 10 August moves.
+- The 30 new codes created.
+- Any row whose rounded value differs from source by more than half a paisa.
+- Whether the CH valve names survived, and the TRIANGULAR spelling with them.
+- Confirmation that the Hardware September period and the Sparsh mappings are untouched.
+
+**If loading would overwrite the CH name corrections, stop and report.** That is a conflict between two authoritative sources and needs a decision, not a default.
+
+One clean commit.
