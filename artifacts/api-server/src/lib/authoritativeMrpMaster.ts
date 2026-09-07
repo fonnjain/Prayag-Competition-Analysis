@@ -22,11 +22,92 @@ import {
 export const AUTHORITATIVE_MASTER_SHA256 = AUTHORITATIVE_MASTER_BATCH.fileSha256;
 export const AUTHORITATIVE_MASTER_FILE_NAME = AUTHORITATIVE_MASTER_BATCH.fileName;
 
-const EXPECTED_PRODUCT_ROWS = 6_076;
 const EXPECTED_DISCONTINUED_ROWS = 233;
 const EXPECTED_EXCLUDED_ROWS = 142;
-const LOAD_REASON =
-  `${AUTHORITATIVE_MASTER_SOURCE.notes}`;
+export const AUTHORITATIVE_MASTER_V2_SHA256 =
+  "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e";
+export const AUTHORITATIVE_MASTER_V2_FILE_NAME =
+  "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx";
+
+interface NamePreservationException {
+  itemCode: string;
+  preservedName: string;
+}
+
+const V2_NAME_PRESERVATION_EXCEPTIONS: readonly NamePreservationException[] = [
+  {
+    itemCode: "CH72",
+    preservedName:
+      "Long Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR",
+  },
+  {
+    itemCode: "CH72F",
+    preservedName: "Full Turn Concealed Valve 3⁄4 inch TRIANGULAR",
+  },
+  {
+    itemCode: "CH72QS",
+    preservedName:
+      "Short Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR",
+  },
+  {
+    itemCode: "CH82",
+    preservedName:
+      "Long Concealed Valve (Quarter Turn) 1 inch TRIANGULAR",
+  },
+  {
+    itemCode: "CH82F",
+    preservedName: "Full Turn Concealed Valve 1 inch TRIANGULAR",
+  },
+  {
+    itemCode: "UH-72",
+    preservedName:
+      "Long Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR mm",
+  },
+  {
+    itemCode: "UH72-S",
+    preservedName:
+      "Short Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR mm",
+  },
+  {
+    itemCode: "UH82",
+    preservedName:
+      "Long Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm",
+  },
+  {
+    itemCode: "UH82-S",
+    preservedName:
+      "Short Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm",
+  },
+] as const;
+
+interface AuthoritativeMasterProfile {
+  fileName: string;
+  fileSha256: string;
+  expectedProductRows: number;
+  loadReason: string;
+  dataFlag: string;
+  namePreservationExceptions: readonly NamePreservationException[];
+}
+
+const AUTHORITATIVE_MASTER_PROFILES: readonly AuthoritativeMasterProfile[] = [
+  {
+    fileName: AUTHORITATIVE_MASTER_FILE_NAME,
+    fileSha256: AUTHORITATIVE_MASTER_SHA256,
+    expectedProductRows: 6_076,
+    loadReason: `${AUTHORITATIVE_MASTER_SOURCE.notes}`,
+    dataFlag: "authoritative_master_2026_09_01",
+    namePreservationExceptions: [],
+  },
+  {
+    fileName: AUTHORITATIVE_MASTER_V2_FILE_NAME,
+    fileSha256: AUTHORITATIVE_MASTER_V2_SHA256,
+    expectedProductRows: 6_106,
+    loadReason:
+      "Revised authoritative master from Prayag, superseding batch 15.",
+    dataFlag: "authoritative_master_v2_2026_09_01",
+    namePreservationExceptions: V2_NAME_PRESERVATION_EXCEPTIONS,
+  },
+] as const;
 const DEACTIVATED_CODES = [
   "PS1106",
   "PS1606",
@@ -59,6 +140,10 @@ export interface AuthoritativeDiscontinuedRow {
 }
 
 export interface ParsedAuthoritativeMaster {
+  fileName: string;
+  fileSha256: string;
+  loadReason: string;
+  dataFlag: string;
   productRows: AuthoritativePriceRow[];
   priceRows: AuthoritativePriceRow[];
   discontinuedRows: AuthoritativeDiscontinuedRow[];
@@ -67,6 +152,11 @@ export interface ParsedAuthoritativeMaster {
   periodCounts: Record<string, number>;
   periodDivisionCounts: Record<string, number>;
   variantCounts: Record<Variant, number>;
+  preservedNameDisagreements: {
+    itemCode: string;
+    sourceName: string;
+    preservedName: string;
+  }[];
 }
 
 export interface AuthoritativeTransactionExecutor {
@@ -128,18 +218,29 @@ function requireHeaders(
 }
 
 export function isAuthoritativeMasterBuffer(buffer: Buffer): boolean {
-  return sha256ForBuffer(buffer) === AUTHORITATIVE_MASTER_SHA256;
+  const hash = sha256ForBuffer(buffer);
+  return AUTHORITATIVE_MASTER_PROFILES.some(
+    (profile) => profile.fileSha256 === hash,
+  );
+}
+
+function profileForHash(hash: string): AuthoritativeMasterProfile {
+  const profile = AUTHORITATIVE_MASTER_PROFILES.find(
+    (candidate) => candidate.fileSha256 === hash,
+  );
+  if (!profile) {
+    throw new Error(
+      `Authoritative master checksum mismatch. Supported checksums: ${AUTHORITATIVE_MASTER_PROFILES.map((candidate) => candidate.fileSha256).join(", ")}; received ${hash}.`,
+    );
+  }
+  return profile;
 }
 
 export function parseAuthoritativeMasterBuffer(
   buffer: Buffer,
 ): ParsedAuthoritativeMaster {
   const actualHash = sha256ForBuffer(buffer);
-  if (actualHash !== AUTHORITATIVE_MASTER_SHA256) {
-    throw new Error(
-      `Authoritative master checksum mismatch. Expected ${AUTHORITATIVE_MASTER_SHA256}, received ${actualHash}.`,
-    );
-  }
+  const profile = profileForHash(actualHash);
 
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
   const expectedSheets = [
@@ -160,9 +261,9 @@ export function parseAuthoritativeMasterBuffer(
   const products = recordsForSheet(workbook, "products");
   const discontinued = recordsForSheet(workbook, "discontinued");
   const excluded = recordsForSheet(workbook, "excluded_do_not_load");
-  if (products.length !== EXPECTED_PRODUCT_ROWS) {
+  if (products.length !== profile.expectedProductRows) {
     throw new Error(
-      `Expected ${EXPECTED_PRODUCT_ROWS} product rows, found ${products.length}.`,
+      `Expected ${profile.expectedProductRows} product rows, found ${products.length}.`,
     );
   }
   if (discontinued.length !== EXPECTED_DISCONTINUED_ROWS) {
@@ -321,7 +422,32 @@ export function parseAuthoritativeMasterBuffer(
     );
   }
 
+  const productRowsByCode = new Map(
+    productRows.map((row) => [row.itemCode, row] as const),
+  );
+  const preservedNameDisagreements =
+    profile.namePreservationExceptions.flatMap((exception) => {
+      const source = productRowsByCode.get(exception.itemCode);
+      if (!source) {
+        throw new Error(
+          `Named product-name preservation exception is missing from the workbook: ${exception.itemCode}.`,
+        );
+      }
+      if (source.productName === exception.preservedName) return [];
+      return [
+        {
+          itemCode: exception.itemCode,
+          sourceName: source.productName,
+          preservedName: exception.preservedName,
+        },
+      ];
+    });
+
   return {
+    fileName: profile.fileName,
+    fileSha256: profile.fileSha256,
+    loadReason: profile.loadReason,
+    dataFlag: profile.dataFlag,
     productRows,
     priceRows,
     discontinuedRows,
@@ -330,6 +456,7 @@ export function parseAuthoritativeMasterBuffer(
     periodCounts,
     periodDivisionCounts,
     variantCounts,
+    preservedNameDisagreements,
   };
 }
 
@@ -344,6 +471,21 @@ export async function loadAuthoritativeMaster(input: {
     throw new Error("downloadedAt must be a valid YYYY-MM-DD date.");
   }
   const parsed = parseAuthoritativeMasterBuffer(input.buffer);
+  const preservedNamesByCode = new Map(
+    parsed.preservedNameDisagreements.map((row) => [
+      row.itemCode,
+      row.preservedName,
+    ]),
+  );
+  const namePreservationNote = parsed.preservedNameDisagreements.length
+    ? ` Named product-name exceptions (${parsed.preservedNameDisagreements.length}): ${parsed.preservedNameDisagreements
+        .map(
+          (row) =>
+            `${row.itemCode}: "${row.sourceName}" -> "${row.preservedName}"`,
+        )
+        .join("; ")}`
+    : "";
+  const loadNotes = `${parsed.loadReason}${namePreservationNote}`;
 
   const load = async (tx: DatabaseTransaction) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(917_901)`);
@@ -375,7 +517,7 @@ export async function loadAuthoritativeMaster(input: {
       .where(
         and(
           eq(mrpLoadBatchesTable.sourceId, sourceId),
-          eq(mrpLoadBatchesTable.fileSha256, AUTHORITATIVE_MASTER_SHA256),
+          eq(mrpLoadBatchesTable.fileSha256, parsed.fileSha256),
         ),
       );
     if (existingBatches.length) {
@@ -397,7 +539,10 @@ export async function loadAuthoritativeMaster(input: {
     `);
 
     const existingProducts = await tx
-      .select({ itemCode: catalogProductsTable.itemCode })
+      .select({
+        itemCode: catalogProductsTable.itemCode,
+        productName: catalogProductsTable.productName,
+      })
       .from(catalogProductsTable);
     const existingCodes = new Set(
       existingProducts.map((row) => authoritativeCode(row.itemCode)),
@@ -418,18 +563,35 @@ export async function loadAuthoritativeMaster(input: {
         `Expected removed Prayag codes are missing from the catalog: ${missingDeactivated.join(", ")}.`,
       );
     }
+    const existingNames = new Map(
+      existingProducts.map((row) => [row.itemCode, row.productName] as const),
+    );
+    const unexpectedPreservedNames =
+      parsed.preservedNameDisagreements.filter(
+        (row) => existingNames.get(row.itemCode) !== row.preservedName,
+      );
+    if (unexpectedPreservedNames.length) {
+      throw new Error(
+        `Named product-name exceptions do not match the audited catalog: ${unexpectedPreservedNames
+          .map(
+            (row) =>
+              `${row.itemCode} is "${existingNames.get(row.itemCode) ?? "<missing>"}", expected "${row.preservedName}"`,
+          )
+          .join("; ")}.`,
+      );
+    }
 
     const batch = await tx
       .insert(mrpLoadBatchesTable)
       .values({
         sourceId,
-        fileName: AUTHORITATIVE_MASTER_FILE_NAME,
-        fileSha256: AUTHORITATIVE_MASTER_SHA256,
+        fileName: parsed.fileName,
+        fileSha256: parsed.fileSha256,
         fileSizeBytes: input.buffer.length,
         downloadedAt: input.downloadedAt,
         loadedBy: input.loadedBy,
         rowCount: parsed.priceRows.length,
-        notes: LOAD_REASON,
+        notes: loadNotes,
       })
       .returning({ id: mrpLoadBatchesTable.id });
     const loadBatchId = batch[0]!.id;
@@ -438,7 +600,7 @@ export async function loadAuthoritativeMaster(input: {
     for (let index = 0; index < parsed.productRows.length; index += 500) {
       const values = parsed.productRows.slice(index, index + 500).map((row) => ({
         itemCode: row.itemCode,
-        productName: row.productName,
+        productName: preservedNamesByCode.get(row.itemCode) ?? row.productName,
         division: row.division,
         category: row.series,
         seriesRange: row.series,
@@ -448,8 +610,8 @@ export async function loadAuthoritativeMaster(input: {
         discontinuedFrom: null,
         discontinuedCheckedBy: null,
         discontinuedStatusNote: null,
-        sourceFiles: AUTHORITATIVE_MASTER_FILE_NAME,
-        dataFlag: "authoritative_master_2026_09_01",
+        sourceFiles: parsed.fileName,
+        dataFlag: parsed.dataFlag,
         updatedAt: new Date(),
       }));
       const inserted = await tx
@@ -473,8 +635,8 @@ export async function loadAuthoritativeMaster(input: {
             discontinuedFrom: null,
             discontinuedCheckedBy: null,
             discontinuedStatusNote: null,
-            sourceFiles: AUTHORITATIVE_MASTER_FILE_NAME,
-            dataFlag: "authoritative_master_2026_09_01",
+            sourceFiles: parsed.fileName,
+            dataFlag: parsed.dataFlag,
             updatedAt: new Date(),
           },
         });
@@ -496,9 +658,9 @@ export async function loadAuthoritativeMaster(input: {
         priceBasis: "MRP",
         effectiveDate: row.effectiveDate,
         loadDate,
-        sourceFile: AUTHORITATIVE_MASTER_FILE_NAME,
+        sourceFile: parsed.fileName,
         isCurrent: false,
-        notes: LOAD_REASON,
+        notes: parsed.loadReason,
         reviewStatus: "approved",
         reviewReasons: null,
         importBatchId: null,
@@ -521,9 +683,9 @@ export async function loadAuthoritativeMaster(input: {
             discountPct: null,
             priceBasis: "MRP",
             loadDate,
-            sourceFile: AUTHORITATIVE_MASTER_FILE_NAME,
+            sourceFile: parsed.fileName,
             isCurrent: false,
-            notes: LOAD_REASON,
+            notes: parsed.loadReason,
             reviewStatus: "approved",
             reviewReasons: null,
             importBatchId: null,
@@ -547,8 +709,8 @@ export async function loadAuthoritativeMaster(input: {
           itemCode: row.itemCode,
           effectiveDate: row.effectiveDate,
           action: "authoritative_master_import",
-          reason: LOAD_REASON,
-          sourceFile: AUTHORITATIVE_MASTER_FILE_NAME,
+          reason: parsed.loadReason,
+          sourceFile: parsed.fileName,
           loadBatchId,
           mrp: row.mrp,
         })),
@@ -617,6 +779,7 @@ export async function loadAuthoritativeMaster(input: {
       periodCounts: parsed.periodCounts,
       periodDivisionCounts: parsed.periodDivisionCounts,
       variantCounts: parsed.variantCounts,
+      preservedNameDisagreements: parsed.preservedNameDisagreements,
     };
   };
   const result = input.transaction
