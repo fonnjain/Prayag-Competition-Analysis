@@ -95,6 +95,39 @@ export const mrpLoadBatchesTable = pgTable(
   ],
 );
 
+// An MRP upload is staged here before it is allowed to alter the catalogue or
+// price history.  `payload` is the validated parse, not the source file, so an
+// Apply always uses precisely the rows the reviewer saw in Preview.
+export const mrpPendingBatchesTable = pgTable(
+  "mrp_pending_batches",
+  {
+    id: serial("id").primaryKey(),
+    sourceId: integer("source_id")
+      .notNull()
+      .references(() => mrpSourcesTable.id),
+    fileName: text("file_name").notNull(),
+    fileSha256: text("file_sha256").notNull(),
+    fileSizeBytes: integer("file_size_bytes").notNull(),
+    downloadedAt: date("downloaded_at", { mode: "string" }).notNull(),
+    uploadedBy: text("uploaded_by"),
+    status: text("status").notNull().default("pending"), // pending | applied | discarded | expired
+    payload: text("payload").notNull(),
+    preview: text("preview").notNull(),
+    result: text("result"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    appliedBy: text("applied_by"),
+    discardedAt: timestamp("discarded_at", { withTimezone: true }),
+    discardedBy: text("discarded_by"),
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
+  },
+  (t) => [
+    index("mrp_pending_batches_status_idx").on(t.status, t.expiresAt),
+    index("mrp_pending_batches_source_hash_idx").on(t.sourceId, t.fileSha256),
+  ],
+);
+
 // MRP price history is append-only for normal source loads. Source-invalid rows
 // can be removed by a documented correction, and same-date manual corrections
 // retain a dedicated audit batch. is_current is a recomputed cache only; every
@@ -524,6 +557,7 @@ export const catalogProductNameCorrectionsTable = pgTable(
 
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
+export type MrpPendingBatch = typeof mrpPendingBatchesTable.$inferSelect;
 
 export type MrpHistoryProvenanceEvent =
   typeof mrpHistoryProvenanceEventsTable.$inferSelect;

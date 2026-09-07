@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import AdmZip from "adm-zip";
-import { and, eq, asc, desc, inArray, sql } from "drizzle-orm";
+import { and, eq, asc, desc, gt, inArray, lte, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -11,13 +11,16 @@ import {
   competitorPricesTable,
   mrpSourcesTable,
   mrpLoadBatchesTable,
+  mrpPendingBatchesTable,
   mrpHistoryProvenanceEventsTable,
   importBatchesTable,
 } from "@workspace/db";
 import {
   recomputeCurrentFlags,
+  recomputeCurrentFlagsInTransaction,
   recomputeCompetitorCurrentFlagsInTransaction,
   normCode,
+  type DatabaseTransaction,
 } from "../lib/catalog";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import { effectivePrice } from "../lib/analysis";
@@ -27,10 +30,13 @@ import {
   ensureOfficialMrpSources,
   isIsoDate,
   sha256ForBuffer,
+  AUTHORITATIVE_MASTER_SOURCE,
 } from "../lib/mrpProvenance";
 import {
   isAuthoritativeMasterBuffer,
   loadAuthoritativeMaster,
+  parseAuthoritativeMasterBuffer,
+  type ParsedAuthoritativeMaster,
 } from "../lib/authoritativeMrpMaster";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 
@@ -48,6 +54,84 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
 });
+
+const PENDING_MRP_BATCH_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
+export function pendingAuthoritativePreview(
+  parsed: ParsedAuthoritativeMaster,
+  products: { itemCode: string; productName: string | null; discontinuedFrom: string | null }[],
+  history: { itemCode: string; effectiveDate: string; mrp: number | null; variant: string }[],
+) {
+  const today = new Date().toISOString().slice(0, 10);
+  const productsByCode = new Map(products.map((row) => [normCode(row.itemCode), row]));
+  const fileCodes = new Set(parsed.productRows.map((row) => normCode(row.itemCode)));
+  const knownPeriods = new Set(history.map((row) => row.effectiveDate));
+  const currentByCode = new Map<string, { mrp: number | null; effectiveDate: string }>();
+  for (const row of history) {
+    if (row.variant !== "Standard" || row.effectiveDate > today) continue;
+    const code = normCode(row.itemCode);
+    const prior = currentByCode.get(code);
+    if (!prior || row.effectiveDate > prior.effectiveDate) {
+      currentByCode.set(code, { mrp: row.mrp, effectiveDate: row.effectiveDate });
+    }
+  }
+  const allPastPriceChanges = parsed.productRows
+    .filter((row) => productsByCode.has(normCode(row.itemCode)) && row.effectiveDate <= today)
+    .flatMap((row) => {
+      const old = currentByCode.get(normCode(row.itemCode));
+      return old && old.mrp !== row.mrp
+        ? [{ itemCode: row.itemCode, productName: productsByCode.get(normCode(row.itemCode))?.productName ?? null, oldMrp: old.mrp, newMrp: row.mrp, effectiveDate: row.effectiveDate, delta: row.mrp - (old.mrp ?? 0) }]
+        : [];
+    })
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const immediatePriceChanges = allPastPriceChanges.filter(
+    (row) =>
+      currentByCode.get(normCode(row.itemCode))?.effectiveDate !==
+      row.effectiveDate,
+  );
+  const existingPeriodPriceRevisions = allPastPriceChanges.filter(
+    (row) =>
+      currentByCode.get(normCode(row.itemCode))?.effectiveDate ===
+      row.effectiveDate,
+  );
+  const periods = Object.entries(parsed.periodCounts)
+    .map(([effectiveDate, rowCount]) => ({
+      effectiveDate, rowCount, isNew: !knownPeriods.has(effectiveDate),
+      movedInCount: parsed.productRows.filter((row) => row.effectiveDate === effectiveDate && currentByCode.get(normCode(row.itemCode))?.effectiveDate !== effectiveDate).length,
+    }))
+    .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
+  const rejectedReasonSummary: Record<string, number> = {};
+  return {
+    kind: "authoritative-master",
+    rowsToWrite: parsed.priceRows.length,
+    productRows: parsed.productRows.length,
+    priceRows: parsed.priceRows.length,
+    periods,
+    immediatePriceChanges,
+    immediatePriceChangeCount: immediatePriceChanges.length,
+    existingPeriodPriceRevisions,
+    existingPeriodPriceRevisionCount: existingPeriodPriceRevisions.length,
+    newProducts: parsed.productRows.filter((row) => !productsByCode.has(normCode(row.itemCode))).map((row) => ({ itemCode: row.itemCode, productName: row.productName })),
+    catalogueProductsAbsentFromFile: products.filter((row) => !fileCodes.has(normCode(row.itemCode))).map((row) => row.itemCode),
+    discontinuations: (() => {
+      const changed = parsed.discontinuedRows.filter(
+        (row) =>
+          productsByCode.get(normCode(row.itemCode))?.discontinuedFrom !==
+          row.discontinuedFrom,
+      );
+      return {
+        total: changed.length,
+        immediate: changed.filter((row) => row.discontinuedFrom <= today).length,
+        future: changed.filter((row) => row.discontinuedFrom > today).length,
+      };
+    })(),
+    protectedNameConflicts: parsed.preservedNameDisagreements,
+    rejectedRows: [],
+    rejectedReasonSummary,
+    canApply: parsed.priceRows.length > 0,
+    noChangeReason: parsed.priceRows.length ? null : "No valid rows would be written.",
+  };
+}
 
 const NET_KEYWORDS = ["net", "rate", "dealer", "scheme", "billing", "discount"];
 const MRP_KEYWORDS = ["mrp", "list", "retail", "price"];
@@ -940,6 +1024,7 @@ async function persistParsedRows(
   warnings: string[],
   reviewBatchId: string,
   loadBatchId: number,
+  transaction?: DatabaseTransaction,
 ): Promise<LoadSummary> {
   // De-duplicate by (item code, variant) — keep last occurrence per combo.
   const byCodeVariant = new Map<string, {
@@ -956,14 +1041,16 @@ async function persistParsedRows(
 
   if (byCodeVariant.size === 0) {
     if (sourcePriceObservations.length > 0) {
-      await db.transaction(async (tx) => {
+      const reconcile = async (tx: DatabaseTransaction) => {
         await reconcileSourceDiscontinuations(
           tx,
           sourcePriceObservations,
           effectiveDate,
           canonical,
         );
-      });
+      };
+      if (transaction) await reconcile(transaction);
+      else await db.transaction(reconcile);
     }
     return {
       file: filename,
@@ -1015,7 +1102,7 @@ async function persistParsedRows(
   // Infer division once per file — same for every product in this upload.
   const inferredDivision = divisionFromFilename(filename);
 
-  await db.transaction(async (tx) => {
+  const write = async (tx: DatabaseTransaction) => {
     const existingPairs = await tx
       .select({
         itemCode: mrpPriceHistoryTable.itemCode,
@@ -1198,7 +1285,12 @@ async function persistParsedRows(
       effectiveDate,
       canonical,
     );
-  });
+  };
+  if (transaction) {
+    await write(transaction);
+  } else {
+    await db.transaction(write);
+  }
 
   if (summary.newHistoryRows === 0 && summary.skippedDuplicates > 0) {
     summary.message = `All ${summary.skippedDuplicates} rows already exist for effective date ${effectiveDate} — nothing added (re-load is safe).`;
@@ -1207,8 +1299,162 @@ async function persistParsedRows(
   return summary;
 }
 
+router.get("/catalog/mrp-loads/:batchId", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.batchId);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "batchId must be a positive integer." });
+    return;
+  }
+  const [batch] = await db.select().from(mrpPendingBatchesTable)
+    .where(eq(mrpPendingBatchesTable.id, id)).limit(1);
+  if (!batch) {
+    res.status(404).json({ error: "Pending MRP batch not found." });
+    return;
+  }
+  res.json({
+    ...batch,
+    payload: undefined,
+    preview: JSON.parse(batch.preview),
+    result: batch.result ? JSON.parse(batch.result) : null,
+  });
+});
+
+router.post("/catalog/mrp-loads/:batchId/discard", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.batchId);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "batchId must be a positive integer." });
+    return;
+  }
+  const [batch] = await db.update(mrpPendingBatchesTable).set({
+    status: "discarded",
+    discardedAt: new Date(),
+    discardedBy: req.user?.email ?? req.user?.id ?? null,
+  }).where(and(eq(mrpPendingBatchesTable.id, id), eq(mrpPendingBatchesTable.status, "pending")))
+    .returning();
+  if (!batch) {
+    res.status(409).json({ error: "Only a pending MRP batch can be discarded." });
+    return;
+  }
+  res.json({
+    ...batch,
+    payload: undefined,
+    preview: JSON.parse(batch.preview),
+    result: batch.result ? JSON.parse(batch.result) : null,
+  });
+});
+
+router.post("/catalog/mrp-loads/:batchId/apply", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.batchId);
+  const confirmedRows = Number(req.body?.rowsToWrite);
+  const confirmedImmediate = Number(req.body?.immediatePriceChanges);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "batchId must be a positive integer." });
+    return;
+  }
+  try {
+    await db
+      .update(mrpPendingBatchesTable)
+      .set({ status: "expired" })
+      .where(
+        and(
+          eq(mrpPendingBatchesTable.id, id),
+          eq(mrpPendingBatchesTable.status, "pending"),
+          lte(mrpPendingBatchesTable.expiresAt, new Date()),
+        ),
+      );
+    const outcome = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${917_902 + id})`);
+      const [batch] = await tx.select().from(mrpPendingBatchesTable)
+        .where(eq(mrpPendingBatchesTable.id, id)).limit(1);
+      if (!batch) throw new Error("Pending MRP batch not found.");
+      if (batch.status !== "pending") throw new Error(`MRP batch is ${batch.status}; only pending batches can be applied.`);
+      const preview = JSON.parse(batch.preview) as { rowsToWrite: number; immediatePriceChangeCount: number; canApply: boolean; noChangeReason: string | null };
+      if (!preview.canApply) throw new Error(preview.noChangeReason ?? "This preview has no changes to apply.");
+      if (confirmedRows !== preview.rowsToWrite || confirmedImmediate !== preview.immediatePriceChangeCount) {
+        throw new Error(`Confirmation must repeat ${preview.rowsToWrite} rows to write and ${preview.immediatePriceChangeCount} immediate price changes.`);
+      }
+      const payload = JSON.parse(batch.payload) as
+        | ParsedAuthoritativeMaster
+        | { kind: "ordinary"; reviewBatchId: string; entries: Array<{ fileName: string; effectiveDate: string; rows: ParsedRow[]; sourcePriceObservations: SourcePriceObservation[]; basis: string; codeColHeader: string; priceColHeader: string; skippedUnparseable: number; warnings: string[] }> };
+      let result: unknown;
+      let appliedLoadBatchId: number;
+      if ("kind" in payload && payload.kind === "ordinary") {
+        const [load] = await tx.insert(mrpLoadBatchesTable).values({
+          sourceId: batch.sourceId, fileName: batch.fileName, fileSha256: batch.fileSha256,
+          fileSizeBytes: batch.fileSizeBytes, downloadedAt: batch.downloadedAt,
+          loadedBy: req.user?.email ?? req.user?.id ?? null, rowCount: 0,
+        }).returning({ id: mrpLoadBatchesTable.id });
+        appliedLoadBatchId = load!.id;
+        const products = await tx.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
+        const knownCodes = new Set(products.map((row) => normCode(row.itemCode)));
+        const canonical = new Map(products.map((row) => [normCode(row.itemCode), row.itemCode] as const));
+        const summaries: LoadSummary[] = [];
+        for (const entry of payload.entries) {
+          summaries.push(await persistParsedRows(entry.rows, entry.sourcePriceObservations, entry.fileName,
+            entry.effectiveDate, knownCodes, canonical, entry.basis, entry.codeColHeader,
+            entry.priceColHeader, entry.skippedUnparseable, entry.warnings,
+            payload.reviewBatchId,
+            appliedLoadBatchId, tx));
+        }
+        const rowsWritten = summaries.reduce((count, summary) => count + summary.newHistoryRows, 0);
+        await tx.update(mrpLoadBatchesTable).set({ rowCount: rowsWritten })
+          .where(eq(mrpLoadBatchesTable.id, appliedLoadBatchId));
+        await recomputeCurrentFlagsInTransaction(tx);
+        result = { kind: "ordinary", loadBatchId: appliedLoadBatchId, summaries, rowsWritten };
+      } else {
+        const authoritative = await loadAuthoritativeMaster({
+          parsed: payload as ParsedAuthoritativeMaster,
+          fileSizeBytes: batch.fileSizeBytes,
+          downloadedAt: batch.downloadedAt,
+          loadedBy: req.user?.email ?? req.user?.id ?? null,
+          transaction: tx,
+        });
+        if (authoritative.duplicate) throw new Error("This source snapshot was already applied.");
+        appliedLoadBatchId = authoritative.loadBatchId;
+        result = authoritative;
+      }
+      await tx.update(mrpPendingBatchesTable).set({
+        status: "applied",
+        appliedAt: new Date(),
+        appliedBy: req.user?.email ?? req.user?.id ?? null,
+        loadBatchId: appliedLoadBatchId,
+        result: JSON.stringify(result),
+      }).where(eq(mrpPendingBatchesTable.id, id));
+      return { result, preview };
+    });
+    let hardwareSourceReplacement: unknown = null;
+    let hardwareSourceWarning: string | null = null;
+    if (!(outcome.result as { kind?: string }).kind) {
+      try {
+        hardwareSourceReplacement = await ensureHardwareReplacementSnapshot(
+          req.user?.email ?? req.user?.id ?? null,
+        );
+      } catch (error) {
+        hardwareSourceWarning =
+          error instanceof Error
+            ? error.message
+            : "Hardware source reconciliation could not be confirmed.";
+        req.log.error(
+          { err: error, pendingBatchId: id },
+          "MRP batch applied but Hardware source reconciliation failed",
+        );
+      }
+    }
+    res.json({
+      batchId: id,
+      status: "applied",
+      preview: outcome.preview,
+      result: outcome.result,
+      hardwareSourceReplacement,
+      hardwareSourceWarning,
+    });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Could not apply MRP batch." });
+  }
+});
+
 router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req, res) => {
-  const file = req.file;
+  const file = req.file!;
   if (!file) {
     res.status(400).json({ error: "No file uploaded" });
     return;
@@ -1231,7 +1477,6 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
     return;
   }
 
-  let loadBatchId: number | null = null;
   try {
     const reviewBatchId = randomUUID();
     let authoritativeWorkbook = false;
@@ -1239,16 +1484,9 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
       const correction = parseDiscontinuationCorrectionWorkbook(workbook);
       if (correction) {
-        await applyDiscontinuationCorrection(correction);
-        res.json({
-          results: {
-            file: name,
-            kind: "discontinuation-correction",
-            unmarkedCodes: correction.unmarkedCodes.length,
-            confirmedDiscontinuations: correction.confirmed.length,
-            message:
-              "Applied the grouped discontinuation correction. Re-importing this workbook is safe.",
-          },
+        res.status(400).json({
+          error:
+            "This is a discontinuation correction workbook. It is not accepted by the MRP loader because uploads are preview-only; use the dedicated discontinuation correction tool.",
         });
         return;
       }
@@ -1278,23 +1516,45 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         });
         return;
       }
-      const result = await loadAuthoritativeMaster({
-        buffer: file.buffer,
-        downloadedAt,
-        loadedBy: req.user?.email ?? req.user?.id ?? null,
-      });
-
-      const hardwareSourceReplacement = await ensureHardwareReplacementSnapshot(
-        req.user?.email ?? req.user?.id ?? null,
-      );
-      if (result.duplicate) {
+      const parsed = parseAuthoritativeMasterBuffer(file.buffer);
+      await db
+        .insert(mrpSourcesTable)
+        .values(AUTHORITATIVE_MASTER_SOURCE)
+        .onConflictDoNothing({ target: mrpSourcesTable.sheetId });
+      const [source] = await db
+        .select({ id: mrpSourcesTable.id })
+        .from(mrpSourcesTable)
+        .where(eq(mrpSourcesTable.sheetId, AUTHORITATIVE_MASTER_SOURCE.sheetId))
+        .limit(1);
+      if (!source) throw new Error("Authoritative MRP provenance source could not be created.");
+      // This precheck intentionally happens before the pending record exists.
+      const existingBatches = await db
+        .select({
+          id: mrpLoadBatchesTable.id,
+          loadedAt: mrpLoadBatchesTable.loadedAt,
+          downloadedAt: mrpLoadBatchesTable.downloadedAt,
+        })
+        .from(mrpLoadBatchesTable)
+        .where(and(eq(mrpLoadBatchesTable.sourceId, source.id), eq(mrpLoadBatchesTable.fileSha256, parsed.fileSha256)));
+      const pendingMatch = await db
+        .select({ id: mrpPendingBatchesTable.id })
+        .from(mrpPendingBatchesTable)
+        .where(and(
+          eq(mrpPendingBatchesTable.sourceId, source.id),
+          eq(mrpPendingBatchesTable.fileSha256, parsed.fileSha256),
+          eq(mrpPendingBatchesTable.status, "pending"),
+          gt(mrpPendingBatchesTable.expiresAt, new Date()),
+        ))
+        .limit(1);
+      if (existingBatches.length || pendingMatch.length) {
         res.status(409).json({
-          error: "This authoritative master has already been loaded.",
-          hardwareSourceReplacement,
+          error: pendingMatch.length
+            ? "This authoritative master is already awaiting review."
+            : "This authoritative master has already been loaded.",
           duplicate: {
             sourceDivision: "Authoritative multi-division master",
-            fileSha256: sha256ForBuffer(file.buffer),
-            matches: result.existingBatches.map((batch) => ({
+            fileSha256: parsed.fileSha256,
+            matches: existingBatches.map((batch) => ({
               loadBatchId: batch.id,
               loadedAt: batch.loadedAt,
               downloadedAt: batch.downloadedAt,
@@ -1303,24 +1563,34 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         });
         return;
       }
+      const products = await db.select({
+        itemCode: catalogProductsTable.itemCode,
+        productName: catalogProductsTable.productName,
+        discontinuedFrom: catalogProductsTable.discontinuedFrom,
+      }).from(catalogProductsTable);
+      const history = await db.select({
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        mrp: mrpPriceHistoryTable.mrp,
+        variant: mrpPriceHistoryTable.variant,
+      }).from(mrpPriceHistoryTable);
+      const preview = pendingAuthoritativePreview(parsed, products, history);
+      const [pending] = await db.insert(mrpPendingBatchesTable).values({
+        sourceId: source.id,
+        fileName: file.originalname,
+        fileSha256: parsed.fileSha256,
+        fileSizeBytes: file.size,
+        downloadedAt,
+        uploadedBy: req.user?.email ?? req.user?.id ?? null,
+        payload: JSON.stringify(parsed),
+        preview: JSON.stringify(preview),
+        expiresAt: new Date(Date.now() + PENDING_MRP_BATCH_LIFETIME_MS),
+      }).returning({ id: mrpPendingBatchesTable.id, expiresAt: mrpPendingBatchesTable.expiresAt });
       res.json({
-        results: {
-          kind: "authoritative-master",
-          file: name,
-          ...result,
-          hardwareSourceReplacement,
-          totalRows: result.productRows,
-          matchedProducts: result.productRows - result.newCodes.length,
-          newProducts: result.newCodes.length,
-          newHistoryRows: result.priceRows,
-          skippedDuplicates: 0,
-          skippedUnparseable: 0,
-          unmatchedCodes: result.newCodes,
-          lowMrpCount: 0,
-          flaggedMrpCount: 0,
-          flaggedRows: [],
-          reviewBatchId: null,
-        },
+        batchId: pending!.id,
+        status: "pending",
+        expiresAt: pending!.expiresAt,
+        preview,
       });
       return;
     }
@@ -1364,10 +1634,21 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         ),
       )
       .orderBy(desc(mrpLoadBatchesTable.loadedAt))
+    const pendingDuplicate = await db.select({ id: mrpPendingBatchesTable.id })
+      .from(mrpPendingBatchesTable)
+      .where(and(
+        eq(mrpPendingBatchesTable.sourceId, source.id),
+        eq(mrpPendingBatchesTable.fileSha256, fileSha256),
+        eq(mrpPendingBatchesTable.status, "pending"),
+        gt(mrpPendingBatchesTable.expiresAt, new Date()),
+      ))
+      .limit(1);
     const confirmDuplicate = req.body.confirmDuplicate === "true";
-    if (duplicateBatches.length > 0 && !confirmDuplicate) {
+    if (duplicateBatches.length > 0 || pendingDuplicate.length > 0) {
       res.status(409).json({
-        error: `This file matches ${duplicateBatches.length} prior load${duplicateBatches.length === 1 ? "" : "s"} for this source. Load anyway?`,
+        error: pendingDuplicate.length
+          ? "This identical file is already awaiting review; no second pending batch was created."
+          : `This file matches ${duplicateBatches.length} prior load${duplicateBatches.length === 1 ? "" : "s"} for this source.`,
         duplicate: {
           sourceDivision: source.division,
           fileSha256,
@@ -1382,229 +1663,140 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
       return;
     }
 
-    const createdBatch = await db
-      .insert(mrpLoadBatchesTable)
-      .values({
-        sourceId: source.id,
-        fileName: name,
-        fileSha256,
-        fileSizeBytes: file.size,
-        downloadedAt,
-        loadedBy: req.user?.email ?? req.user?.id ?? null,
-        notes: confirmDuplicate
-          ? "Identical snapshot load explicitly confirmed by the user."
-          : null,
-      })
-      .returning({ id: mrpLoadBatchesTable.id });
-    loadBatchId = createdBatch[0]!.id;
-    const provenance = {
-      sourceDivision: source.division,
-      sourceUrl: source.sheetUrl,
-      downloadedAt,
-      fileSha256,
-      loadBatchId,
-    };
-
-    const existingProducts = await db
-      .select({ itemCode: catalogProductsTable.itemCode })
-      .from(catalogProductsTable);
-    const knownCodes = new Set(existingProducts.map((p) => normCode(p.itemCode)));
-    const canonical = new Map<string, string>(
-      existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
-    );
-
-    // ------------------------------------------------------------------
-    // ZIP: process every xlsx/xls/csv entry inside the archive, one at a
-    // time, accumulating results.  knownCodes/canonical are mutated across
-    // iterations so later files see products created by earlier ones.
-    // ------------------------------------------------------------------
+    // Parse once and stage the exact parser output.  In particular, do not
+    // create an mrp_load_batches record here: source uploads are previews.
+    const existingProductsForPreview = await db.select({
+      itemCode: catalogProductsTable.itemCode,
+      productName: catalogProductsTable.productName,
+    }).from(catalogProductsTable);
+    const previewKnownCodes = new Set(existingProductsForPreview.map((p) => normCode(p.itemCode)));
+    const entries: Array<{
+      fileName: string; effectiveDate: string; rows: ParsedRow[];
+      sourcePriceObservations: SourcePriceObservation[]; basis: string;
+      codeColHeader: string; priceColHeader: string; skippedUnparseable: number;
+      skippedRows: SkippedRow[]; warnings: string[];
+    }> = [];
     if (ext === "zip") {
       if (!effectiveDate) {
-        await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
-        res.status(400).json({
-          error: "effectiveDate is required for ZIP imports until each entry carries a resolvable dated price column.",
-        });
+        res.status(400).json({ error: "effectiveDate is required for ZIP imports until each entry carries a resolvable dated price column." });
         return;
       }
-      const zip = new AdmZip(file.buffer);
-      const entries = zip
-        .getEntries()
-        .filter((e) => {
-          if (e.isDirectory) return false;
-          const entryExt = e.name.toLowerCase().split(".").pop() ?? "";
-          return ["xlsx", "xls", "csv"].includes(entryExt);
-        })
-        // Ignore macOS resource-fork entries (__MACOSX / ._xxx)
-        .filter((e) => !e.entryName.startsWith("__MACOSX") && !e.name.startsWith("._"))
+      const zipEntries = new AdmZip(file.buffer).getEntries()
+        .filter((entry) => !entry.isDirectory && ["xlsx", "xls", "csv"].includes(entry.name.toLowerCase().split(".").pop() ?? ""))
+        .filter((entry) => !entry.entryName.startsWith("__MACOSX") && !entry.name.startsWith("._"))
         .sort((a, b) => a.name.localeCompare(b.name));
-
-      if (entries.length === 0) {
-        await db
-          .delete(mrpLoadBatchesTable)
-          .where(eq(mrpLoadBatchesTable.id, loadBatchId));
-        res.status(400).json({
-          error: "The ZIP file contains no .xlsx / .xls / .csv files.",
-        });
+      if (!zipEntries.length) {
+        res.status(400).json({ error: "The ZIP file contains no .xlsx / .xls / .csv files." });
         return;
       }
-
-      const fileSummaries: LoadSummary[] = [];
-      for (const entry of entries) {
-        const buf = entry.getData();
-        const parsed = parseWorkbookBuffer(buf, knownCodes);
-        const summary = await persistParsedRows(
-          parsed.rows,
-          parsed.sourcePriceObservations,
-          entry.name,
+      for (const entry of zipEntries) {
+        const parsed = parseWorkbookBuffer(entry.getData(), previewKnownCodes);
+        entries.push({
+          fileName: entry.name,
           effectiveDate,
-          knownCodes,
-          canonical,
-          parsed.basis,
-          parsed.codeColHeader,
-          parsed.priceColHeader,
-          parsed.skippedUnparseable,
-          parsed.warnings,
-          reviewBatchId,
-          loadBatchId,
-        );
-        fileSummaries.push(summary);
+          rows: parsed.rows.map((row) => ({ ...row, effectiveDate })),
+          sourcePriceObservations: parsed.sourcePriceObservations.map((row) => ({
+            ...row,
+            effectiveDate,
+          })),
+          basis: parsed.basis,
+          codeColHeader: parsed.codeColHeader,
+          priceColHeader: parsed.priceColHeader,
+          skippedUnparseable: parsed.skippedUnparseable,
+          skippedRows: parsed.skippedRows,
+          warnings: parsed.warnings,
+        });
       }
-
-      await recomputeCurrentFlags();
-
-      // Build aggregate totals across all files.
-      const aggregate = {
-        file: name,
-        effectiveDate,
-        basis: fileSummaries.map((s) => s.basis).join(", "),
-        codeColHeader: "",
-        priceColHeader: "",
-        totalRows: fileSummaries.reduce((s, f) => s + f.totalRows, 0),
-        matchedProducts: fileSummaries.reduce((s, f) => s + f.matchedProducts, 0),
-        newProducts: fileSummaries.reduce((s, f) => s + f.newProducts, 0),
-        newHistoryRows: fileSummaries.reduce((s, f) => s + f.newHistoryRows, 0),
-        skippedDuplicates: fileSummaries.reduce((s, f) => s + f.skippedDuplicates, 0),
-        skippedUnparseable: fileSummaries.reduce((s, f) => s + f.skippedUnparseable, 0),
-        unmatchedCodes: fileSummaries.flatMap((f) => f.unmatchedCodes),
-        warnings: [...new Set(fileSummaries.flatMap((f) => f.warnings))],
-        lowMrpCount: fileSummaries.reduce((s, f) => s + f.lowMrpCount, 0),
-        flaggedMrpCount: fileSummaries.reduce((s, f) => s + f.flaggedMrpCount, 0),
-        flaggedRows: fileSummaries.flatMap((f) => f.flaggedRows),
-        reviewBatchId:
-          fileSummaries.some((f) => f.flaggedMrpCount > 0) ? reviewBatchId : null,
-        provenance,
-        files: fileSummaries,
-      };
-      if (aggregate.newHistoryRows === 0) {
-        await db
-          .delete(mrpLoadBatchesTable)
-          .where(eq(mrpLoadBatchesTable.id, loadBatchId));
-      } else {
-        await db
-          .update(mrpLoadBatchesTable)
-          .set({ rowCount: aggregate.newHistoryRows })
-          .where(eq(mrpLoadBatchesTable.id, loadBatchId));
-      }
-
-      res.json({ results: aggregate });
-      return;
-    }
-
-    // ------------------------------------------------------------------
-    // Single spreadsheet file (existing behaviour)
-    // ------------------------------------------------------------------
-    const parsed = parseWorkbookBuffer(file.buffer, knownCodes);
-    if (!parsed.hasHeaderPeriods && !effectiveDate) {
-      await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
-      res.status(400).json({
-        error: "No dated price column was found. Supply an explicit effectiveDate; the loader will never default it to the load date.",
-      });
-      return;
-    }
-    const periods = parsed.hasHeaderPeriods
-      ? [...new Set(parsed.rows.map((row) => row.effectiveDate).filter((date): date is string => !!date))]
-      : [effectiveDate!];
-    if (periods.length === 0) {
-      await db.delete(mrpLoadBatchesTable).where(eq(mrpLoadBatchesTable.id, loadBatchId));
-      res.status(400).json({
-        error: "No price rows with a resolvable source period were found.",
-      });
-      return;
-    }
-    const summaries: LoadSummary[] = [];
-    for (const period of periods) {
-      summaries.push(
-        await persistParsedRows(
-          parsed.rows.filter((row) => !parsed.hasHeaderPeriods || row.effectiveDate === period),
-          parsed.sourcePriceObservations.filter(
-            (row) => !parsed.hasHeaderPeriods || row.effectiveDate === period,
-          ),
-          name,
-          period,
-          knownCodes,
-          canonical,
-          parsed.basis,
-          parsed.codeColHeader,
-          parsed.priceColHeader,
-          parsed.skippedUnparseable,
-          parsed.warnings,
-          reviewBatchId,
-          loadBatchId,
-        ),
-      );
-    }
-    const summary: LoadSummary = summaries.length === 1
-      ? summaries[0]!
-      : {
-          ...summaries[0]!,
-          effectiveDate: periods.join(", "),
-          totalRows: summaries.reduce((total, row) => total + row.totalRows, 0),
-          matchedProducts: summaries.reduce((total, row) => total + row.matchedProducts, 0),
-          newProducts: summaries.reduce((total, row) => total + row.newProducts, 0),
-          newHistoryRows: summaries.reduce((total, row) => total + row.newHistoryRows, 0),
-          skippedDuplicates: summaries.reduce((total, row) => total + row.skippedDuplicates, 0),
-          skippedUnparseable: summaries.reduce((total, row) => total + row.skippedUnparseable, 0),
-          unmatchedCodes: summaries.flatMap((row) => row.unmatchedCodes),
-          warnings: [...new Set(summaries.flatMap((row) => row.warnings))],
-          lowMrpCount: summaries.reduce((total, row) => total + row.lowMrpCount, 0),
-          flaggedMrpCount: summaries.reduce((total, row) => total + row.flaggedMrpCount, 0),
-          flaggedRows: summaries.flatMap((row) => row.flaggedRows),
-        };
-
-    await recomputeCurrentFlags();
-    if (summary.newHistoryRows === 0) {
-      await db
-        .delete(mrpLoadBatchesTable)
-        .where(eq(mrpLoadBatchesTable.id, loadBatchId));
     } else {
-      await db
-        .update(mrpLoadBatchesTable)
-        .set({ rowCount: summary.newHistoryRows })
-        .where(eq(mrpLoadBatchesTable.id, loadBatchId));
-    }
-
-    res.json({ results: { ...summary, provenance } });
-  } catch (err) {
-    if (loadBatchId !== null) {
-      try {
-        await db.execute(sql`
-          DELETE FROM mrp_load_batches AS batch
-          WHERE batch.id = ${loadBatchId}
-            AND NOT EXISTS (
-              SELECT 1
-              FROM mrp_price_history AS history
-              WHERE history.load_batch_id = batch.id
-            )
-        `);
-      } catch (cleanupErr) {
-        req.log.error(
-          { err: cleanupErr, file: name, loadBatchId },
-          "failed to clean up empty MRP load batch",
-        );
+      const parsed = parseWorkbookBuffer(file.buffer, previewKnownCodes);
+      if (!parsed.hasHeaderPeriods && !effectiveDate) {
+        res.status(400).json({ error: "No dated price column was found. Supply an explicit effectiveDate; the loader will never default it to the load date." });
+        return;
+      }
+      const periods = parsed.hasHeaderPeriods
+        ? [...new Set(parsed.rows.map((row) => row.effectiveDate).filter((date): date is string => !!date))]
+        : [effectiveDate!];
+      if (!periods.length) {
+        res.status(400).json({ error: "No price rows with a resolvable source period were found." });
+        return;
+      }
+      for (const period of periods) {
+        entries.push({
+          fileName: name,
+          effectiveDate: period,
+          rows: parsed.rows
+            .filter((row) => !parsed.hasHeaderPeriods || row.effectiveDate === period)
+            .map((row) => ({ ...row, effectiveDate: period })),
+          sourcePriceObservations: parsed.sourcePriceObservations
+            .filter((row) => !parsed.hasHeaderPeriods || row.effectiveDate === period)
+            .map((row) => ({ ...row, effectiveDate: period })),
+          basis: parsed.basis,
+          codeColHeader: parsed.codeColHeader,
+          priceColHeader: parsed.priceColHeader,
+          skippedUnparseable: parsed.skippedUnparseable,
+          skippedRows: parsed.skippedRows,
+          warnings: parsed.warnings,
+        });
       }
     }
-    req.log.error({ err, file: name }, "load-mrp failed");
-    res.status(500).json({ error: "Failed to parse and load file" });
+    const historyForPreview = await db.select({
+      itemCode: mrpPriceHistoryTable.itemCode, effectiveDate: mrpPriceHistoryTable.effectiveDate,
+      mrp: mrpPriceHistoryTable.mrp, variant: mrpPriceHistoryTable.variant,
+    }).from(mrpPriceHistoryTable);
+    const today = new Date().toISOString().slice(0, 10);
+    const knownPeriods = new Set(historyForPreview.map((row) => row.effectiveDate));
+    const latest = new Map<string, { mrp: number | null; effectiveDate: string }>();
+    for (const row of historyForPreview) if (row.variant === "Standard" && row.effectiveDate <= today && (!latest.get(normCode(row.itemCode)) || latest.get(normCode(row.itemCode))!.effectiveDate < row.effectiveDate)) latest.set(normCode(row.itemCode), { mrp: row.mrp, effectiveDate: row.effectiveDate });
+    const allRows = entries.flatMap((entry) => entry.rows);
+    const historyByKey = new Map(
+      historyForPreview.map((row) => [
+        `${normCode(row.itemCode)}\u001f${row.effectiveDate}\u001f${row.variant}`,
+        row.mrp,
+      ]),
+    );
+    const rowsThatWrite = allRows.filter(
+      (row) =>
+        historyByKey.get(
+          `${normCode(row.itemCode)}\u001f${row.effectiveDate}\u001f${row.variant ?? "Standard"}`,
+        ) !== row.price,
+    );
+    const immediatePriceChanges = allRows.filter((row) => (row.variant ?? "Standard") === "Standard" && row.effectiveDate! <= today && previewKnownCodes.has(normCode(row.itemCode)) && latest.get(normCode(row.itemCode))?.mrp !== row.price).map((row) => ({ itemCode: row.itemCode, oldMrp: latest.get(normCode(row.itemCode))?.mrp ?? null, newMrp: row.price, effectiveDate: row.effectiveDate, delta: row.price - (latest.get(normCode(row.itemCode))?.mrp ?? 0) })).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const rejectedRows = entries.flatMap((entry) => entry.skippedRows);
+    const rejectedReasonSummary = rejectedRows.reduce<Record<string, number>>((out, row) => { out[row.reason] = (out[row.reason] ?? 0) + 1; return out; }, {});
+    const discontinuationDates = entries.flatMap((entry) => entry.sourcePriceObservations
+      .filter((row) => row.isRemoved)
+      .map((row) => row.effectiveDate ?? entry.effectiveDate));
+    const preview = {
+      kind: "ordinary", rowsToWrite: rowsThatWrite.length, productRows: allRows.length, priceRows: allRows.length,
+      periods: entries.map((entry) => ({ effectiveDate: entry.effectiveDate, rowCount: entry.rows.length, isNew: !knownPeriods.has(entry.effectiveDate), movedInCount: entry.rows.filter((row) => latest.get(normCode(row.itemCode))?.effectiveDate !== entry.effectiveDate).length })),
+      immediatePriceChanges, immediatePriceChangeCount: immediatePriceChanges.length,
+      newProducts: [...new Set(allRows.filter((row) => !previewKnownCodes.has(normCode(row.itemCode))).map((row) => row.itemCode))],
+      catalogueProductsAbsentFromFile: existingProductsForPreview.filter((row) => !allRows.some((input) => normCode(input.itemCode) === normCode(row.itemCode))).map((row) => row.itemCode),
+      discontinuations: {
+        total: discontinuationDates.length,
+        immediate: discontinuationDates.filter((date) => date <= today).length,
+        future: discontinuationDates.filter((date) => date > today).length,
+      }, protectedNameConflicts: [],
+      rejectedRows, rejectedReasonSummary,
+      canApply: rowsThatWrite.length > 0 || discontinuationDates.length > 0,
+      noChangeReason:
+        rowsThatWrite.length > 0 || discontinuationDates.length > 0
+          ? null
+          : allRows.length
+            ? "Every parsed price already exists with the same value, and no discontinuation would change."
+            : "No valid rows would be written.",
+    };
+    const [pending] = await db.insert(mrpPendingBatchesTable).values({
+      sourceId: source.id, fileName: name, fileSha256, fileSizeBytes: file.size, downloadedAt,
+      uploadedBy: req.user?.email ?? req.user?.id ?? null,
+      payload: JSON.stringify({ kind: "ordinary", reviewBatchId, entries }),
+      preview: JSON.stringify(preview), expiresAt: new Date(Date.now() + PENDING_MRP_BATCH_LIFETIME_MS),
+    }).returning({ id: mrpPendingBatchesTable.id, expiresAt: mrpPendingBatchesTable.expiresAt });
+    res.json({ batchId: pending!.id, status: "pending", expiresAt: pending!.expiresAt, preview });
+    return;
+  } catch (err) {
+    req.log.error({ err, file: name }, "load-mrp preview failed");
+    res.status(500).json({ error: "Failed to parse and preview file" });
   }
 });
 

@@ -10,6 +10,7 @@ import {
   db,
   mrpHistoryProvenanceEventsTable,
   mrpLoadBatchesTable,
+  mrpPendingBatchesTable,
   mrpPriceHistoryTable,
   mrpSourcesTable,
 } from "@workspace/db";
@@ -19,6 +20,7 @@ const RUN = Date.now();
 const INTERVENING_HASH = createHash("sha256").update(`intervening-${RUN}`).digest("hex");
 
 let createdBatchIds: number[] = [];
+let createdPendingIds: number[] = [];
 
 function datedWorkbookBuffer(): Buffer {
   const workbook = XLSX.utils.book_new();
@@ -69,6 +71,24 @@ function genericWorkbookBuffer(itemCode: string, includeExplicitMrp: boolean): B
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 }
 
+function noOpWorkbookBuffer(itemCode: string): Buffer {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["Item Code", "Product Name", "MRP"],
+      [itemCode, `Fixture ${RUN}`, 1234],
+    ]),
+    "PRICES",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([["Ignored audit marker"], [`noop-${RUN}`]]),
+    "NOTES",
+  );
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+}
+
 function wrongAuthoritativeWorkbookBuffer(): Buffer {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(
@@ -115,6 +135,11 @@ function wrongAuthoritativeWorkbookBuffer(): Buffer {
 }
 
 afterAll(async () => {
+  if (createdPendingIds.length) {
+    await db
+      .delete(mrpPendingBatchesTable)
+      .where(inArray(mrpPendingBatchesTable.id, createdPendingIds));
+  }
   if (createdBatchIds.length) {
     await db.delete(mrpLoadBatchesTable).where(
       inArray(mrpLoadBatchesTable.id, createdBatchIds),
@@ -242,7 +267,9 @@ describe("MRP loader period and duplicate safeguards", () => {
       .where(eq(mrpLoadBatchesTable.fileSha256, fixtureHash));
 
     expect(response.status).toBe(200);
-    expect(response.body.results.newHistoryRows).toBe(0);
+    expect(response.body.status).toBe("pending");
+    createdPendingIds.push(Number(response.body.batchId));
+    expect(response.body.preview.rowsToWrite).toBe(0);
     expect(after).toEqual(before);
   });
 
@@ -365,14 +392,13 @@ describe("MRP loader period and duplicate safeguards", () => {
       batchIds = batches.map((batch) => batch.id);
 
       expect(response.status).toBe(200);
-      expect(response.body.results.newHistoryRows).toBe(1);
-      expect(response.body.results.files).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ file: "valid.xlsx", newHistoryRows: 1 }),
-          expect.objectContaining({ file: "rejected.xlsx", newHistoryRows: 0 }),
-        ]),
+      expect(response.body.status).toBe("pending");
+      createdPendingIds.push(Number(response.body.batchId));
+      expect(response.body.preview.rowsToWrite).toBe(1);
+      expect(response.body.preview.rejectedRows).toEqual(
+        expect.arrayContaining([expect.objectContaining({ rawCode: `REJECTED-ZIP-${RUN}` })]),
       );
-      expect(batches).toEqual([expect.objectContaining({ rowCount: 1 })]);
+      expect(batches).toEqual([]);
     } finally {
       if (batchIds.length > 0) {
         await db
@@ -433,4 +459,190 @@ describe("MRP loader period and duplicate safeguards", () => {
       expect.arrayContaining([expect.objectContaining({ loadBatchId: first[0]!.id })]),
     );
   });
+
+  it("stages without writing, applies once, retains discarded previews, and expires safely", async () => {
+    const [source] = await db
+      .select({ id: mrpSourcesTable.id })
+      .from(mrpSourcesTable)
+      .limit(1);
+    expect(source).toBeTruthy();
+
+    const app = express();
+    app.use(express.json());
+    app.use(router);
+    const code = `PENDING-LIFECYCLE-${RUN}`;
+    const expiredCode = `PENDING-EXPIRED-${RUN}`;
+    const fixture = genericWorkbookBuffer(code, true);
+    const fixtureHash = createHash("sha256").update(fixture).digest("hex");
+    const pendingIds: number[] = [];
+    const appliedLoadIds: number[] = [];
+
+    const counts = async () => ({
+      catalog: (
+        await db.select({ id: catalogProductsTable.id }).from(catalogProductsTable)
+      ).length,
+      history: (
+        await db.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+      ).length,
+      loads: (
+        await db.select({ id: mrpLoadBatchesTable.id }).from(mrpLoadBatchesTable)
+      ).length,
+    });
+
+    try {
+      const before = await counts();
+      const uploadResponse = await supertest(app)
+        .post("/catalog/load-mrp")
+        .field("sourceId", String(source!.id))
+        .field("downloadedAt", "2026-09-07")
+        .field("effectiveDate", "2099-12-31")
+        .attach("file", fixture, {
+          filename: `pending-lifecycle-${RUN}.xlsx`,
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+      expect(uploadResponse.status).toBe(200);
+      expect(uploadResponse.body.status).toBe("pending");
+      expect(uploadResponse.body.preview).toMatchObject({
+        rowsToWrite: 1,
+        immediatePriceChangeCount: 0,
+        canApply: true,
+      });
+      expect(uploadResponse.body.preview.periods).toEqual([
+        expect.objectContaining({
+          effectiveDate: "2099-12-31",
+          isNew: true,
+        }),
+      ]);
+      const pendingId = Number(uploadResponse.body.batchId);
+      pendingIds.push(pendingId);
+      expect(await counts()).toEqual(before);
+
+      const duplicatePending = await supertest(app)
+        .post("/catalog/load-mrp")
+        .field("sourceId", String(source!.id))
+        .field("downloadedAt", "2026-09-07")
+        .field("effectiveDate", "2099-12-31")
+        .attach("file", fixture, {
+          filename: `pending-lifecycle-${RUN}.xlsx`,
+        });
+      expect(duplicatePending.status).toBe(409);
+      expect(duplicatePending.body.error).toMatch(/awaiting review/i);
+
+      const wrongConfirmation = await supertest(app)
+        .post(`/catalog/mrp-loads/${pendingId}/apply`)
+        .send({ rowsToWrite: 1, immediatePriceChanges: 1 });
+      expect(wrongConfirmation.status).toBe(409);
+      expect(await counts()).toEqual(before);
+
+      const applyResponse = await supertest(app)
+        .post(`/catalog/mrp-loads/${pendingId}/apply`)
+        .send({ rowsToWrite: 1, immediatePriceChanges: 0 });
+      expect(applyResponse.status).toBe(200);
+      expect(applyResponse.body.status).toBe("applied");
+      const appliedBatch = await supertest(app).get(
+        `/catalog/mrp-loads/${pendingId}`,
+      );
+      expect(appliedBatch.body.status).toBe("applied");
+      expect(appliedBatch.body.preview.rowsToWrite).toBe(1);
+      appliedLoadIds.push(Number(appliedBatch.body.loadBatchId));
+      expect(await counts()).toEqual({
+        catalog: before.catalog + 1,
+        history: before.history + 1,
+        loads: before.loads + 1,
+      });
+
+      const duplicateApplied = await supertest(app)
+        .post("/catalog/load-mrp")
+        .field("sourceId", String(source!.id))
+        .field("downloadedAt", "2026-09-07")
+        .field("effectiveDate", "2099-12-31")
+        .attach("file", fixture, {
+          filename: `pending-lifecycle-${RUN}.xlsx`,
+        });
+      expect(duplicateApplied.status).toBe(409);
+      expect(duplicateApplied.body.duplicate.matches).toEqual([
+        expect.objectContaining({ loadBatchId: appliedLoadIds[0] }),
+      ]);
+
+      const noOp = await supertest(app)
+        .post("/catalog/load-mrp")
+        .field("sourceId", String(source!.id))
+        .field("downloadedAt", "2026-09-07")
+        .field("effectiveDate", "2099-12-31")
+        .attach("file", noOpWorkbookBuffer(code), {
+          filename: `pending-noop-${RUN}.xlsx`,
+        });
+      expect(noOp.status).toBe(200);
+      pendingIds.push(Number(noOp.body.batchId));
+      expect(noOp.body.preview).toMatchObject({
+        rowsToWrite: 0,
+        canApply: false,
+      });
+      expect(noOp.body.preview.noChangeReason).toMatch(/already exists/i);
+
+      const discard = await supertest(app).post(
+        `/catalog/mrp-loads/${noOp.body.batchId}/discard`,
+      );
+      expect(discard.status).toBe(200);
+      expect(discard.body.status).toBe("discarded");
+      expect(discard.body.discardedAt).toBeTruthy();
+      const retainedDiscard = await supertest(app).get(
+        `/catalog/mrp-loads/${noOp.body.batchId}`,
+      );
+      expect(retainedDiscard.body.status).toBe("discarded");
+      expect(retainedDiscard.body.preview.rowsToWrite).toBe(0);
+
+      const expiringFixture = genericWorkbookBuffer(expiredCode, true);
+      const expiring = await supertest(app)
+        .post("/catalog/load-mrp")
+        .field("sourceId", String(source!.id))
+        .field("downloadedAt", "2026-09-07")
+        .field("effectiveDate", "2098-12-31")
+        .attach("file", expiringFixture, {
+          filename: `pending-expired-${RUN}.xlsx`,
+        });
+      expect(expiring.status).toBe(200);
+      const expiredId = Number(expiring.body.batchId);
+      pendingIds.push(expiredId);
+      await db
+        .update(mrpPendingBatchesTable)
+        .set({ expiresAt: new Date(Date.now() - 1_000) })
+        .where(eq(mrpPendingBatchesTable.id, expiredId));
+      const expiredApply = await supertest(app)
+        .post(`/catalog/mrp-loads/${expiredId}/apply`)
+        .send({ rowsToWrite: 1, immediatePriceChanges: 0 });
+      expect(expiredApply.status).toBe(409);
+      expect(expiredApply.body.error).toMatch(/expired/i);
+      const retainedExpired = await supertest(app).get(
+        `/catalog/mrp-loads/${expiredId}`,
+      );
+      expect(retainedExpired.body.status).toBe("expired");
+    } finally {
+      if (pendingIds.length) {
+        await db
+          .delete(mrpPendingBatchesTable)
+          .where(inArray(mrpPendingBatchesTable.id, pendingIds));
+      }
+      if (appliedLoadIds.length) {
+        await db
+          .delete(mrpHistoryProvenanceEventsTable)
+          .where(
+            inArray(
+              mrpHistoryProvenanceEventsTable.loadBatchId,
+              appliedLoadIds,
+            ),
+          );
+        await db
+          .delete(mrpPriceHistoryTable)
+          .where(inArray(mrpPriceHistoryTable.loadBatchId, appliedLoadIds));
+        await db
+          .delete(mrpLoadBatchesTable)
+          .where(inArray(mrpLoadBatchesTable.id, appliedLoadIds));
+      }
+      await db
+        .delete(catalogProductsTable)
+        .where(inArray(catalogProductsTable.itemCode, [code, expiredCode]));
+    }
+  }, 120_000);
 });

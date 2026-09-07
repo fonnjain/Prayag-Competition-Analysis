@@ -480,7 +480,11 @@ export function parseAuthoritativeMasterBuffer(
 }
 
 export async function loadAuthoritativeMaster(input: {
-  buffer: Buffer;
+  buffer?: Buffer;
+  // Pending MRP batches retain this validated payload.  Supplying it prevents
+  // Apply from parsing a possibly different workbook a second time.
+  parsed?: ParsedAuthoritativeMaster;
+  fileSizeBytes?: number;
   downloadedAt: string;
   loadedBy: string | null;
   transaction?: DatabaseTransaction;
@@ -489,7 +493,10 @@ export async function loadAuthoritativeMaster(input: {
   if (!isIsoDate(input.downloadedAt)) {
     throw new Error("downloadedAt must be a valid YYYY-MM-DD date.");
   }
-  const parsed = parseAuthoritativeMasterBuffer(input.buffer);
+  if (!input.buffer && !input.parsed) {
+    throw new Error("An authoritative workbook buffer or validated payload is required.");
+  }
+  const parsed = input.parsed ?? parseAuthoritativeMasterBuffer(input.buffer!);
   const preservedNamesByCode = new Map(
     parsed.preservedNameDisagreements.map((row) => [
       row.itemCode,
@@ -616,7 +623,7 @@ export async function loadAuthoritativeMaster(input: {
         sourceId,
         fileName: parsed.fileName,
         fileSha256: parsed.fileSha256,
-        fileSizeBytes: input.buffer.length,
+        fileSizeBytes: input.buffer?.length ?? input.fileSizeBytes ?? 0,
         downloadedAt: input.downloadedAt,
         loadedBy: input.loadedBy,
         rowCount: parsed.priceRows.length,
@@ -812,7 +819,7 @@ export async function loadAuthoritativeMaster(input: {
     };
   };
   const result = input.transaction
-    ? await input.transaction.transaction(load)
+    ? await load(input.transaction)
     : await (input.database ?? db).transaction(load);
   return result;
 }
