@@ -179,3 +179,17 @@ mtime_ms = 1788604548937
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/cf980641-4d03-4f77-8363-4cdb26d0ce6e/74b1541c-a8fb-44fe-b199-7cad1e150aa3"
 storage_version_token = "1788604572320278"
 content_type = "text/csv"
+
+[[outputs]]
+id = "4y-R_Rf64PyEFIIt1S9NV"
+uri = "file://reports/mrp-loader-preview-apply-2026-09-07.md"
+type = "text"
+title = "MRP Loader Preview and Apply Report"
+description = "Implementation and acceptance report, including the batch 17 replay figures and lifecycle verification."
+logical_id = "b19b6d3f-c95d-4627-9329-9940efed0060"
+content_hash = "sha256:2f4c27b555860064064cc6caf72facd2e3b9e89289dc9314b7093ad0e7323960"
+size = 3032
+mtime_ms = 1788787105642
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b19b6d3f-c95d-4627-9329-9940efed0060/7e072290-fb1c-4524-a280-7bf97f2287b7"
+storage_version_token = "1788787339171266"
+content_type = "text/markdown"

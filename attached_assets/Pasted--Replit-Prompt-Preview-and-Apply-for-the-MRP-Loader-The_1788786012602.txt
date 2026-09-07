@@ -1,0 +1,122 @@
+# Replit Prompt — Preview and Apply for the MRP Loader
+
+The Price Revision tool, which can only correct values on existing rows, has a preview and an explicit Apply. The MRP loader, which creates periods, adds products, withdraws products and changes live prices, **commits the moment a file is uploaded.**
+
+The tool with the larger blast radius has the weaker gate. Today's production load of batch 17 wrote 6,256 rows and changed **392 resolved prices with immediate effect** — because the 10 August period had already passed — and there was no point at which anyone could see that before it happened.
+
+Give the MRP loader the same two-step flow.
+
+---
+
+## 1. Upload writes nothing
+
+Uploading parses, validates and stores a **pending batch**. No row reaches `mrp_price_history` or `catalog_products` until Apply.
+
+The pending batch keeps the file hash, download date, source selection and the full parsed result, so Apply uses exactly what was previewed — not a re-parse that might differ.
+
+---
+
+## 2. What the preview must show
+
+Not a row dump. The summary a person needs in order to decide.
+
+### Immediate price changes, first and prominently
+
+The most important number, and the one nobody could see today:
+
+> **392 products change price immediately** — their effective date has already passed.
+> 158 products move period with no price change. 30 are new.
+
+Any period dated on or before today takes effect the instant Apply runs. That belongs at the top, not in a row list. Show the count, the periods involved, and a way to see the products.
+
+### Periods
+
+Which periods the file contains, their row counts, and **which are new**:
+
+```
+2026-09-01   2,409     existing
+2026-08-10     580     existing        495 rows moved into this period
+2026-08-01     865     existing
+2026-02-01   1,616     existing
+2026-05-01     475     existing
+2024-02-15     161     existing
+```
+
+A **new** period is the single most consequential thing a load can do. Mark it clearly. Today's earlier load created two, and the only warning was in a prompt.
+
+### Products
+
+New products to be created, with codes. Products in the catalogue but absent from the file. Products whose price changes, with old and new values, biggest movers first.
+
+### Discontinuations
+
+How many, and **how many take effect immediately** because their date is past. When batch 15 loaded, 215 products disappeared on the spot. That must be visible beforehand.
+
+### Protected names
+
+Which product names in the file disagree with audited corrections, and will therefore be preserved rather than overwritten. Batch 17 had 11. That is currently only discoverable in the batch notes afterwards.
+
+### Rejected rows
+
+Anything that cannot load, with the reason per row and a summary by reason at the top.
+
+---
+
+## 3. Apply
+
+One transaction. On success, report what was written — and keep the preview viewable afterwards, so the decision and its outcome can be compared.
+
+**Disable Apply when nothing would change**, with the reason stated. A disabled button and no explanation reads as a broken page.
+
+Require confirmation that repeats the two figures that matter: **rows to be written** and **products changing price immediately**.
+
+---
+
+## 4. Discard, and expiry
+
+Discard abandons the batch, recording who did it and when. The preview stays viewable.
+
+A pending batch that is neither applied nor discarded should expire — a day is reasonable. A stale pending batch is a trap: someone finds it months later, sees plausible prices, and applies a file whose source has moved on. That has already nearly happened with the Sparsh batches.
+
+---
+
+## 5. Two things not to break
+
+**Idempotency.** Re-uploading a byte-identical file must still be detected and warned about at upload, before a pending batch is created. Do not let the two-step flow reopen the duplicate-load path that batch 154 exposed.
+
+**The authoritative branch.** Files recognised by hash read their effective dates per row. The preview must show those per-row dates, not the form's date field. If the preview showed one date and Apply wrote six, the preview would be worse than useless.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  Upload writes nothing — row counts identical before and after upload.
+2.  Only Apply writes.
+3.  The preview states how many products change price immediately, and the
+    figure matches what Apply produces.
+4.  A file containing a new period marks it as new in the preview.
+5.  Discontinuations already past are counted separately from future ones.
+6.  Protected name conflicts appear in the preview, not only afterwards.
+7.  Apply is disabled with a stated reason when nothing would change.
+8.  Discard records who and when; the preview remains viewable.
+9.  A pending batch older than 24 hours cannot be applied.
+10. Re-uploading an identical file is detected before a pending batch is
+    created.
+11. Replaying batch 17's file through the new flow previews 6,106 rows,
+    six periods, 30 new products, 392 immediate price changes and 11
+    protected names — then applies to the same result as today.
+```
+
+Test 11 is the proof. Batch 17 is a known-good load with known figures; the new flow must reproduce it exactly.
+
+---
+
+## 7. Report
+
+- Preview output for batch 17's file replayed in development.
+- Confirmation that upload alone writes nothing.
+- What the preview shows for immediate price changes, new periods and protected names.
+- That duplicate detection still fires at upload.
+
+One clean commit.
