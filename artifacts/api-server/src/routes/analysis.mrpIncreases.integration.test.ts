@@ -27,12 +27,13 @@
  * Prerequisites: DATABASE_URL must be set (standard in the Replit environment).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import { eq } from "drizzle-orm";
 import { db, catalogProductsTable, mrpPriceHistoryTable } from "@workspace/db";
 import analysisRouter from "./analysis.js";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 // Mount the analysis router on a minimal Express app (no auth guard needed —
 // the route handlers do not call req.isAuthenticated()).
@@ -73,6 +74,16 @@ let catalogId: number;
 // exactly our seeded item and ignores every real row in the shared database.
 let sentinelDivision: string;
 let testSeq = 0;
+const RUN = Date.now();
+let fixtureBatchId = 0;
+
+beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("mrp-increases", RUN);
+});
+
+afterAll(async () => {
+  await deleteMrpFixtureBatch(fixtureBatchId);
+});
 
 beforeEach(async () => {
   testSeq++;
@@ -118,7 +129,7 @@ beforeEach(async () => {
       isCurrent: true,
       priceBasis: "MRP",
     },
-  ]);
+  ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
 });
 
 afterEach(async () => {
@@ -318,7 +329,7 @@ describe("GET /analysis/mrp-increases — division filter narrows results", () =
         isCurrent: true,
         priceBasis: "MRP",
       },
-    ]);
+    ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   });
 
   afterEach(async () => {
@@ -403,7 +414,7 @@ describe("GET /analysis/mrp-increases — category filter narrows results", () =
         isCurrent: true,
         priceBasis: "MRP",
       },
-    ]);
+    ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   });
 
   afterEach(async () => {
@@ -511,7 +522,7 @@ describe("GET /analysis/mrp-increases — combined division + category filter", 
     await db.insert(mrpPriceHistoryTable).values([
       ...priceRows(itemCodeD),
       ...priceRows(itemCodeE),
-    ]);
+    ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   });
 
   afterEach(async () => {
@@ -591,7 +602,7 @@ describe("GET /analysis/mrp-increases — price decrease is excluded", () => {
         isCurrent: true,
         priceBasis: "MRP",
       },
-    ]);
+    ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   });
 
   afterEach(async () => {
@@ -674,7 +685,7 @@ describe("GET /analysis/mrp-increases — unchanged price is excluded", () => {
         isCurrent: true,
         priceBasis: "MRP",
       },
-    ]);
+    ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   });
 
   afterEach(async () => {

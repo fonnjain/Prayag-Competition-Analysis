@@ -188,6 +188,29 @@ beforeAll(async () => {
         false
       );
 
+      INSERT INTO ${DISPOSABLE_SCHEMA}.mrp_sources (
+        division, sheet_id, sheet_url, expected_file_name, source_kind
+      ) VALUES (
+        'Authoritative rollback fixture',
+        'authoritative-rollback-fixture',
+        'internal://authoritative-rollback-fixture',
+        'authoritative-rollback-baseline.xlsx',
+        'test'
+      );
+      INSERT INTO ${DISPOSABLE_SCHEMA}.mrp_load_batches (
+        source_id, file_name, file_sha256, file_size_bytes, downloaded_at,
+        row_count, notes
+      ) SELECT
+        id,
+        'authoritative-rollback-baseline.xlsx',
+        'authoritative-rollback-baseline',
+        0,
+        '2026-03-01',
+        1,
+        'Integration-test rollback baseline'
+      FROM ${DISPOSABLE_SCHEMA}.mrp_sources
+      WHERE sheet_id = 'authoritative-rollback-fixture';
+
       INSERT INTO ${DISPOSABLE_SCHEMA}.mrp_price_history (
         item_code,
         mrp,
@@ -197,6 +220,7 @@ beforeAll(async () => {
         source_file,
         is_current,
         review_status,
+        load_batch_id,
         variant
       ) VALUES (
         'CCL-60-BSK',
@@ -207,6 +231,8 @@ beforeAll(async () => {
         'authoritative-rollback-baseline.xlsx',
         true,
         'approved',
+        (SELECT id FROM ${DISPOSABLE_SCHEMA}.mrp_load_batches
+         WHERE file_sha256 = 'authoritative-rollback-baseline'),
         'Standard'
       );
     `),
@@ -259,6 +285,13 @@ describe("authoritative MRP master transaction guarantees", () => {
           await tx
             .delete(catalogProductsTable)
             .where(inArray(catalogProductsTable.itemCode, [...V2_NEW_CODES]));
+          const catalogCodesBefore = new Set(
+            (
+              await tx
+                .select({ itemCode: catalogProductsTable.itemCode })
+                .from(catalogProductsTable)
+            ).map((row) => row.itemCode),
+          );
           const [vbBefore] = (
             await tx.execute<{ count: number }>(sql`
               SELECT COUNT(*)::int AS count
@@ -283,6 +316,18 @@ describe("authoritative MRP master transaction guarantees", () => {
           expect(result.priceRows).toBe(6_256);
           expect(result.periodCounts["2026-08-10"]).toBe(580);
           expect(new Set(result.newCodes)).toEqual(new Set(V2_NEW_CODES));
+          const finalStateNewCodes = (
+            await tx
+              .select({ itemCode: catalogProductsTable.itemCode })
+              .from(catalogProductsTable)
+          )
+            .map((row) => row.itemCode)
+            .filter((itemCode) => !catalogCodesBefore.has(itemCode));
+          expect(new Set(result.newCodes)).toEqual(new Set(finalStateNewCodes));
+          expect(result.newCodes).toHaveLength(new Set(result.newCodes).size);
+          expect(result.newCodes).toHaveLength(
+            result.after.catalog_rows - result.before.catalog_rows,
+          );
           expect(result.preservedNameDisagreements).toHaveLength(11);
 
           const [batch] = await tx
@@ -410,6 +455,13 @@ describe("authoritative MRP master transaction guarantees", () => {
           await tx
             .delete(catalogProductsTable)
             .where(eq(catalogProductsTable.itemCode, "EP-GANESHA"));
+          const catalogCodesBefore = new Set(
+            (
+              await tx
+                .select({ itemCode: catalogProductsTable.itemCode })
+                .from(catalogProductsTable)
+            ).map((row) => row.itemCode),
+          );
           const result = await loadAuthoritativeMaster(
             {
               buffer: MASTER_BUFFER,
@@ -429,6 +481,15 @@ describe("authoritative MRP master transaction guarantees", () => {
           expect(result.newCodes).toHaveLength(
             result.after.catalog_rows - result.before.catalog_rows,
           );
+          const finalStateNewCodes = (
+            await tx
+              .select({ itemCode: catalogProductsTable.itemCode })
+              .from(catalogProductsTable)
+          )
+            .map((row) => row.itemCode)
+            .filter((itemCode) => !catalogCodesBefore.has(itemCode));
+          expect(new Set(result.newCodes)).toEqual(new Set(finalStateNewCodes));
+          expect(result.newCodes).toHaveLength(new Set(result.newCodes).size);
           expect(result.periodCounts).toEqual({
             "2024-02-15": 161,
             "2026-02-01": 1_685,

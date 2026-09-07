@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import comparisonRouter from "./comparison.js";
 import { validToFromNextDate } from "../lib/priceWindow.js";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const ITEM_CODE = `CMP-WINDOW-${RUN}`;
@@ -37,6 +38,7 @@ const NEXT_DATE = dateOffset(10);
 let historicalCompetitorRowId = 0;
 let futureCompetitorRowId = 0;
 let mutationCurrentRowId = 0;
+let fixtureBatchId = 0;
 
 const app = express();
 app.use(express.json());
@@ -44,6 +46,7 @@ app.use(comparisonRouter);
 const request = supertest(app);
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("comparison-window", RUN);
   await db.insert(catalogProductsTable).values([
     {
       itemCode: ITEM_CODE,
@@ -68,6 +71,7 @@ beforeAll(async () => {
   await db.insert(mrpPriceHistoryTable).values([
     {
       itemCode: ITEM_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 150,
       priceBasis: "MRP",
       effectiveDate: CURRENT_DATE,
@@ -76,6 +80,7 @@ beforeAll(async () => {
     },
     {
       itemCode: ITEM_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 165,
       priceBasis: "MRP",
       effectiveDate: NEXT_DATE,
@@ -84,6 +89,7 @@ beforeAll(async () => {
     },
     {
       itemCode: FUTURE_MRP_ITEM,
+      loadBatchId: fixtureBatchId,
       mrp: 500,
       priceBasis: "MRP",
       effectiveDate: NEXT_DATE,
@@ -92,13 +98,14 @@ beforeAll(async () => {
     },
     {
       itemCode: WITHDRAWN_ITEM,
+      loadBatchId: fixtureBatchId,
       mrp: 500,
       priceBasis: "MRP",
       effectiveDate: CURRENT_DATE,
       loadDate: CURRENT_DATE,
       isCurrent: true,
     },
-  ]);
+  ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   const insertedCompetitorRows = await db.insert(competitorPricesTable).values([
     {
       competitor: COMPETITOR,
@@ -396,6 +403,7 @@ afterAll(async () => {
   await db
     .delete(mrpPriceHistoryTable)
     .where(eq(mrpPriceHistoryTable.itemCode, WITHDRAWN_ITEM));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db
     .delete(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, ITEM_CODE));

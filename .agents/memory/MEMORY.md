@@ -23,3 +23,4 @@
 - [GitHub repository](github-repository.md) — use the active Prayag-Competition-Analysis repository; the former “-New” repository no longer exists.
 - [CH concealed-valve naming](ch-valve-naming.md) — use TRIANGULAR; 82–90 repeat the confirmed 72–80 range order across valve types and size bands.
 - [MRP preview and apply](mrp-loader-preview-apply.md) — MRP uploads stage immutable 24-hour previews; only explicit Apply may alter catalogue/history.
+- [MRP fixture provenance](mrp-fixture-provenance.md) — every active writer and ordinary test fixture assigns history rows to a load batch; null is reserved for legacy reconciliation tests.

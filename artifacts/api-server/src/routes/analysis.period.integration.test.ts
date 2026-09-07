@@ -40,6 +40,7 @@ import analysisRouter, {
   getCompetitorRowsForPeriod,
 } from "./analysis.js";
 import { normCode } from "../lib/catalog.js";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -50,6 +51,8 @@ const COMPETITOR = `__test_period_comp_${Date.now()}__`;
 const INACTIVE_ITEM_CODE = `__TEST_INACTIVE_PERIOD_${Date.now()}__`;
 const INACTIVE_COMPETITOR = `__test_inactive_comp_${Date.now()}__`;
 const LEGACY_MRP_TABLE = `mrp_price_history_analysis_test_${process.pid}_${Date.now()}`;
+const RUN = Date.now();
+let fixtureBatchId = 0;
 
 // The three revisions under test (matching task spec):
 const MAR_DATE = "2026-03-05";
@@ -72,6 +75,7 @@ const AS_OF_MAR = "2026-03-10"; // must resolve to Mar
 // ---------------------------------------------------------------------------
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("analysis-period", RUN);
   // Insert catalog product
   await db.insert(catalogProductsTable).values([
     {
@@ -131,7 +135,7 @@ beforeAll(async () => {
       loadDate: APR_DATE,
       isCurrent: true,
     },
-  ]);
+  ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
 
   // Preserve the unique parent index while simulating a legacy same-day row.
   // PostgreSQL parent-table reads include inherited child rows, whose later ID
@@ -143,9 +147,9 @@ beforeAll(async () => {
   );
   await db.execute(sql`
     INSERT INTO ${sql.raw(LEGACY_MRP_TABLE)}
-      (item_code, mrp, price_basis, effective_date, load_date, is_current)
+      (item_code, mrp, price_basis, effective_date, load_date, is_current, load_batch_id)
     VALUES
-      (${ITEM_CODE}, ${SEP_MRP}, 'MRP', ${SEP_DATE}, ${SEP_DATE}, false)
+      (${ITEM_CODE}, ${SEP_MRP}, 'MRP', ${SEP_DATE}, ${SEP_DATE}, false, ${fixtureBatchId})
   `);
 
   // Insert a matched competitor price row so opportunities has something to
@@ -196,6 +200,7 @@ afterAll(async () => {
   await db
     .delete(mrpPriceHistoryTable)
     .where(eq(mrpPriceHistoryTable.itemCode, INACTIVE_ITEM_CODE));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db
     .delete(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, ITEM_CODE));
@@ -798,6 +803,7 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
     // One MRP revision so the row is comparable in the export
     await db.insert(mrpPriceHistoryTable).values({
       itemCode: EX_ITEM,
+      loadBatchId: fixtureBatchId,
       mrp: EX_MRP,
       priceBasis: "MRP",
       effectiveDate: EX_MRP_DATE,
@@ -1028,6 +1034,7 @@ describe("GET /analysis/export — zero-row guard for pre-data effectivePeriod",
     });
     await db.insert(mrpPriceHistoryTable).values({
       itemCode: ZR_ITEM,
+      loadBatchId: fixtureBatchId,
       mrp: ZR_MRP,
       priceBasis: "MRP",
       effectiveDate: ZR_DATE,
@@ -1269,7 +1276,7 @@ describe("GET /analysis/export — filter combinations scope rows correctly", ()
         loadDate: FILT_DATE,
         isCurrent: false,
       },
-    ]);
+    ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
 
     // FILT_COMP_A: two matched rows (one per catalog item)
     // FILT_COMP_B: one matched row (ITEM_A) + one unmatched row (no prayag code)

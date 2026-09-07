@@ -11,6 +11,7 @@ import {
 import analysisRouter from "./analysis.js";
 import catalogRouter from "./catalog.js";
 import catalogImportExportRouter from "./catalogImportExport.js";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const ITEM_CODE = `__STATUS_${RUN}__`;
@@ -18,6 +19,7 @@ const COMPETITOR = `__STATUS_COMP_${RUN}__`;
 const AUG_DATE = "2026-08-01";
 const SEP_DATE = "2026-09-01";
 const OCT_DATE = "2026-10-01";
+let fixtureBatchId = 0;
 
 const app = express();
 app.use(express.json());
@@ -52,6 +54,7 @@ function exportedStatusByDate(csv: string): Map<string, string> {
 }
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("history-status", RUN);
   await db.insert(catalogProductsTable).values({
     itemCode: ITEM_CODE,
     productName: "Status derivation fixture",
@@ -61,6 +64,7 @@ beforeAll(async () => {
   await db.insert(mrpPriceHistoryTable).values([
     {
       itemCode: ITEM_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 100,
       priceBasis: "MRP",
       effectiveDate: AUG_DATE,
@@ -70,6 +74,7 @@ beforeAll(async () => {
     },
     {
       itemCode: ITEM_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 1190,
       priceBasis: "MRP",
       effectiveDate: SEP_DATE,
@@ -79,6 +84,7 @@ beforeAll(async () => {
     },
     {
       itemCode: ITEM_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 110,
       priceBasis: "MRP",
       effectiveDate: AUG_DATE,
@@ -88,6 +94,7 @@ beforeAll(async () => {
     },
     {
       itemCode: ITEM_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 120,
       priceBasis: "MRP",
       effectiveDate: SEP_DATE,
@@ -131,6 +138,7 @@ afterAll(async () => {
   await db
     .delete(mrpPriceHistoryTable)
     .where(eq(mrpPriceHistoryTable.itemCode, ITEM_CODE));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db
     .delete(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, ITEM_CODE));

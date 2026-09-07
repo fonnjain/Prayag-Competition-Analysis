@@ -16,6 +16,7 @@ import {
   reconcileSanitarywareVariantProvenance,
   sha256ForBuffer,
 } from "../lib/mrpProvenance";
+import { createMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const MANUAL_CODE = `__MRP_MANUAL_PROVENANCE_${RUN}__`;
@@ -35,6 +36,7 @@ const CODES = [
 ];
 const VARIANT_SOURCE_SHEET_ID = `variant-provenance-test-${RUN}`;
 const MAY_SOURCE_SHEET_ID = `may-authoritative-test-${RUN}`;
+let fixtureBatchId = 0;
 
 const app = express();
 app.use(express.json());
@@ -43,6 +45,7 @@ app.use(catalogImportExportRouter);
 const request = supertest(app);
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("mrp-provenance", RUN);
   await db.insert(catalogProductsTable).values(
     CODES.map((itemCode) => ({
       itemCode,
@@ -64,6 +67,12 @@ afterAll(async () => {
     await tx
       .delete(mrpPriceHistoryTable)
       .where(inArray(mrpPriceHistoryTable.itemCode, CODES));
+    await tx
+      .delete(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.loadBatchId, fixtureBatchId));
+    await tx
+      .delete(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, fixtureBatchId));
     await tx
       .delete(catalogProductsTable)
       .where(inArray(catalogProductsTable.itemCode, CODES));
@@ -91,6 +100,7 @@ describe("manual MRP provenance", () => {
   it("requires a reviewer reason and records a manual correction event", async () => {
     await db.insert(mrpPriceHistoryTable).values({
       itemCode: MANUAL_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 100,
       priceBasis: "MRP",
       effectiveDate: EFFECTIVE_DATE,
@@ -384,6 +394,7 @@ describe("manual MRP provenance", () => {
   it("retains a period deletion event after the history row is removed", async () => {
     await db.insert(mrpPriceHistoryTable).values({
       itemCode: PERIOD_CODE,
+      loadBatchId: fixtureBatchId,
       mrp: 175,
       priceBasis: "MRP",
       effectiveDate: PERIOD_DATE,

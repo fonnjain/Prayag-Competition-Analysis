@@ -11,6 +11,7 @@ import analysisRouter from "./analysis.js";
 import catalogRouter from "./catalog.js";
 import catalogImportExportRouter from "./catalogImportExport.js";
 import priceFinderRouter from "./priceFinder.js";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const DATE = "2026-09-01";
@@ -23,6 +24,7 @@ const ITEM_CODES = [
   `OPAQUE-${RUN}+PLUS`,
   `OPAQUE-${RUN} SPACE`,
 ];
+let fixtureBatchId = 0;
 
 const app = express();
 app.use(express.json());
@@ -33,6 +35,7 @@ app.use(catalogImportExportRouter);
 const request = supertest(app);
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("opaque-codes", RUN);
   await db.insert(catalogProductsTable).values(
     ITEM_CODES.map((itemCode) => ({
       itemCode,
@@ -45,6 +48,7 @@ beforeAll(async () => {
   await db.insert(mrpPriceHistoryTable).values(
     ITEM_CODES.map((itemCode, index) => ({
       itemCode,
+      loadBatchId: fixtureBatchId,
       mrp: 100 + index,
       priceBasis: "MRP",
       effectiveDate: DATE,
@@ -60,6 +64,7 @@ afterAll(async () => {
   await db
     .delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, ITEM_CODES));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db
     .delete(catalogProductsTable)
     .where(inArray(catalogProductsTable.itemCode, ITEM_CODES));

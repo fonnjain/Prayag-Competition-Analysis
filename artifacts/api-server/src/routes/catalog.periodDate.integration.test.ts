@@ -10,6 +10,7 @@ import {
   mrpPriceHistoryTable,
 } from "@workspace/db";
 import catalogImportExportRouter from "./catalogImportExport";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const MRP_CODE = `__PERIOD_DATE_MRP_${RUN}__`;
@@ -19,6 +20,7 @@ const NEW_MRP_DATE = "2037-01-11";
 const OLD_COMPETITOR_DATE = "2037-02-10";
 const NEW_COMPETITOR_DATE = "2037-02-11";
 const COLLIDING_COMPETITOR_DATE = "2037-02-12";
+let fixtureBatchId = 0;
 
 const app = express();
 app.use(express.json());
@@ -26,6 +28,7 @@ app.use(catalogImportExportRouter);
 const request = supertest(app);
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("period-date", RUN);
   await db.insert(catalogProductsTable).values({
     itemCode: MRP_CODE,
     productName: "Effective-date move fixture",
@@ -34,6 +37,7 @@ beforeAll(async () => {
   });
   await db.insert(mrpPriceHistoryTable).values({
     itemCode: MRP_CODE,
+    loadBatchId: fixtureBatchId,
     mrp: 125,
     priceBasis: "MRP",
     effectiveDate: OLD_MRP_DATE,
@@ -52,6 +56,7 @@ afterAll(async () => {
   await db.delete(mrpHistoryProvenanceEventsTable)
     .where(eq(mrpHistoryProvenanceEventsTable.itemCode, MRP_CODE));
   await db.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, MRP_CODE));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db.delete(catalogProductsTable).where(eq(catalogProductsTable.itemCode, MRP_CODE));
   await db.delete(competitorPricesTable).where(eq(competitorPricesTable.competitor, COMPETITOR));
 });

@@ -16,6 +16,7 @@ import {
 } from "@workspace/db";
 import revisionRouter from "./mrpRevision";
 import { warningFor } from "./mrpRevision";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const CODE = `__MRP_REVISION_${RUN}__`;
@@ -48,6 +49,7 @@ const request = supertest(
     .use(revisionRouter),
 );
 const batchIds: number[] = [];
+let fixtureBatchId = 0;
 
 function workbook(): Buffer {
   const book = XLSX.utils.book_new();
@@ -110,6 +112,7 @@ async function createChangePreview(reason: string) {
 }
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("mrp-revision", RUN);
   await db.insert(catalogProductsTable).values([
     { itemCode: CODE, productName: "Revision fixture", division: "PTMT & Plastic Fittings / CP Fittings", category: "Test" },
     { itemCode: UNTOUCHED_CODE, productName: "Untouched fixture", division: "PTMT & Plastic Fittings", category: "Test" },
@@ -118,7 +121,7 @@ beforeAll(async () => {
     { itemCode: CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
     { itemCode: CODE, mrp: 90, priceBasis: "MRP", effectiveDate: "2040-03-06", loadDate: "2040-03-06", variant: "Standard" },
     { itemCode: UNTOUCHED_CODE, mrp: 200, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
-  ]);
+  ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   await db.insert(competitorPricesTable).values([
     { competitor: COMPETITOR, competitorCode: COMPETITOR_CODE, price: 100, effectiveDate: COMPETITOR_DATE, matchStatus: "matched" },
     { competitor: COMPETITOR, competitorCode: COMPETITOR_CODE, price: 130, effectiveDate: COMPETITOR_LATER_DATE, matchStatus: "matched" },
@@ -137,6 +140,7 @@ afterAll(async () => {
     .where(inArray(competitorPricesTable.competitor, [COMPETITOR, OTHER_COMPETITOR]));
   await db.delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, [CODE, UNTOUCHED_CODE]));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db.delete(catalogProductsTable)
     .where(inArray(catalogProductsTable.itemCode, [CODE, UNTOUCHED_CODE]));
 });

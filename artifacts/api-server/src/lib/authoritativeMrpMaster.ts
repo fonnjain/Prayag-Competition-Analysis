@@ -563,6 +563,13 @@ export async function loadAuthoritativeMaster(input: {
         (SELECT COUNT(*)::int FROM mrp_price_history) AS history_rows,
         (SELECT COUNT(DISTINCT item_code)::int FROM mrp_price_history) AS history_codes
     `);
+    const catalogCodesBefore = new Set(
+      (
+        await tx
+          .select({ itemCode: catalogProductsTable.itemCode })
+          .from(catalogProductsTable)
+      ).map((row) => row.itemCode),
+    );
 
     const existingProducts = await tx
       .select({
@@ -632,7 +639,6 @@ export async function loadAuthoritativeMaster(input: {
       .returning({ id: mrpLoadBatchesTable.id });
     const loadBatchId = batch[0]!.id;
 
-    const newCodes: string[] = [];
     for (let index = 0; index < parsed.productRows.length; index += 500) {
       const values = parsed.productRows.slice(index, index + 500).map((row) => ({
         itemCode: row.itemCode,
@@ -650,12 +656,6 @@ export async function loadAuthoritativeMaster(input: {
         dataFlag: parsed.dataFlag,
         updatedAt: new Date(),
       }));
-      const inserted = await tx
-        .insert(catalogProductsTable)
-        .values(values)
-        .onConflictDoNothing({ target: catalogProductsTable.itemCode })
-        .returning({ itemCode: catalogProductsTable.itemCode });
-      newCodes.push(...inserted.map((row) => authoritativeCode(row.itemCode)));
       await tx
         .insert(catalogProductsTable)
         .values(values)
@@ -796,6 +796,14 @@ export async function loadAuthoritativeMaster(input: {
         (SELECT COUNT(*)::int FROM mrp_price_history) AS history_rows,
         (SELECT COUNT(DISTINCT item_code)::int FROM mrp_price_history) AS history_codes
     `);
+    const newCodes = (
+      await tx
+        .select({ itemCode: catalogProductsTable.itemCode })
+        .from(catalogProductsTable)
+    )
+      .map((row) => row.itemCode)
+      .filter((itemCode) => !catalogCodesBefore.has(itemCode))
+      .sort();
 
     return {
       duplicate: false as const,

@@ -10,13 +10,17 @@ import {
 import { eq, inArray, sql } from "drizzle-orm";
 import { getPrayagCatalogMapForPeriod } from "./analysis";
 import catalogRouter from "./catalog";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const FUTURE_FIXTURES = Array.from(
   { length: 68 },
   (_, index) => `__SINK_ACCEPTANCE_FUTURE_${Date.now()}_${index}__`,
 );
+const RUN = Date.now();
+let fixtureBatchId = 0;
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("sink-repair", RUN);
   await db.insert(catalogProductsTable).values(
     FUTURE_FIXTURES.map((itemCode) => ({
       itemCode,
@@ -28,6 +32,7 @@ beforeAll(async () => {
   await db.insert(mrpPriceHistoryTable).values(
     FUTURE_FIXTURES.map((itemCode, index) => ({
       itemCode,
+      loadBatchId: fixtureBatchId,
       mrp: 100 + index,
       priceBasis: "MRP",
       effectiveDate: "2026-09-01",
@@ -42,6 +47,7 @@ afterAll(async () => {
   await db
     .delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, FUTURE_FIXTURES));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db
     .delete(catalogProductsTable)
     .where(inArray(catalogProductsTable.itemCode, FUTURE_FIXTURES));

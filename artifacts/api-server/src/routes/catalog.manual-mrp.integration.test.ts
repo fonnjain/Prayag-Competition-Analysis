@@ -12,6 +12,7 @@ import {
   mrpSourcesTable,
 } from "@workspace/db";
 import catalogRouter from "./catalog";
+import { createMrpFixtureBatch } from "./testMrpFixture.js";
 
 const ITEM_CODE = `__MANUAL_MRP_AUDIT_${Date.now()}__`;
 const BASE_DATE = "2020-01-01";
@@ -19,9 +20,11 @@ const BASE_MRP = 100;
 const EFFECTIVE_DATE = "2099-09-01";
 const COMPETITOR = `__MANUAL_MRP_COMP_${Date.now()}__`;
 const FILE_NAME = `manual-correction:${ITEM_CODE}:${EFFECTIVE_DATE}`;
+let fixtureBatchId = 0;
 const request = supertest(express().use(express.json()).use(catalogRouter));
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("manual-mrp", Date.now());
   await db.insert(catalogProductsTable).values({
     itemCode: ITEM_CODE,
     productName: "Manual correction provenance fixture",
@@ -30,6 +33,7 @@ beforeAll(async () => {
   });
   await db.insert(mrpPriceHistoryTable).values({
     itemCode: ITEM_CODE,
+    loadBatchId: fixtureBatchId,
     mrp: BASE_MRP,
     priceBasis: "MRP",
     effectiveDate: BASE_DATE,
@@ -60,6 +64,12 @@ afterAll(async () => {
     await tx
       .delete(mrpPriceHistoryTable)
       .where(eq(mrpPriceHistoryTable.itemCode, ITEM_CODE));
+    await tx
+      .delete(mrpHistoryProvenanceEventsTable)
+      .where(eq(mrpHistoryProvenanceEventsTable.loadBatchId, fixtureBatchId));
+    await tx
+      .delete(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, fixtureBatchId));
     await tx
       .delete(mrpLoadBatchesTable)
       .where(eq(mrpLoadBatchesTable.fileName, FILE_NAME));

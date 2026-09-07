@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
@@ -71,6 +72,14 @@ interface CompetitorSeedFile {
 
 const data = catalogSeedData as CatalogSeedFile;
 const competitorData = competitorSeedData as CompetitorSeedFile;
+const CATALOG_SEED_SOURCE = {
+  division: "Legacy catalog seed",
+  sheetId: "internal-catalog-seed",
+  sheetUrl: "internal://catalog-seed.json",
+  expectedFileName: "catalog-seed.json",
+  notes: "Checked-in application seed used only when initializing or explicitly resetting the catalogue.",
+  sourceKind: "internal",
+} as const;
 
 async function chunkedInsert<T>(
   rows: T[],
@@ -114,6 +123,35 @@ export async function loadCatalogSeed(): Promise<void> {
     await tx.delete(codeConflictsTable);
     await tx.delete(competitorPricesTable);
 
+    await tx
+      .insert(mrpSourcesTable)
+      .values(CATALOG_SEED_SOURCE)
+      .onConflictDoNothing({ target: mrpSourcesTable.sheetId });
+    const [seedSource] = await tx
+      .select({ id: mrpSourcesTable.id })
+      .from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.sheetId, CATALOG_SEED_SOURCE.sheetId))
+      .limit(1);
+    if (!seedSource) throw new Error("Catalog seed source could not be created.");
+    const seedPayload = JSON.stringify(data.priceHistory);
+    const [seedBatch] = await tx
+      .insert(mrpLoadBatchesTable)
+      .values({
+        sourceId: seedSource.id,
+        fileName: CATALOG_SEED_SOURCE.expectedFileName,
+        fileSha256: createHash("sha256").update(seedPayload).digest("hex"),
+        fileSizeBytes: Buffer.byteLength(seedPayload),
+        downloadedAt:
+          data.priceHistory
+            .map((row) => row.loadDate)
+            .sort()
+            .at(-1) ?? "1970-01-01",
+        rowCount: data.priceHistory.length,
+        notes: CATALOG_SEED_SOURCE.notes,
+      })
+      .returning({ id: mrpLoadBatchesTable.id });
+    if (!seedBatch) throw new Error("Catalog seed load batch could not be created.");
+
     await chunkedInsert(data.products, (batch) =>
       tx.insert(catalogProductsTable).values(
       batch.map((p) => ({
@@ -147,6 +185,7 @@ export async function loadCatalogSeed(): Promise<void> {
           sourceFile: r.sourceFile,
           isCurrent: false,
           notes: r.notes,
+          loadBatchId: seedBatch.id,
         })),
       ).returning({
         id: mrpPriceHistoryTable.id,
@@ -162,6 +201,7 @@ export async function loadCatalogSeed(): Promise<void> {
           effectiveDate: row.effectiveDate,
           action: "legacy_seed_import",
           sourceFile: row.sourceFile,
+          loadBatchId: seedBatch.id,
           mrp: row.mrp,
         })),
       );

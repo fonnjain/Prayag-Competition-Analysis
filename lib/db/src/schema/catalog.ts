@@ -152,8 +152,9 @@ export const mrpPriceHistoryTable = pgTable(
     reviewStatus: text("review_status").notNull().default("approved"),
     reviewReasons: text("review_reasons"),
     importBatchId: text("import_batch_id"),
-    // Every normal source load and manual correction has an auditable batch.
-    // Null is retained only for legacy rows so Data Health can surface them.
+    // Every active writer supplies an auditable batch. Null remains available
+    // only so legacy rows can be detected and attached by the reconciliation
+    // workflow.
     loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
     // The most recent controlled revision that touched this row. Full revision
     // history (including previous values) lives in mrp_revision_rows.

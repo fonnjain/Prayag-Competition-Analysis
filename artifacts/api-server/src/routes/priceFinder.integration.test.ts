@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import priceFinderRouter from "./priceFinder.js";
 import { validToFromNextDate } from "../lib/priceWindow.js";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 
 const RUN = Date.now();
 const CHANGING = `PF-CHANGE-${RUN}`;
@@ -35,6 +36,7 @@ const ITEM_CODES = [
   NO_FUTURE_GAP,
 ];
 const LEGACY_MRP_TABLE = `mrp_price_history_pf_test_${process.pid}_${RUN}`;
+let fixtureBatchId = 0;
 
 function dateOffset(days: number): string {
   const date = new Date();
@@ -53,6 +55,7 @@ app.use(priceFinderRouter);
 const request = supertest(app);
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("price-finder", RUN);
   await db.insert(catalogProductsTable).values([
     {
       itemCode: CHANGING,
@@ -233,7 +236,7 @@ beforeAll(async () => {
       loadDate: CURRENT_DATE,
       isCurrent: true,
     },
-  ]);
+  ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
 
   // The parent table's unique index prevents new same-day duplicates. An
   // inherited child safely simulates a restored legacy duplicate while keeping
@@ -245,9 +248,9 @@ beforeAll(async () => {
   );
   await db.execute(sql`
     INSERT INTO ${sql.raw(LEGACY_MRP_TABLE)}
-      (item_code, mrp, price_basis, effective_date, load_date, is_current)
+      (item_code, mrp, price_basis, effective_date, load_date, is_current, load_batch_id)
     VALUES
-      (${CHANGING}, ${130}, 'MRP', ${NEXT_DATE}, ${NEXT_DATE}, false)
+      (${CHANGING}, ${130}, 'MRP', ${NEXT_DATE}, ${NEXT_DATE}, false, ${fixtureBatchId})
   `);
 
   await db.insert(competitorPricesTable).values([
@@ -335,6 +338,7 @@ afterAll(async () => {
   await db
     .delete(mrpPriceHistoryTable)
     .where(inArray(mrpPriceHistoryTable.itemCode, ITEM_CODES));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db
     .delete(catalogProductsTable)
     .where(inArray(catalogProductsTable.itemCode, ITEM_CODES));
