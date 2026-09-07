@@ -14,6 +14,8 @@ import * as schema from "@workspace/db/schema";
 import {
   AUTHORITATIVE_MASTER_FILE_NAME,
   AUTHORITATIVE_MASTER_SHA256,
+  AUTHORITATIVE_MASTER_V2_FILE_NAME,
+  AUTHORITATIVE_MASTER_V2_SHA256,
   loadAuthoritativeMaster,
   parseAuthoritativeMasterBuffer,
 } from "./authoritativeMrpMaster";
@@ -25,6 +27,11 @@ const MASTER_FILE = new URL(
   import.meta.url,
 );
 const MASTER_BUFFER = readFileSync(MASTER_FILE);
+const MASTER_V2_FILE = new URL(
+  "../../../../attached_assets/Prayag_MRP_Authoritative_v2_01Sep2026_1788783858192.xlsx",
+  import.meta.url,
+);
+const MASTER_V2_BUFFER = readFileSync(MASTER_V2_FILE);
 const RUN = Date.now();
 const DISPOSABLE_SCHEMA = `authoritative_load_test_${RUN}`;
 const ROLLBACK_MARKER = `authoritative-load-test-rollback-${RUN}`;
@@ -46,6 +53,38 @@ const DEACTIVATED_CODES = [
   "PS5763",
   "PS7506",
 ] as const;
+const V2_NEW_CODES = [
+  "PF306",
+  "PF326",
+  "PF51",
+  "PF525",
+  "PF608",
+  "PF609",
+  "PF61",
+  "PF610",
+  "PF611",
+  "PF71",
+  "PG306",
+  "PG326",
+  "PG51",
+  "PG525",
+  "PG608",
+  "PG609",
+  "PG61",
+  "PG610",
+  "PG611",
+  "PG71",
+  "PP306",
+  "PP326",
+  "PP51",
+  "PP525",
+  "PP608",
+  "PP609",
+  "PP61",
+  "PP610",
+  "PP611",
+  "PP71",
+] as const;
 let firstClient: PoolClient | null = null;
 let secondClient: PoolClient | null = null;
 let firstDatabase: Omit<typeof db, "$client">;
@@ -53,11 +92,12 @@ let secondDatabase: Omit<typeof db, "$client">;
 
 async function removeExistingAuthoritativeBatches(
   tx: DatabaseTransaction,
+  fileSha256: string = AUTHORITATIVE_MASTER_SHA256,
 ): Promise<void> {
   const batches = await tx
     .select({ id: mrpLoadBatchesTable.id })
     .from(mrpLoadBatchesTable)
-    .where(eq(mrpLoadBatchesTable.fileSha256, AUTHORITATIVE_MASTER_SHA256));
+    .where(eq(mrpLoadBatchesTable.fileSha256, fileSha256));
   const batchIds = batches.map((batch) => batch.id);
   if (batchIds.length === 0) return;
 
@@ -189,6 +229,175 @@ afterAll(async () => {
 });
 
 describe("authoritative MRP master transaction guarantees", () => {
+  it(
+    "loads revised v2 while visibly preserving the named audited names",
+    async () => {
+      expect(sha256ForBuffer(MASTER_V2_BUFFER)).toBe(
+        AUTHORITATIVE_MASTER_V2_SHA256,
+      );
+      const parsed = parseAuthoritativeMasterBuffer(MASTER_V2_BUFFER);
+      expect(parsed.productRows).toHaveLength(6_106);
+      expect(parsed.priceRows).toHaveLength(6_256);
+      expect(parsed.discontinuedRows).toHaveLength(233);
+      expect(parsed.excludedRows).toBe(142);
+      expect(parsed.periodCounts).toEqual({
+        "2024-02-15": 161,
+        "2026-02-01": 1_616,
+        "2026-05-01": 475,
+        "2026-08-01": 865,
+        "2026-08-10": 580,
+        "2026-09-01": 2_409,
+      });
+      expect(parsed.preservedNameDisagreements).toHaveLength(11);
+
+      await expect(
+        firstDatabase.transaction(async (tx) => {
+          await removeExistingAuthoritativeBatches(
+            tx,
+            AUTHORITATIVE_MASTER_V2_SHA256,
+          );
+          await tx
+            .delete(catalogProductsTable)
+            .where(inArray(catalogProductsTable.itemCode, [...V2_NEW_CODES]));
+          const [vbBefore] = (
+            await tx.execute<{ count: number }>(sql`
+              SELECT COUNT(*)::int AS count
+              FROM catalog_products
+              WHERE item_code IN (
+                '121-VB', '124-VB', '127-VB', '129-VB', '130-VB',
+                '132-VB', '1322-VB', '133-VB', '134-VB', '135-VB',
+                '1375-VB', '144-VB', '145-VB', '147-VB', '149-VB'
+              )
+            `)
+          ).rows;
+          const result = await loadAuthoritativeMaster({
+            buffer: MASTER_V2_BUFFER,
+            downloadedAt: "2026-09-07",
+            loadedBy: "authoritative-v2-load-test",
+            transaction: tx,
+          });
+          expect(result.duplicate).toBe(false);
+          if (result.duplicate) return;
+
+          expect(result.productRows).toBe(6_106);
+          expect(result.priceRows).toBe(6_256);
+          expect(result.periodCounts["2026-08-10"]).toBe(580);
+          expect(new Set(result.newCodes)).toEqual(new Set(V2_NEW_CODES));
+          expect(result.preservedNameDisagreements).toHaveLength(11);
+
+          const [batch] = await tx
+            .select()
+            .from(mrpLoadBatchesTable)
+            .where(eq(mrpLoadBatchesTable.id, result.loadBatchId));
+          expect(batch).toMatchObject({
+            fileName: AUTHORITATIVE_MASTER_V2_FILE_NAME,
+            fileSha256: AUTHORITATIVE_MASTER_V2_SHA256,
+            downloadedAt: "2026-09-07",
+            rowCount: 6_256,
+          });
+          expect(batch?.notes).toContain(
+            "Revised authoritative master from Prayag, superseding batch 15.",
+          );
+          expect(batch?.notes).toContain("Named product-name exceptions (11)");
+          expect(batch?.notes).toContain("UH82-S");
+
+          const exactRows = await tx
+            .select({
+              itemCode: mrpPriceHistoryTable.itemCode,
+              mrp: mrpPriceHistoryTable.mrp,
+              effectiveDate: mrpPriceHistoryTable.effectiveDate,
+            })
+            .from(mrpPriceHistoryTable)
+            .where(
+              and(
+                eq(mrpPriceHistoryTable.loadBatchId, result.loadBatchId),
+                inArray(mrpPriceHistoryTable.itemCode, [
+                  "P10A12",
+                  "BOS-108",
+                  "P10A04",
+                  "PF326",
+                  "PF71",
+                  "CCL-60-BSK",
+                ]),
+              ),
+            );
+          expect(exactRows).toEqual(
+            expect.arrayContaining([
+              {
+                itemCode: "P10A12",
+                mrp: 7_354,
+                effectiveDate: "2026-08-10",
+              },
+              {
+                itemCode: "BOS-108",
+                mrp: 1_990,
+                effectiveDate: "2026-08-01",
+              },
+              {
+                itemCode: "P10A04",
+                mrp: 168,
+                effectiveDate: "2026-08-10",
+              },
+              {
+                itemCode: "PF326",
+                mrp: 515.2,
+                effectiveDate: "2026-08-10",
+              },
+              {
+                itemCode: "PF71",
+                mrp: 10_060.2,
+                effectiveDate: "2026-08-10",
+              },
+              {
+                itemCode: "CCL-60-BSK",
+                mrp: 1_190,
+                effectiveDate: "2026-09-01",
+              },
+            ]),
+          );
+
+          const preservedNames = await tx
+            .select({
+              itemCode: catalogProductsTable.itemCode,
+              productName: catalogProductsTable.productName,
+            })
+            .from(catalogProductsTable)
+            .where(
+              inArray(
+                catalogProductsTable.itemCode,
+                parsed.preservedNameDisagreements.map((row) => row.itemCode),
+              ),
+            );
+          expect(
+            preservedNames.every(
+              (row) =>
+                row.productName ===
+                parsed.preservedNameDisagreements.find(
+                  (expected) => expected.itemCode === row.itemCode,
+                )?.preservedName,
+            ),
+          ).toBe(true);
+
+          const [vbCount] = (
+            await tx.execute<{ count: number }>(sql`
+              SELECT COUNT(*)::int AS count
+              FROM catalog_products
+              WHERE item_code IN (
+                '121-VB', '124-VB', '127-VB', '129-VB', '130-VB',
+                '132-VB', '1322-VB', '133-VB', '134-VB', '135-VB',
+                '1375-VB', '144-VB', '145-VB', '147-VB', '149-VB'
+              )
+            `)
+          ).rows;
+          expect(vbCount?.count).toBe(vbBefore?.count);
+
+          throw new Error(`${ROLLBACK_MARKER}-v2`);
+        }),
+      ).rejects.toThrow(`${ROLLBACK_MARKER}-v2`);
+    },
+    120_000,
+  );
+
   it(
     "persists exact prices, variants, withdrawals, deactivations, and provenance linkage",
     async () => {

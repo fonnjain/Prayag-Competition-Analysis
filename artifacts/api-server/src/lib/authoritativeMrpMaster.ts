@@ -32,6 +32,7 @@ export const AUTHORITATIVE_MASTER_V2_FILE_NAME =
 interface NamePreservationException {
   itemCode: string;
   preservedName: string;
+  allowedCurrentNames?: readonly string[];
 }
 
 const V2_NAME_PRESERVATION_EXCEPTIONS: readonly NamePreservationException[] = [
@@ -78,6 +79,23 @@ const V2_NAME_PRESERVATION_EXCEPTIONS: readonly NamePreservationException[] = [
     preservedName:
       "Short Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm",
   },
+  {
+    itemCode: "UH82-F",
+    preservedName: "Full Turn Concealed Valve 1 inch TRIANGULAR",
+    allowedCurrentNames: [
+      "Full Turn Concealed Valve",
+      "Full Turn Concealed Valve 1 inch TRIANGULER",
+    ],
+  },
+  {
+    itemCode: "UH82-L",
+    preservedName:
+      "Long Concealed Valve (Quarter Turn) 1 inch TRIANGULAR",
+    allowedCurrentNames: [
+      "Long Concealed Valve (Quarter Turn)",
+      "Long Concealed Valve (Quarter Turn) 1 inch TRIANGULER",
+    ],
+  },
 ] as const;
 
 interface AuthoritativeMasterProfile {
@@ -94,7 +112,8 @@ const AUTHORITATIVE_MASTER_PROFILES: readonly AuthoritativeMasterProfile[] = [
     fileName: AUTHORITATIVE_MASTER_FILE_NAME,
     fileSha256: AUTHORITATIVE_MASTER_SHA256,
     expectedProductRows: 6_076,
-    loadReason: `${AUTHORITATIVE_MASTER_SOURCE.notes}`,
+    loadReason:
+      "Authoritative master returned by Prayag, superseding the compiled 01 Sep list.",
     dataFlag: "authoritative_master_2026_09_01",
     namePreservationExceptions: [],
   },
@@ -568,7 +587,17 @@ export async function loadAuthoritativeMaster(input: {
     );
     const unexpectedPreservedNames =
       parsed.preservedNameDisagreements.filter(
-        (row) => existingNames.get(row.itemCode) !== row.preservedName,
+        (row) => {
+          const exception = profileForHash(parsed.fileSha256)
+            .namePreservationExceptions.find(
+              (candidate) => candidate.itemCode === row.itemCode,
+            );
+          const currentName = existingNames.get(row.itemCode);
+          return (
+            currentName !== row.preservedName &&
+            !exception?.allowedCurrentNames?.includes(currentName ?? "")
+          );
+        },
       );
     if (unexpectedPreservedNames.length) {
       throw new Error(

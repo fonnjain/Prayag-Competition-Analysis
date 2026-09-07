@@ -142,6 +142,23 @@ export const CH_VALVE_NAME_CORRECTIONS: readonly NameCorrection[] = [
     correctedName:
       "Short Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm",
   },
+  {
+    itemCode: "UH82-F",
+    expectedNames: [
+      "Full Turn Concealed Valve",
+      "Full Turn Concealed Valve 1 inch TRIANGULER",
+    ],
+    correctedName: "Full Turn Concealed Valve 1 inch TRIANGULAR",
+  },
+  {
+    itemCode: "UH82-L",
+    expectedNames: [
+      "Long Concealed Valve (Quarter Turn)",
+      "Long Concealed Valve (Quarter Turn) 1 inch TRIANGULER",
+    ],
+    correctedName:
+      "Long Concealed Valve (Quarter Turn) 1 inch TRIANGULAR",
+  },
 ] as const;
 
 export async function applyChValveNameCorrections() {

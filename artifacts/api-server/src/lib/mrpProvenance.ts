@@ -296,6 +296,28 @@ export async function ensureHardwareReplacementSnapshot(
       throw new Error("The official Hardware provenance source is missing.");
     }
 
+    const [existingBatch] = await tx
+      .select({ id: mrpLoadBatchesTable.id })
+      .from(mrpLoadBatchesTable)
+      .where(
+        and(
+          eq(mrpLoadBatchesTable.sourceId, hardwareSource.id),
+          eq(
+            mrpLoadBatchesTable.fileSha256,
+            HARDWARE_REPLACEMENT_SNAPSHOT.fileSha256,
+          ),
+        ),
+      )
+      .limit(1);
+    if (existingBatch) {
+      return {
+        loadBatchId: existingBatch.id,
+        rows: HARDWARE_REPLACEMENT_SNAPSHOT.expectedRows,
+        revisions: HARDWARE_REPLACEMENT_SNAPSHOT.expectedRevisions,
+        additions: HARDWARE_REPLACEMENT_SNAPSHOT.expectedAdditions,
+      };
+    }
+
     const candidates = await tx
       .select({
         id: mrpPriceHistoryTable.id,
@@ -315,9 +337,12 @@ export async function ensureHardwareReplacementSnapshot(
             HARDWARE_REPLACEMENT_SNAPSHOT.effectiveDate,
           ),
           eq(mrpPriceHistoryTable.variant, "Standard"),
-          eq(
+          inArray(
             mrpPriceHistoryTable.sourceFile,
-            HARDWARE_REPLACEMENT_SNAPSHOT.fileName,
+            [
+              HARDWARE_REPLACEMENT_SNAPSHOT.fileName,
+              "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx",
+            ],
           ),
         ),
       );
@@ -352,36 +377,21 @@ export async function ensureHardwareReplacementSnapshot(
       );
     }
 
-    const [existingBatch] = await tx
-      .select({ id: mrpLoadBatchesTable.id })
-      .from(mrpLoadBatchesTable)
-      .where(
-        and(
-          eq(mrpLoadBatchesTable.sourceId, hardwareSource.id),
-          eq(
-            mrpLoadBatchesTable.fileSha256,
-            HARDWARE_REPLACEMENT_SNAPSHOT.fileSha256,
-          ),
-        ),
-      )
-      .limit(1);
-    const loadBatchId =
-      existingBatch?.id ??
-      (
-        await tx
-          .insert(mrpLoadBatchesTable)
-          .values({
-            sourceId: hardwareSource.id,
-            fileName: HARDWARE_REPLACEMENT_SNAPSHOT.fileName,
-            fileSha256: HARDWARE_REPLACEMENT_SNAPSHOT.fileSha256,
-            fileSizeBytes: HARDWARE_REPLACEMENT_SNAPSHOT.fileSizeBytes,
-            downloadedAt: HARDWARE_REPLACEMENT_SNAPSHOT.downloadedAt,
-            loadedBy,
-            rowCount: HARDWARE_REPLACEMENT_SNAPSHOT.expectedRows,
-            notes: HARDWARE_REPLACEMENT_SNAPSHOT.notes,
-          })
-          .returning({ id: mrpLoadBatchesTable.id })
-      )[0]!.id;
+    const loadBatchId = (
+      await tx
+        .insert(mrpLoadBatchesTable)
+        .values({
+          sourceId: hardwareSource.id,
+          fileName: HARDWARE_REPLACEMENT_SNAPSHOT.fileName,
+          fileSha256: HARDWARE_REPLACEMENT_SNAPSHOT.fileSha256,
+          fileSizeBytes: HARDWARE_REPLACEMENT_SNAPSHOT.fileSizeBytes,
+          downloadedAt: HARDWARE_REPLACEMENT_SNAPSHOT.downloadedAt,
+          loadedBy,
+          rowCount: HARDWARE_REPLACEMENT_SNAPSHOT.expectedRows,
+          notes: HARDWARE_REPLACEMENT_SNAPSHOT.notes,
+        })
+        .returning({ id: mrpLoadBatchesTable.id })
+    )[0]!.id;
 
     await tx
       .update(mrpPriceHistoryTable)

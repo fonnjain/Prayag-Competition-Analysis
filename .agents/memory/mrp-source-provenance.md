@@ -38,3 +38,9 @@ Every batch note must name the checksum domain. A source-file checksum identifie
 **Why:** Equal-looking data can have different byte identities, and treating a normalized payload digest as a workbook digest would make duplicate detection and source verification misleading.
 
 **How to apply:** State the domain and intentional mismatch behavior in the batch record itself. Never compare a normalized-payload checksum with uploaded XLSX bytes or imply that such a mismatch signals changed prices.
+
+An authoritative price master may not silently overwrite a separately audited catalogue-name correction. Preserve only a named exception list, and record every source/current disagreement in the load-batch note.
+
+**Why:** Prayag's revised September 2026 master retained confirmed source naming errors. Treating the workbook as authoritative for product names would have undone reviewed corrections while correctly updating prices.
+
+**How to apply:** Keep the workbook authoritative for prices, effective dates, variants, products, and discontinuations. Validate the current corrected names before loading, substitute the approved names transactionally, and return the disagreement list in the load receipt so Prayag can fix its next master.
