@@ -1,0 +1,130 @@
+# Replit Prompt — Add Ashirvad as a Second Competitor
+
+A competitor price list for the plumbing divisions has arrived. Ashirvad becomes the second mapped competitor alongside Sparsh Pearl.
+
+---
+
+## Input file
+
+**`Ashirvad_Competitor_Mapping.xlsx`**
+
+```
+SHA-256   5dfa4fdcc76595e4e3c090734808a506d85eb3902137428263274272e2b0e499
+```
+
+Sheet `competitor_mapping`, **669 rows**: `prayag_code`, `competitor` (Ashirvad), `competitor_code`, `competitor_mrp`, `effective_from` (all `2025-03-01`).
+
+Derived from `Competitor Master - Plumbing.xlsx`, which maps Prayag plumbing products to Ashirvad across eight category sheets.
+
+---
+
+## 1. The source is unusually clean
+
+Worth stating because it is not the norm here:
+
+- **All 669 Prayag codes exist** in `catalog_products`. None missing.
+- **All 669 Prayag prices in the source match ours exactly.** No reconciliation needed.
+- **No duplicate codes** on either side — each Prayag code maps to one Ashirvad code and vice versa.
+
+So the mapping can be trusted as given. Load it as-is.
+
+---
+
+## 2. Do not load the Prayag column
+
+The file carries `prayag_mrp_reference` for context. **It must not be loaded.**
+
+Prayag MRP comes from the authoritative master and is resolved by date. A competitor file supplying Prayag prices is exactly the confusion that has to be avoided — the competitor side and the Prayag side must never come from the same upload.
+
+The `gap_pct` column is likewise for human review only. Gaps are computed at query time, both sides resolved at the same date.
+
+---
+
+## 3. Effective date, and why it needs flagging
+
+Every Ashirvad price is dated **01 March 2025** — eighteen months old. Sparsh Pearl Vol 6.2 is dated 01 July 2026.
+
+Load the date as given; it is what the source states. But **surface the age prominently** wherever Ashirvad appears — on the product page, in comparison, and in exports. The existing "valid from" treatment should already do this, but confirm it reads clearly when the date is this old.
+
+A user comparing against an eighteen-month-old list should be able to see that at a glance, not work it out.
+
+---
+
+## 4. Coverage is partial, and that must be visible
+
+Ashirvad covers **669 of 1,183** Prayag plumbing products — 57%. Coverage varies sharply by category:
+
+```
+CPVC Pipe        40 / 40      UPVC Fittings   154 / 269
+CPVC Fittings   171 / 255     AGRI Pipe        67 / 123
+SWR Fittings    121 / 149     SWR Pipe         56 / 160
+UPVC Pipe        40 / 52      AGRI Fittings    20 / 135
+```
+
+A Prayag product with no Ashirvad mapping must show as **"no data"**, never as a zero gap or an absent competitor column that implies parity. This is the same rule already applied for Vectus.
+
+---
+
+## 5. Two competitors, not one
+
+This is the first time the application holds more than one mapped competitor with real data. Check that everything built around a single competitor still holds:
+
+- **Comparison** must show both, and the competitor filter must be genuinely multi-select rather than defaulting to Sparsh.
+- **The Price Finder inline gap line** currently shows one competitor. Decide what it shows when a product has two — both, or the closest, stated explicitly.
+- **Competition Analysis** rankings and opportunity/threat classification must account for two competitors, not silently pick one.
+- **Exports** need a competitor column, or one column pair per competitor.
+
+Report what currently assumes a single competitor. That list is more useful than the load itself.
+
+---
+
+## 6. Loading
+
+Register a competitor source and load batch as for Sparsh: file name, the SHA-256 above, download date, and the reason.
+
+Only 669 mapped rows load. Nothing creates a `catalog_products` row — every Prayag code already exists, and no Ashirvad product may enter the Prayag catalogue.
+
+---
+
+## 7. Acceptance tests
+
+```
+1.  669 Ashirvad prices load, all dated 2025-03-01.
+2.  No catalog_products row is created or modified.
+3.  No mrp_price_history row is created or modified — Prayag prices unchanged
+    at their current count.
+4.  A Prayag plumbing product with no Ashirvad mapping shows "no data", not
+    a zero gap.
+5.  A product mapped to both Sparsh and Ashirvad shows both, with each gap
+    computed against the Prayag price in force on the same date.
+6.  The competitor filter can select Sparsh only, Ashirvad only, or both.
+7.  The Ashirvad price displays its 01 Mar 2025 date wherever it appears.
+8.  All 150 Sparsh Pearl mappings still resolve — unchanged by this load.
+9.  Exports distinguish which competitor each price belongs to.
+```
+
+Test 3 is the guard. This file contains Prayag prices; none of them may reach `mrp_price_history`.
+
+---
+
+## 8. Report
+
+Read from the database:
+
+- Rows loaded, and the batch id.
+- Confirmation that Prayag prices and catalogue rows are untouched.
+- Median gap against Ashirvad, overall and by category.
+- Everything found that assumes a single competitor.
+- How "no data" renders for the 514 unmapped plumbing products.
+
+---
+
+## Worth knowing before anyone reads the numbers
+
+Two figures will stand out, and both should be checked with the business rather than taken at face value.
+
+**CPVC is not a close race.** Prayag is cheaper on 40 of 40 pipes and 161 of 171 fittings, median +43% to +50%. Against Sparsh the median is +2.9%. Either Ashirvad sits well above Prayag in CPVC, or their list is materially out of date.
+
+**AGRI Pipe runs the other way.** Prayag is cheaper on only **3 of 67**, median −6.2%. It is the single category where Ashirvad undercuts consistently.
+
+Both may be real. Both are also what an eighteen-month-old price list would look like. Flag them in the report rather than presenting them as settled findings.

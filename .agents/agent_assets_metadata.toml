@@ -207,3 +207,31 @@ mtime_ms = 1788791493358
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/792ed16d-9c3d-4150-a52e-7bdf85495aca/11daff82-739e-4ea6-9296-5e53c765bf2e"
 storage_version_token = "1788791544743384"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "jGD0KmbUn-xx5FEfSYLse"
+uri = "file://reports/ashirvad-second-competitor-2026-09-08.md"
+type = "text"
+title = "Ashirvad Second-Competitor Report"
+description = "Database-backed load audit, coverage, date-aligned median gaps, immutable Prayag checks, and remaining live-data limitation."
+logical_id = "e896bd7a-94fa-4aa5-a678-7fa5037ea81a"
+content_hash = "sha256:138f297904de029bdd5ddddc3140be7e942c9cd76fa97178726f1730e03b145f"
+size = 7052
+mtime_ms = 1788857242494
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e896bd7a-94fa-4aa5-a678-7fa5037ea81a/6b7d6517-ae76-438e-9bcd-6d762bee91fc"
+storage_version_token = "1788857265638829"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "oOHeFJ1hwOAkmUuHV2Tdb"
+uri = "file://screenshots/ashirvad-price-finder-comparison.jpg"
+type = "image"
+title = "Price Finder Multi-Competitor Verification"
+description = "Ashirvad and Sparsh selected together for PS-1, showing the old Ashirvad date and explicit missing Sparsh data."
+logical_id = "055f2faf-8b1c-4c94-9a50-09733893be22"
+content_hash = "sha256:d5c0ddc235ef38b265efd7a283f31fa76ad281fbd5197affe09a8dfb173aa0a5"
+size = 56170
+mtime_ms = 1788857208898
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/055f2faf-8b1c-4c94-9a50-09733893be22/9da2747f-ea5d-40dc-a3d6-a6c911e504da"
+storage_version_token = "1788857267100278"
+content_type = "image/jpeg"
