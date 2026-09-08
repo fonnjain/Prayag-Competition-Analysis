@@ -12,8 +12,10 @@ import {
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler, Clock3 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler, Clock3, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -117,7 +119,7 @@ function PendingRevisionNote({
 export default function ComparisonPage() {
   const [view, setView] = useState<ViewMode>("byProduct");
   const [search, setSearch] = useState("");
-  const [competitor, setCompetitor] = useState<string>("all");
+  const [competitor, setCompetitor] = useState<string[]>([]);
   const [category, setCategory] = useState<string>("all");
   const [matchStatus, setMatchStatus] = useState<string>("all");
   const [confidence, setConfidence] = useState<string>("all");
@@ -158,18 +160,18 @@ export default function ComparisonPage() {
       : null;
   
   const { data: summaryData, isLoading: summaryLoading } = useGetComparisonSummary({
-    competitor: competitor !== "all" ? competitor : undefined,
+    competitor: competitor.length > 0 ? competitor.join(",") : undefined,
   }, {
     query: {
       queryKey: getGetComparisonSummaryQueryKey({
-        competitor: competitor !== "all" ? competitor : undefined
+        competitor: competitor.length > 0 ? competitor.join(",") : undefined
       })
     }
   });
 
   const rowsParams = {
     search: search || undefined,
-    competitor: competitor !== "all" ? competitor : undefined,
+    competitor: competitor.length > 0 ? competitor.join(",") : undefined,
     category: category !== "all" ? category : undefined,
     matchStatus: matchStatus !== "all" ? matchStatus : undefined,
     confidence: confidence !== "all" ? confidence : undefined,
@@ -188,6 +190,7 @@ export default function ComparisonPage() {
 
   const productParams = {
     search: search || undefined,
+    competitor: competitor.length > 0 ? competitor.join(",") : undefined,
     category: category !== "all" ? category : undefined,
     expensiveOnly: expensiveOnly ? true : undefined,
     page,
@@ -211,7 +214,7 @@ export default function ComparisonPage() {
   const exportUrl = (format: "csv" | "xlsx") => {
     const params = new URLSearchParams({ format });
     if (search) params.set("search", search);
-    if (competitor !== "all") params.set("competitor", competitor);
+    if (competitor.length > 0) params.set("competitor", competitor.join(","));
     if (category !== "all") params.set("category", category);
     if (matchStatus !== "all") params.set("matchStatus", matchStatus);
     if (confidence !== "all") params.set("confidence", confidence);
@@ -402,19 +405,44 @@ export default function ComparisonPage() {
             />
           </div>
           
-          {view === "byCompetitor" && (
-            <Select value={competitor} onValueChange={setCompetitor}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Competitor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Competitors</SelectItem>
-                {(filters?.competitors ?? []).map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[180px] justify-between font-normal">
+                <span className="truncate">
+                  {competitor.length === 0 ? "All Competitors" : competitor.join(", ")}
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[180px] p-0" align="start">
+              <div className="p-1 flex flex-col gap-0.5">
+                <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded-sm cursor-pointer">
+                  <Checkbox
+                    checked={competitor.length === 0}
+                    onCheckedChange={(c) => {
+                      if (c) setCompetitor([]);
+                    }}
+                  />
+                  <span className="text-sm">All Competitors</span>
+                </label>
+                {(filters?.competitors ?? []).map(c => (
+                  <label key={c} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded-sm cursor-pointer">
+                    <Checkbox
+                      checked={competitor.includes(c)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setCompetitor([...competitor, c]);
+                        } else {
+                          setCompetitor(competitor.filter(x => x !== c));
+                        }
+                      }}
+                    />
+                    <span className="text-sm">{c}</span>
+                  </label>
                 ))}
-              </SelectContent>
-            </Select>
-          )}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger className="w-[180px]">
@@ -495,7 +523,17 @@ export default function ComparisonPage() {
                   <th className="px-4 py-3 font-medium text-muted-foreground sticky left-0 bg-muted/50 z-10">Prayag Product</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground text-right">Prayag MRP</th>
                   {(productData?.competitors ?? []).map((c) => (
-                    <th key={c} className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">{c}</th>
+                    <th key={c} className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">
+                      {c}
+                      {c === "Ashirvad" && (
+                        <div className="mt-1 flex justify-end">
+                          <span className="inline-flex items-center gap-1 px-1 py-0.5 text-[9px] font-bold text-amber-800 bg-amber-100/80 border border-amber-200/80 rounded leading-none font-sans normal-case">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            Valid from 01 Mar 2025 (18+ months old)
+                          </span>
+                        </div>
+                      )}
+                    </th>
                   ))}
                   <th className="px-4 py-3 font-medium text-muted-foreground text-right whitespace-nowrap">Market (min · med · max)</th>
                   <th className="px-4 py-3 font-medium text-muted-foreground text-center whitespace-nowrap">Position</th>
@@ -533,7 +571,7 @@ export default function ComparisonPage() {
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
                           {row.prayagMrp != null ? (
-                            <>
+                            <div className="flex flex-col items-end">
                               <span className={cn(row.prayagLowest && "text-green-600 font-semibold")}>₹{row.prayagMrp.toFixed(2)}</span>
                               {row.prayagPerMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -550,25 +588,33 @@ export default function ComparisonPage() {
                                 upcomingChangePct={row.upcomingPrayagChangePct}
                                 className="mt-1 min-w-[190px]"
                               />
-                            </>
+                            </div>
                           ) : (
-                            <span className="text-muted-foreground">-</span>
+                            <span className="text-muted-foreground italic text-xs font-sans">No data</span>
                           )}
                         </td>
                         {(productData?.competitors ?? []).map((comp) => {
                           const cell = cellByComp.get(comp);
-                          if (!cell) {
-                            return <td key={comp} className="px-4 py-3 text-right text-muted-foreground">-</td>;
+                          if (!cell || cell.price == null) {
+                            return <td key={comp} className="px-4 py-3 text-right text-muted-foreground italic text-xs">No data</td>;
                           }
                           return (
                             <td key={comp} className="px-4 py-3 text-right font-mono whitespace-nowrap">
-                              <span className={cn(
-                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded",
-                                cell.isCheapest && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-semibold"
-                              )}>
-                                {cell.isCheapest && <Trophy className="w-3 h-3" />}
-                                ₹{cell.price.toFixed(2)}
-                              </span>
+                              <div className="flex flex-col items-end gap-1">
+                                {comp === "Ashirvad" && (
+                                  <span className="inline-flex items-center gap-1 px-1 py-0.5 text-[9px] font-bold text-amber-800 bg-amber-100/80 border border-amber-200/80 rounded leading-none max-w-fit font-sans">
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    Valid from 01 Mar 2025 (18+ months old)
+                                  </span>
+                                )}
+                                <span className={cn(
+                                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded",
+                                  cell.isCheapest && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-semibold"
+                                )}>
+                                  {cell.isCheapest && <Trophy className="w-3 h-3" />}
+                                  ₹{cell.price.toFixed(2)}
+                                </span>
+                              </div>
                               {cell.perMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground">
                                   ₹{cell.perMetre.toFixed(2)}/m
@@ -692,7 +738,15 @@ export default function ComparisonPage() {
                     return (
                       <tr key={row.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="font-medium">{row.competitor}</div>
+                          <div className="font-medium flex flex-wrap items-center gap-1">
+                            {row.competitor}
+                            {row.competitor === "Ashirvad" && (
+                              <span className="inline-flex items-center gap-1 px-1 py-0.5 text-[9px] font-bold text-amber-800 bg-amber-100/80 border border-amber-200/80 rounded leading-none">
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                Valid from 01 Mar 2025 (18+ months old)
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">{row.category}</div>
                         </td>
                         <td className="px-4 py-3 truncate max-w-[200px]" title={row.description || ""}>

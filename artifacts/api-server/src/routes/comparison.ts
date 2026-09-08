@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { sql, eq, ne, asc, desc, and } from "drizzle-orm";
+import { sql, eq, ne, asc, desc, and, inArray } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -519,9 +519,19 @@ function strParam(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
+function competitorParams(v: unknown): string[] {
+  const values = Array.isArray(v) ? v : v == null ? [] : [v];
+  return [...new Set(
+    values
+      .flatMap((value) => String(value).split(","))
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
+}
+
 // GET /catalog/comparison — competitor rows joined to Prayag current MRP.
 router.get("/catalog/comparison", async (req, res) => {
-  const competitor = strParam(req.query.competitor);
+  const competitors = competitorParams(req.query.competitor);
   const category = strParam(req.query.category);
   const matchStatus = strParam(req.query.matchStatus);
   const confidence = strParam(req.query.confidence);
@@ -532,7 +542,7 @@ router.get("/catalog/comparison", async (req, res) => {
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
   const conditions = [];
-  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (competitors.length) conditions.push(inArray(competitorPricesTable.competitor, competitors));
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
   if (confidence)
@@ -581,7 +591,7 @@ router.get("/catalog/comparison", async (req, res) => {
 
 // GET /catalog/comparison/export — full filtered comparison as CSV/XLSX.
 router.get("/catalog/comparison/export", async (req, res) => {
-  const competitor = strParam(req.query.competitor);
+  const competitors = competitorParams(req.query.competitor);
   const category = strParam(req.query.category);
   const matchStatus = strParam(req.query.matchStatus);
   const search = strParam(req.query.search);
@@ -589,7 +599,7 @@ router.get("/catalog/comparison/export", async (req, res) => {
   const format = String(req.query.format ?? "xlsx");
 
   const conditions = [];
-  if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
+  if (competitors.length) conditions.push(inArray(competitorPricesTable.competitor, competitors));
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
   if (search) {
@@ -703,9 +713,9 @@ router.get("/catalog/comparison/export", async (req, res) => {
 
 // GET /catalog/comparison/summary — competitive share KPI + category win-rate.
 router.get("/catalog/comparison/summary", async (req, res) => {
-  const competitor = strParam(req.query.competitor);
+  const competitors = competitorParams(req.query.competitor);
   let q = db.select().from(competitorPricesTable).$dynamic();
-  if (competitor) q = q.where(eq(competitorPricesTable.competitor, competitor));
+  if (competitors.length) q = q.where(inArray(competitorPricesTable.competitor, competitors));
   const [maps, all] = await Promise.all([getPrayagMaps(), q]);
   const windows = getCompetitorWindows(all);
   const matchedWindows = getCompetitorWindows(
@@ -804,7 +814,12 @@ router.get("/catalog/comparison/summary", async (req, res) => {
     .sort((a, b) => b.comparable - a.comparable);
 
   res.json({
-    competitor: competitor ?? null,
+    competitor:
+      competitors.length === 0
+        ? null
+        : competitors.length === 1
+          ? competitors[0]
+          : competitors.join(","),
     totalRows: rows.length,
     matchedRows: matched.length,
     comparableRows: comparable.length,

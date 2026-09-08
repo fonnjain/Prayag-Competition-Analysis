@@ -3,7 +3,7 @@ import {
   writeSelectedCodes,
 } from "./selectionState.ts";
 
-export const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Vectus"] as const;
+export const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Ashirvad", "Vectus"] as const;
 export type PriceFinderCompetitor = (typeof PRICE_FINDER_COMPETITORS)[number];
 
 const KNOWN_PARAMS = new Set(["code", "filter", "competitor", "asOf"]);

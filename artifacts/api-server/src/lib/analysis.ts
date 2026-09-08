@@ -383,11 +383,14 @@ export function strParam(v: unknown): string | null {
 }
 
 export function arrParam(v: unknown): string[] {
-  if (Array.isArray(v)) {
-    return v.filter((x): x is string => typeof x === "string" && x.trim() !== "");
-  }
-  if (typeof v === "string" && v.trim() !== "") return [v.trim()];
-  return [];
+  const values = Array.isArray(v) ? v : v == null ? [] : [v];
+  return [...new Set(
+    values
+      .filter((value): value is string => typeof value === "string")
+      .flatMap((value) => value.split(","))
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
 }
 
 export function parseFilters(query: Record<string, unknown>): Filters {

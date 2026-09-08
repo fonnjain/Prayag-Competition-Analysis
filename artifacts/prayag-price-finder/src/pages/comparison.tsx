@@ -56,7 +56,7 @@ export default function ComparisonPage() {
   const { data, isLoading, isError } = useGetPriceFinderComparison(
     { 
       code: codes, 
-      competitor: activeCompetitors,
+      competitor: activeCompetitors as any,
       asOf: asOf || undefined 
     },
     {
@@ -69,7 +69,7 @@ export default function ComparisonPage() {
 
   const exportUrl = getExportPriceFinderComparisonUrl({
     code: codes,
-    competitor: activeCompetitors,
+    competitor: activeCompetitors as any,
     asOf: asOf || undefined
   });
 
@@ -163,7 +163,15 @@ export default function ComparisonPage() {
                       <th className="px-2.5 py-2 font-bold w-[34%] border-b uppercase tracking-wider text-[10px]">Product Info</th>
                       <th className="px-2.5 py-2 font-bold text-right w-[22%] border-b bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-300 uppercase tracking-wider text-[10px]">Prayag MRP</th>
                      {data.competitors.map(comp => (
-                        <th key={comp} className="px-2.5 py-2 font-bold text-right w-[21%] border-b uppercase tracking-wider text-[10px]">{comp}</th>
+                        <th key={comp} className="px-2.5 py-2 font-bold text-right w-[21%] border-b uppercase tracking-wider text-[10px]">
+                          <span>{comp}</span>
+                          {String(comp) === "Ashirvad" && (
+                            <span className="mt-1 ml-auto flex w-fit items-center gap-1 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold normal-case tracking-normal text-amber-800">
+                              <AlertCircle className="h-2.5 w-2.5 shrink-0" />
+                              01 Mar 2025 · 18+ months old
+                            </span>
+                          )}
+                        </th>
                      ))}
                    </tr>
                  </thead>

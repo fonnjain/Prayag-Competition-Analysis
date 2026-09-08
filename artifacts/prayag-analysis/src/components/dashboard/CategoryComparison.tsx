@@ -22,7 +22,7 @@ export function CategoryComparison({ filters }: { filters: DashboardFilters }) {
   }
 
   // Sort by avg gap descending
-  const chartData = [...data].sort((a, b) => (b.avgPriceDiffPct ?? 0) - (a.avgPriceDiffPct ?? 0));
+  const chartData = [...data].sort((a, b) => (b.avgPriceDiffPct ?? -Infinity) - (a.avgPriceDiffPct ?? -Infinity));
 
   return (
     <Card className="h-full flex flex-col">
@@ -47,7 +47,7 @@ export function CategoryComparison({ filters }: { filters: DashboardFilters }) {
             <Tooltip 
               cursor={{ fill: "hsl(var(--muted))" }}
               contentStyle={{ borderRadius: "var(--radius)", border: "1px solid hsl(var(--border))" }}
-              formatter={(value: number) => [`${value.toFixed(1)}%`, "Avg Gap"]}
+              formatter={(value: any) => [value != null ? `${Number(value).toFixed(1)}%` : "No data", "Avg Gap"]}
             />
             <ReferenceLine x={0} stroke="hsl(var(--muted-foreground))" strokeWidth={2} />
             <Bar dataKey="avgPriceDiffPct" radius={[0, 4, 4, 0]} barSize={20}>

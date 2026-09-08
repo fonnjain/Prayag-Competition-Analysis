@@ -14,7 +14,7 @@ import {
 
 const router: IRouter = Router();
 
-const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Vectus"] as const;
+const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Ashirvad", "Vectus"] as const;
 type PriceFinderCompetitor = (typeof PRICE_FINDER_COMPETITORS)[number];
 
 function queryArray(value: unknown): string[] {
@@ -543,7 +543,13 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       WHERE cp.matched_prayag_code = p.item_code
         AND cp.price IS NOT NULL
         AND cp.effective_date <= CURRENT_DATE
-      ORDER BY normalized_price ASC
+      ORDER BY ABS(
+        CASE
+          WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+            THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+          ELSE cp.price
+        END - current_price.mrp
+      ), normalized_price ASC
       LIMIT 1
     ) best_comp ON true
     WHERE p.is_active IS TRUE
@@ -758,7 +764,13 @@ router.get("/price-finder/browse", async (req, res) => {
         WHERE cp.matched_prayag_code = p.item_code
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
-        ORDER BY normalized_price ASC
+        ORDER BY ABS(
+          CASE
+            WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
+              THEN cp.price * (1 + coalesce(cp.gst_pct, 18) / 100.0)
+            ELSE cp.price
+          END - current_price.mrp
+        ), normalized_price ASC
         LIMIT 1
       ) best_comp ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}

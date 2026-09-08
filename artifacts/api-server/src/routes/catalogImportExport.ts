@@ -2122,6 +2122,11 @@ interface ParsedCompetitorRow {
 const SPARSH_MASTER_SHEET = "competitor_mapping";
 const SPARSH_MASTER_COMPETITOR = "Sparsh Pearl";
 const SPARSH_MASTER_ROW_COUNT = 150;
+const ASHIRVAD_MASTER_COMPETITOR = "Ashirvad";
+const ASHIRVAD_MASTER_ROW_COUNT = 669;
+const ASHIRVAD_MASTER_EFFECTIVE_DATE = "2025-03-01";
+const ASHIRVAD_MASTER_SHA256 =
+  "5dfa4fdcc76595e4e3c090734808a506d85eb3902137428263274272e2b0e499";
 const SPARSH_MASTER_PERIOD_FIELDS = [
   { key: "vol_4_8", label: "Vol 4.8", priceKey: "vol_4_8_mrp", dateKey: "vol_4_8_effective_from" },
   { key: "vol_6_2", label: "Vol 6.2", priceKey: "vol_6_2_mrp", dateKey: "vol_6_2_effective_from" },
@@ -2146,6 +2151,97 @@ interface SparshMasterRow {
 interface SparshMasterParseResult {
   rows: SparshMasterRow[];
   periods: SparshMasterPeriod[];
+}
+
+interface AshirvadMasterRow {
+  prayagCode: string;
+  competitorCode: string;
+  price: number;
+  description: string | null;
+  category: string | null;
+}
+
+/**
+ * Parse the one approved Ashirvad mapping snapshot. Its digest is deliberately
+ * part of the format contract: review-only Prayag values in this workbook must
+ * never be treated as a Prayag price source or as a gap calculation input.
+ */
+export function parseAshirvadCompetitorMaster(
+  buffer: Buffer,
+  workbook: XLSX.WorkBook,
+  canonicalCodes: Map<string, string>,
+): AshirvadMasterRow[] | null {
+  const sheet = workbook.Sheets[SPARSH_MASTER_SHEET];
+  if (!sheet) return null;
+  const headerRow =
+    XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null })[0] ?? [];
+  const headers = new Set(headerRow.map((value) => String(value ?? "").trim()));
+  const requiredColumns = [
+    "prayag_code",
+    "competitor",
+    "competitor_code",
+    "competitor_mrp",
+    "effective_from",
+  ];
+  // A normal generic workbook sharing this sheet name is not this special
+  // master. Once it presents this signature, however, reject a changed copy.
+  if (!requiredColumns.every((column) => headers.has(column))) return null;
+  if (sha256ForBuffer(buffer) !== ASHIRVAD_MASTER_SHA256) {
+    throw new Error("Ashirvad master checksum does not match the approved trusted snapshot.");
+  }
+
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: null,
+  });
+  if (rows.length !== ASHIRVAD_MASTER_ROW_COUNT) {
+    throw new Error(
+      `Ashirvad master must contain exactly ${ASHIRVAD_MASTER_ROW_COUNT} mapping rows; found ${rows.length}.`,
+    );
+  }
+
+  const prayagCodes = new Set<string>();
+  const competitorCodes = new Set<string>();
+  const parsed: AshirvadMasterRow[] = [];
+  for (const [index, row] of rows.entries()) {
+    const rowNumber = index + 2;
+    const rawPrayagCode = norm(row.prayag_code);
+    const competitorCode = norm(row.competitor_code);
+    const canonicalPrayagCode = canonicalCodes.get(normCode(rawPrayagCode));
+    if (norm(row.competitor) !== ASHIRVAD_MASTER_COMPETITOR) {
+      throw new Error(`Ashirvad master row ${rowNumber} has an unexpected competitor.`);
+    }
+    if (!rawPrayagCode || !competitorCode || !canonicalPrayagCode) {
+      throw new Error(
+        `Ashirvad master row ${rowNumber} has a missing or unknown Prayag code, or missing competitor code.`,
+      );
+    }
+    const prayagKey = normCode(canonicalPrayagCode);
+    const competitorKey = normCode(competitorCode);
+    if (prayagCodes.has(prayagKey) || competitorCodes.has(competitorKey)) {
+      throw new Error(`Ashirvad master row ${rowNumber} duplicates a Prayag or competitor code.`);
+    }
+    const price = Number(row.competitor_mrp);
+    if (!Number.isFinite(price) || price <= 0) {
+      throw new Error(`Ashirvad master row ${rowNumber} has an invalid competitor_mrp value.`);
+    }
+    if (toDateStr(row.effective_from) !== ASHIRVAD_MASTER_EFFECTIVE_DATE) {
+      throw new Error(
+        `Ashirvad master row ${rowNumber} must have effective_from ${ASHIRVAD_MASTER_EFFECTIVE_DATE}.`,
+      );
+    }
+    prayagCodes.add(prayagKey);
+    competitorCodes.add(competitorKey);
+    // Do not read prayag_mrp_reference or gap_pct. They are explicitly
+    // review-only and live Prayag MRP/gaps are resolved at query time.
+    parsed.push({
+      prayagCode: canonicalPrayagCode,
+      competitorCode,
+      price,
+      description: norm(row.prayag_name) || null,
+      category: norm(row.category) || null,
+    });
+  }
+  return parsed;
 }
 
 /**
@@ -2176,9 +2272,9 @@ export function parseSparshCompetitorMaster(
   );
   const missingColumns = requiredColumns.filter((column) => !headers.has(column));
   if (missingColumns.length > 0) {
-    throw new Error(
-      `Sparsh master is missing required column(s): ${missingColumns.join(", ")}.`,
-    );
+    // competitor_mapping is also used by other dedicated masters. Only claim
+    // this workbook when it has the Sparsh period signature.
+    return null;
   }
   if (rows.length !== SPARSH_MASTER_ROW_COUNT) {
     throw new Error(
@@ -2475,10 +2571,16 @@ router.post(
         existingProducts.map((product) => [normCode(product.itemCode), product.itemCode]),
       );
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
+       const ashirvadMaster = parseAshirvadCompetitorMaster(
+         file.buffer,
+         workbook,
+         canonical,
+       );
       const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
 
       res.json({
         isSparshMaster: Boolean(sparshMaster),
+         isAshirvadMaster: Boolean(ashirvadMaster),
         periods: sparshMaster?.periods.map((period) => ({
           key: period.key,
           label: period.label,
@@ -2531,7 +2633,104 @@ router.post(
         existingProducts.map((p) => [normCode(p.itemCode), p.itemCode]),
       );
       const wb = XLSX.read(file.buffer, { type: "buffer" });
+       const ashirvadMaster = parseAshirvadCompetitorMaster(
+         file.buffer,
+         wb,
+         canonical,
+       );
       const sparshMaster = parseSparshCompetitorMaster(wb, canonical);
+
+       if (ashirvadMaster) {
+         if (competitor !== ASHIRVAD_MASTER_COMPETITOR) {
+           res.status(400).json({
+             error: `The trusted Ashirvad master must be imported as ${ASHIRVAD_MASTER_COMPETITOR}.`,
+           });
+           return;
+         }
+         const sourceHash = sha256ForBuffer(file.buffer);
+         const values = ashirvadMaster.map((row) => ({
+           competitor: ASHIRVAD_MASTER_COMPETITOR,
+           category: row.category,
+           description: row.description,
+           size: null,
+           price: row.price,
+           unit: "MRP",
+           competitorCode: row.competitorCode,
+           effectiveDate: ASHIRVAD_MASTER_EFFECTIVE_DATE,
+           matchedPrayagCode: row.prayagCode,
+           matchStatus: "matched",
+           matchConfidence: "High",
+           // Never source this from prayag_mrp_reference in the upload.
+           prayagMrpAtCompare: null,
+           isCurrent: false,
+           priceBasis: "MRP",
+           gstPct: null,
+         }));
+
+         await db.transaction(async (tx) => {
+           // Replacement scope is only this brand and this trusted period.
+           // No catalogue or Prayag MRP writer is called in this path.
+           await tx
+             .delete(competitorPricesTable)
+             .where(
+               and(
+                 eq(competitorPricesTable.competitor, ASHIRVAD_MASTER_COMPETITOR),
+                 eq(competitorPricesTable.effectiveDate, ASHIRVAD_MASTER_EFFECTIVE_DATE),
+               ),
+             );
+           await tx.insert(importBatchesTable).values({
+             competitor: ASHIRVAD_MASTER_COMPETITOR,
+             effectiveDate: ASHIRVAD_MASTER_EFFECTIVE_DATE,
+             sourceFileName: name,
+             priceBasis: "MRP",
+             gstPct: null,
+             status: "approved",
+             rowCounts: JSON.stringify({
+               total: values.length,
+               matched: values.length,
+               direct_code: values.length,
+               source: "trusted_ashirvad_competitor_master",
+               source_sha256: ASHIRVAD_MASTER_SHA256,
+               source_effective_date: ASHIRVAD_MASTER_EFFECTIVE_DATE,
+               reason: "Trusted one-to-one Ashirvad competitor mapping; review-only Prayag fields ignored.",
+             }),
+             extractionModel: null,
+             fileSha256: sourceHash,
+             fileSizeBytes: file.size,
+             extractorVersion: null,
+             catalogueProfileRevision: null,
+             promptRevision: null,
+             model: null,
+             pagesRequested: null,
+             passesRun: null,
+             itemsAdjudicated: null,
+           });
+           await tx.insert(competitorPricesTable).values(values);
+           await recomputeCompetitorCurrentFlagsInTransaction(
+             ASHIRVAD_MASTER_COMPETITOR,
+             tx,
+           );
+         });
+
+         req.log?.info(
+           { rows: values.length, effectiveDate: ASHIRVAD_MASTER_EFFECTIVE_DATE },
+           "Adopted trusted Ashirvad competitor master",
+         );
+         res.json({
+           results: {
+             competitor: ASHIRVAD_MASTER_COMPETITOR,
+             file: name,
+             totalRows: values.length,
+             inserted: values.length,
+             matched: values.length,
+             unmatched: 0,
+             rejectedByGap: 0,
+             effectiveDate: ASHIRVAD_MASTER_EFFECTIVE_DATE,
+             fileSha256: sourceHash,
+           },
+         });
+         return;
+       }
 
       if (sparshMaster) {
         if (competitor !== SPARSH_MASTER_COMPETITOR) {

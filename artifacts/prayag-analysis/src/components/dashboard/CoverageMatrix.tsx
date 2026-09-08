@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { AlertCircle } from "lucide-react";
 
 export function CoverageMatrix({ filters }: { filters: DashboardFilters }) {
   const { data, isLoading } = useGetAnalysisCoverageMatrix(filters as any);
@@ -43,7 +43,17 @@ export function CoverageMatrix({ filters }: { filters: DashboardFilters }) {
           <TableBody>
             {data.rows.map((row) => (
               <TableRow key={row.competitor}>
-                <TableCell className="font-medium">{row.competitor}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex flex-col items-start gap-1">
+                    <span>{row.competitor}</span>
+                    {row.competitor === "Ashirvad" && (
+                      <span className="inline-flex items-center gap-1 px-1 py-0.5 text-[9px] font-bold text-amber-800 bg-amber-100/80 border border-amber-200/80 rounded leading-none">
+                        <AlertCircle className="w-2.5 h-2.5" />
+                        Valid from 01 Mar 2025 (18+ months old)
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{row.matched.toLocaleString()}</TableCell>
                 <TableCell className="text-right font-medium">

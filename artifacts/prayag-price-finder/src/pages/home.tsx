@@ -80,7 +80,7 @@ function CompetitorLine({
         <Minus className="w-3 h-3 shrink-0" />
       )}
       <span>
-        {brand} ₹{price.toFixed(0)}
+        Closest: {brand} ₹{price.toFixed(0)}
         {absGap != null && absGap >= 0.05 && (
           <span className="ml-1 opacity-80">
             · Prayag {absGap.toFixed(1)}% {cheaper ? "cheaper" : "costlier"}
@@ -1267,8 +1267,14 @@ function ProductView({
                   return (
                     <div key={comp.competitor} className="flex items-start justify-between gap-2 p-2.5 bg-muted/30 border-b last:border-b-0 rounded-md">
                       <div className="min-w-0">
-                        <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                        <p className="font-bold text-foreground text-sm flex flex-wrap items-center gap-1.5">
                           {comp.competitor}
+                          {comp.competitor === "Ashirvad" && (
+                            <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 normal-case tracking-normal">
+                              <AlertCircle className="h-3 w-3 shrink-0" />
+                              Valid from 01 Mar 2025 · 18+ months old
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs font-mono text-muted-foreground mt-0.5">
                           ₹{comp.price.toFixed(2)} {comp.priceBasis ? `(${comp.priceBasis})` : ""}
