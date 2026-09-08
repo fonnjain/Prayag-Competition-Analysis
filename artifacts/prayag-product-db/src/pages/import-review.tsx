@@ -466,6 +466,12 @@ export default function ImportReviewPage() {
           {batch.status === "approved" ? " Prices are live in the comparison dashboard." : ""}
         </div>
       )}
+      {!isAlreadyDone && (
+        <div className="rounded-lg px-4 py-3 border border-amber-300 bg-amber-50 text-sm text-amber-900">
+          <strong>Pending review — prices are not live.</strong> Inspect the staged rows below, then use
+          {" "}Commit Prices to write the approved rows to the competitor price list.
+        </div>
+      )}
 
       {/* Failed-chunks warning */}
       {failedChunks.length > 0 && (
@@ -526,7 +532,7 @@ export default function ImportReviewPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2" data-activity="competitor_import.approve">
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Approve &amp; Commit ({toApprove} rows)
+            Commit Prices ({toApprove} rows)
           </Button>
           <Button variant="outline" onClick={handleDiscard} disabled={isApproving || isDiscarding} className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30" data-activity="competitor_import.discard">
             {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
@@ -656,7 +662,7 @@ export default function ImportReviewPage() {
         <div className="flex items-center gap-3 flex-wrap pt-2 border-t">
           <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2" data-activity="competitor_import.approve">
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Approve &amp; Commit ({toApprove} rows)
+            Commit Prices ({toApprove} rows)
           </Button>
           <Button variant="outline" onClick={handleDiscard} disabled={isApproving || isDiscarding} className="gap-2 text-destructive hover:text-destructive border-destructive/30" data-activity="competitor_import.discard">
             {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}

@@ -1105,6 +1105,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /catalog/stage-competitor-workbook:
+    post:
+      operationId: stageCompetitorWorkbook
+      tags: [catalog]
+      summary: Parse and persist a competitor workbook for review before committing prices
+      description: Creates pending import batch records and competitor_price_staging rows only. This operation never writes competitor_prices.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CompetitorWorkbookImportInput"
+      responses:
+        "201":
+          description: Pending review batch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompetitorWorkbookStaged"
+        "400":
+          description: Invalid workbook or effective date selection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /catalog/competitors/{competitor}:
     delete:
       operationId: deleteCatalogCompetitor
@@ -2245,6 +2270,21 @@ components:
           type: integer
         descSizeMatches:
           type: integer
+    CompetitorWorkbookStaged:
+      type: object
+      required: [batchId, batchIds, status]
+      properties:
+        batchId:
+          type: integer
+          description: First created batch, suitable for navigation to its review screen.
+        batchIds:
+          type: array
+          description: One pending batch per source period (multiple only for the trusted Sparsh master).
+          items:
+            type: integer
+        status:
+          type: string
+          enum: [pending]
     CompetitorWorkbookImportSummary:
       type: object
       required: [competitor, file, totalRows, inserted, matched, unmatched, rejectedByGap]

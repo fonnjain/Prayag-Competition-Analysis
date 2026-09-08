@@ -34,7 +34,7 @@ import {
   getGetMappingReviewQueryKey,
   getGetCompetitorBrandsQueryKey,
   previewCompetitorWorkbook,
-  loadCompetitorWorkbook,
+  stageCompetitorWorkbook,
 } from "@workspace/api-client-react";
 import {
   AlertDialog,
@@ -440,8 +440,9 @@ export default function ImportCompetitorPage() {
           "The extraction connection closed before the result arrived. The server may still be processing this batch; please try again in a moment.",
         );
       } else {
-        // Excel/CSV → typed direct-import route
-        const data = await loadCompetitorWorkbook({
+        // Workbooks follow the same durable staging/review flow as PDFs.  No
+        // Excel/CSV price is live until the reviewer explicitly commits it.
+        const data = await stageCompetitorWorkbook({
           file,
           competitor: competitor.trim(),
           effectiveDate: isAuthoritativeSparshMaster ? undefined : effectiveDate,
@@ -451,21 +452,13 @@ export default function ImportCompetitorPage() {
           priceBasis,
           gstPct: priceBasis === "Ex-GST" ? gstPct : undefined,
         });
-
-        setResult(data.results);
-        const importedPeriods = data.results.periods;
         toast({
-          title: "Upload Successful",
-          description: importedPeriods
-            ? `Imported ${data.results.inserted} verified rows for ${data.results.competitor} across ${importedPeriods.map((period) => formatDate(period.effectiveDate)).join(" and ")}.`
-            : `Imported ${data.results.inserted} rows for ${data.results.competitor} (w.e.f. ${formatDate(effectiveDate)}).`,
+          title: "Workbook Staged",
+          description: Array.isArray(data.batchIds) && data.batchIds.length > 1
+            ? `${data.batchIds.length} price periods were staged. Review and commit each period explicitly.`
+            : "Review the staged rows before committing prices.",
         });
-        invalidateComparisonQueries();
-
-        setFile(null);
-        setSparshPeriods([]);
-        setWorkbookPreviewError(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        navigate(`/import-review/${data.batchId}`);
       }
     } catch (err: any) {
       toast({
@@ -484,8 +477,8 @@ export default function ImportCompetitorPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Import Competitor Data</h1>
         <p className="text-muted-foreground mt-2">
-          Upload an Excel/CSV price sheet for instant import, or a PDF catalogue for
-          AI-powered extraction with a review step before committing.
+          Upload an Excel/CSV price sheet or PDF catalogue. Every upload is staged
+          for review before prices can be committed.
         </p>
       </div>
 
@@ -638,7 +631,7 @@ export default function ImportCompetitorPage() {
                       ? "— checking workbook periods…"
                       : isAuthoritativeSparshMaster
                       ? "— verified Sparsh master detected; review or change each period date before importing."
-                      : "— will import directly"}
+                       : "— workbook will be staged for review before commit"}
                   </span>
                 )}
               </div>
@@ -707,7 +700,7 @@ export default function ImportCompetitorPage() {
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                Import Prices
+                Stage Prices for Review
               </>
             )}
           </Button>

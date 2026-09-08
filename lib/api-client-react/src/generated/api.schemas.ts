@@ -54,6 +54,21 @@ export interface CompetitorWorkbookImportedPeriod {
   descSizeMatches: number;
 }
 
+export type CompetitorWorkbookStagedStatus = typeof CompetitorWorkbookStagedStatus[keyof typeof CompetitorWorkbookStagedStatus];
+
+
+export const CompetitorWorkbookStagedStatus = {
+  pending: 'pending',
+} as const;
+
+export interface CompetitorWorkbookStaged {
+  /** First created batch, suitable for navigation to its review screen. */
+  batchId: number;
+  /** One pending batch per source period (multiple only for the trusted Sparsh master). */
+  batchIds: number[];
+  status: CompetitorWorkbookStagedStatus;
+}
+
 export interface CompetitorWorkbookImportSummary {
   competitor: string;
   file: string;

@@ -69,6 +69,7 @@ import type {
   CompetitorWorkbookImportInput,
   CompetitorWorkbookPreview,
   CompetitorWorkbookPreviewInput,
+  CompetitorWorkbookStaged,
   CreateAdminUserBody,
   DeleteCompetitorPeriodResult,
   DeleteCompetitorResult,
@@ -3086,6 +3087,93 @@ export const useLoadCompetitorWorkbook = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getLoadCompetitorWorkbookMutationOptions(options));
+    }
+
+export const getStageCompetitorWorkbookUrl = () => {
+
+
+
+
+  return `/api/catalog/stage-competitor-workbook`
+}
+
+/**
+ * Creates pending import batch records and competitor_price_staging rows only. This operation never writes competitor_prices.
+ * @summary Parse and persist a competitor workbook for review before committing prices
+ */
+export const stageCompetitorWorkbook = async (competitorWorkbookImportInput: CompetitorWorkbookImportInput, options?: RequestInit): Promise<CompetitorWorkbookStaged> => {
+    const formData = new FormData();
+formData.append(`file`, competitorWorkbookImportInput.file);
+formData.append(`competitor`, competitorWorkbookImportInput.competitor);
+if(competitorWorkbookImportInput.effectiveDate !== undefined) {
+ formData.append(`effectiveDate`, competitorWorkbookImportInput.effectiveDate);
+ }
+if(competitorWorkbookImportInput.periodDates !== undefined) {
+ formData.append(`periodDates`, competitorWorkbookImportInput.periodDates);
+ }
+if(competitorWorkbookImportInput.priceBasis !== undefined) {
+ formData.append(`priceBasis`, competitorWorkbookImportInput.priceBasis);
+ }
+if(competitorWorkbookImportInput.gstPct !== undefined) {
+ formData.append(`gstPct`, competitorWorkbookImportInput.gstPct.toString())
+ }
+
+  return customFetch<CompetitorWorkbookStaged>(getStageCompetitorWorkbookUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getStageCompetitorWorkbookMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stageCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof stageCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookImportInput>}, TContext> => {
+
+const mutationKey = ['stageCompetitorWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof stageCompetitorWorkbook>>, {data: BodyType<CompetitorWorkbookImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  stageCompetitorWorkbook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StageCompetitorWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof stageCompetitorWorkbook>>>
+    export type StageCompetitorWorkbookMutationBody = BodyType<CompetitorWorkbookImportInput>
+    export type StageCompetitorWorkbookMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Parse and persist a competitor workbook for review before committing prices
+ */
+export const useStageCompetitorWorkbook = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stageCompetitorWorkbook>>, TError,{data: BodyType<CompetitorWorkbookImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof stageCompetitorWorkbook>>,
+        TError,
+        {data: BodyType<CompetitorWorkbookImportInput>},
+        TContext
+      > => {
+      return useMutation(getStageCompetitorWorkbookMutationOptions(options));
     }
 
 export const getDeleteCatalogCompetitorUrl = (competitor: string,) => {

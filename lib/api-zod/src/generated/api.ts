@@ -1156,6 +1156,23 @@ export const LoadCompetitorWorkbookResponse = zod.object({
 
 
 /**
+ * Creates pending import batch records and competitor_price_staging rows only. This operation never writes competitor_prices.
+ * @summary Parse and persist a competitor workbook for review before committing prices
+ */
+
+
+
+export const StageCompetitorWorkbookBody = zod.object({
+  "file": zod.instanceof(File),
+  "competitor": zod.string().min(1),
+  "effectiveDate": zod.coerce.date().optional().describe('Required for ordinary uploads; omitted for a verified multi-period master.'),
+  "periodDates": zod.string().optional().describe('JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods.'),
+  "priceBasis": zod.enum(['MRP', 'Ex-GST']).optional(),
+  "gstPct": zod.number().optional()
+})
+
+
+/**
  * @summary Delete all price rows for a competitor brand
  */
 export const DeleteCatalogCompetitorParams = zod.object({

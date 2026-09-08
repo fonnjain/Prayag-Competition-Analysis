@@ -14,6 +14,7 @@ import {
   mrpPendingBatchesTable,
   mrpHistoryProvenanceEventsTable,
   importBatchesTable,
+  competitorPriceStagingTable,
 } from "@workspace/db";
 import {
   recomputeCurrentFlags,
@@ -2591,6 +2592,144 @@ router.post(
       res.status(400).json({
         error: error instanceof Error ? error.message : "Could not read competitor workbook.",
       });
+    }
+  },
+);
+
+// POST /catalog/stage-competitor-workbook — parse an Excel/CSV workbook into a
+// persistent review batch.  Unlike the legacy load endpoint below, this route
+// never writes competitor_prices.
+router.post(
+  "/catalog/stage-competitor-workbook",
+  requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    const file = req.file;
+    if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
+    const competitor = typeof req.body.competitor === "string" ? req.body.competitor.trim() : "";
+    if (!competitor) { res.status(400).json({ error: "competitor name is required" }); return; }
+    const ext = file.originalname.toLowerCase().split(".").pop() ?? "";
+    if (!["xlsx", "xls", "csv"].includes(ext)) {
+      res.status(400).json({ error: "Upload an .xlsx, .xls, or .csv file" }); return;
+    }
+
+    try {
+      const products = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
+      const knownCodes = new Set(products.map((p) => normCode(p.itemCode)));
+      const canonical = new Map(products.map((p) => [normCode(p.itemCode), p.itemCode]));
+      const workbook = XLSX.read(file.buffer, { type: "buffer" });
+      const ashirvadMaster = parseAshirvadCompetitorMaster(file.buffer, workbook, canonical);
+      const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
+      const sourceHash = sha256ForBuffer(file.buffer);
+      const priceBasis = req.body.priceBasis === "Ex-GST" ? "Ex-GST" : "MRP";
+      const gstPct = priceBasis === "Ex-GST" && !isNaN(Number(req.body.gstPct))
+        ? Number(req.body.gstPct) : priceBasis === "Ex-GST" ? 18 : null;
+
+      const createBatch = async (
+        batchCompetitor: string,
+        effectiveDate: string,
+        rows: Array<{
+          prayagCode: string | null; description: string | null; variant: string | null;
+          price: number | null; competitorCode: string | null; status: "ok" | "needs_review";
+          prayagMrp?: number | null;
+        }>,
+        counts: Record<string, unknown>,
+      ) => {
+        const [batch] = await db.insert(importBatchesTable).values({
+          competitor: batchCompetitor, effectiveDate, sourceFileName: file.originalname,
+          priceBasis, gstPct, status: "pending", fileSha256: sourceHash,
+          fileSizeBytes: file.size, rowCounts: JSON.stringify(counts),
+        }).returning();
+        if (!batch) throw new Error("Could not create import batch.");
+        if (rows.length) {
+          await db.insert(competitorPriceStagingTable).values(rows.map((row) => ({
+            batchId: batch.id, competitor: batchCompetitor,
+            competitorCodeMaster: row.competitorCode, competitorCodeCatalogue: row.competitorCode,
+            matchedPrayagCode: row.prayagCode, description: row.description,
+            catalogueDescription: row.description, variant: row.variant, oldMrp: null,
+            newMrp: row.price, increasePct: null, prayagMrpCurrent: row.prayagMrp ?? null,
+            gapPct: null, page: null, discoveryEvidence: null, adjudicated: false,
+            matchMethod: row.prayagCode ? "code+desc" : null, status: row.status,
+            reviewReason: row.prayagCode ? null : "No verified Prayag product match.",
+          })));
+        }
+        return batch.id;
+      };
+
+      if (ashirvadMaster) {
+        if (competitor !== ASHIRVAD_MASTER_COMPETITOR) {
+          res.status(400).json({ error: `The trusted Ashirvad master must be imported as ${ASHIRVAD_MASTER_COMPETITOR}.` }); return;
+        }
+        const batchId = await createBatch(
+          ASHIRVAD_MASTER_COMPETITOR, ASHIRVAD_MASTER_EFFECTIVE_DATE,
+          ashirvadMaster.map((row) => ({ prayagCode: row.prayagCode, description: row.description,
+            variant: null, price: row.price, competitorCode: row.competitorCode, status: "ok" as const })),
+          { ok: ashirvadMaster.length, needs_review: 0, not_found: 0, new_products: 0,
+            source: "trusted_ashirvad_competitor_master", source_sha256: ASHIRVAD_MASTER_SHA256,
+            source_effective_date: ASHIRVAD_MASTER_EFFECTIVE_DATE,
+            reason: "Trusted one-to-one Ashirvad competitor mapping; review-only Prayag fields ignored." },
+        );
+        res.status(201).json({ batchId, batchIds: [batchId], status: "pending" }); return;
+      }
+
+      if (sparshMaster) {
+        if (competitor !== SPARSH_MASTER_COMPETITOR) {
+          res.status(400).json({ error: `The ${SPARSH_MASTER_SHEET} workbook must be imported as ${SPARSH_MASTER_COMPETITOR}.` }); return;
+        }
+        let dates: string[];
+        try { dates = resolveSparshEffectiveDates(sparshMaster.periods, req.body.periodDates); }
+        catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Invalid Sparsh effective dates." }); return; }
+        const batchIds = await Promise.all(sparshMaster.periods.map((period, index) => createBatch(
+          SPARSH_MASTER_COMPETITOR, dates[index]!,
+          sparshMaster.rows.map((row) => ({ prayagCode: row.prayagCode, description: row.description,
+            variant: null, price: row.prices[period.sourceEffectiveDate], competitorCode: row.competitorCode, status: "ok" as const })),
+          { ok: sparshMaster.rows.length, needs_review: 0, not_found: 0, new_products: 0,
+            source: "authoritative_sparsh_competitor_master", source_effective_date: period.sourceEffectiveDate,
+            effective_date_overridden: dates[index] !== period.sourceEffectiveDate },
+        )));
+        res.status(201).json({ batchId: batchIds[0], batchIds, status: "pending" }); return;
+      }
+
+      const effectiveDate = typeof req.body.effectiveDate === "string" ? req.body.effectiveDate.trim() : "";
+      if (!isIsoDate(effectiveDate)) {
+        res.status(400).json({ error: "effectiveDate is required and must be a valid YYYY-MM-DD calendar date." }); return;
+      }
+      const currentMrpResult = await db.execute<{ item_code: string; mrp: number | null }>(sql`
+        SELECT DISTINCT ON (h.item_code) h.item_code, h.mrp FROM mrp_price_history h
+        JOIN catalog_products p ON p.item_code = h.item_code
+        WHERE h.effective_date <= CURRENT_DATE AND h.review_status = 'approved'
+          AND h.variant = 'Standard' AND p.is_active IS TRUE
+          AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+        ORDER BY h.item_code, h.effective_date DESC, h.id DESC`);
+      const currentMrp = new Map(currentMrpResult.rows.filter((r) => r.mrp != null).map((r) => [normCode(r.item_code), r.mrp!]));
+      let parsed: ParsedCompetitorRow[] = [];
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) continue;
+        const candidate = parseCompetitorSheet(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null }), knownCodes);
+        if (candidate.length > parsed.length) parsed = candidate;
+      }
+      let matched = 0; let needsReview = 0;
+      const rows = parsed.map((row) => {
+        const norm = row.matchedPrayagCode;
+        let matchedCode = !!norm && knownCodes.has(norm);
+        const prayagMrp = matchedCode ? currentMrp.get(norm!) ?? null : null;
+        if (matchedCode && prayagMrp && prayagMrp > 0) {
+          const gap = ((effectivePrice(row.unit, row.price) - prayagMrp) / prayagMrp) * 100;
+          if (gap < GAP_MIN_PCT || gap > GAP_MAX_PCT) matchedCode = false;
+        }
+        if (matchedCode) matched++; else needsReview++;
+        return { prayagCode: matchedCode ? (canonical.get(norm!) ?? norm!) : null, description: row.description,
+          variant: row.size, price: row.price, competitorCode: null, status: matchedCode ? "ok" as const : "needs_review" as const,
+          prayagMrp: matchedCode ? prayagMrp : null };
+      });
+      const batchId = await createBatch(competitor, effectiveDate, rows, {
+        ok: matched, needs_review: needsReview, not_found: 0, new_products: 0, total: rows.length,
+      });
+      res.status(201).json({ batchId, batchIds: [batchId], status: "pending" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not stage competitor workbook.";
+      res.status(400).json({ error: message });
     }
   },
 );
