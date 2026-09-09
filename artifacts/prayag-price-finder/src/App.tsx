@@ -12,6 +12,7 @@ import {
 } from 'wouter';
 import { AuthProvider, PasswordChangeGate } from '@workspace/replit-auth-web';
 import { Layout } from '@/components/layout';
+import { BrowseProvider } from '@/lib/browseContext';
 import PriceFinderPage from '@/pages/home';
 import ComparisonPage from '@/pages/comparison';
 
@@ -19,15 +20,17 @@ const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <RoutedErrorBoundary>
-      <Layout>
-        <Switch>
-          <Route path="/" component={PriceFinderPage} />
-          <Route path="/comparison" component={ComparisonPage} />
-          <Route component={NotFound} />
-        </Switch>
-      </Layout>
-    </RoutedErrorBoundary>
+    <BrowseProvider>
+      <RoutedErrorBoundary>
+        <Layout>
+          <Switch>
+            <Route path="/" component={PriceFinderPage} />
+            <Route path="/comparison" component={ComparisonPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </RoutedErrorBoundary>
+    </BrowseProvider>
   );
 }
 

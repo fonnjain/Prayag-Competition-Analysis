@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useBrowse } from "@/lib/browseContext";
 import {
   Search,
   Mic,
   MicOff,
   ChevronRight,
-  ChevronLeft,
   Info,
   AlertCircle,
   X,
@@ -262,41 +262,25 @@ export default function PriceFinderPage() {
   // triggers the debounce → queryKey change → the effect below would normally
   // reset selectedItemCode.  This ref suppresses that single reset.
   const suppressSelectionResetRef = useRef(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const scrollTabs = (direction: "left" | "right") => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-
-    const tabs = Array.from(el.children).filter(
-      (child): child is HTMLElement => child instanceof HTMLElement,
-    );
-    if (tabs.length === 0) return;
-
-    const containerLeft = el.getBoundingClientRect().left;
-    const tabStart = (tab: HTMLElement) =>
-      tab.getBoundingClientRect().left - containerLeft + el.scrollLeft;
-    const desired =
-      el.scrollLeft +
-      (direction === "left" ? -el.clientWidth * 0.75 : el.clientWidth * 0.75);
-    const target =
-      direction === "right"
-        ? tabs.find((tab) => tabStart(tab) >= desired) ?? tabs[tabs.length - 1]
-        : [...tabs].reverse().find((tab) => tabStart(tab) <= desired) ?? tabs[0];
-
-    el.scrollTo({
-      left: Math.max(0, tabStart(target)),
-      behavior: "smooth",
-    });
-  };
-  const [browseDivision, setBrowseDivision] = useState<string | null>(null);
-  const [browseCategory, setBrowseCategory] = useState<string | null>(null);
+  const {
+    browseDivision,
+    browseCategory,
+    selectDivision,
+    selectCategory,
+    divisionsData,
+    isDivisionsLoading,
+    categoriesData,
+    isCategoriesLoading,
+  } = useBrowse();
   const [selectionSequence, setSelectionSequence] = useState(0);
   const [speechRequested, setSpeechRequested] = useState(false);
   const [speechAvailable, setSpeechAvailable] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
+
+  useEffect(() => {
+    setSelectedItemCode(null);
+  }, [browseDivision, browseCategory]);
+
   const comparisonHref = localPriceFinderUrl(
     "/comparison",
     normalizePriceFinderParams(
@@ -471,55 +455,6 @@ export default function PriceFinderPage() {
         : "You can compare up to 50 products. Remove a product before adding another.",
     );
   }, [toggleCode]);
-  // Query 1: divisions list (no division selected)
-  const { data: divisionsData, isLoading: isDivisionsLoading } = useGetPriceFinderBrowse(
-    { limit: 300 },
-    {
-      query: {
-        queryKey: ["price-finder-browse-divisions"],
-        enabled: !browseDivision,
-        staleTime: 1000 * 60,
-      },
-    },
-  );
-
-  // Query 2: categories for selected division (tab list)
-  const { data: categoriesData, isLoading: isCategoriesLoading } = useGetPriceFinderBrowse(
-    { division: browseDivision ?? undefined, limit: 300 },
-    {
-      query: {
-        queryKey: ["price-finder-browse-categories", browseDivision],
-        enabled: !!browseDivision,
-        staleTime: 1000 * 60,
-      },
-    },
-  );
-
-  const checkScroll = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (el) {
-      setCanScrollLeft(el.scrollLeft > 0);
-      setCanScrollRight(
-        Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    checkScroll();
-    window.addEventListener("resize", checkScroll);
-    const container = scrollContainerRef.current;
-    const resizeObserver =
-      container && typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(checkScroll)
-        : null;
-    if (container && resizeObserver) resizeObserver.observe(container);
-
-    return () => {
-      window.removeEventListener("resize", checkScroll);
-      resizeObserver?.disconnect();
-    };
-  }, [checkScroll, categoriesData?.categories, browseDivision]);
 
   // Query 3: products for selected division + category
   const { data: productsData, isLoading: isProductsLoading } = useGetPriceFinderBrowse(
@@ -532,14 +467,6 @@ export default function PriceFinderPage() {
       },
     },
   );
-
-  // Auto-select first category when categories load
-  useEffect(() => {
-    if (browseDivision && !browseCategory && categoriesData?.categories?.length) {
-      const first = categoriesData.categories[0];
-      setBrowseCategory(first.category ?? "__uncategorised__");
-    }
-  }, [browseDivision, browseCategory, categoriesData]);
 
   return (
     <div
@@ -1042,8 +969,7 @@ export default function PriceFinderPage() {
               size="sm"
               className="shrink-0"
               onClick={() => {
-                setBrowseDivision(null);
-                setBrowseCategory(null);
+                selectDivision(null);
                 setSelectedItemCode(null);
               }}
             >
@@ -1063,8 +989,7 @@ export default function PriceFinderPage() {
                   key={item.division}
                   type="button"
                   onClick={() => {
-                    setBrowseDivision(item.division);
-                    setBrowseCategory(null);
+                    selectDivision(item.division);
                     setSelectedItemCode(null);
                   }}
                   className="flex items-center justify-between rounded-md border px-3 py-2.5 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1078,78 +1003,6 @@ export default function PriceFinderPage() {
         ) : (
           /* Category tabs + product list */
           <div>
-            {/* Scrollable category tab pills */}
-            {isCategoriesLoading ? (
-              <p className="text-sm text-muted-foreground mb-4">Loading categories…</p>
-            ) : (
-              <div className="mb-3 flex items-start gap-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => scrollTabs("left")}
-                  disabled={!canScrollLeft}
-                  className={cn(
-                    "shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-sm transition-colors",
-                    !canScrollLeft && "invisible pointer-events-none",
-                  )}
-                  aria-label="Scroll categories left"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-
-                <div
-                  ref={scrollContainerRef}
-                  onScroll={checkScroll}
-                  className="flex-1 flex gap-1.5 overflow-x-auto pb-1.5 pt-0.5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0"
-                >
-                  {(categoriesData?.categories ?? []).map((item) => {
-                    const key = item.category ?? "__uncategorised__";
-                    const isActive = browseCategory === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setBrowseCategory(key);
-                          setSelectedItemCode(null);
-                        }}
-                        className={cn(
-                           "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary",
-                          isActive
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                        )}
-                      >
-                        {item.label}
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
-                            isActive
-                              ? "bg-primary-foreground/20 text-primary-foreground"
-                              : "bg-background text-muted-foreground",
-                          )}
-                        >
-                          {item.count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => scrollTabs("right")}
-                  disabled={!canScrollRight}
-                  className={cn(
-                    "shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-sm transition-colors",
-                    !canScrollRight && "invisible pointer-events-none",
-                  )}
-                  aria-label="Scroll categories right"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
             {/* Product list for selected category */}
             {browseCategory && (
               isProductsLoading ? (
