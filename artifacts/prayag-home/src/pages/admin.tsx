@@ -15,7 +15,8 @@ import {
   Loader2,
   CheckCircle2,
 } from "lucide-react";
-import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { Link } from "wouter";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListAdminUsers,
@@ -660,18 +661,16 @@ export default function AdminPage() {
   const counters = users.filter((u) => u.role === "counter");
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <WorkspaceHeader activeApp="admin" />
-
+    <div className="flex flex-col">
       {/* Back link */}
       <div className="max-w-5xl mx-auto w-full px-4 pt-6">
-        <a
+        <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
           Back to home
-        </a>
+        </Link>
       </div>
 
       {/* Page body */}

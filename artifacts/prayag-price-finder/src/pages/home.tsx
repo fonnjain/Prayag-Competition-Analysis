@@ -4,6 +4,7 @@ import {
   Mic,
   MicOff,
   ChevronRight,
+  ChevronLeft,
   Info,
   AlertCircle,
   X,
@@ -261,6 +262,35 @@ export default function PriceFinderPage() {
   // triggers the debounce → queryKey change → the effect below would normally
   // reset selectedItemCode.  This ref suppresses that single reset.
   const suppressSelectionResetRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const scrollTabs = (direction: "left" | "right") => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const tabs = Array.from(el.children).filter(
+      (child): child is HTMLElement => child instanceof HTMLElement,
+    );
+    if (tabs.length === 0) return;
+
+    const containerLeft = el.getBoundingClientRect().left;
+    const tabStart = (tab: HTMLElement) =>
+      tab.getBoundingClientRect().left - containerLeft + el.scrollLeft;
+    const desired =
+      el.scrollLeft +
+      (direction === "left" ? -el.clientWidth * 0.75 : el.clientWidth * 0.75);
+    const target =
+      direction === "right"
+        ? tabs.find((tab) => tabStart(tab) >= desired) ?? tabs[tabs.length - 1]
+        : [...tabs].reverse().find((tab) => tabStart(tab) <= desired) ?? tabs[0];
+
+    el.scrollTo({
+      left: Math.max(0, tabStart(target)),
+      behavior: "smooth",
+    });
+  };
   const [browseDivision, setBrowseDivision] = useState<string | null>(null);
   const [browseCategory, setBrowseCategory] = useState<string | null>(null);
   const [selectionSequence, setSelectionSequence] = useState(0);
@@ -464,6 +494,32 @@ export default function PriceFinderPage() {
       },
     },
   );
+
+  const checkScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      setCanScrollLeft(el.scrollLeft > 0);
+      setCanScrollRight(
+        Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener("resize", checkScroll);
+    const container = scrollContainerRef.current;
+    const resizeObserver =
+      container && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(checkScroll)
+        : null;
+    if (container && resizeObserver) resizeObserver.observe(container);
+
+    return () => {
+      window.removeEventListener("resize", checkScroll);
+      resizeObserver?.disconnect();
+    };
+  }, [checkScroll, categoriesData?.categories, browseDivision]);
 
   // Query 3: products for selected division + category
   const { data: productsData, isLoading: isProductsLoading } = useGetPriceFinderBrowse(
@@ -1026,8 +1082,25 @@ export default function PriceFinderPage() {
             {isCategoriesLoading ? (
               <p className="text-sm text-muted-foreground mb-4">Loading categories…</p>
             ) : (
-              <div className="relative mb-3">
-                <div className="flex gap-1.5 overflow-x-auto pb-1.5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mb-3 flex items-start gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={() => scrollTabs("left")}
+                  disabled={!canScrollLeft}
+                  className={cn(
+                    "shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-sm transition-colors",
+                    !canScrollLeft && "invisible pointer-events-none",
+                  )}
+                  aria-label="Scroll categories left"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={checkScroll}
+                  className="flex-1 flex gap-1.5 overflow-x-auto pb-1.5 pt-0.5 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0"
+                >
                   {(categoriesData?.categories ?? []).map((item) => {
                     const key = item.category ?? "__uncategorised__";
                     const isActive = browseCategory === key;
@@ -1061,8 +1134,19 @@ export default function PriceFinderPage() {
                     );
                   })}
                 </div>
-                {/* fade-out gradient on the right to hint scroll */}
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent" />
+
+                <button
+                  type="button"
+                  onClick={() => scrollTabs("right")}
+                  disabled={!canScrollRight}
+                  className={cn(
+                    "shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-sm transition-colors",
+                    !canScrollRight && "invisible pointer-events-none",
+                  )}
+                  aria-label="Scroll categories right"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             )}
 
@@ -1186,7 +1270,7 @@ function ProductView({
       </div>
     );
   }
-  
+
   if (isError || !data?.product) {
     return (
       <div className="mt-4 bg-destructive/5 border border-destructive/20 rounded-xl p-5 flex items-center justify-center gap-2 text-destructive">
@@ -1251,7 +1335,7 @@ function ProductView({
           {/* Competitor Data */}
           <div className="border rounded-lg p-4 bg-card flex flex-col">
             <p className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wide">Market Context</p>
-            
+
             {!competitors || competitors.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
                 <Info className="w-8 h-8 text-muted-foreground/40 mb-2" />
@@ -1294,7 +1378,7 @@ function ProductView({
                         {comp.gapPct != null ? (
                           <div className={cn(
                               "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold font-mono",
-                            isCompetitorCheaper ? "bg-destructive/10 text-destructive" : 
+                            isCompetitorCheaper ? "bg-destructive/10 text-destructive" :
                             isPrayagCheaper ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
                           )}>
                             {comp.gapPct > 0 ? "+" : ""}{comp.gapPct.toFixed(1)}%

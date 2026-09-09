@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   BarChart3,
   ChevronLeft,
@@ -11,9 +11,12 @@ import {
   Search,
   Settings,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ── App-switcher entries (all cross-app = raw <a> links) ──────────────────────
 type AppSwitcherEntry = {
@@ -50,6 +53,7 @@ export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const hadInAppNavigation = useRef(false);
   const initialLocation = useRef(location);
 
@@ -74,27 +78,33 @@ export function AppShell({ children }: AppShellProps) {
   };
 
   // ── Sidebar content (shared between desktop + mobile drawer) ─────────────────
-  function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
+  function SidebarContent({ onNavClick, mobile = false }: { onNavClick?: () => void; mobile?: boolean }) {
+    const collapsed = !mobile && isCollapsed;
+
     return (
       <div className="flex flex-col h-full">
         {/* Brand */}
-        <div className="flex items-center gap-2.5 px-4 h-14 border-b shrink-0">
+        <div className={cn("flex items-center h-14 border-b shrink-0", collapsed ? "justify-center px-0" : "gap-2.5 px-4")}>
           <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-sm shrink-0">
             <Hexagon className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
-          <div className="leading-none min-w-0">
-            <span className="font-bold text-sm text-foreground">Prayag</span>
-            <span className="text-[10px] text-muted-foreground block">
-              Pricing workspace
-            </span>
-          </div>
+          {!collapsed && (
+            <div className="leading-none min-w-0">
+              <span className="font-bold text-sm text-foreground">Prayag</span>
+              <span className="text-[10px] text-muted-foreground block">
+                Pricing workspace
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Context label */}
         <div className="px-4 pt-4 pb-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 mb-1">
-            Competition Analysis
-          </p>
+          {!collapsed && (
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 mb-1">
+              Competition Analysis
+            </p>
+          )}
         </div>
 
         {/* In-app nav */}
@@ -102,65 +112,110 @@ export function AppShell({ children }: AppShellProps) {
           {ANALYSIS_NAV.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path;
-            return (
-              <a
+            const content = (
+              <Link
                 key={item.path}
-                href={item.path === "/" ? "/analysis/" : `/analysis${item.path}`}
-                aria-current={isActive ? "page" : undefined}
+                href={item.path}
                 onClick={onNavClick}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  "flex items-center rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  collapsed ? "justify-center py-2 px-0" : "gap-2.5 px-3 py-2 font-medium",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
+                aria-label={collapsed ? item.label : undefined}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {item.label}
-              </a>
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
             );
+
+            if (collapsed) {
+              return (
+                <Tooltip key={item.path} delayDuration={0}>
+                  <TooltipTrigger asChild>{content}</TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={14}>{item.label}</TooltipContent>
+                </Tooltip>
+              );
+            }
+            return content;
           })}
         </nav>
 
         {/* App switcher */}
         <div className="px-3 pb-3 pt-2 border-t mt-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 mb-1.5">
-            Switch app
-          </p>
+          {!collapsed && (
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 mb-1.5">
+              Switch app
+            </p>
+          )}
           {APP_SWITCHER.map((app) => {
             const Icon = app.icon;
-            return (
+            const content = (
               <a
                 key={app.href}
                 href={app.href}
                 onClick={onNavClick}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary w-full",
+                  "flex items-center rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary w-full",
+                  collapsed ? "justify-center py-1.5 px-0" : "gap-2 px-3 py-1.5",
                   app.active
-                    ? "text-primary font-medium"
+                    ? "text-primary font-medium bg-primary/5"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
+                aria-label={collapsed ? app.label : undefined}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {app.label}
-                {app.active && (
+                {!collapsed && <span>{app.label}</span>}
+                {!collapsed && app.active && (
                   <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide bg-primary/10 text-primary rounded px-1.5 py-0.5">
                     Active
                   </span>
                 )}
               </a>
             );
+
+            if (collapsed) {
+              return (
+                <Tooltip key={app.href} delayDuration={0}>
+                  <TooltipTrigger asChild>{content}</TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={14}>{app.label}</TooltipContent>
+                </Tooltip>
+              );
+            }
+            return content;
           })}
         </div>
 
+        {/* Collapse button */}
+        {!mobile && (
+          <div className="px-3 pb-3">
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className={cn(
+                "flex items-center rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary w-full text-muted-foreground hover:text-foreground hover:bg-accent",
+                collapsed ? "justify-center py-2 px-0" : "gap-2 px-3 py-2 font-medium"
+              )}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <PanelLeftOpen className="w-4 h-4 shrink-0" /> : <PanelLeftClose className="w-4 h-4 shrink-0" />}
+              {!collapsed && <span>Collapse</span>}
+            </button>
+          </div>
+        )}
+
         {/* User / logout */}
-        <div className="px-3 pb-3 pt-2 border-t flex items-center gap-2">
+        <div className={cn("px-3 pb-3 pt-2 border-t flex items-center", collapsed ? "justify-center flex-col gap-2" : "gap-2")}>
           <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0 select-none">
             {userName.slice(0, 1).toUpperCase()}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground truncate">{userName}</p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground truncate">{userName}</p>
+            </div>
+          )}
           <button
             onClick={logout}
             title="Log out"
@@ -179,7 +234,10 @@ export function AppShell({ children }: AppShellProps) {
       <WorkspaceHeader activeApp="competition-analysis" />
       <div className="flex min-h-[calc(100vh-3.5rem)] flex-1 overflow-hidden">
       {/* ── Desktop sidebar ─────────────────────────────────────────────────── */}
-      <aside className="hidden md:flex flex-col w-56 border-r bg-card shrink-0 overflow-y-auto">
+      <aside className={cn(
+        "hidden md:flex flex-col border-r bg-card shrink-0 overflow-y-auto transition-all duration-300",
+        isCollapsed ? "w-16" : "w-56"
+      )}>
         <SidebarContent />
       </aside>
 
@@ -217,7 +275,7 @@ export function AppShell({ children }: AppShellProps) {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <SidebarContent onNavClick={() => setMobileOpen(false)} />
+          <SidebarContent onNavClick={() => setMobileOpen(false)} mobile={true} />
         </div>
       </aside>
 

@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import Admin from "@/pages/admin";
 import { useAuth, AuthProvider, PasswordChangeGate } from "@workspace/replit-auth-web";
 import { useEffect, useState } from "react";
+import { Layout } from "@/components/layout";
 
 const queryClient = new QueryClient();
 
@@ -102,11 +103,13 @@ function RestrictedHomeRedirect() {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/admin" component={Admin} />
-      <Route component={NotFound} />
-    </Switch>
+    <Layout>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/admin" component={Admin} />
+        <Route component={NotFound} />
+      </Switch>
+    </Layout>
   );
 }
 

@@ -18,9 +18,12 @@ import {
   PencilLine,
   Users,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -56,6 +59,7 @@ function getPageContext(location: string) {
 export function Layout({ children }: LayoutProps) {
   const [location, navigate] = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const hadInAppNavigation = useRef(false);
   const initialLocation = useRef(location);
   const { user, logout } = useAuth();
@@ -82,60 +86,83 @@ export function Layout({ children }: LayoutProps) {
     <nav className="space-y-1" aria-label="Product Database navigation">
       {visibleNavItems.map((item) => {
         const Icon = item.icon;
+        const active = isActive(item.href);
         const content = (
           <span
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-              isActive(item.href)
+              "flex items-center rounded-lg transition-colors",
+              !mobile && isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5 text-sm font-medium",
+              active
                 ? "bg-white/90 text-[#174c57] shadow-sm"
-                : "text-white/75 hover:bg-white/10 hover:text-white",
+                : "text-white/75 hover:bg-white/10 hover:text-white"
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" />
-            {item.label}
+            <Icon className="h-5 w-5 shrink-0" />
+            {(!isCollapsed || mobile) && <span>{item.label}</span>}
           </span>
         );
 
-        return item.external ? (
-          <a key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)}>
+        const link = item.external ? (
+          <a key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)} aria-label={isCollapsed && !mobile ? item.label : undefined}>
             {content}
           </a>
         ) : (
-          <Link key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)}>
+          <Link key={item.href} href={item.href} onClick={() => mobile && setMobileNavOpen(false)} aria-label={isCollapsed && !mobile ? item.label : undefined}>
             {content}
           </Link>
         );
+
+        if (!mobile && isCollapsed) {
+          return (
+            <Tooltip key={item.href} delayDuration={0}>
+              <TooltipTrigger asChild>{link}</TooltipTrigger>
+              <TooltipContent side="right" sideOffset={14}>{item.label}</TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        return link;
       })}
     </nav>
   );
 
   const appSwitcher = (mobile = false) => (
     <div className="space-y-1">
-      <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">Switch app</p>
-      <a
-        href="/"
-        onClick={() => mobile && setMobileNavOpen(false)}
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-      >
-        <Home className="h-4 w-4" />
-        Home
-      </a>
-      <a
-        href="/analysis/"
-        onClick={() => mobile && setMobileNavOpen(false)}
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-      >
-        <TrendingUp className="h-4 w-4" />
-        Competition Analysis
-      </a>
-      <a
-        href="/price-finder/"
-        onClick={() => mobile && setMobileNavOpen(false)}
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-      >
-        <Search className="h-4 w-4" />
-        Price Finder
-      </a>
+      {(!isCollapsed || mobile) && <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">Switch app</p>}
+      {[
+        { href: "/", icon: Home, label: "Home" },
+        { href: "/analysis/", icon: TrendingUp, label: "Competition Analysis" },
+        { href: "/price-finder/", icon: Search, label: "Price Finder" },
+      ].map((app) => {
+        const content = (
+          <span
+            className={cn(
+              "flex items-center rounded-lg transition-colors text-white/75 hover:bg-white/10 hover:text-white",
+              !mobile && isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2 text-sm font-medium"
+            )}
+          >
+            <app.icon className="h-5 w-5 shrink-0" />
+            {(!isCollapsed || mobile) && <span>{app.label}</span>}
+          </span>
+        );
+
+        const link = (
+          <a key={app.href} href={app.href} onClick={() => mobile && setMobileNavOpen(false)} aria-label={isCollapsed && !mobile ? app.label : undefined}>
+            {content}
+          </a>
+        );
+
+        if (!mobile && isCollapsed) {
+          return (
+            <Tooltip key={app.href} delayDuration={0}>
+              <TooltipTrigger asChild>{link}</TooltipTrigger>
+              <TooltipContent side="right" sideOffset={14}>{app.label}</TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        return link;
+      })}
     </div>
   );
 
@@ -143,46 +170,72 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-[#f6f8f7] text-foreground">
       <WorkspaceHeader activeApp="product-database" />
       <div className="min-h-[calc(100vh-3.5rem)] lg:flex">
-      <aside className="hidden w-64 shrink-0 flex-col bg-[#164954] text-white lg:flex">
-        <div className="border-b border-white/15 px-5 py-5">
+      <aside className={cn(
+        "hidden shrink-0 flex-col bg-[#164954] text-white lg:flex transition-all duration-300",
+        isCollapsed ? "w-[68px]" : "w-64"
+      )}>
+        <div className={cn("border-b border-white/15 px-4 py-5 flex items-center", isCollapsed ? "justify-center" : "")}>
           <a href="/" className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#5bc5bb] text-[#164954]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#5bc5bb] text-[#164954]">
               <LayoutGrid className="h-5 w-5" />
             </span>
-            <span>
-              <span className="block text-sm font-bold tracking-tight">Prayag</span>
-              <span className="block text-[11px] text-white/60">Pricing workspace</span>
-            </span>
+            {!isCollapsed && (
+              <span className="min-w-0">
+                <span className="block text-sm font-bold tracking-tight truncate">Prayag</span>
+                <span className="block text-[11px] text-white/60 truncate">Pricing workspace</span>
+              </span>
+            )}
           </a>
         </div>
 
-        <div className="px-4 pt-5">
-          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">Workspace</p>
-          <div className="flex items-center gap-2 px-3 pb-3 text-sm font-semibold text-white">
-            <Database className="h-4 w-4 text-[#84ded5]" />
-            Product Database
+        <div className="px-3 pt-5">
+          {!isCollapsed && <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">Workspace</p>}
+          <div className={cn("flex items-center pb-3 text-sm font-semibold text-white", isCollapsed ? "justify-center" : "px-3 gap-2")}>
+            <Database className={cn("text-[#84ded5]", isCollapsed ? "h-5 w-5" : "h-4 w-4")} />
+            {!isCollapsed && <span className="truncate">Product Database</span>}
           </div>
           {navigation()}
         </div>
 
-        <div className="mt-4 border-t border-white/15 px-4 pt-4">{appSwitcher()}</div>
+        <div className="mt-4 border-t border-white/15 px-3 pt-4">{appSwitcher()}</div>
 
-        <div className="mt-auto border-t border-white/15 p-4">
-          <div className="mb-3 flex items-center gap-2 px-1">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dff1ee] text-[10px] font-bold text-[#164954]">
+        <div className="mt-auto border-t border-white/15 p-3">
+          <div className={cn("mb-3 flex items-center", isCollapsed ? "justify-center" : "px-1 gap-2")}>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dff1ee] text-[10px] font-bold text-[#164954]">
               {displayName.slice(0, 2).toUpperCase()}
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white">{displayName}</p>
-              <p className="text-[11px] text-white/55">Catalog reviewer</p>
-            </div>
+            {!isCollapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-white">{displayName}</p>
+                <p className="text-[11px] text-white/55 truncate">Catalog reviewer</p>
+              </div>
+            )}
           </div>
+
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={cn(
+              "flex w-full items-center rounded-lg py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white mb-2",
+              isCollapsed ? "justify-center px-0" : "gap-3 px-3"
+            )}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-5 w-5 shrink-0" /> : <PanelLeftClose className="h-5 w-5 shrink-0" />}
+            {!isCollapsed && <span>Collapse</span>}
+          </button>
+
           <button
             onClick={logout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className={cn(
+              "flex w-full items-center rounded-lg py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
+              isCollapsed ? "justify-center px-0" : "gap-3 px-3"
+            )}
+            title={isCollapsed ? "Log out" : undefined}
+            aria-label={isCollapsed ? "Log out" : undefined}
           >
-            <LogOut className="h-4 w-4" />
-            Log out
+            <LogOut className="h-5 w-5 shrink-0" />
+            {!isCollapsed && <span>Log out</span>}
           </button>
         </div>
       </aside>

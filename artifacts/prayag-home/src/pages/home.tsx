@@ -9,16 +9,15 @@ import {
   Users,
   ShieldCheck,
 } from "lucide-react";
-import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { Link } from "wouter";
+import { useAuth } from "@workspace/replit-auth-web";
 
 export default function Home() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-background">
-      <WorkspaceHeader activeApp="home" />
-
+    <div className="w-full flex flex-col">
       {/* ── Page body ── */}
       <div className="flex-1 flex flex-col items-center justify-start px-4 py-8 md:justify-center md:py-10 relative overflow-hidden">
         {/* Decorative background elements */}
@@ -150,7 +149,7 @@ export default function Home() {
           {/* Admin card — only for admin users */}
           {isAdmin && (
             <div className="mt-4 max-w-5xl mx-auto">
-              <a
+              <Link
                 href="/admin"
                 className="group flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 hover:bg-primary/10 hover:border-primary/40 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -171,7 +170,7 @@ export default function Home() {
                     Add or remove users, reset passwords, and manage roles.
                   </p>
                 </div>
-              </a>
+              </Link>
             </div>
           )}
 
