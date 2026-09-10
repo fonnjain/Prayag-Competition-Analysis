@@ -101,6 +101,8 @@ import type {
   GetComparisonSummaryParams,
   GetMappingReviewParams,
   GetMrpIncreasesParams,
+  GetPriceEditorEditsParams,
+  GetPriceEditorProductParams,
   GetPriceFinderBrowseParams,
   GetPriceFinderComparisonParams,
   GetPriceFinderProductParams,
@@ -123,6 +125,13 @@ import type {
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
   PatchCatalogProductMrpParams,
+  PriceEditorEditRequest,
+  PriceEditorEditsResponse,
+  PriceEditorPreviewResponse,
+  PriceEditorProductResponse,
+  PriceEditorSaveRequest,
+  PriceEditorSaveResponse,
+  PriceEditorUndoResponse,
   PriceFinderBrowseResponse,
   PriceFinderComparisonResponse,
   PriceFinderProductResponse,
@@ -220,13 +229,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-
-
-
-
-
-
 export const getGetApiKeysUrl = () => {
 
 
@@ -297,13 +299,6 @@ export function useGetApiKeys<TData = Awaited<ReturnType<typeof getApiKeys>>, TE
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-
-
-
-
-
-
 export const getCreateApiKeyUrl = () => {
 
 
@@ -6197,3 +6192,376 @@ export const useRollbackMrpRevision = <TError = ErrorType<ErrorResponse>,
       return useMutation(getRollbackMrpRevisionMutationOptions(options));
     }
 
+export const getGetPriceEditorProductUrl = (params: GetPriceEditorProductParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/price-editor/product?${stringifiedParams}` : `/api/catalog/price-editor/product`
+}
+
+/**
+ * @summary Admin-only product and configured price series for the single-product editor
+ */
+export const getPriceEditorProduct = async (params: GetPriceEditorProductParams, options?: RequestInit): Promise<PriceEditorProductResponse> => {
+
+  return customFetch<PriceEditorProductResponse>(getGetPriceEditorProductUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceEditorProductQueryKey = (params?: GetPriceEditorProductParams,) => {
+    return [
+    `/api/catalog/price-editor/product`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceEditorProductQueryOptions = <TData = Awaited<ReturnType<typeof getPriceEditorProduct>>, TError = ErrorType<void>>(params: GetPriceEditorProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceEditorProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceEditorProductQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceEditorProduct>>> = ({ signal }) => getPriceEditorProduct(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceEditorProduct>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceEditorProductQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceEditorProduct>>>
+export type GetPriceEditorProductQueryError = ErrorType<void>
+
+
+/**
+ * @summary Admin-only product and configured price series for the single-product editor
+ */
+
+export function useGetPriceEditorProduct<TData = Awaited<ReturnType<typeof getPriceEditorProduct>>, TError = ErrorType<void>>(
+ params: GetPriceEditorProductParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceEditorProduct>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceEditorProductQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewPriceEditorChangeUrl = () => {
+
+
+
+
+  return `/api/catalog/price-editor/preview`
+}
+
+/**
+ * @summary Preview one dated price edit and its warnings
+ */
+export const previewPriceEditorChange = async (priceEditorEditRequest: PriceEditorEditRequest, options?: RequestInit): Promise<PriceEditorPreviewResponse> => {
+
+  return customFetch<PriceEditorPreviewResponse>(getPreviewPriceEditorChangeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      priceEditorEditRequest,)
+  }
+);}
+
+
+
+
+export const getPreviewPriceEditorChangeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewPriceEditorChange>>, TError,{data: BodyType<PriceEditorEditRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewPriceEditorChange>>, TError,{data: BodyType<PriceEditorEditRequest>}, TContext> => {
+
+const mutationKey = ['previewPriceEditorChange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewPriceEditorChange>>, {data: BodyType<PriceEditorEditRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewPriceEditorChange(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewPriceEditorChangeMutationResult = NonNullable<Awaited<ReturnType<typeof previewPriceEditorChange>>>
+    export type PreviewPriceEditorChangeMutationBody = BodyType<PriceEditorEditRequest>
+    export type PreviewPriceEditorChangeMutationError = ErrorType<void>
+
+    /**
+ * @summary Preview one dated price edit and its warnings
+ */
+export const usePreviewPriceEditorChange = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewPriceEditorChange>>, TError,{data: BodyType<PriceEditorEditRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewPriceEditorChange>>,
+        TError,
+        {data: BodyType<PriceEditorEditRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewPriceEditorChangeMutationOptions(options));
+    }
+
+export const getSavePriceEditorChangeUrl = () => {
+
+
+
+
+  return `/api/catalog/price-editor/save`
+}
+
+/**
+ * @summary Save exactly one product price edit with immutable audit
+ */
+export const savePriceEditorChange = async (priceEditorSaveRequest: PriceEditorSaveRequest, options?: RequestInit): Promise<PriceEditorSaveResponse> => {
+
+  return customFetch<PriceEditorSaveResponse>(getSavePriceEditorChangeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      priceEditorSaveRequest,)
+  }
+);}
+
+
+
+
+export const getSavePriceEditorChangeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePriceEditorChange>>, TError,{data: BodyType<PriceEditorSaveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof savePriceEditorChange>>, TError,{data: BodyType<PriceEditorSaveRequest>}, TContext> => {
+
+const mutationKey = ['savePriceEditorChange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof savePriceEditorChange>>, {data: BodyType<PriceEditorSaveRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  savePriceEditorChange(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SavePriceEditorChangeMutationResult = NonNullable<Awaited<ReturnType<typeof savePriceEditorChange>>>
+    export type SavePriceEditorChangeMutationBody = BodyType<PriceEditorSaveRequest>
+    export type SavePriceEditorChangeMutationError = ErrorType<void>
+
+    /**
+ * @summary Save exactly one product price edit with immutable audit
+ */
+export const useSavePriceEditorChange = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof savePriceEditorChange>>, TError,{data: BodyType<PriceEditorSaveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof savePriceEditorChange>>,
+        TError,
+        {data: BodyType<PriceEditorSaveRequest>},
+        TContext
+      > => {
+      return useMutation(getSavePriceEditorChangeMutationOptions(options));
+    }
+
+export const getUndoPriceEditorChangeUrl = (auditId: number,) => {
+
+
+
+
+  return `/api/catalog/price-editor/undo/${auditId}`
+}
+
+/**
+ * @summary Reverse one single-product price edit without deleting its audit
+ */
+export const undoPriceEditorChange = async (auditId: number, options?: RequestInit): Promise<PriceEditorUndoResponse> => {
+
+  return customFetch<PriceEditorUndoResponse>(getUndoPriceEditorChangeUrl(auditId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUndoPriceEditorChangeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoPriceEditorChange>>, TError,{auditId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof undoPriceEditorChange>>, TError,{auditId: number}, TContext> => {
+
+const mutationKey = ['undoPriceEditorChange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof undoPriceEditorChange>>, {auditId: number}> = (props) => {
+          const {auditId} = props ?? {};
+
+          return  undoPriceEditorChange(auditId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UndoPriceEditorChangeMutationResult = NonNullable<Awaited<ReturnType<typeof undoPriceEditorChange>>>
+
+    export type UndoPriceEditorChangeMutationError = ErrorType<void>
+
+    /**
+ * @summary Reverse one single-product price edit without deleting its audit
+ */
+export const useUndoPriceEditorChange = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoPriceEditorChange>>, TError,{auditId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof undoPriceEditorChange>>,
+        TError,
+        {auditId: number},
+        TContext
+      > => {
+      return useMutation(getUndoPriceEditorChangeMutationOptions(options));
+    }
+
+export const getGetPriceEditorEditsUrl = (params: GetPriceEditorEditsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/price-editor/edits?${stringifiedParams}` : `/api/catalog/price-editor/edits`
+}
+
+/**
+ * @summary Recent single-product edits
+ */
+export const getPriceEditorEdits = async (params: GetPriceEditorEditsParams, options?: RequestInit): Promise<PriceEditorEditsResponse> => {
+
+  return customFetch<PriceEditorEditsResponse>(getGetPriceEditorEditsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceEditorEditsQueryKey = (params?: GetPriceEditorEditsParams,) => {
+    return [
+    `/api/catalog/price-editor/edits`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceEditorEditsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceEditorEdits>>, TError = ErrorType<unknown>>(params: GetPriceEditorEditsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceEditorEdits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceEditorEditsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceEditorEdits>>> = ({ signal }) => getPriceEditorEdits(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceEditorEdits>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceEditorEditsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceEditorEdits>>>
+export type GetPriceEditorEditsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent single-product edits
+ */
+
+export function useGetPriceEditorEdits<TData = Awaited<ReturnType<typeof getPriceEditorEdits>>, TError = ErrorType<unknown>>(
+ params: GetPriceEditorEditsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceEditorEdits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceEditorEditsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

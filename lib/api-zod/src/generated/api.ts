@@ -2069,3 +2069,185 @@ export const RollbackMrpRevisionResponse = zod.object({
 })
 
 
+/**
+ * @summary Admin-only product and configured price series for the single-product editor
+ */
+export const GetPriceEditorProductQueryParams = zod.object({
+  "itemCode": zod.coerce.string(),
+  "asOf": zod.date().optional()
+})
+
+export const GetPriceEditorProductResponse = zod.object({
+  "product": zod.object({
+  "id": zod.number(),
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "seriesRange": zod.string().nullable(),
+  "size": zod.string().nullable(),
+  "uom": zod.string(),
+  "isActive": zod.boolean(),
+  "discontinuedFrom": zod.coerce.date().nullish()
+}),
+  "series": zod.array(zod.object({
+  "series": zod.string(),
+  "current": zod.union([zod.object({
+  "id": zod.number().optional(),
+  "mrp": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date().nullish(),
+  "matchedPrayagCode": zod.string().nullish(),
+  "competitor": zod.string().nullish()
+}),zod.null()]),
+  "previous": zod.union([zod.object({
+  "id": zod.number().optional(),
+  "mrp": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date().nullish(),
+  "matchedPrayagCode": zod.string().nullish(),
+  "competitor": zod.string().nullish()
+}),zod.null()]).optional()
+})),
+  "recentEdits": zod.array(zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+}))
+})
+
+
+/**
+ * @summary Preview one dated price edit and its warnings
+ */
+export const previewPriceEditorChangeBodyValueExclusiveMin = 0;
+
+
+
+export const PreviewPriceEditorChangeBody = zod.object({
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "value": zod.number().gt(previewPriceEditorChangeBodyValueExclusiveMin),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string().optional()
+})
+
+export const PreviewPriceEditorChangeResponse = zod.object({
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "value": zod.number(),
+  "previous": zod.number().nullable(),
+  "previousResolvedValue": zod.number().nullable(),
+  "effectiveDate": zod.coerce.date(),
+  "existingSameDateValue": zod.number().nullable(),
+  "dateMeaning": zod.object({
+  "operation": zod.enum(['correction', 'immediate', 'scheduled']),
+  "wording": zod.string()
+}),
+  "warnings": zod.array(zod.string()),
+  "competitorGapPct": zod.number().nullish(),
+  "currentUntil": zod.coerce.date().nullish(),
+  "firstCompetitorMapping": zod.boolean()
+})
+
+
+/**
+ * @summary Save exactly one product price edit with immutable audit
+ */
+export const savePriceEditorChangeBodyValueExclusiveMin = 0;
+
+
+
+
+export const SavePriceEditorChangeBody = zod.object({
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "value": zod.number().gt(savePriceEditorChangeBodyValueExclusiveMin),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string().min(1)
+})
+
+export const SavePriceEditorChangeResponse = zod.object({
+  "ok": zod.boolean(),
+  "audit": zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+}),
+  "firstCompetitorMapping": zod.boolean()
+})
+
+
+/**
+ * @summary Reverse one single-product price edit without deleting its audit
+ */
+export const UndoPriceEditorChangeParams = zod.object({
+  "auditId": zod.coerce.number()
+})
+
+export const UndoPriceEditorChangeResponse = zod.object({
+  "ok": zod.boolean(),
+  "reversal": zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+})
+})
+
+
+/**
+ * @summary Recent single-product edits
+ */
+export const GetPriceEditorEditsQueryParams = zod.object({
+  "itemCode": zod.coerce.string()
+})
+
+export const GetPriceEditorEditsResponse = zod.object({
+  "edits": zod.array(zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+}))
+})
+
+

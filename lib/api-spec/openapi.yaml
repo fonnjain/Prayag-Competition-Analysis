@@ -2118,6 +2118,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /catalog/price-editor/product:
+    get:
+      operationId: getPriceEditorProduct
+      tags: [catalog]
+      summary: Admin-only product and configured price series for the single-product editor
+      parameters:
+        - { name: itemCode, in: query, required: true, schema: { type: string } }
+        - { name: asOf, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200": { description: Product editor data, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorProductResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/preview:
+    post:
+      operationId: previewPriceEditorChange
+      tags: [catalog]
+      summary: Preview one dated price edit and its warnings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceEditorEditRequest"
+      responses:
+        "200": { description: Preview, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorPreviewResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/save:
+    post:
+      operationId: savePriceEditorChange
+      tags: [catalog]
+      summary: Save exactly one product price edit with immutable audit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceEditorSaveRequest"
+      responses:
+        "200": { description: Saved edit, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorSaveResponse" } } } }
+        "400": { description: Invalid input }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/undo/{auditId}:
+    post:
+      operationId: undoPriceEditorChange
+      tags: [catalog]
+      summary: Reverse one single-product price edit without deleting its audit
+      parameters:
+        - { name: auditId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Reversal recorded, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorUndoResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/edits:
+    get:
+      operationId: getPriceEditorEdits
+      tags: [catalog]
+      summary: Recent single-product edits
+      parameters:
+        - { name: itemCode, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Recent edits, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorEditsResponse" } } } }
+
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -2194,6 +2254,127 @@ components:
         type: string
         format: date
   schemas:
+    PriceEditorProduct:
+      type: object
+      required: [id, itemCode, productName, division, category, seriesRange, size, uom, isActive]
+      properties:
+        id: { type: integer }
+        itemCode: { type: string }
+        productName: { type: [string, "null"] }
+        division: { type: [string, "null"] }
+        category: { type: [string, "null"] }
+        seriesRange: { type: [string, "null"] }
+        size: { type: [string, "null"] }
+        uom: { type: string }
+        isActive: { type: boolean }
+        discontinuedFrom: { type: [string, "null"], format: date }
+    PriceEditorCurrent:
+      type: object
+      properties:
+        id: { type: integer }
+        mrp: { type: [number, "null"] }
+        price: { type: [number, "null"] }
+        effectiveDate: { type: [string, "null"], format: date }
+        matchedPrayagCode: { type: [string, "null"] }
+        competitor: { type: [string, "null"] }
+    PriceEditorSeries:
+      type: object
+      required: [series, current]
+      properties:
+        series: { type: string }
+        current:
+          oneOf:
+            - $ref: "#/components/schemas/PriceEditorCurrent"
+            - type: "null"
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/PriceEditorCurrent"
+            - type: "null"
+    PriceEditorAudit:
+      type: object
+      required: [id, actor, createdAt, itemCode, series, operationType, effectiveDate, remarks]
+      properties:
+        id: { type: integer }
+        actor: { type: string }
+        createdAt: { type: string, format: date-time }
+        itemCode: { type: string }
+        series: { type: string }
+        operationType: { type: string, enum: [save, reversal] }
+        oldValue: { type: [number, "null"] }
+        newValue: { type: [number, "null"] }
+        effectiveDate: { type: string, format: date }
+        remarks: { type: string }
+        originalAuditId: { type: [integer, "null"] }
+        targetRowId: { type: [integer, "null"] }
+        previousResolvedValue: { type: [number, "null"] }
+    PriceEditorProductResponse:
+      type: object
+      required: [product, series, recentEdits]
+      properties:
+        product: { $ref: "#/components/schemas/PriceEditorProduct" }
+        series:
+          type: array
+          items: { $ref: "#/components/schemas/PriceEditorSeries" }
+        recentEdits:
+          type: array
+          items: { $ref: "#/components/schemas/PriceEditorAudit" }
+    PriceEditorEditRequest:
+      type: object
+      required: [itemCode, series, value, effectiveDate]
+      properties:
+        itemCode: { type: string }
+        series: { type: string }
+        value: { type: number, exclusiveMinimum: 0 }
+        effectiveDate: { type: string, format: date }
+        remarks: { type: string }
+    PriceEditorSaveRequest:
+      required: [itemCode, series, value, effectiveDate, remarks]
+      type: object
+      properties:
+        itemCode: { type: string }
+        series: { type: string }
+        value: { type: number, exclusiveMinimum: 0 }
+        effectiveDate: { type: string, format: date }
+        remarks: { type: string, minLength: 1 }
+    PriceEditorPreviewResponse:
+      type: object
+      required: [itemCode, series, value, previous, previousResolvedValue, effectiveDate, existingSameDateValue, dateMeaning, warnings, firstCompetitorMapping]
+      properties:
+        itemCode: { type: string }
+        series: { type: string }
+        value: { type: number }
+        previous: { type: [number, "null"] }
+        previousResolvedValue: { type: [number, "null"] }
+        effectiveDate: { type: string, format: date }
+        existingSameDateValue: { type: [number, "null"] }
+        dateMeaning:
+          type: object
+          required: [operation, wording]
+          properties:
+            operation: { type: string, enum: [correction, immediate, scheduled] }
+            wording: { type: string }
+        warnings: { type: array, items: { type: string } }
+        competitorGapPct: { type: [number, "null"] }
+        currentUntil: { type: [string, "null"], format: date }
+        firstCompetitorMapping: { type: boolean }
+    PriceEditorSaveResponse:
+      type: object
+      required: [ok, audit, firstCompetitorMapping]
+      properties:
+        ok: { type: boolean }
+        audit: { $ref: "#/components/schemas/PriceEditorAudit" }
+        firstCompetitorMapping: { type: boolean }
+    PriceEditorEditsResponse:
+      type: object
+      required: [edits]
+      properties:
+        edits: { type: array, items: { $ref: "#/components/schemas/PriceEditorAudit" } }
+    PriceEditorUndoResponse:
+      type: object
+      required: [ok, reversal]
+      properties:
+        ok: { type: boolean }
+        reversal: { $ref: "#/components/schemas/PriceEditorAudit" }
     ErrorResponse:
       type: object
       required: [error]

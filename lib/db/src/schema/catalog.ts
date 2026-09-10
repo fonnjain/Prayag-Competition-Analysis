@@ -9,7 +9,9 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Central product catalog (one row per unique product). Namespaced as
 // `catalog_products` to avoid colliding with the Competition Console `products`
@@ -265,6 +267,11 @@ export const competitorPricesTable = pgTable(
     index("competitor_prices_competitor_idx").on(t.competitor),
     index("competitor_prices_category_idx").on(t.category),
     index("competitor_prices_current_idx").on(t.competitor, t.isCurrent),
+    uniqueIndex("competitor_prices_editor_identity_idx").on(
+      t.competitor,
+      t.matchedPrayagCode,
+      t.effectiveDate,
+    ),
   ],
 );
 
@@ -556,6 +563,40 @@ export const catalogProductNameCorrectionsTable = pgTable(
   ],
 );
 
+// Immutable audit entries for the single-product price editor.  Price rows are
+// deliberately not embedded here: this table remains useful when a first
+// competitor mapping is added (there is no previous row/value) and when an
+// edit is undone (the original entry is retained).
+export const catalogPriceEditAuditsTable = pgTable(
+  "catalog_price_edit_audits",
+  {
+    id: serial("id").primaryKey(),
+    actor: text("actor").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    itemCode: text("item_code").notNull(),
+    series: text("series").notNull(), // Prayag MRP or configured competitor
+    operationType: text("operation_type").notNull(), // save | reversal
+    oldValue: doublePrecision("old_value"),
+    previousResolvedValue: doublePrecision("previous_resolved_value"),
+    newValue: doublePrecision("new_value"),
+    effectiveDate: date("effective_date", { mode: "string" }).notNull(),
+    remarks: text("remarks").notNull(),
+    originalAuditId: integer("original_audit_id"),
+    targetRowId: integer("target_row_id"),
+  },
+  (t) => [
+    index("catalog_price_edit_audits_item_idx").on(t.itemCode, t.createdAt),
+    index("catalog_price_edit_audits_original_idx").on(t.originalAuditId),
+    uniqueIndex("catalog_price_edit_audits_reversal_once_idx")
+      .on(t.originalAuditId)
+      .where(sql`${t.operationType} = 'reversal'`),
+    check(
+      "catalog_price_edit_audits_operation_check",
+      sql`${t.operationType} in ('save', 'reversal')`,
+    ),
+  ],
+);
+
 export type CatalogProduct = typeof catalogProductsTable.$inferSelect;
 export type MrpPriceRow = typeof mrpPriceHistoryTable.$inferSelect;
 export type MrpPendingBatch = typeof mrpPendingBatchesTable.$inferSelect;
@@ -572,3 +613,4 @@ export type CompetitorCodeAlias = typeof competitorCodeAliasesTable.$inferSelect
 export type CatalogSyncAudit = typeof catalogSyncAuditsTable.$inferSelect;
 export type CatalogProductNameCorrection =
   typeof catalogProductNameCorrectionsTable.$inferSelect;
+export type CatalogPriceEditAudit = typeof catalogPriceEditAuditsTable.$inferSelect;

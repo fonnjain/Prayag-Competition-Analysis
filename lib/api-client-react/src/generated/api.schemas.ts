@@ -5,6 +5,148 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export interface PriceEditorProduct {
+  id: number;
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  seriesRange: string | null;
+  /** @nullable */
+  size: string | null;
+  uom: string;
+  isActive: boolean;
+  /** @nullable */
+  discontinuedFrom?: string | null;
+}
+
+export interface PriceEditorCurrent {
+  id?: number;
+  /** @nullable */
+  mrp?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  effectiveDate?: string | null;
+  /** @nullable */
+  matchedPrayagCode?: string | null;
+  /** @nullable */
+  competitor?: string | null;
+}
+
+export interface PriceEditorSeries {
+  series: string;
+  current: PriceEditorCurrent | null;
+  previous?: PriceEditorCurrent | null;
+}
+
+export type PriceEditorAuditOperationType = typeof PriceEditorAuditOperationType[keyof typeof PriceEditorAuditOperationType];
+
+
+export const PriceEditorAuditOperationType = {
+  save: 'save',
+  reversal: 'reversal',
+} as const;
+
+export interface PriceEditorAudit {
+  id: number;
+  actor: string;
+  createdAt: string;
+  itemCode: string;
+  series: string;
+  operationType: PriceEditorAuditOperationType;
+  /** @nullable */
+  oldValue?: number | null;
+  /** @nullable */
+  newValue?: number | null;
+  effectiveDate: string;
+  remarks: string;
+  /** @nullable */
+  originalAuditId?: number | null;
+  /** @nullable */
+  targetRowId?: number | null;
+  /** @nullable */
+  previousResolvedValue?: number | null;
+}
+
+export interface PriceEditorProductResponse {
+  product: PriceEditorProduct;
+  series: PriceEditorSeries[];
+  recentEdits: PriceEditorAudit[];
+}
+
+export interface PriceEditorEditRequest {
+  itemCode: string;
+  series: string;
+  /** @exclusiveMinimum 0 */
+  value: number;
+  effectiveDate: string;
+  remarks?: string;
+}
+
+export interface PriceEditorSaveRequest {
+  itemCode: string;
+  series: string;
+  /** @exclusiveMinimum 0 */
+  value: number;
+  effectiveDate: string;
+  /** @minLength 1 */
+  remarks: string;
+}
+
+export type PriceEditorPreviewResponseDateMeaningOperation = typeof PriceEditorPreviewResponseDateMeaningOperation[keyof typeof PriceEditorPreviewResponseDateMeaningOperation];
+
+
+export const PriceEditorPreviewResponseDateMeaningOperation = {
+  correction: 'correction',
+  immediate: 'immediate',
+  scheduled: 'scheduled',
+} as const;
+
+export type PriceEditorPreviewResponseDateMeaning = {
+  operation: PriceEditorPreviewResponseDateMeaningOperation;
+  wording: string;
+};
+
+export interface PriceEditorPreviewResponse {
+  itemCode: string;
+  series: string;
+  value: number;
+  /** @nullable */
+  previous: number | null;
+  /** @nullable */
+  previousResolvedValue: number | null;
+  effectiveDate: string;
+  /** @nullable */
+  existingSameDateValue: number | null;
+  dateMeaning: PriceEditorPreviewResponseDateMeaning;
+  warnings: string[];
+  /** @nullable */
+  competitorGapPct?: number | null;
+  /** @nullable */
+  currentUntil?: string | null;
+  firstCompetitorMapping: boolean;
+}
+
+export interface PriceEditorSaveResponse {
+  ok: boolean;
+  audit: PriceEditorAudit;
+  firstCompetitorMapping: boolean;
+}
+
+export interface PriceEditorEditsResponse {
+  edits: PriceEditorAudit[];
+}
+
+export interface PriceEditorUndoResponse {
+  ok: boolean;
+  reversal: PriceEditorAudit;
+}
+
 export interface ErrorResponse {
   error: string;
 }
@@ -2392,5 +2534,14 @@ iss?: string;
 
 export type LogoutBrowserSessionParams = {
 returnTo?: string;
+};
+
+export type GetPriceEditorProductParams = {
+itemCode: string;
+asOf?: string;
+};
+
+export type GetPriceEditorEditsParams = {
+itemCode: string;
 };
 

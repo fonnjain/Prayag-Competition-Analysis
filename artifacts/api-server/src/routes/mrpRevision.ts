@@ -158,7 +158,7 @@ function targetTypeValue(value: unknown): TargetType | null {
 export function warningFor(
   itemCode: string,
   division: string | null,
-  previous: number,
+  previous: number | null,
   next: number,
 ): string[] {
   const warnings: string[] = [];
@@ -170,7 +170,7 @@ export function warningFor(
   ) {
     warnings.push(`New value ₹${next} is below ₹50 for ${division}.`);
   }
-  if (previous !== 0) {
+  if (previous != null && previous !== 0) {
     const changePct = ((next - previous) / Math.abs(previous)) * 100;
     if (changePct > 60) warnings.push(`Increase is ${changePct.toFixed(1)}%, above +60%.`);
     if (changePct < -20) warnings.push(`Decrease is ${changePct.toFixed(1)}%, below -20%.`);
