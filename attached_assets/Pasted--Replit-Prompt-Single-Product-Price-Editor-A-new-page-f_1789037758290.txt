@@ -1,0 +1,132 @@
+# Replit Prompt — Single Product Price Editor
+
+A new page for correcting one price at a time, interactively. Not everything justifies preparing a workbook — a wrong digit on one product should take a minute, not an upload.
+
+**This is a new page.** Do not fold it into the Price Revision upload or the Load MRP form. Those are bulk tools; this is a single-row tool, and mixing them would make both harder to reason about.
+
+---
+
+## What it does
+
+Find a product, pick which price you are changing, see what it is now, change it, say why, and set when it applies.
+
+```
+1. Find the product      browse by division and category, or search
+2. Choose the price      Prayag MRP · Sparsh Pearl · Ashirvad
+3. See what it is now    current value, effective from, and what it replaced
+4. Enter the new value    with the difference shown as you type
+5. Say why                remarks, required
+6. Set when it applies    a date
+7. Review and confirm     a summary of exactly what will change
+```
+
+Reuse the existing browse-by-division-and-category control from Price Finder rather than building a second one. Someone correcting a price is usually looking at the same screen they spotted the error on.
+
+---
+
+## The three things that make this safe
+
+### It edits prices. It creates nothing.
+
+- **No new products.** If a code is not in the catalogue, this page cannot add it. Say so and point to the proper route.
+- **No new competitors.** Only competitors that already exist can be selected.
+- **No product name or category changes.** Prices only.
+
+### Every change is attributed
+
+Remarks are **required**, not optional. A price that differs from its source workbook needs a reason attached, and this page will be the most common way that happens.
+
+Store per change: who, when, old value, new value, effective date, remarks, and which price series was touched. The same provenance discipline as a load batch — a single-row edit is not exempt from it.
+
+### The effective date decides everything, so say what it means
+
+Three cases, and the page must make clear which one is happening:
+
+| Date chosen | What it means | How to show it |
+|---|---|---|
+| **Today or earlier** | Takes effect **immediately** | Say so prominently before confirming |
+| **A future date** | Scheduled; nothing changes today | Show what is current until then |
+| **An existing period for that product** | **Corrects** that price rather than adding one | State that clearly — this replaces a value |
+
+The third case is the one people will get wrong. Choosing a date that already has a price for that product is a correction, not a new price, and the confirmation must say which it is doing.
+
+---
+
+## What to show before saving
+
+A plain summary. Not a form echoed back — a sentence someone can check:
+
+```
+Prayag MRP for 151 (Ball Cock with Rod & Ball 15mm)
+    changes from  Rs 336.00  to  Rs 340.00     (+4.00, +1.2%)
+    with effect from  15 Sep 2026               (8 days from now)
+    Until then it remains Rs 336.00.
+
+Reason: corrected per Preeti's email of 07 Sep
+```
+
+Apply the existing plausibility checks and show them here, without blocking: a value below ₹50 in PTMT, CP or Sanitaryware, or a change beyond +60% or −20%. Those exist because six sink prices once loaded at 5 paise.
+
+---
+
+## Competitor prices
+
+Same flow, with two differences worth handling explicitly.
+
+The competitor list must be **only those already set up** — Sparsh Pearl and Ashirvad today. If a product has no price for the chosen competitor, offer to add one rather than showing a blank field with no explanation, and make clear that this creates the first mapping for that product.
+
+When a competitor price changes, show the resulting gap in the summary — **both sides resolved at the same date**, never the new competitor price against a differently-dated Prayag price.
+
+---
+
+## After saving
+
+Show the change on screen with its new effective date, and a link to the product.
+
+**Every edit must be reversible.** Show the product's recent edits with who made them and when, and allow one to be undone — which restores the previous value and records the reversal as its own entry. Do not delete the original record.
+
+---
+
+## Access
+
+**Admin only**, enforced server-side at the router, using the existing `requireAdmin` pattern. A non-admin session requesting the endpoint directly must receive 403, not a hidden menu item.
+
+This edits live prices with fewer steps than any other route in the application. Ease of use is the point, and it is also the reason the access check matters.
+
+---
+
+## Acceptance tests
+
+```
+1.  A product can be found by browsing division then category, and by search.
+2.  Selecting Prayag shows the current MRP and its effective date.
+3.  Selecting a competitor shows that competitor's current price and date.
+4.  A date that already has a price for that product is described as a
+    correction, not an addition.
+5.  A past or today's date is flagged as taking effect immediately.
+6.  A future date shows what remains current until then.
+7.  Saving without remarks is rejected.
+8.  A value below Rs 50 in PTMT is flagged but not blocked.
+9.  Every saved change records user, time, old value, new value, date and
+    remarks.
+10. An edit can be undone, restoring the previous value and recording the
+    reversal separately.
+11. A code not in the catalogue cannot be created from this page.
+12. A competitor not already set up cannot be created from this page.
+13. A non-admin session receives 403 from the save endpoint.
+14. Row counts change by at most one row per save.
+```
+
+Test 14 is the guard. This is a single-row tool; if one save moves more than one row, something is wrong.
+
+---
+
+## Report
+
+- Where the page sits and how a product is found.
+- How the three effective-date cases are worded on screen.
+- What is stored per change.
+- How undo works, and what it records.
+- Confirmation that products and competitors cannot be created here.
+
+One clean commit.
