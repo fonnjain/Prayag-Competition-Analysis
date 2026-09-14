@@ -1,0 +1,274 @@
+# Prompt for COMPETITION app (`prayag-price.com` / `fonnjain/Prayag-Competition-Analysis`)
+
+> **P001** · app: **COMPETITION** · AI MRP Generator page
+> **THIS PROMPT CHANGES CODE.**
+> **Revision 2, 14 Sep** — stage 1 is already built and committed as `8f91621`.
+> This revision changes three rule definitions based on measured data returned
+> by P007. Read section 3 before touching anything else.
+> Quote `P001` when reporting back.
+
+
+A dedicated **MRP Generator** page. Admin only. It suggests new MRPs by bringing together what a product costs against competitors, what it sells, and what margin it makes — under rules the user defines.
+
+**It suggests. It never sets a price.** Output goes to the existing revision flow for human approval. That constraint shapes everything below.
+
+---
+
+## 1. What it is, and what it is not
+
+**It is** a rules engine with a good interface: the user states a pricing policy, the tool applies it to every product in scope, and shows the suggested MRP with the full reasoning behind it.
+
+**It is not** a model that produces prices. A price an LLM computed cannot be audited, cannot be reproduced, and cannot be defended to a distributor. Every suggested figure must be traceable to stated inputs and a stated rule.
+
+**Where AI genuinely helps**, and where it should be used:
+
+- Explaining in plain language why a product was suggested for change
+- Summarising a run — *"38 products would rise, concentrated in CPVC fittings, driven by the Ashirvad margin floor"*
+- Flagging products the rules did not cover but probably should have
+- Suggesting a rule from a described intent — *"keep us 5% under Sparsh on fast movers"* → a draft rule the user edits and confirms
+
+**Never** for computing the number itself.
+
+---
+
+## 2. The four inputs, and what to do when one is missing
+
+| Input | Source |
+|---|---|
+| Current Prayag MRP | this application, resolved by date |
+| Competitor MRP | this application — Sparsh Pearl, Ashirvad |
+| Sales value and quantity | Sales app API — see the accompanying Sales prompt |
+| Gross margin % | Sales app API |
+
+The Sales app already consumes `/api/v1/products` and `/api/v1/comparison` from this application, so the flow becomes two-way: we supply prices and competitor gaps, they supply sales and margin. Worth noting when designing the client — the same API key regime and the same code space should apply in both directions.
+
+**Missing data is not zero.** This is the single most important rule on the page.
+
+```
+No competitor price      →  competitive rules cannot apply; say so per product
+No sales data            →  volume tiering cannot apply; the product is
+                            EXCLUDED, never placed in the lowest tier
+No margin data           →  margin floor CANNOT be checked; the product must
+                            be excluded from any rule that depends on margin
+Held margin period       →  show the hold and its reason; never substitute
+Code absent from sales   →  822 sold codes do not resolve to the catalogue at
+                            all, worth Rs 9.90 Cr. They are not in scope and
+                            must not have a price inferred for them.
+```
+
+A product excluded for missing data appears in the output **as excluded, with the reason** — never silently absent, and never suggested using a company-average substituted for its own figure.
+
+The Sales API returns a `coverage` block naming held and unavailable periods. Surface it on screen. If margin data stops at June 2026 and someone runs a September suggestion, they must see that the margin input is three months old before they act on it.
+
+---
+
+## 3. User-defined logic
+
+The core of the page. Rules are created, ordered, saved and re-run.
+
+**Revision 2 note.** Stage 1 shipped with a single global margin floor and percentile volume tiers. P007 measured the data and both are wrong for this business. The margin floor must be **per master category**, and volume tiers must be by **cumulative contribution or value threshold**, not percentile. Details in the two rule sections below.
+
+Stage 1's competitive rules, change limits, holds, rounding, conflict resolution and revision handoff are correct and should not be reworked.
+
+### Rule types
+
+**Scope** — which products a rule applies to: division, series, category, competitor mapped or not, sales tier, or an explicit code list.
+
+**Competitive positioning**
+```
+Target: be 5% BELOW Sparsh Pearl
+Target: MATCH Ashirvad
+Target: be 10% ABOVE the lowest mapped competitor
+```
+
+**Margin floor — must be per category, not a single number**
+
+A global floor is meaningless here. Measured gross margin for June 2026:
+
+```
+PTMT          median 76.14%    P10 51.98%    P90 83.65%
+C P           median 43.30%    P10 32.04%    P90 53.06%
+SINK          median 45.99%    P10 13.92%    P90 70.20%
+HARDWARE      median 44.54%    P10 23.73%    P90 58.43%
+SANITARYWARE  median 42.77%    P10 31.88%    P90 53.99%
+PLUMBING      median 37.75%    P10 16.79%    P90 73.59%
+```
+
+A 45% floor blocks nothing in PTMT and blocks most of PLUMBING. So:
+
+```
+Gross margin must not fall below:
+    PTMT 65%  ·  C P 38%  ·  PLUMBING 30%  ·  SANITARYWARE 38%
+    SINK 40%  ·  HARDWARE 38%
+```
+
+One floor per master category, each set independently. Offer a single value only as a convenience that fills all six, and show the six after it is applied so nobody believes one number means one thing.
+
+PLUMBING's own spread runs 16.79% to 73.59%, so even a category floor is coarse. Allow a floor to be overridden for a narrower scope — a division, series or code list — and show which floor applied to each product in the trace.
+
+A product with no usable margin figure **cannot** pass this rule and must be excluded, not assumed compliant.
+
+**Change limits**
+```
+No increase above 15%
+No decrease below 5%
+No change at all if the current price is under Rs 50
+```
+
+**Volume tiering — by value threshold, not percentile**
+
+Percentile bands do not describe this business. FY2025-26, by item code:
+
+```
+Top 20% of codes     1,022 codes     90.11% of value
+Next 30%             1,531 codes      8.38%
+Bottom 50%           2,553 codes      1.51%
+
+546 codes produce 80% of value -- 10.7% of sold codes
+```
+
+A 20% band puts a code worth Rs 60 lakh beside one worth Rs 2,000. Use instead:
+
+- **Cumulative contribution (A/B/C).** A = codes making up the first 80% of value, B the next 15%, C the rest. This is the shape the data actually has.
+- **Or an explicit value threshold** — *above Rs 10 lakh FY sales*, *below Rs 50,000*.
+
+Offer both. Do not offer percentile bands.
+
+Tiers are computed from a period the user picks, and the period must be shown with the tier.
+
+**Half the catalogue has no sales at all**, so tiering reaches only about half of it:
+
+```
+FY2025-26    3,555 of 6,106 matched    2,551 with no sales
+FY2026-27    3,163 of 6,106 matched    2,943 with no sales
+```
+
+Concentrated in Pipes & Fittings (1,299) and PTMT (745). A product with **no sales** must be **excluded and listed**, never placed in the lowest tier. No sales and low sales are different facts, and a rule that conflates them will act on 2,551 products for a reason that does not exist.
+
+**Rounding**
+```
+Round to the nearest rupee / 5 / 10 / 50
+Round up only / nearest / down only
+```
+
+### Conflict resolution is the hard part
+
+Two rules will contradict each other — a competitive target that breaches the margin floor, a change limit that prevents reaching the target. The tool must:
+
+1. Apply rules in a **user-set order**, shown explicitly
+2. Record **every rule that fired and every rule that was blocked**
+3. State the binding constraint per product — *"held at ₹340 by the 45% margin floor; the Sparsh target implied ₹318"*
+
+A suggestion without its binding constraint is not actionable. That sentence is the output, more than the number is.
+
+---
+
+## 4. The output
+
+A table, one row per product in scope:
+
+```
+Code   Product        Current  Suggested  Change   Binding constraint
+151    Ball Cock 15mm   336       340      +1.2%   45% margin floor
+                                                    (Sparsh target implied 318)
+```
+
+Per product, on expansion: current MRP and its effective date, each competitor price with its date and age, sales value and quantity for the chosen period, gross margin with its coverage status, every rule evaluated and its outcome.
+
+**Show the competitor price date prominently.** Ashirvad is dated 01 March 2025 — eighteen months old. A suggestion built on it is a suggestion built on stale information, and the user must see that without looking for it.
+
+### A run summary before anything else
+
+```
+1,840 products in scope
+  1,204 no change suggested
+    412 increase        median +4.2%
+    118 decrease        median -2.8%
+    106 excluded        (72 no margin data, 34 no competitor price)
+
+Margin data coverage: Apr 2026 - Jun 2026. PTMT Apr-26 held (H1).
+Sales coverage: 3,163 of 6,106 catalogue codes have FY2026-27 sales.
+Margin floors applied: PTMT 65% · C P 38% · PLUMBING 30% · ...
+Competitor prices: Sparsh 01 Jul 2026 - Ashirvad 01 Mar 2025 (18 months old)
+```
+
+---
+
+## 5. Nothing is applied from this page
+
+A run produces a **saved, named scenario** — reviewable, comparable, exportable. It writes no price.
+
+To act on it, the user selects products and sends them to the **existing price revision flow**, which already has preview, apply, discard, provenance and audit. Do not build a second write path.
+
+The revision batch must record which scenario it came from, so a price can be traced back to the rule that produced it.
+
+**Scenarios must be comparable.** Someone will want to see what three different margin floors would do before choosing. Two scenarios side by side, with the products where they differ.
+
+---
+
+## 6. Access and safety
+
+**Admin only**, server-side at the router. This page reads margin data — the most commercially sensitive figures in either system — and a `counter` or ordinary `user` session must receive 403.
+
+**The Sales API credential is a secret.** Server-side only, never exposed to the browser, never in a client bundle.
+
+**Cache the sales and margin data** rather than calling on every keystroke, but show the fetch timestamp and let the user refresh. A rule engine re-running against silently changing inputs produces irreproducible results.
+
+---
+
+## 7. Acceptance tests
+
+```
+0.  A margin floor can be set independently per master category, and the
+    trace names which floor applied to each product.
+0b. Volume tiers are A/B/C by cumulative contribution or by value threshold.
+    No percentile banding is offered.
+0c. A product with NO sales is excluded and listed, not placed in tier C.
+1.  A non-admin session receives 403 from the page and its endpoints.
+2.  A product with no margin data is EXCLUDED from a margin-floor rule and
+    listed as excluded with the reason — never assumed compliant.
+3.  A product with no competitor price is excluded from competitive rules
+    and listed with the reason.
+4.  A held margin period is shown as held, with its reason, and is not used.
+5.  The binding constraint is stated for every product whose suggestion
+    differs from the competitive target.
+6.  Two rules in conflict resolve by the user's stated order, and both are
+    shown in the trace.
+7.  Running the same scenario twice on the same data gives identical
+    suggestions.
+8.  No price is written by any action on this page.
+9.  Sending a scenario to the revision flow creates a preview, not a write.
+10. The revision batch records the scenario it came from.
+11. Competitor price dates appear with each suggestion, and an
+    eighteen-month-old price is visibly flagged as such.
+12. Sales and margin figures show the database they came from and the
+    timestamp they were read.
+```
+
+Test 7 is what separates a tool from a toy. Test 2 is what stops it producing a confidently wrong answer.
+
+---
+
+## 8. Build order
+
+The Sales API does not exist yet — see the accompanying Sales prompt.
+
+**Do not wait.** Build in this order:
+
+1. The rules engine and interface, using **Prayag and competitor prices only**, which this application already holds. Margin and volume rules present but disabled, stating why.
+2. The Sales API client behind an interface, so it can be developed against a fixture.
+3. Enable margin and volume rules once the API exists.
+
+The code-space question is less risky than it first appeared: the Sales app **already consumes this application's API** — `/api/v1/products` and `/api/v1/comparison` — so it already holds Prayag MRP and competitor prices keyed on our catalogue codes. A working join between the two systems therefore exists on their side. The Sales prompt asks them to show it.
+
+Report what the page can do at stage 1, so it can be used for competitive positioning while the rest is built.
+
+---
+
+## 9. Report
+
+- The rule types implemented and how conflicts resolve.
+- How a product with missing data appears in the output.
+- The scenario format, and how one reaches the revision flow.
+- Confirmation that no path from this page writes a price.
+- What stage 1 delivers without the Sales API.
