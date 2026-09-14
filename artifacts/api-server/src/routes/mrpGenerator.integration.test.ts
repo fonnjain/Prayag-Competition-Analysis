@@ -144,6 +144,20 @@ describe("MRP Generator HTTP contract and safety", () => {
   });
 
   it("creates a scenario, runs it twice deterministically, and exposes stale source metadata", async () => {
+    const metadata = await admin.get("/api/mrp-generator/metadata");
+    expect(metadata.status).toBe(200);
+    expect(metadata.body.disabledRules).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "margin_floor",
+        configurationSummary: expect.stringContaining("PTMT 65%"),
+      }),
+      expect.objectContaining({
+        type: "volume_tier",
+        configurationSummary: expect.stringContaining("cumulative sales-value contribution"),
+      }),
+    ]));
+    expect(JSON.stringify(metadata.body.disabledRules)).not.toContain("percentile");
+
     const disabled = await admin.post("/api/mrp-generator/scenarios").send({
       name: `Generator disabled ${RUN}`,
       rules: [{ type: "margin_floor", percent: 45 }],

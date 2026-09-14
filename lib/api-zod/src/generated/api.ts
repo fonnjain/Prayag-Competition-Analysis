@@ -2288,7 +2288,8 @@ export const GetMrpGeneratorMetadataResponse = zod.object({
 }),
   "disabledRules": zod.array(zod.object({
   "type": zod.enum(['margin_floor', 'volume_tier']),
-  "reason": zod.string()
+  "reason": zod.string(),
+  "configurationSummary": zod.string()
 })),
   "supportedRules": zod.array(zod.string()),
   "staleAfterMonths": zod.number(),

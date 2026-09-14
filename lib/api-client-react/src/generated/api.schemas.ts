@@ -29,6 +29,7 @@ export const MrpGeneratorDisabledRuleType = {
 export interface MrpGeneratorDisabledRule {
   type: MrpGeneratorDisabledRuleType;
   reason: string;
+  configurationSummary: string;
 }
 
 export interface MrpGeneratorMetadata {
@@ -141,29 +142,60 @@ export type MrpGeneratorRoundingRule = MrpGeneratorRuleScope & {
 
 export type MrpGeneratorRule = MrpGeneratorScopeRule | MrpGeneratorPercentBelowRule | MrpGeneratorMatchRule | MrpGeneratorPercentAboveLowestRule | MrpGeneratorMaxIncreaseRule | MrpGeneratorMaxDecreaseRule | MrpGeneratorHoldBelowRule | MrpGeneratorRoundingRule;
 
-export type MrpGeneratorMarginFloorRule = MrpGeneratorRuleScope & {
-  type: 'margin_floor';
+export type MrpGeneratorMarginFloorRuleCategoryFloors = {
   /**
      * @minimum 0
      * @maximum 100
      */
-  percent: number;
+  PTMT: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  'C P': number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  PLUMBING: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  SANITARYWARE: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  SINK: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  HARDWARE: number;
 };
 
-export type MrpGeneratorVolumeTierRule = MrpGeneratorRuleScope & {
-  type: 'volume_tier';
-  tier: string;
-  /**
-     * @minimum 0
-     * @maximum 100
-     */
-  percentile?: number;
-  /**
-     * @minimum 0
-     * @maximum 100
-     */
-  maxIncreasePercent?: number;
+export type MrpGeneratorMarginFloorRule = MrpGeneratorRuleScope & {
+  type: 'margin_floor';
+  categoryFloors: MrpGeneratorMarginFloorRuleCategoryFloors;
 };
+
+export type MrpGeneratorVolumeTierRule = MrpGeneratorRuleScope & ({
+  type: 'volume_tier';
+  /** @minLength 1 */
+  period: string;
+  mode: 'cumulative_contribution';
+  tier: 'A' | 'B' | 'C';
+  cumulativeValuePercent: 80 | 95 | 100;
+}) | MrpGeneratorRuleScope & ({
+  type: 'volume_tier';
+  /** @minLength 1 */
+  period: string;
+  mode: 'value_threshold';
+  operator: 'above' | 'below';
+  /** @minimum 0 */
+  salesValue: number;
+});
 
 export interface MrpGeneratorScenarioInput {
   /** @minLength 1 */

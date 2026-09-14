@@ -2403,10 +2403,11 @@ components:
         reason: { type: string }
     MrpGeneratorDisabledRule:
       type: object
-      required: [type, reason]
+      required: [type, reason, configurationSummary]
       properties:
         type: { type: string, enum: [margin_floor, volume_tier] }
         reason: { type: string }
+        configurationSummary: { type: string }
     MrpGeneratorScopes:
       type: object
       required: [divisions, series, categories, competitors]
@@ -2519,20 +2520,42 @@ components:
       allOf:
         - $ref: "#/components/schemas/MrpGeneratorRuleScope"
         - type: object
-          required: [type, percent]
+          required: [type, categoryFloors]
           properties:
             type: { const: margin_floor }
-            percent: { type: number, minimum: 0, maximum: 100 }
+            categoryFloors:
+              type: object
+              required: [PTMT, C P, PLUMBING, SANITARYWARE, SINK, HARDWARE]
+              properties:
+                PTMT: { type: number, minimum: 0, maximum: 100, default: 65 }
+                C P: { type: number, minimum: 0, maximum: 100, default: 38 }
+                PLUMBING: { type: number, minimum: 0, maximum: 100, default: 30 }
+                SANITARYWARE: { type: number, minimum: 0, maximum: 100, default: 38 }
+                SINK: { type: number, minimum: 0, maximum: 100, default: 40 }
+                HARDWARE: { type: number, minimum: 0, maximum: 100, default: 38 }
+              additionalProperties: false
     MrpGeneratorVolumeTierRule:
-      allOf:
-        - $ref: "#/components/schemas/MrpGeneratorRuleScope"
-        - type: object
-          required: [type, tier]
-          properties:
-            type: { const: volume_tier }
-            tier: { type: string }
-            percentile: { type: number, minimum: 0, maximum: 100 }
-            maxIncreasePercent: { type: number, minimum: 0, maximum: 100 }
+      oneOf:
+        - allOf:
+            - $ref: "#/components/schemas/MrpGeneratorRuleScope"
+            - type: object
+              required: [type, period, mode, tier, cumulativeValuePercent]
+              properties:
+                type: { const: volume_tier }
+                period: { type: string, minLength: 1 }
+                mode: { const: cumulative_contribution }
+                tier: { type: string, enum: [A, B, C] }
+                cumulativeValuePercent: { type: integer, enum: [80, 95, 100] }
+        - allOf:
+            - $ref: "#/components/schemas/MrpGeneratorRuleScope"
+            - type: object
+              required: [type, period, mode, operator, salesValue]
+              properties:
+                type: { const: volume_tier }
+                period: { type: string, minLength: 1 }
+                mode: { const: value_threshold }
+                operator: { type: string, enum: [above, below] }
+                salesValue: { type: number, minimum: 0 }
     MrpGeneratorScenarioInput:
       type: object
       required: [name, rules]

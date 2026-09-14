@@ -125,8 +125,16 @@ router.get("/mrp-generator/metadata", requireAdmin, async (_req, res) => {
     deterministic: true,
     salesApi: { available: false, status: "unavailable", reason: "Sales API does not exist yet." },
     disabledRules: [
-      { type: "margin_floor", reason: "Sales API margin data is unavailable." },
-      { type: "volume_tier", reason: "Sales API sales data is unavailable." },
+      {
+        type: "margin_floor",
+        reason: "Sales API margin data is unavailable.",
+        configurationSummary: "One floor per master category: PTMT 65%, C P 38%, PLUMBING 30%, SANITARYWARE 38%, SINK 40%, HARDWARE 38%; narrower scope overrides will be supported.",
+      },
+      {
+        type: "volume_tier",
+        reason: "Sales API sales data is unavailable.",
+        configurationSummary: "A/B/C by cumulative sales-value contribution (first 80%, next 15%, remainder) or an explicit FY sales-value threshold. Percentile bands are not used.",
+      },
     ],
     supportedRules: [
       "scope", "percent_below", "match", "percent_above_lowest", "max_increase",

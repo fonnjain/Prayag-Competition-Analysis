@@ -94,8 +94,6 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
     if (type === "max_decrease") Object.assign(baseRule, { percent: 10 });
     if (type === "hold_below") Object.assign(baseRule, { threshold: 1000 });
     if (type === "rounding") Object.assign(baseRule, { unit: 10, direction: "nearest" });
-    if (type === "margin_floor") Object.assign(baseRule, { percent: 15 });
-    if (type === "volume_tier") Object.assign(baseRule, { tier: "A", percentile: 5 });
     setRules([...rules, baseRule]);
   };
 
@@ -212,6 +210,12 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                   placeholder="e.g. 10101, 10102"
                 />
               </div>
+              <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p className="font-semibold">Sales tier scope — unavailable in Stage 1</p>
+                <p className="mt-1">
+                  When the Sales API is connected, scope can use A/B/C cumulative contribution or an explicit period sales-value threshold. Products with no sales will remain a separate excluded group.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -239,6 +243,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                 <div key={rule.type} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                   <p className="font-semibold">{rule.type === "margin_floor" ? "Margin floor" : "Volume tier"} — unavailable in Stage 1</p>
                   <p className="mt-1">{rule.reason}</p>
+                  <p className="mt-2 font-medium">{rule.configurationSummary}</p>
                 </div>
               ))}
             </div>
@@ -347,22 +352,14 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                             </>
                           )}
                           {rule.type === "margin_floor" && (
-                            <div>
-                              <Label className="text-xs">Percent Margin</Label>
-                              <Input type="number" step="0.1" value={rule.percent} onChange={(e) => updateRule(idx, { percent: Number(e.target.value) })} className="h-8" disabled />
+                            <div className="col-span-2 rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
+                              Category floors: PTMT 65% · C P 38% · PLUMBING 30% · SANITARYWARE 38% · SINK 40% · HARDWARE 38%. Narrower scope overrides will be supported after the Sales API is connected.
                             </div>
                           )}
                           {rule.type === "volume_tier" && (
-                            <>
-                              <div>
-                                <Label className="text-xs">Tier</Label>
-                                <Input value={rule.tier} onChange={(e) => updateRule(idx, { tier: e.target.value })} className="h-8" disabled />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Percentile</Label>
-                                <Input type="number" step="0.1" value={rule.percentile} onChange={(e) => updateRule(idx, { percentile: Number(e.target.value) })} className="h-8" disabled />
-                              </div>
-                            </>
+                            <div className="col-span-2 rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
+                              Choose a sales period, then classify by cumulative contribution (A: first 80%, B: next 15%, C: remainder) or by an explicit sales-value threshold. Products with no sales will be excluded, not placed in tier C.
+                            </div>
                           )}
                         </div>
                       </div>

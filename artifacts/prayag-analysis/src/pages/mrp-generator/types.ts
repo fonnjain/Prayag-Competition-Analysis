@@ -6,6 +6,16 @@ export type MrpGeneratorScope = {
   explicitCodes?: string[];
 };
 
+export type MrpMasterCategory =
+  | "PTMT"
+  | "C P"
+  | "PLUMBING"
+  | "SANITARYWARE"
+  | "SINK"
+  | "HARDWARE";
+
+export type MrpCategoryFloors = Partial<Record<MrpMasterCategory, number>>;
+
 export type MrpGeneratorRule =
   | { type: "percent_below"; competitor: string; percent: number }
   | { type: "match"; competitor: string }
@@ -14,8 +24,21 @@ export type MrpGeneratorRule =
   | { type: "max_decrease"; percent: number }
   | { type: "hold_below"; threshold: number }
   | { type: "rounding"; unit: 1 | 5 | 10 | 50; direction: "nearest" | "up" | "down" }
-  | { type: "margin_floor"; percent: number }
-  | { type: "volume_tier"; tier: string; percentile: number };
+  | { type: "margin_floor"; categoryFloors: MrpCategoryFloors; scope?: MrpGeneratorScope }
+  | {
+      type: "volume_tier";
+      period: string;
+      mode: "cumulative_contribution";
+      tier: "A" | "B" | "C";
+      cumulativeValuePercent: 80 | 95 | 100;
+    }
+  | {
+      type: "volume_tier";
+      period: string;
+      mode: "value_threshold";
+      operator: "above" | "below";
+      salesValue: number;
+    };
 
 export const ALL_RULE_TYPES = [
   "percent_below",
@@ -46,9 +69,11 @@ export function getRuleDescription(rule: MrpGeneratorRule) {
     case "rounding":
       return `Round ${rule.direction} to nearest ₹${rule.unit}`;
     case "margin_floor":
-      return `Maintain ${rule.percent}% margin`;
+      return `Maintain category-specific margin floors`;
     case "volume_tier":
-      return `Volume tier ${rule.tier} adjust by ${rule.percentile}%`;
+      return rule.mode === "cumulative_contribution"
+        ? `${rule.tier} tier by cumulative contribution for ${rule.period}`
+        : `FY sales ${rule.operator} ₹${rule.salesValue} for ${rule.period}`;
     default:
       return "Unknown rule";
   }
