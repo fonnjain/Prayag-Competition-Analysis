@@ -202,26 +202,87 @@ export default function MrpGeneratorRun() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Run Summary</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
-              <div className="text-2xl font-bold">{summary.total || 0}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Analyzed</div>
+              <div className="text-2xl font-bold">{summary.policyVersion === 3 ? (summary.evaluated ?? summary.total) : summary.total || 0}</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Evaluated</div>
             </div>
             <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
-              <div className="text-2xl font-bold text-emerald-700">{summary.increases || 0}</div>
-              <div className="text-xs text-emerald-600/80 uppercase tracking-wide">Increases</div>
-            </div>
-            <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-700">{summary.decreases || 0}</div>
-              <div className="text-xs text-red-600/80 uppercase tracking-wide">Decreases</div>
+              <div className="text-2xl font-bold text-emerald-700">{summary.policyVersion === 3 ? (summary.wouldChange ?? summary.suggested) : summary.suggested || 0}</div>
+              <div className="text-xs text-emerald-600/80 uppercase tracking-wide">Would Change</div>
             </div>
             <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
               <div className="text-2xl font-bold">{summary.noChange || 0}</div>
               <div className="text-xs text-muted-foreground uppercase tracking-wide">No Change</div>
             </div>
-            <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
-              <div className="text-2xl font-bold">{summary.excluded || 0}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Excluded</div>
+            <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
+              <div className="text-2xl font-bold text-red-700">{summary.excluded || 0}</div>
+              <div className="text-xs text-red-600/80 uppercase tracking-wide">Excluded</div>
             </div>
           </div>
+
+          {/* Simple Policy Summary Rows */}
+          {summary.policyVersion === 3 && (
+            <div className="bg-muted/10 p-4 rounded border mb-6 text-sm">
+              <div className="flex flex-wrap gap-x-8 gap-y-2 mb-3 pb-3 border-b">
+                {summary.noCompetitorUntouched != null && (
+                  <div className="text-muted-foreground"><strong className="text-foreground">{summary.noCompetitorUntouched}</strong> no competitor price -- untouched</div>
+                )}
+                {summary.fallthroughUntouched != null && (
+                  <div className="text-muted-foreground"><strong className="text-foreground">{summary.fallthroughUntouched}</strong> fallthrough -- untouched</div>
+                )}
+                {summary.salesValueRepresented != null && (
+                  <div className="text-muted-foreground"><strong className="text-foreground text-emerald-700">₹{summary.salesValueRepresented.toLocaleString()}</strong> matched FY Sales</div>
+                )}
+              </div>
+
+              {summary.tierDistribution && Object.keys(summary.tierDistribution).length > 0 && (
+                <div className="flex flex-wrap gap-4 text-muted-foreground mb-3 pb-3 border-b">
+                  <span className="font-semibold text-foreground text-xs uppercase">Volume Tiers:</span>
+                  {Object.entries(summary.tierDistribution).map(([tier, count]) => (
+                    <div key={tier} className="flex gap-2 text-xs">
+                      <span className="font-medium text-foreground">Tier {tier}:</span>
+                      <span>{count as number} products</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 text-muted-foreground">
+                <span className="font-semibold text-foreground text-xs uppercase mt-0.5">Matched Rules:</span>
+                {Object.entries(summary.rowCounts || {})
+                  .sort(([a], [b]) => {
+                    const na = parseInt(a.replace(/\D/g, "")) || 0;
+                    const nb = parseInt(b.replace(/\D/g, "")) || 0;
+                    return na - nb;
+                  })
+                  .map(([rowName, counts]) => (
+                    <div key={rowName} className="flex flex-wrap gap-x-4 gap-y-1 text-xs items-center p-1.5 bg-background rounded border">
+                      <span className="font-medium text-sm text-foreground w-16">{rowName}</span>
+                      <span>{counts.scopeMatched} matched scope</span>
+                      <span>&middot;</span>
+                      <span>{counts.withCompetitorPrice} have competitor price</span>
+                      <span>&middot;</span>
+                      <span>{counts.wouldChange} would change</span>
+                      {counts.matchedFySalesValue != null && (
+                        <>
+                          <span>&middot;</span>
+                          <span className="text-emerald-700">₹{counts.matchedFySalesValue.toLocaleString()} FY Sales</span>
+                        </>
+                      )}
+                      {counts.tierDistribution && Object.keys(counts.tierDistribution).length > 0 && (
+                        <>
+                          <span>&middot;</span>
+                          <div className="flex gap-2">
+                            {Object.entries(counts.tierDistribution).map(([tier, tCount]) => (
+                              <span key={tier} className="text-muted-foreground">[{tier}: {tCount}]</span>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="space-y-2 bg-muted/20 p-3 rounded border">
@@ -619,6 +680,28 @@ export default function MrpGeneratorRun() {
                           <ChevronDown className={cn("w-4 h-4 transition-transform", expanded && "rotate-180")} />
                         </button>
                       </div>
+
+                      {summary.policyVersion === 3 && (r.decisionSentence || r.matchedRowLabel || r.salesEvidence) && (
+                        <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px] px-3 pb-3 text-xs text-muted-foreground">
+                          <div className="col-start-2 col-end-7 flex flex-wrap items-center gap-2">
+                            {r.matchedRowLabel && (
+                              <>
+                                <span className="font-medium text-foreground">{r.matchedRowNumber ? `Row ${r.matchedRowNumber}: ` : ""}{r.matchedRowLabel}</span>
+                                <span>&middot;</span>
+                                <span>{r.decisionSentence}</span>
+                                {r.selectedCompetitorPrice != null && <span className="font-medium">&rarr; Rs {r.selectedCompetitorPrice}</span>}
+                              </>
+                            )}
+                            {r.salesEvidence && (
+                              <>
+                                {r.matchedRowLabel && <span className="mx-2 border-l h-3 border-border"></span>}
+                                <span className="font-medium text-emerald-700">Tier {r.salesEvidence.tier || "F"}</span>
+                                <span>(₹{r.salesEvidence.salesAmount?.toLocaleString() || "0"} FY Sales)</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {expanded && (
                         <div className="px-[50px] pb-4 space-y-4">

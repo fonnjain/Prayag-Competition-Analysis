@@ -1,21 +1,55 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Play, Trash2, Edit, Activity, History, Zap, Info, ShieldAlert, Lock } from "lucide-react";
+import { Plus, Play, Trash2, Edit, Activity, History, Zap, Info, ShieldAlert, Lock, Copy, RotateCcw } from "lucide-react";
 import {
   useListMrpGeneratorScenarios,
   useDeleteMrpGeneratorScenario,
   useCreateMrpGeneratorScenario,
   useUpdateMrpGeneratorScenario,
   useRunMrpGeneratorScenario,
+  useDuplicateMrpGeneratorScenario,
+  useResetMrpGeneratorScenario,
   useListMrpGeneratorRuns,
   useGetMrpGeneratorMetadata,
-  useGetMrpGeneratorFreshness
+  useGetMrpGeneratorFreshness,
+  usePreviewMrpGeneratorSimpleScenario
 } from "@workspace/api-client-react";
 import { ScenarioDialog } from "./components/ScenarioDialog";
-import { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorPolicy } from "./types";
+import { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorPolicy, MrpGeneratorSimplePolicy } from "./types";
 import { useToast } from "@/hooks/use-toast";
 import { formatDisplayDate } from "@/lib/date-format";
+
+function ScenarioPreviewSentence({ scenario }: { scenario: any }) {
+  const previewMutation = usePreviewMrpGeneratorSimpleScenario();
+
+  useEffect(() => {
+    if (scenario.policyVersion === 3 && scenario.simplePolicy) {
+      previewMutation.mutate({ data: { simplePolicy: scenario.simplePolicy, scope: scenario.scope } });
+    }
+  }, [scenario.id, scenario.updatedAt]); // Re-run if scenario updates
+
+  if (scenario.policyVersion !== 3 || !scenario.simplePolicy) return null;
+
+  if (previewMutation.isPending) {
+    return <div className="text-sm text-muted-foreground animate-pulse mt-1">Calculating preview...</div>;
+  }
+
+  if (previewMutation.isError) {
+    return <div className="text-sm text-destructive mt-1">Preview failed to load</div>;
+  }
+
+  if (previewMutation.isSuccess && previewMutation.data) {
+    const summary = previewMutation.data.summary as any;
+    return (
+      <div className="text-sm text-muted-foreground mt-1">
+        Would evaluate {summary?.total || 0} products; {summary?.suggested || 0} would change.
+      </div>
+    );
+  }
+
+  return null;
+}
 
 export default function MrpGeneratorList() {
   const { data: scenarios, refetch: refetchScenarios, error: scenariosError } = useListMrpGeneratorScenarios();
@@ -29,6 +63,8 @@ export default function MrpGeneratorList() {
   const createMutation = useCreateMrpGeneratorScenario();
   const updateMutation = useUpdateMrpGeneratorScenario();
   const runMutation = useRunMrpGeneratorScenario();
+  const duplicateMutation = useDuplicateMrpGeneratorScenario();
+  const resetMutation = useResetMrpGeneratorScenario();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<any>(null);
@@ -70,9 +106,9 @@ export default function MrpGeneratorList() {
     });
   };
 
-  const handleSave = (data: { name: string; description: string | null; scope: MrpGeneratorScope; rules?: MrpGeneratorRule[]; policyVersion?: 2; policy?: MrpGeneratorPolicy }) => {
+  const handleSave = (data: { name: string; description: string | null; scope: MrpGeneratorScope; rules?: MrpGeneratorRule[]; policyVersion?: 2 | 3; policy?: MrpGeneratorPolicy; simplePolicy?: MrpGeneratorSimplePolicy; advancedPolicy?: any }) => {
     if (editingScenario?.id) {
-      updateMutation.mutate({ scenarioId: editingScenario.id, data: { ...data, rules: data.rules as any, scope: data.scope as any } }, {
+      updateMutation.mutate({ scenarioId: editingScenario.id, data: { ...data, rules: data.rules as any, scope: data.scope as any } as any }, {
         onSuccess: () => {
           setDialogOpen(false);
           refetchScenarios();
@@ -80,7 +116,7 @@ export default function MrpGeneratorList() {
         onError: (err: any) => toast({ title: "Update Failed", description: getErrorMessage(err), variant: "destructive" })
       });
     } else {
-      createMutation.mutate({ data: { ...data, rules: data.rules as any, scope: data.scope as any } }, {
+      createMutation.mutate({ data: { ...data, rules: data.rules as any, scope: data.scope as any, advancedPolicy: data.advancedPolicy as any } }, {
         onSuccess: () => {
           setDialogOpen(false);
           refetchScenarios();
@@ -88,6 +124,27 @@ export default function MrpGeneratorList() {
         onError: (err: any) => toast({ title: "Create Failed", description: getErrorMessage(err), variant: "destructive" })
       });
     }
+  };
+
+  const handleDuplicate = (id: number) => {
+    duplicateMutation.mutate({ scenarioId: id, data: {} }, {
+      onSuccess: () => {
+        toast({ title: "Scenario duplicated" });
+        refetchScenarios();
+      },
+      onError: (err: any) => toast({ title: "Duplicate Failed", description: getErrorMessage(err), variant: "destructive" })
+    });
+  };
+
+  const handleReset = (id: number) => {
+    if (!confirm("Are you sure you want to reset this scenario to its default state? All custom changes will be lost.")) return;
+    resetMutation.mutate({ scenarioId: id }, {
+      onSuccess: () => {
+        toast({ title: "Scenario reset to default" });
+        refetchScenarios();
+      },
+      onError: (err: any) => toast({ title: "Reset Failed", description: getErrorMessage(err), variant: "destructive" })
+    });
   };
 
   const handleRun = (id: number, name: string) => {
@@ -135,28 +192,38 @@ export default function MrpGeneratorList() {
                 <div className="flex flex-col gap-1 text-muted-foreground">
                   <div>Stage: <strong className="text-foreground">{metadata.stage}</strong></div>
                   <div>Mode: <strong className="text-foreground">{metadata.deterministic ? "Deterministic" : "Stochastic"}</strong></div>
-                  {metadata.salesApi?.status === "missing_credential" && (
-                    <div className="flex items-start gap-1.5 mt-2 text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
-                      <ShieldAlert className="w-4 h-4 shrink-0" />
-                      <span>SALES_API_KEY is not configured and rules are unavailable.</span>
-                    </div>
-                  )}
-                  {metadata.salesApi?.status === "auth_failed" && (
-                    <div className="flex items-start gap-1.5 mt-2 text-destructive bg-destructive/10 p-1.5 rounded border border-destructive/20">
-                      <ShieldAlert className="w-4 h-4 shrink-0" />
-                      <span>Sales API authentication failed and rules are unavailable.</span>
-                    </div>
-                  )}
-                  {metadata.salesApi?.status === "unavailable" && (
-                    <div className="flex items-start gap-1.5 mt-2 text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
-                      <ShieldAlert className="w-4 h-4 shrink-0" />
-                      <span>Sales API is currently unavailable upstream. Rules are unavailable.</span>
-                    </div>
-                  )}
-                  {metadata.salesApi?.status === "authenticated" && (
-                    <div className="flex items-start gap-1.5 mt-2 text-emerald-700 bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                  <div className="flex items-start gap-1.5 mt-2 text-emerald-700 bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                    <Zap className="w-4 h-4 shrink-0" />
+                    <span>Competitive-only pricing engine is available.</span>
+                  </div>
+
+                  {metadata.salesApi?.components?.sales && (
+                    <div className={`flex items-start gap-1.5 mt-2 p-1.5 rounded border ${metadata.salesApi.components.sales.available ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
                       <Zap className="w-4 h-4 shrink-0" />
-                      <span>Sales API authenticated. Advanced rules available.</span>
+                      <div className="flex flex-col">
+                        <span>Sales API (Volume): {metadata.salesApi.components.sales.available ? 'Available' : 'Unavailable'}</span>
+                        {!metadata.salesApi.components.sales.available && metadata.salesApi.components.sales.reason && (
+                          <span className="text-xs mt-0.5">{metadata.salesApi.components.sales.reason}</span>
+                        )}
+                        {!metadata.salesApi.components.sales.available && metadata.salesApi.components.sales.upstreamStatus && (
+                          <span className="text-xs mt-0.5">Upstream Status: {metadata.salesApi.components.sales.upstreamStatus}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {metadata.salesApi?.components?.margin && (
+                    <div className={`flex items-start gap-1.5 mt-2 p-1.5 rounded border ${metadata.salesApi.components.margin.available ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                      <Zap className="w-4 h-4 shrink-0" />
+                      <div className="flex flex-col">
+                        <span>Margin API: {metadata.salesApi.components.margin.available ? 'Available' : 'Unavailable'}</span>
+                        {!metadata.salesApi.components.margin.available && metadata.salesApi.components.margin.reason && (
+                          <span className="text-xs mt-0.5">{metadata.salesApi.components.margin.reason}</span>
+                        )}
+                        {!metadata.salesApi.components.margin.available && metadata.salesApi.components.margin.upstreamStatus && (
+                          <span className="text-xs mt-0.5">Upstream Status: {metadata.salesApi.components.margin.upstreamStatus}</span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -207,13 +274,22 @@ export default function MrpGeneratorList() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-base text-foreground truncate">{s.name}</h3>
                     {s.description && <p className="text-sm text-muted-foreground truncate">{s.description}</p>}
+                    <ScenarioPreviewSentence scenario={s} />
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      {s.policyVersion === 2 ? (
+                      {s.policyVersion === 2 && s.advancedPolicy ? (
                         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                          P011 Policy: {s.policy?.competitor?.mode === 'named' ? s.policy.competitor.named : s.policy?.competitor?.mode} | {s.policy?.portfolio?.mode === 'improve_by_points' ? `+${s.policy.portfolio.points} pts` : s.policy?.portfolio?.mode === 'allow_decline_points' ? `-${s.policy.portfolio.points} pts` : 'Hold margin'}
+                          Promoted Advanced ({s.advancedPolicy.simpleRows?.length || 0} base rules)
+                        </span>
+                      ) : s.policyVersion === 2 ? (
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          Native P011: {s.policy?.competitor?.mode === 'named' ? s.policy.competitor.named : s.policy?.competitor?.mode} | {s.policy?.portfolio?.mode === 'improve_by_points' ? `+${s.policy.portfolio.points} pts` : s.policy?.portfolio?.mode === 'allow_decline_points' ? `-${s.policy.portfolio.points} pts` : 'Hold margin'}
+                        </span>
+                      ) : s.policyVersion === 3 ? (
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          Simple ({s.simplePolicy?.rows?.length || 0} rules){!s.simplePolicy?.marginEnabled ? ' · Margin Off' : ''}{!s.simplePolicy?.volumeEnabled ? ' · Volume Off' : ''}
                         </span>
                       ) : s.rules?.length ? (
-                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{s.rules.length} Rules</span>
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Legacy ({s.rules.length} Rules)</span>
                       ) : null}
                       <span className="text-muted-foreground/80">Updated {formatDisplayDate(s.updatedAt)}</span>
                     </div>
@@ -222,10 +298,18 @@ export default function MrpGeneratorList() {
                     <Button variant="secondary" size="sm" onClick={() => handleRun(s.id, s.name)} disabled={runMutation.isPending}>
                       <Play className="w-4 h-4 mr-2" /> Run
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingScenario(s); setDialogOpen(true); }}>
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingScenario(s); setDialogOpen(true); }} title="Edit">
                       <Edit className="w-4 h-4 text-muted-foreground" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDuplicate(s.id)} title="Duplicate">
+                      <Copy className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    {s.canReset && (
+                      <Button variant="ghost" size="icon" onClick={() => handleReset(s.id)} title="Reset to default">
+                        <RotateCcw className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)} title="Delete">
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>

@@ -104,6 +104,17 @@ export type SalesApiStatus =
   | { available: false; status: "unavailable"; reason: string }
   | { available: true; status: "authenticated"; dataSource: string };
 
+export type SalesComponentStatus = {
+  available: boolean;
+  status: "missing_credential" | "auth_failed" | "unavailable" | "authenticated";
+  reason?: string;
+  dataSource?: string;
+  endpoint?: string;
+  upstreamStatus?: number;
+  lastAttemptAt?: string | null;
+  coverage?: SalesCoverage | null;
+};
+
 export class SalesApiError extends Error {
   readonly kind: "missing_credential" | "auth" | "network" | "schema" | "source_changed";
   readonly statusCode?: number;
@@ -361,6 +372,12 @@ export class SalesApiClient {
   private readonly key: string | undefined;
   private cached: SalesSnapshot | null = null;
   private lastFailure: SalesApiError | null = null;
+  private salesCache: { rows: SalesRow[]; coverage: SalesCoverage; fetchedAt: string } | null = null;
+  private marginCache: { rows: MarginRow[]; coverage: SalesCoverage; fetchedAt: string } | null = null;
+  private salesFailure: SalesApiError | null = null;
+  private marginFailure: SalesApiError | null = null;
+  private salesLastAttemptAt: string | null = null;
+  private marginLastAttemptAt: string | null = null;
 
   constructor(options: { fetch?: FetchLike; apiKey?: string; baseUrl?: string } = {}) {
     this.fetcher = options.fetch ?? ((input, init) => fetch(input, init));
@@ -381,8 +398,89 @@ export class SalesApiClient {
     return { available: false, status: "unavailable", reason: "Sales API snapshot has not been authenticated." };
   }
 
-  clearCache(): void { this.cached = null; this.lastFailure = null; }
+  clearCache(): void {
+    this.cached = null; this.lastFailure = null; this.salesCache = null; this.marginCache = null;
+    this.salesFailure = null; this.marginFailure = null;
+  }
   cachedSnapshot(): SalesSnapshot | null { return this.cached; }
+
+  componentStatus(component: "sales" | "margin"): SalesComponentStatus {
+    const endpoint = component === "sales" ? "/api/external/sales-by-item" : "/api/external/margin-by-item";
+    const lastAttemptAt = component === "sales" ? this.salesLastAttemptAt : this.marginLastAttemptAt;
+    const cache = component === "sales" ? this.salesCache : this.marginCache;
+    const failure = component === "sales" ? this.salesFailure : this.marginFailure;
+    if (!this.key?.trim()) return { available: false, status: "missing_credential", reason: "Sales API credential is not configured.", endpoint, lastAttemptAt };
+    if (failure?.kind === "auth") return { available: false, status: "auth_failed", reason: failure.message, endpoint, upstreamStatus: failure.statusCode, lastAttemptAt };
+    if (failure) return { available: false, status: "unavailable", reason: failure.message, endpoint, upstreamStatus: failure.statusCode, lastAttemptAt };
+    if (cache) return {
+      available: true, status: "authenticated", dataSource: cache.coverage.dataSource ?? this.baseUrl,
+      endpoint, lastAttemptAt, coverage: cache.coverage,
+    };
+    return { available: false, status: "unavailable", reason: "Sales API endpoint has not been authenticated.", endpoint, lastAttemptAt };
+  }
+
+  private snapshotFromParts(
+    period: string,
+    salesRows: SalesRow[],
+    salesCoverage: SalesCoverage,
+    marginRows: MarginRow[],
+    marginCoverage: SalesCoverage,
+    fetchedAt = new Date().toISOString(),
+  ): SalesSnapshot {
+    const dataSource = salesCoverage.dataSource ?? marginCoverage.dataSource ?? this.baseUrl;
+    return {
+      fetchedAt, period, dataSource, salesRows, marginRows,
+      salesByCode: aggregateSales(salesRows),
+      awaitingConfirmationByCode: aggregateSales(salesRows.filter((row) => AWAITING_CONFIRMATION.has(row.code)), true),
+      awaitingByCode: aggregateSales(salesRows.filter((row) => AWAITING_CONFIRMATION.has(row.code)), true),
+      marginByCode: aggregateMargin(marginRows, marginCoverage),
+      coverage: { sales: salesCoverage, margin: marginCoverage },
+      availability: { available: true, status: "authenticated", dataSource },
+    };
+  }
+
+  async getOptionSnapshot(options: { sales?: boolean; margin?: boolean; refresh?: boolean; period?: string } = {}): Promise<SalesSnapshot> {
+    const period = options.period ?? SUPPORTED_SALES_PERIOD;
+    if (period !== SUPPORTED_SALES_PERIOD) throw new SalesApiError("schema", `Sales period ${period} is not supported; only ${SUPPORTED_SALES_PERIOD} is available.`);
+    if (!options.sales && !options.margin) return this.getSnapshot({ refresh: options.refresh, period });
+    if (!this.key?.trim()) throw new SalesApiError("missing_credential", "Sales API credential is not configured.");
+    const emptyCoverage = (): SalesCoverage => ({
+      requested: [], returned: [], held: [], unavailable: [], provisional: [], read_at: null,
+      reconciliation: {}, dataSource: this.baseUrl, last_modified: null,
+    });
+    let salesPart = options.sales ? this.salesCache : null;
+    let marginPart = options.margin ? this.marginCache : null;
+    if (options.sales && (!salesPart || options.refresh)) {
+      this.salesLastAttemptAt = new Date().toISOString();
+      try {
+        const source = await this.traverse("/api/external/sales-by-item?fy=2026-27&from=2026-04&to=2026-08");
+        salesPart = { rows: source.rows.map(parseSalesRow), coverage: source.coverage, fetchedAt: new Date().toISOString() };
+        this.salesCache = salesPart; this.salesFailure = null;
+      } catch (error) {
+        this.salesFailure = error instanceof SalesApiError ? error : new SalesApiError("network", "Sales API network request failed.");
+        throw this.salesFailure;
+      }
+    }
+    if (options.margin && (!marginPart || options.refresh)) {
+      this.marginLastAttemptAt = new Date().toISOString();
+      try {
+        const source = await this.traverse("/api/external/margin-by-item?fy=2026-27&from=2026-04&to=2026-06");
+        marginPart = { rows: source.rows.map(parseMarginRow), coverage: source.coverage, fetchedAt: new Date().toISOString() };
+        this.marginCache = marginPart; this.marginFailure = null;
+      } catch (error) {
+        this.marginFailure = error instanceof SalesApiError ? error : new SalesApiError("network", "Sales API network request failed.");
+        throw this.marginFailure;
+      }
+    }
+    const snapshot = this.snapshotFromParts(
+      period,
+      salesPart?.rows ?? [], salesPart?.coverage ?? emptyCoverage(),
+      marginPart?.rows ?? [], marginPart?.coverage ?? emptyCoverage(),
+      salesPart?.fetchedAt ?? marginPart?.fetchedAt,
+    );
+    if (options.sales && options.margin) this.cached = snapshot;
+    return snapshot;
+  }
 
   async getSnapshot(options: { refresh?: boolean; period?: string } = {}): Promise<SalesSnapshot> {
     const period = options.period ?? SUPPORTED_SALES_PERIOD;
@@ -419,6 +517,10 @@ export class SalesApiClient {
           },
         };
          this.cached = snapshot;
+        this.salesCache = { rows: parsedSalesRows, coverage: sales.coverage, fetchedAt: snapshot.fetchedAt };
+        this.marginCache = { rows: parsedMarginRows, coverage: margin.coverage, fetchedAt: snapshot.fetchedAt };
+        this.salesFailure = null;
+        this.marginFailure = null;
         this.lastFailure = null;
         return snapshot;
       } catch (error) {
@@ -492,4 +594,8 @@ export const getSalesApiStatus = (): SalesApiStatus => activeSalesApiClient.stat
 export const getCachedSalesSnapshot = (): SalesSnapshot | null => activeSalesApiClient.cachedSnapshot();
 export const getSalesSnapshot = (options?: { refresh?: boolean; period?: string }): Promise<SalesSnapshot> =>
   activeSalesApiClient.getSnapshot(options);
+export const getSalesOptionSnapshot = (options?: { sales?: boolean; margin?: boolean; refresh?: boolean; period?: string }): Promise<SalesSnapshot> =>
+  activeSalesApiClient.getOptionSnapshot(options);
+export const getSalesComponentStatus = (component: "sales" | "margin"): SalesComponentStatus =>
+  activeSalesApiClient.componentStatus(component);
 export const clearSalesSnapshot = (): void => activeSalesApiClient.clearCache();

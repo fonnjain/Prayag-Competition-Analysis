@@ -34,3 +34,9 @@ Sales margin data may contain a negative discount fraction when the realized ave
 **Why:** The live FY2026-27 margin feed includes legitimate above-MRP sales, so rejecting all negative discounts prevents the entire snapshot from loading and clamping would distort gross-margin calculations.
 
 **How to apply:** Validate `discount_frac` in the open interval (-1, 1), retain its sign, and use it directly in realized-sale and required-MRP formulas.
+
+P012 Simple scenarios are competitive-only by default. Ordered rows use first-match-wins; once a row's scope matches, missing competitor evidence leaves the product untouched and must not fall through to a later row.
+
+**Why:** The table order is part of the administrator's pricing intent. Falling through after a named competitor is missing would silently apply a broader rule the user did not choose for that product.
+
+**How to apply:** Keep margin floors and volume weighting independently opt-in. Margin may constrain a target; volume adds deterministic A/B/C/F sales-value weighting and evidence but does not silently rewrite the row's competitive target.

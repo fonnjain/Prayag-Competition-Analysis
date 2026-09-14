@@ -39,6 +39,7 @@ export type GeneratorSalesEvidence = {
 
 export type GeneratorMarginEvidence = {
   grossMarginPct: number | null;
+  qty?: number | null;
   saleValue?: number | null;
   bomValue?: number | null;
   unitBomValue?: number | null;
@@ -91,7 +92,7 @@ export type GeneratorResult = {
   /** P011 policy fields. They are optional so immutable legacy runs remain readable. */
   policyVersion?: number;
   band?: P011Band;
-  fySalesAmount?: number;
+  fySalesAmount?: number | null;
   selectedCompetitor?: string | null;
   competitorMode?: P011CompetitorMode | null;
   gap?: number | null;
@@ -102,12 +103,179 @@ export type GeneratorResult = {
   escalation?: boolean;
   escalationReason?: string | null;
   fullTrace?: GeneratorTrace[];
+  /** P012 simple-table evidence. Optional for immutable P011/legacy rows. */
+  matchedRowNumber?: number | null;
+  matchedRowId?: string | null;
+  matchedRowLabel?: string | null;
+  selectedCompetitorPrice?: number | null;
+  rawTarget?: number | null;
+  decisionSentence?: string;
+  volumeTier?: P011Band | null;
 };
 
 export type P011Band = "A" | "B" | "C" | "D" | "E" | "F";
 export type P011Position = "well_below" | "parity" | "above";
 export type P011CompetitorMode = "nearest" | "lowest" | "named";
 export type P011Action = "CAPTURE" | "DEFEND" | "HOLD" | "REVIEW" | "LEAVE_ALONE" | "MARGIN_ONLY" | "EXCLUDED";
+
+export type P012TargetMode = "below" | "match" | "above" | "close_gap";
+export type P012AppliesTo = "division" | "series" | "category" | "explicit_codes" | "all";
+export type P012CompetitorMode = "named" | "nearest" | "lowest";
+export type P012Competitor = { mode: P012CompetitorMode; name?: string | null };
+export type P012Rule = {
+  id: string;
+  order: number;
+  label: string;
+  competitor: P012Competitor;
+  appliesTo: { type: P012AppliesTo; value?: string | string[] | null };
+  target: { mode: P012TargetMode; percent?: number | null };
+  maxIncrease?: number | null;
+  maxDecrease?: number | null;
+  catchAll?: boolean;
+};
+export type P012SimplePolicy = {
+  policyVersion: 3;
+  mode: "simple";
+  holdBelow: number;
+  rounding: { unit: number; direction: "nearest" | "up" | "down" };
+  marginEnabled: boolean;
+  volumeEnabled: boolean;
+  categoryFloors: Record<string, number>;
+  rows: P012Rule[];
+};
+export type P012Scenario = {
+  name: string;
+  description: string;
+  scope: GeneratorScope;
+  policy: P012SimplePolicy;
+};
+
+export const DEFAULT_P012_SCENARIO: P012Scenario = {
+  name: "Match competition, stay below",
+  description: "Starting point. Edit freely -- it explains itself as you change it.",
+  scope: { competitorMapped: true },
+  policy: {
+    policyVersion: 3,
+    mode: "simple",
+    holdBelow: 50,
+    rounding: { unit: 1, direction: "nearest" },
+    marginEnabled: false,
+    volumeEnabled: false,
+    categoryFloors: { PTMT: 65, "C P": 38, PLUMBING: 30, SANITARYWARE: 38, SINK: 40, HARDWARE: 38 },
+    rows: [{
+      id: "default-nearest-below",
+      order: 1,
+      label: "Nearest competitor, 5% below",
+      competitor: { mode: "nearest", name: null },
+      appliesTo: { type: "all" },
+      target: { mode: "below", percent: 5 },
+      maxIncrease: 15,
+      maxDecrease: 5,
+      catchAll: true,
+    }],
+  },
+};
+export const DEFAULT_P012_POLICY = DEFAULT_P012_SCENARIO.policy;
+
+const p012Number = (value: unknown, fallback: number | null = null): number | null => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+function normalizeP012Rule(value: unknown, index: number): P012Rule {
+  const row = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+  const competitorValue = row.competitor;
+  const competitorObject = competitorValue && typeof competitorValue === "object" && !Array.isArray(competitorValue)
+    ? competitorValue as Record<string, unknown> : {};
+  const modeRaw = competitorObject.mode ?? row.competitorMode ?? (typeof competitorValue === "string" ? competitorValue : "nearest");
+  const mode = String(modeRaw).toLowerCase().replace(/[\s-]+/g, "_");
+  const competitorMode: P012CompetitorMode =
+    mode === "named" ? "named" : mode === "lowest" ? "lowest" : "nearest";
+  const appliesValue = row.appliesTo;
+  const appliesObject = appliesValue && typeof appliesValue === "object" && !Array.isArray(appliesValue)
+    ? appliesValue as Record<string, unknown> : {};
+  const appliesRaw = appliesObject.type ?? (typeof appliesValue === "string" ? appliesValue : "all");
+  const appliesType = String(appliesRaw).toLowerCase().replace(/[\s-]+/g, "_");
+  const applies: P012AppliesTo =
+    appliesType === "division" || appliesType === "series" || appliesType === "category" ||
+    appliesType === "explicit_codes" ? appliesType : "all";
+  const targetValue = row.target;
+  const targetObject = targetValue && typeof targetValue === "object" && !Array.isArray(targetValue)
+    ? targetValue as Record<string, unknown> : {};
+  const targetRaw = targetObject.mode ?? (typeof targetValue === "string" ? targetValue : "match");
+  const targetModeRaw = String(targetRaw).toLowerCase().replace(/[\s-]+/g, "_");
+  const targetMode: P012TargetMode =
+    targetModeRaw === "below" || targetModeRaw === "above" || targetModeRaw === "close_gap"
+      ? targetModeRaw : "match";
+  const scopeValue = appliesObject.value ?? appliesObject.name ?? row.value ?? row.scopeValue;
+  return {
+    id: typeof row.id === "string" && row.id.trim() ? row.id.trim() : `p012-row-${index + 1}`,
+    order: Number.isFinite(Number(row.order)) ? Number(row.order) : index + 1,
+    label: typeof row.label === "string" && row.label.trim() ? row.label.trim() : `Row ${index + 1}`,
+    competitor: {
+      mode: competitorMode,
+      name: typeof (competitorObject.name ?? competitorObject.named ?? row.competitorName ?? row.name) === "string"
+        ? String(competitorObject.name ?? competitorObject.named ?? row.competitorName ?? row.name).trim() : null,
+    },
+    appliesTo: { type: applies, value: Array.isArray(scopeValue) ? scopeValue.filter((v): v is string => typeof v === "string") : typeof scopeValue === "string" ? scopeValue : null },
+    target: { mode: targetMode, percent: p012Number(targetObject.percent ?? row.percent ?? row.percentage, targetMode === "match" ? null : 0) },
+    maxIncrease: p012Number(row.maxIncrease ?? row.maxIncreasePercent),
+    maxDecrease: p012Number(row.maxDecrease ?? row.maxDecreasePercent),
+    catchAll: row.catchAll === true || applies === "all",
+  };
+}
+
+export function normalizeP012Policy(value: unknown): P012SimplePolicy {
+  const input = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+  const rows = Array.isArray(input.rows) ? input.rows.map(normalizeP012Rule) : [];
+  const roundingValue = input.rounding;
+  const rounding = roundingValue && typeof roundingValue === "object" && !Array.isArray(roundingValue)
+    ? roundingValue as Record<string, unknown> : {};
+  const direction = rounding.direction === "up" || rounding.direction === "down" ? rounding.direction : "nearest";
+  return {
+    policyVersion: 3,
+    mode: "simple",
+    holdBelow: p012Number(input.holdBelow, 50) ?? 50,
+    rounding: { unit: p012Number(rounding.unit, 1) ?? 1, direction },
+    marginEnabled: input.marginEnabled === true,
+    volumeEnabled: input.volumeEnabled === true,
+    categoryFloors: {
+      PTMT: 65, "C P": 38, PLUMBING: 30, SANITARYWARE: 38, SINK: 40, HARDWARE: 38,
+      ...(input.categoryFloors && typeof input.categoryFloors === "object" && !Array.isArray(input.categoryFloors)
+        ? Object.fromEntries(Object.entries(input.categoryFloors).map(([key, value]) => [key, Number(value)]).filter(([, value]) => Number.isFinite(value)))
+        : {}),
+    },
+    rows: rows.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)),
+  };
+}
+
+export function validateP012Policy(value: unknown): P012SimplePolicy {
+  const policy = normalizeP012Policy(value);
+  if (!policy.rows.length) throw new Error("P012 simplePolicy.rows must be a non-empty ordered array.");
+  if (!Number.isFinite(policy.holdBelow) || policy.holdBelow < 0) throw new Error("P012 holdBelow must be non-negative.");
+  if (!Number.isFinite(policy.rounding.unit) || policy.rounding.unit <= 0) throw new Error("P012 rounding.unit must be positive.");
+  for (const [category, floor] of Object.entries(policy.categoryFloors)) {
+    if (!Number.isFinite(floor) || floor < 0 || floor >= 100) throw new Error(`P012 margin floor for ${category} must be at least 0 and below 100.`);
+  }
+  const ids = new Set<string>();
+  const orders = new Set<number>();
+  for (const [index, row] of policy.rows.entries()) {
+    if (!row.id || ids.has(row.id)) throw new Error(`P012 rows[${index}] id must be unique.`);
+    if (orders.has(row.order)) throw new Error(`P012 rows[${index}] order must be unique.`);
+    ids.add(row.id);
+    orders.add(row.order);
+    if (row.competitor.mode === "named" && !row.competitor.name) throw new Error(`P012 rows[${index}] named competitor requires a name.`);
+    if (row.target.mode !== "match" && (row.target.percent == null || row.target.percent < 0 || row.target.percent > 100)) {
+      throw new Error(`P012 rows[${index}] target percent must be between 0 and 100.`);
+    }
+    for (const [field, raw] of [["maxIncrease", row.maxIncrease], ["maxDecrease", row.maxDecrease] ] as const) {
+      if (raw != null && (!Number.isFinite(raw) || raw < 0 || raw > 100)) throw new Error(`P012 rows[${index}] ${field} must be between 0 and 100.`);
+    }
+  }
+  return policy;
+}
 
 export type P011Policy = {
   policyVersion: 2;
@@ -843,6 +1011,322 @@ export function matchesScope(product: GeneratorProduct, scope: GeneratorScope): 
   ) return false;
   return true;
 }
+
+function p012RowMatches(product: GeneratorProduct, row: P012Rule): boolean {
+  const type = row.appliesTo.type;
+  if (row.catchAll || type === "all") return true;
+  const configured = Array.isArray(row.appliesTo.value) ? row.appliesTo.value : row.appliesTo.value == null ? [] : [row.appliesTo.value];
+  if (!configured.length) return false;
+  const wanted = configured.map(norm);
+  if (type === "explicit_codes") return wanted.includes(canonicalItemCode(product.itemCode).toLowerCase());
+  const actual = type === "division" ? product.division : type === "series" ? product.seriesRange : product.category;
+  return actual != null && wanted.includes(norm(actual));
+}
+
+function p012Competitor(product: GeneratorProduct, row: P012Rule): GeneratorCompetitor | null {
+  const candidates = product.competitors.filter((candidate) =>
+    candidate.matched && candidate.effectivePrice != null && Number.isFinite(candidate.effectivePrice),
+  );
+  if (!candidates.length) return null;
+  if (row.competitor.mode === "named") {
+    const named = norm(row.competitor.name ?? "");
+    return candidates.find((candidate) => norm(candidate.competitor) === named) ?? null;
+  }
+  if (row.competitor.mode === "lowest") {
+    return [...candidates].sort((a, b) =>
+      a.effectivePrice! - b.effectivePrice! || a.competitor.localeCompare(b.competitor),
+    )[0] ?? null;
+  }
+  // Nearest is deterministic: absolute gap, then effective price, then name.
+  const current = product.currentMrp;
+  if (current == null || !Number.isFinite(current)) return null;
+  return [...candidates].sort((a, b) =>
+    Math.abs(a.effectivePrice! - current) - Math.abs(b.effectivePrice! - current) ||
+    a.effectivePrice! - b.effectivePrice! || a.competitor.localeCompare(b.competitor),
+  )[0] ?? null;
+}
+
+function p012Target(current: number, competitor: number, target: P012Rule["target"]): number {
+  const percent = target.percent ?? 0;
+  if (target.mode === "below") return competitor * (1 - percent / 100);
+  if (target.mode === "above") return competitor * (1 + percent / 100);
+  if (target.mode === "close_gap") return current + (competitor - current) * (percent / 100);
+  return competitor;
+}
+
+function p012RoundBounded(
+  candidate: number,
+  current: number,
+  policy: P012SimplePolicy,
+  row: P012Rule,
+  minimumMrp: number | null = null,
+): { value: number; infeasible: boolean; reason: string | null } {
+  let value = candidate;
+  const decimal = (number: number) => Number(number.toFixed(10));
+  const lower = row.maxDecrease == null ? Number.NEGATIVE_INFINITY : decimal(current * (1 - row.maxDecrease / 100));
+  const upper = row.maxIncrease == null ? Number.POSITIVE_INFINITY : decimal(current * (1 + row.maxIncrease / 100));
+  const effectiveLower = Math.max(lower, minimumMrp ?? Number.NEGATIVE_INFINITY);
+  if (effectiveLower > upper + 1e-9) {
+    return { value: current, infeasible: true, reason: "movement cap and margin floor do not overlap" };
+  }
+  value = Math.min(upper, Math.max(effectiveLower, value));
+  value = roundValue(value, policy.rounding.unit, policy.rounding.direction);
+  // Never let nearest rounding violate an explicitly configured movement cap.
+  if (value < effectiveLower) value = roundValue(effectiveLower, policy.rounding.unit, "up");
+  if (value > upper) value = roundValue(upper, policy.rounding.unit, "down");
+  value = decimal(value);
+  if (value < effectiveLower - 1e-9 || value > upper + 1e-9) {
+    return { value: current, infeasible: true, reason: "rounding lattice has no value within configured bounds" };
+  }
+  return { value, infeasible: false, reason: null };
+}
+
+export type P012Result = GeneratorResult & {
+  matchedRowNumber: number | null;
+  matchedRowId: string | null;
+  matchedRowLabel: string | null;
+  selectedCompetitor: string | null;
+  competitorMode: P012CompetitorMode | null;
+  selectedCompetitorPrice: number | null;
+  rawTarget: number | null;
+  decisionSentence: string;
+  volumeTier: P011Band | null;
+  fySalesAmount: number | null;
+};
+
+export type P012Summary = {
+  total: number;
+  evaluated: number;
+  wouldChange: number;
+  noChange: number;
+  noCompetitorUntouched: number;
+  fallthroughUntouched: number;
+  suggested: number;
+  excluded: number;
+  increases: number;
+  decreases: number;
+  rowCounts: Record<string, {
+    scopeMatched: number;
+    withCompetitorPrice: number;
+    wouldChange: number;
+    matchedFySalesValue: number;
+    tierDistribution: Record<string, number>;
+  }>;
+  tierDistribution: Record<string, number>;
+};
+
+function p012CategoryFloor(product: GeneratorProduct, policy: P012SimplePolicy): number | null {
+  const category = canonicalMasterCategory(product.division) ?? canonicalMasterCategory(product.category);
+  if (!category) return null;
+  const configured = Object.entries(policy.categoryFloors).find(([key]) => canonicalMasterCategory(key) === category)?.[1];
+  return configured == null ? null : Number(configured);
+}
+
+function p012MinimumMrp(product: GeneratorProduct, policy: P012SimplePolicy): number | null {
+  const floor = p012CategoryFloor(product, policy);
+  const margin = product.margin;
+  const qty = product.sales?.qty ?? margin?.qty;
+  if (floor == null || !margin || margin.unitBomValue == null || margin.discountFrac == null ||
+    !Number.isFinite(margin.unitBomValue) || !Number.isFinite(margin.discountFrac) ||
+    margin.discountFrac < 0 || margin.discountFrac >= 1 || margin.qtyUnknown === true ||
+    qty == null || !Number.isFinite(qty) || qty <= 0 || floor < 0 || floor >= 100) return null;
+  const minimum = margin.unitBomValue / (1 - floor / 100) / (1 - margin.discountFrac);
+  return Number.isFinite(minimum) ? minimum : null;
+}
+
+function p012Tier(product: GeneratorProduct, tiers?: Map<string, "A" | "B" | "C">): P011Band {
+  const sales = product.sales;
+  if (!sales || sales.awaitingConfirmation === true || sales.fySalesExists === false || !(sales.salesAmount > 0)) return "F";
+  return tiers?.get(canonicalItemCode(product.itemCode)) ?? sales.tier ?? "F";
+}
+
+export function evaluateP012Product(
+  product: GeneratorProduct,
+  policyInput: P012SimplePolicy = DEFAULT_P012_SCENARIO.policy,
+  options: { volumeTiers?: Map<string, "A" | "B" | "C"> } = {},
+): P012Result {
+  const policy = normalizeP012Policy(policyInput);
+  const rows = policy.rows;
+  const matched = rows.find((row) => p012RowMatches(product, row)) ?? null;
+  const rowNumber = matched ? rows.indexOf(matched) + 1 : null;
+  const competitor = matched ? p012Competitor(product, matched) : null;
+  const current = product.currentMrp;
+  const tier = policy.volumeEnabled ? p012Tier(product, options.volumeTiers) : null;
+  const fySalesAmount = product.sales?.salesAmount ?? null;
+  const untouched = (reason: string, optionalExclusions: string[] = [], bindingConstraint: string | null = null): P012Result => ({
+    itemCode: product.itemCode, productName: product.productName, division: product.division,
+    category: product.category, currentMrp: current, currentDate: product.currentDate, currentRowId: product.currentRowId,
+    suggestedMrp: current, status: "no_change", exclusions: optionalExclusions, competitorValues: product.competitors,
+    trace: [], competitiveTarget: null, bindingConstraint, changePercent: 0,
+    salesEvidence: product.sales ?? null, marginEvidence: product.margin ?? null, warnings: [],
+    matchedRowNumber: rowNumber, matchedRowId: matched?.id ?? null, matchedRowLabel: matched?.label ?? null,
+    selectedCompetitor: competitor?.competitor ?? null, competitorMode: matched?.competitor.mode ?? null,
+    selectedCompetitorPrice: competitor?.effectivePrice ?? null, rawTarget: null,
+    decisionSentence: reason, policyVersion: 3, volumeTier: tier, fySalesAmount,
+  });
+  if (current == null || !Number.isFinite(current)) return untouched("No current MRP; untouched.");
+  if (!matched) return untouched("No simple policy row matched; fallthrough untouched.");
+  if (current < policy.holdBelow) return untouched(`Current MRP ₹${current} is below the ₹${policy.holdBelow} hold threshold; untouched.`);
+  if (policy.marginEnabled && (!product.margin || product.margin.grossMarginPct == null)) {
+    return untouched(`Row ${rowNumber}: margin option requires usable margin evidence; untouched.`, ["Margin option: usable margin evidence is unavailable."]);
+  }
+  if (!competitor) return untouched(`Row ${rowNumber}: ${matched.label}; no ${matched.competitor.mode === "named" ? `price for ${matched.competitor.name ?? "named competitor"}` : "competitor price"}; untouched.`);
+  const rawTarget = p012Target(current, competitor.effectivePrice!, matched.target);
+  const minimumMrp = policy.marginEnabled ? p012MinimumMrp(product, policy) : null;
+  if (policy.marginEnabled && minimumMrp == null) {
+    return untouched(`Row ${rowNumber}: margin option requires usable quantity, unit BOM, discount, and category-floor evidence; untouched.`, ["Margin option: usable margin evidence is unavailable."]);
+  }
+  const rowLower = matched.maxDecrease == null ? Number.NEGATIVE_INFINITY : current * (1 - matched.maxDecrease / 100);
+  const rowUpper = matched.maxIncrease == null ? Number.POSITIVE_INFINITY : current * (1 + matched.maxIncrease / 100);
+  if (minimumMrp != null && minimumMrp > rowUpper + 1e-9) {
+    const reason = `Row ${rowNumber}: margin floor minimum ₹${minimumMrp.toFixed(2)} conflicts with maximum increase cap ₹${rowUpper.toFixed(2)}; review required.`;
+    return untouched(reason, [reason], "margin floor conflicts with row movement cap");
+  }
+  const rounded = p012RoundBounded(rawTarget, current, policy, matched, minimumMrp);
+  if (rounded.infeasible) {
+    const reason = `Row ${rowNumber}: no nearest-rupee value satisfies the row movement and margin-floor bounds; review required.`;
+    return untouched(reason, [reason], rounded.reason);
+  }
+  const suggested = rounded.value;
+  const changePercent = current === 0 ? 0 : (suggested - current) / current * 100;
+  const status = suggested === current ? "no_change" : "suggested";
+  const direction = suggested > current ? "increase" : suggested < current ? "decrease" : "no change";
+  return {
+    itemCode: product.itemCode, productName: product.productName, division: product.division,
+    category: product.category, currentMrp: current, currentDate: product.currentDate, currentRowId: product.currentRowId,
+    suggestedMrp: suggested, status, exclusions: [], competitorValues: product.competitors,
+    trace: [{ order: rowNumber!, ruleType: "p012_simple", outcome: "fired", before: current, after: suggested, reason: matched.label, target: rawTarget }],
+    competitiveTarget: rawTarget, bindingConstraint: suggested !== rawTarget ? "simple row movement limit or rounding" : null,
+    changePercent, salesEvidence: product.sales ?? null, marginEvidence: product.margin ?? null, warnings: [],
+    matchedRowNumber: rowNumber, matchedRowId: matched.id, matchedRowLabel: matched.label,
+    selectedCompetitor: competitor.competitor, competitorMode: matched.competitor.mode,
+    selectedCompetitorPrice: competitor.effectivePrice, rawTarget,
+    decisionSentence: `Row ${rowNumber}: ${matched.label} -> ${competitor.competitor} ₹${competitor.effectivePrice}; raw target ₹${rawTarget.toFixed(2)}, ${direction} to ₹${suggested}.`,
+    policyVersion: 3,
+    volumeTier: tier, fySalesAmount,
+  };
+}
+
+export function evaluateP012Scenario(
+  products: GeneratorProduct[],
+  policyInput: P012SimplePolicy = DEFAULT_P012_SCENARIO.policy,
+  scope?: GeneratorScope,
+): { results: P012Result[]; summary: P012Summary; reach: P012Summary["rowCounts"]; warnings: string[] } {
+  const policy = normalizeP012Policy(policyInput);
+  const inScope = scope ? products.filter((product) => matchesScope(product, scope)) : products;
+  const rowCounts: P012Summary["rowCounts"] = Object.fromEntries(policy.rows.map((row) => [
+    row.id, {
+      scopeMatched: 0, withCompetitorPrice: 0, wouldChange: 0, matchedFySalesValue: 0,
+      tierDistribution: { A: 0, B: 0, C: 0, F: 0 },
+    },
+  ]));
+  const volumeTiers = policy.volumeEnabled ? computeVolumeTiers(inScope) : undefined;
+  const tierDistribution: Record<"A" | "B" | "C" | "F", number> = { A: 0, B: 0, C: 0, F: 0 };
+  let fallthroughUntouched = 0;
+  const results = inScope
+    .sort((a, b) => canonicalItemCode(a.itemCode).localeCompare(canonicalItemCode(b.itemCode)))
+    .map((product) => {
+      const result = evaluateP012Product(product, policy, { volumeTiers });
+      if (policy.volumeEnabled && result.volumeTier && result.volumeTier in tierDistribution) {
+        tierDistribution[result.volumeTier as "A" | "B" | "C" | "F"]++;
+      }
+      if (result.matchedRowId) {
+        const count = rowCounts[result.matchedRowId]!;
+        count.scopeMatched++;
+        if (result.selectedCompetitorPrice != null) count.withCompetitorPrice++;
+        if (result.status === "suggested") count.wouldChange++;
+        if (result.fySalesAmount != null && Number.isFinite(result.fySalesAmount)) count.matchedFySalesValue += result.fySalesAmount;
+        if (result.volumeTier) count.tierDistribution[result.volumeTier]++;
+      } else fallthroughUntouched++;
+      return result;
+    });
+  const noCompetitorUntouched = results.filter((result) => result.matchedRowId != null && result.selectedCompetitorPrice == null).length;
+  const wouldChange = results.filter((result) => result.status === "suggested").length;
+  const noChange = results.filter((result) => result.status === "no_change").length;
+  const warnings = policy.rows.some((row) => row.catchAll || row.appliesTo.type === "all")
+    ? [] : [`No catch-all row; ${fallthroughUntouched} product(s) fall through untouched.`];
+  const summary: P012Summary = {
+    total: results.length, evaluated: results.length, wouldChange, noChange,
+    noCompetitorUntouched, fallthroughUntouched, suggested: wouldChange, excluded: 0,
+    increases: results.filter((r) => (r.changePercent ?? 0) > 0).length,
+    decreases: results.filter((r) => (r.changePercent ?? 0) < 0).length,
+    rowCounts, tierDistribution,
+  };
+  return { results, summary, reach: rowCounts, warnings };
+}
+
+export const evaluateP012 = evaluateP012Scenario;
+
+/** An explicit Advanced envelope keeps every simple row visible instead of
+ * silently translating it into a lossy P011 policy. */
+export type P012AdvancedRepresentation = {
+  policyVersion: 2;
+  mode: "advanced";
+  source: "p012-simple";
+  simpleRows: P012Rule[];
+  rules: GeneratorRule[];
+  holdBelow: number;
+  rounding: P012SimplePolicy["rounding"];
+  marginEnabled: boolean;
+  volumeEnabled: boolean;
+  categoryFloors: Record<string, number>;
+};
+
+export function promoteP012ToAdvanced(policyInput: P012SimplePolicy): P012AdvancedRepresentation {
+  const policy = normalizeP012Policy(policyInput);
+  return {
+    policyVersion: 2,
+    mode: "advanced",
+    source: "p012-simple",
+    simpleRows: policy.rows,
+    holdBelow: policy.holdBelow,
+    rounding: policy.rounding,
+    marginEnabled: policy.marginEnabled,
+    volumeEnabled: policy.volumeEnabled,
+    categoryFloors: policy.categoryFloors,
+    rules: policy.rows.map((row) => ({
+      type: "p012_simple_row",
+      id: row.id,
+      order: row.order,
+      label: row.label,
+      competitor: row.competitor.mode,
+      competitorName: row.competitor.name ?? null,
+      appliesTo: row.appliesTo,
+      target: row.target,
+      maxIncrease: row.maxIncrease ?? null,
+      maxDecrease: row.maxDecrease ?? null,
+      catchAll: row.catchAll === true,
+    })),
+  };
+}
+
+export function convertAdvancedToP012(value: unknown): { policy: P012SimplePolicy } | { reasons: string[] } {
+  const input = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+  if (input.source !== "p012-simple" || !Array.isArray(input.simpleRows)) {
+    return { reasons: ["Advanced policy contains rules that cannot be represented by an ordered simple table."] };
+  }
+  const unsupported = Array.isArray(input.rules)
+    ? input.rules.filter((rule) => !rule || typeof rule !== "object" || (rule as Record<string, unknown>).type !== "p012_simple_row")
+    : [];
+  if (unsupported.length) return { reasons: ["Advanced policy contains non-simple rules."] };
+  const policy = normalizeP012Policy({
+    holdBelow: input.holdBelow,
+    rounding: input.rounding,
+    marginEnabled: input.marginEnabled,
+    volumeEnabled: input.volumeEnabled,
+    categoryFloors: input.categoryFloors,
+    rows: input.simpleRows,
+  });
+  const expected = promoteP012ToAdvanced(policy);
+  if (JSON.stringify(expected.simpleRows) !== JSON.stringify(input.simpleRows) ||
+    JSON.stringify(expected.rules) !== JSON.stringify(input.rules)) {
+    return { reasons: ["Advanced policy simple representation has been edited and is no longer lossless."] };
+  }
+  return { policy };
+}
+export const simpleToAdvanced = promoteP012ToAdvanced;
+export const advancedToSimple = convertAdvancedToP012;
 
 function numberRule(rule: GeneratorRule, ...keys: string[]): number | null {
   for (const key of keys) {

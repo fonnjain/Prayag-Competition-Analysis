@@ -37,6 +37,36 @@ describe("SalesApiClient", () => {
     expect(JSON.stringify(snapshot)).not.toContain("do-not-log");
   });
 
+  it("retrieves volume independently when margin is down and reports component detail", async () => {
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async (url) => url.includes("sales-by-item")
+        ? response({ coverage, rows: [salesRow] })
+        : response({ error: "margin unavailable" }, 503),
+    });
+    const snapshot = await client.getOptionSnapshot({ sales: true });
+    expect(snapshot.salesByCode["151"]?.salesAmount).toBe(100);
+    expect(snapshot.marginByCode).toEqual({});
+    expect(client.componentStatus("sales")).toMatchObject({ available: true, status: "authenticated" });
+    await expect(client.getOptionSnapshot({ margin: true })).rejects.toMatchObject({ kind: "network", statusCode: 503 });
+    expect(client.componentStatus("margin")).toMatchObject({ available: false, status: "unavailable", upstreamStatus: 503 });
+  });
+
+  it("retrieves margin independently when sales is down and reports component detail", async () => {
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async (url) => url.includes("sales-by-item")
+        ? response({ error: "sales unavailable" }, 503)
+        : response({ coverage, rows: [marginRow] }),
+    });
+    const snapshot = await client.getOptionSnapshot({ margin: true });
+    expect(snapshot.marginByCode["151"]?.unitBomValue).toBeCloseTo(27.5);
+    expect(snapshot.salesByCode).toEqual({});
+    expect(client.componentStatus("margin")).toMatchObject({ available: true, status: "authenticated" });
+    await expect(client.getOptionSnapshot({ sales: true })).rejects.toMatchObject({ kind: "network", statusCode: 503 });
+    expect(client.componentStatus("sales")).toMatchObject({ available: false, status: "unavailable", upstreamStatus: 503 });
+  });
+
   it("preserves a negative discount when realized sale is above MRP", async () => {
     const client = new SalesApiClient({
       apiKey: "secret",

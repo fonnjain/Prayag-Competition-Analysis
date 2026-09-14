@@ -8,8 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, ArrowUp, ArrowDown, Info } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MrpGeneratorScope, MrpGeneratorRule, ALL_RULE_TYPES, MrpGeneratorPolicy } from "../types";
-import { useGetMrpGeneratorScopes, useGetMrpGeneratorMetadata } from "@workspace/api-client-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MrpGeneratorScope, MrpGeneratorRule, ALL_RULE_TYPES, MrpGeneratorPolicy, MrpGeneratorSimplePolicy, MrpGeneratorSimpleRule, MrpGeneratorSimpleCompetitorMode, MrpGeneratorSimpleRuleAppliesToType, MrpGeneratorSimpleRuleTargetMode, MrpGeneratorSimplePolicyRoundingDirection, MrpGeneratorAdvancedPolicy } from "../types";
+import { useGetMrpGeneratorScopes, useGetMrpGeneratorMetadata, usePromoteMrpGeneratorSimpleScenario, useDemoteMrpGeneratorAdvancedScenario } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
+import { usePreviewMrpGeneratorSimpleScenario } from "@workspace/api-client-react";
 
 const DEFAULT_POLICY: MrpGeneratorPolicy = {
   policyVersion: 2,
@@ -28,6 +31,16 @@ const DEFAULT_POLICY: MrpGeneratorPolicy = {
   portfolio: { mode: "hold_current", points: 0 }
 };
 
+const DEFAULT_SIMPLE_POLICY: MrpGeneratorSimplePolicy = {
+  policyVersion: 3,
+  mode: 'simple',
+  holdBelow: 50,
+  rounding: { unit: 1, direction: 'nearest' },
+  marginEnabled: false,
+  volumeEnabled: false,
+  rows: []
+};
+
 interface ScenarioDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,8 +52,10 @@ interface ScenarioDialogProps {
     rules: MrpGeneratorRule[];
     policyVersion?: number | null;
     policy?: MrpGeneratorPolicy | null;
+    simplePolicy?: MrpGeneratorSimplePolicy;
+    advancedPolicy?: MrpGeneratorAdvancedPolicy;
   };
-  onSave: (data: { name: string; description: string | null; scope: MrpGeneratorScope; rules?: MrpGeneratorRule[]; policyVersion?: 2; policy?: MrpGeneratorPolicy }) => void;
+  onSave: (data: { name: string; description: string | null; scope: MrpGeneratorScope; rules?: MrpGeneratorRule[]; policyVersion?: 2 | 3; policy?: MrpGeneratorPolicy; simplePolicy?: MrpGeneratorSimplePolicy; advancedPolicy?: MrpGeneratorAdvancedPolicy }) => void;
   isSaving: boolean;
   error?: string | null;
 }
@@ -50,9 +65,49 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState<MrpGeneratorScope>({});
   const [rules, setRules] = useState<MrpGeneratorRule[]>([]);
-  const [policyVersion, setPolicyVersion] = useState<2 | undefined>(undefined);
+  const [policyVersion, setPolicyVersion] = useState<2 | 3>(3);
   const [policy, setPolicy] = useState<MrpGeneratorPolicy>(DEFAULT_POLICY);
+  const [simplePolicy, setSimplePolicy] = useState<MrpGeneratorSimplePolicy>(DEFAULT_SIMPLE_POLICY);
+  const [advancedPolicy, setAdvancedPolicy] = useState<MrpGeneratorAdvancedPolicy | null>(null);
+  const [isNativeP011, setIsNativeP011] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const promoteMutation = usePromoteMrpGeneratorSimpleScenario();
+  const demoteMutation = useDemoteMrpGeneratorAdvancedScenario();
+  const previewMutation = usePreviewMrpGeneratorSimpleScenario();
+  const { toast } = useToast();
+
+  const [previewData, setPreviewData] = useState<any>(null);
+  const previewSequenceRef = React.useRef(0);
+
+  useEffect(() => {
+    if (!open || policyVersion !== 3) return;
+
+    // Immediately increment sequence and clear preview on any change
+    const seq = ++previewSequenceRef.current;
+    setPreviewData(null);
+
+    const timeout = setTimeout(() => {
+      const isValid = simplePolicy.rows.every(r => {
+        if (r.competitor.mode === "named" && !r.competitor.name?.trim()) return false;
+        if (r.appliesTo.type === "explicit_codes" && (!r.appliesTo.value || !r.appliesTo.value.length)) return false;
+        if (r.target.mode !== "match" && (r.target.percent === null || r.target.percent === undefined || r.target.percent < 0)) return false;
+        return true;
+      });
+
+      if (!isValid) return; // keeps preview cleared if invalid
+
+      previewMutation.mutate({ data: { simplePolicy, scope } }, {
+        onSuccess: (data) => {
+          if (seq === previewSequenceRef.current) setPreviewData(data);
+        },
+        onError: () => {
+          if (seq === previewSequenceRef.current) setPreviewData(null);
+        }
+      });
+    }, 750);
+    return () => clearTimeout(timeout);
+  }, [simplePolicy, scope, policyVersion, open]);
 
   const { data: scopesData } = useGetMrpGeneratorScopes();
   const { data: metadata } = useGetMrpGeneratorMetadata();
@@ -66,50 +121,135 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
       setDescription(initialData?.description || "");
       setScope(initialData?.scope || {});
       setRules(initialData?.rules || []);
-      setPolicyVersion(initialData?.policyVersion === 2 ? 2 : (metadata?.salesApi?.status === "authenticated" && !initialData?.id ? 2 : undefined));
+
+      const v = initialData?.policyVersion;
+      setPolicyVersion(v === 2 ? 2 : 3);
+
+      const hasAdvanced = !!initialData?.advancedPolicy;
+      setAdvancedPolicy(initialData?.advancedPolicy || null);
+
+      // Native P011 is when it's version 2 but no advancedPolicy (promoted) is present
+      setIsNativeP011(v === 2 && !hasAdvanced);
+
       if (initialData?.policy) {
         setPolicy(initialData.policy);
       } else {
         setPolicy(DEFAULT_POLICY);
       }
+
+      if (initialData?.simplePolicy) {
+        setSimplePolicy(initialData.simplePolicy);
+      } else {
+        setSimplePolicy(DEFAULT_SIMPLE_POLICY);
+      }
+
       setFormError(null);
     }
   }, [open, initialData, metadata?.salesApi?.status]);
+
+  const handleTabChange = async (val: string) => {
+    const targetVersion = val === "simple" ? 3 : 2;
+    if (targetVersion === policyVersion) return;
+
+    // If we are native P011, we shouldn't really be demoting to Simple or maybe we should?
+    // "If user chooses a native P011 scenario, retain existing full P011 editor. Advanced->Simple sends current advancedPolicy to demotion endpoint without mutating"
+
+    if (targetVersion === 2) {
+      // Promote Simple -> Advanced
+      // "Promotion must send CURRENT unsaved simplePolicy + current name/description/scope to non-mutating promotion endpoint."
+      promoteMutation.mutate({
+        scenarioId: initialData?.id || 0,
+        data: { simplePolicy }
+      }, {
+        onSuccess: (res) => {
+          setAdvancedPolicy(res.advanced);
+          setIsNativeP011(false);
+          setPolicyVersion(2);
+          toast({ title: "Scenario Promoted to Advanced", description: "Your rules have been converted to policy bounds." });
+        },
+        onError: (err: any) => {
+          const msg = err?.data?.error || err?.message || "Failed to promote scenario";
+          toast({ title: "Promotion Failed", description: msg, variant: "destructive" });
+        }
+      });
+    } else {
+      // Demote Advanced -> Simple
+      // "Advanced->Simple sends current advancedPolicy to demotion endpoint without mutating"
+      demoteMutation.mutate({
+        scenarioId: initialData?.id || 0,
+        data: advancedPolicy ? { advancedPolicy } : undefined
+      }, {
+        onSuccess: (res) => {
+          if (res?.simplePolicy) {
+            setSimplePolicy(res.simplePolicy);
+          }
+          setPolicyVersion(3);
+          toast({ title: "Scenario Demoted to Simple", description: "Policy bounds converted to rules." });
+        },
+        onError: (err: any) => {
+          const msg = err?.data?.error || err?.message || "Failed to demote scenario";
+          toast({ title: "Cannot convert to Simple", description: msg, variant: "destructive" });
+        }
+      });
+    }
+  };
 
   const validationError = (() => {
     if (!name.trim()) return "Enter a scenario name.";
 
     if (policyVersion === 2) {
-      if (policy.competitor?.mode === "named" && !policy.competitor.named) {
-        return "You must select a named competitor.";
+      if (!isNativeP011 && !advancedPolicy) {
+        return "Advanced policy is not loaded.";
       }
-      if (
-        (policy.position?.wellBelowAbove ?? 0) < (policy.position?.parityAbove ?? 0) ||
-        (policy.position?.wellBelowAbove ?? 0) < Math.abs(policy.position?.parityBelow ?? 0)
-      ) {
-        return "Position thresholds are invalid: well below/above must be greater than or equal to parity buffers.";
+      if (isNativeP011) {
+        if (policy.competitor?.mode === "named" && !policy.competitor.named) {
+          return "You must select a named competitor.";
+        }
+        if (
+          (policy.position?.wellBelowAbove ?? 0) < (policy.position?.parityAbove ?? 0) ||
+          (policy.position?.wellBelowAbove ?? 0) < Math.abs(policy.position?.parityBelow ?? 0)
+        ) {
+          return "Position thresholds are invalid: well below/above must be greater than or equal to parity buffers.";
+        }
+        const b = policy.bands || { A: 0, B: 0, C: 0, D: 0 };
+        const [bA, bB, bC, bD] = [b.A ?? 0, b.B ?? 0, b.C ?? 0, b.D ?? 0];
+        if (bA >= bB || bB >= bC || bC >= bD) {
+          return "Band boundaries must be strictly ascending.";
+        }
+        if (
+          Object.values(policy.captureShares || {}).some(v => v < 0 || v > 1) ||
+          (policy.defendTargetUndercut !== undefined && (policy.defendTargetUndercut < 0 || policy.defendTargetUndercut > 1))
+        ) {
+          return "Fractions like capture shares and defend undercut must be between 0 and 1.";
+        }
+        const requiredCats = ['PTMT', 'C P', 'PLUMBING', 'SANITARYWARE', 'SINK', 'HARDWARE'];
+        const floors = policy.categoryFloors as Record<string, number> | undefined;
+        if (!floors || requiredCats.some(c => floors[c] === undefined || floors[c] < 0 || floors[c] >= 100)) {
+          return "All category floors must be provided and stay below 100%.";
+        }
+        if (requiredCats.some(c => floors[c] + (policy.marginTargetUpliftPoints ?? 0) >= 100)) {
+          return "Each category floor plus the margin-only uplift must stay below 100%.";
+        }
+        if ((policy.marginTargetUpliftPoints ?? 0) < 0 || (policy.maxIncreasePercent ?? 0) < 0 || (policy.maxDecreasePercent ?? 0) < 0) {
+          return "Points and limit thresholds cannot be negative.";
+        }
       }
-      const b = policy.bands || { A: 0, B: 0, C: 0, D: 0 };
-      const [bA, bB, bC, bD] = [b.A ?? 0, b.B ?? 0, b.C ?? 0, b.D ?? 0];
-      if (bA >= bB || bB >= bC || bC >= bD) {
-        return "Band boundaries must be strictly ascending.";
+    } else if (policyVersion === 3) {
+      if (simplePolicy.holdBelow < 0) return "Hold threshold must be zero or greater.";
+      if (!simplePolicy.rows.length) return "Add at least one rule.";
+      if (!simplePolicy.rows.some(r => r.catchAll)) {
+        // Warning, not error
       }
-      if (
-        Object.values(policy.captureShares || {}).some(v => v < 0 || v > 1) ||
-        (policy.defendTargetUndercut !== undefined && (policy.defendTargetUndercut < 0 || policy.defendTargetUndercut > 1))
-      ) {
-        return "Fractions like capture shares and defend undercut must be between 0 and 1.";
-      }
-      const requiredCats = ['PTMT', 'C P', 'PLUMBING', 'SANITARYWARE', 'SINK', 'HARDWARE'];
-      const floors = policy.categoryFloors as Record<string, number> | undefined;
-      if (!floors || requiredCats.some(c => floors[c] === undefined || floors[c] < 0 || floors[c] >= 100)) {
-        return "All category floors must be provided and stay below 100%.";
-      }
-      if (requiredCats.some(c => floors[c] + (policy.marginTargetUpliftPoints ?? 0) >= 100)) {
-        return "Each category floor plus the margin-only uplift must stay below 100%.";
-      }
-      if ((policy.marginTargetUpliftPoints ?? 0) < 0 || (policy.maxIncreasePercent ?? 0) < 0 || (policy.maxDecreasePercent ?? 0) < 0) {
-        return "Points and limit thresholds cannot be negative.";
+      for (const row of simplePolicy.rows) {
+        if (row.competitor.mode === "named" && !row.competitor.name?.trim()) {
+          return `Row ${row.order}: Choose a named competitor.`;
+        }
+        if (row.appliesTo.type === "explicit_codes" && (!row.appliesTo.value || !row.appliesTo.value.length)) {
+          return `Row ${row.order}: Enter at least one item code.`;
+        }
+        if (row.target.mode !== "match" && (row.target.percent === null || row.target.percent === undefined || row.target.percent < 0)) {
+          return `Row ${row.order}: Target percentage must be 0 or greater.`;
+        }
       }
     } else {
       const activeRules = rules.filter((rule) => !disabledRules.has(rule.type));
@@ -142,12 +282,30 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
     const finalScope = { ...scope, explicitCodes: explicitCodes.length ? explicitCodes : undefined };
 
     if (policyVersion === 2) {
+      if (!isNativeP011 && advancedPolicy) {
+        onSave({
+          name: name.trim(),
+          description: description.trim() || null,
+          scope: finalScope,
+          policyVersion: 2,
+          advancedPolicy
+        });
+      } else {
+        onSave({
+          name: name.trim(),
+          description: description.trim() || null,
+          scope: finalScope,
+          policyVersion: 2,
+          policy: policy || DEFAULT_POLICY
+        });
+      }
+    } else if (policyVersion === 3) {
       onSave({
         name: name.trim(),
         description: description.trim() || null,
         scope: finalScope,
-        policyVersion: 2,
-        policy: policy || DEFAULT_POLICY
+        policyVersion: 3,
+        simplePolicy: simplePolicy
       });
     } else {
       onSave({
@@ -192,11 +350,26 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
     setRules(rules.filter((_, i) => i !== index));
   };
 
+  const marginComponent = metadata?.salesApi?.components?.margin;
+  const volumeComponent = metadata?.salesApi?.components?.sales;
+  const noMargin = marginComponent ? !marginComponent.available : (metadata?.salesApi?.status !== "authenticated");
+  const noVolume = volumeComponent ? !volumeComponent.available : (metadata?.salesApi?.status !== "authenticated");
+  const marginReason = marginComponent?.reason || metadata?.salesApi?.reason || "Sales API unavailable.";
+  const volumeReason = volumeComponent?.reason || metadata?.salesApi?.reason || "Sales API unavailable.";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData?.id ? "Edit Scenario" : "New Scenario"}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{initialData?.id ? "Edit Scenario" : "New Scenario"}</DialogTitle>
+            <Tabs value={policyVersion === 3 ? "simple" : "advanced"} onValueChange={handleTabChange} className="w-[300px]">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="simple">Simple</TabsTrigger>
+                <TabsTrigger value="advanced">Advanced</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <div className="space-y-4">
@@ -308,56 +481,28 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
             </div>
           </div>
 
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Configuration Mode</h3>
-            <RadioGroup
-              value={policyVersion === 2 ? "p011" : "legacy"}
-              onValueChange={v => setPolicyVersion(v === "p011" ? 2 : undefined)}
-              className="flex flex-col sm:flex-row sm:gap-6 gap-3"
-            >
-              <div className="flex items-start space-x-2 border rounded p-3 flex-1 bg-muted/5">
-                <RadioGroupItem value="p011" id="mode-p011" className="mt-0.5" />
-                <div className="grid gap-1.5">
-                  <Label htmlFor="mode-p011" className="cursor-pointer font-medium">P011 Policy (v2)</Label>
-                  <p className="text-xs text-muted-foreground">Deterministic margin & volume driven pricing model.</p>
-                  {metadata?.salesApi?.status !== "authenticated" && (
-                    <span className="block text-xs font-medium text-amber-700 mt-1">
-                      Sales API unavailable. P011 logic is loaded but requires coverage to run.
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-start space-x-2 border rounded p-3 flex-1 bg-muted/5">
-                <RadioGroupItem value="legacy" id="mode-legacy" className="mt-0.5" />
-                <div className="grid gap-1.5">
-                  <Label htmlFor="mode-legacy" className="cursor-pointer font-medium">Rule-based (Legacy)</Label>
-                  <p className="text-xs text-muted-foreground">Ordered sequential rules matched in order of precedence.</p>
-                </div>
-              </div>
-            </RadioGroup>
-          </div>
-
           {policyVersion === 2 ? (
-            <div className="space-y-6">
+            isNativeP011 ? (
+              <div className="space-y-6">
 
-              <div className="grid grid-cols-2 gap-4 bg-muted/10 p-4 rounded-md border border-border/50">
-                <h4 className="col-span-2 font-medium text-sm flex items-center justify-between">
-                  Competitor Selection
-                </h4>
-                <div>
-                  <Label className="text-xs">Mode</Label>
-                  <Select value={policy.competitor?.mode || "nearest"} onValueChange={(v: any) => setPolicy(p => ({ ...p, competitor: { ...p.competitor, mode: v } }))}>
-                    <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nearest">Nearest</SelectItem>
-                      <SelectItem value="lowest">Lowest</SelectItem>
-                      <SelectItem value="named">Named Competitor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {policy.competitor?.mode === "named" && (
+                <div className="grid grid-cols-2 gap-4 bg-muted/10 p-4 rounded-md border border-border/50">
+                  <h4 className="col-span-2 font-medium text-sm flex items-center justify-between">
+                    Competitor Selection
+                  </h4>
                   <div>
-                    <Label className="text-xs">Named Competitor</Label>
+                    <Label className="text-xs">Mode</Label>
+                    <Select value={policy.competitor?.mode || "nearest"} onValueChange={(v: any) => setPolicy(p => ({ ...p, competitor: { ...p.competitor, mode: v } }))}>
+                      <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nearest">Nearest</SelectItem>
+                        <SelectItem value="lowest">Lowest</SelectItem>
+                        <SelectItem value="named">Named Competitor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {policy.competitor?.mode === "named" && (
+                    <div>
+                      <Label className="text-xs">Named Competitor</Label>
                     <Select value={policy.competitor?.named || "none"} onValueChange={(v) => setPolicy(p => ({ ...p, competitor: { ...p.competitor, named: v === "none" ? null : v } }))}>
                       <SelectTrigger className="h-8 bg-background"><SelectValue placeholder="Select competitor" /></SelectTrigger>
                       <SelectContent>
@@ -490,6 +635,423 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                       <Input type="number" min="0" max="99.9" step="0.1" value={(policy.categoryFloors as any)?.[cat] !== undefined ? (policy.categoryFloors as any)[cat] : ""} onChange={(e) => setPolicy(p => { const nextFloors = { ...p.categoryFloors }; if (e.target.value) { nextFloors[cat] = Number(e.target.value); } else { delete nextFloors[cat]; } return { ...p, categoryFloors: nextFloors }; })} className="h-8 bg-background text-xs" />
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          ) : advancedPolicy ? (
+              <div className="space-y-6">
+                <div className="bg-muted/10 p-4 rounded-md border border-border/50 text-sm space-y-4">
+                  <h4 className="font-semibold text-foreground uppercase tracking-wider">Promoted Advanced Policy</h4>
+                  <p className="text-muted-foreground">
+                    This scenario has been promoted to an Advanced bounds-based policy.
+                    The underlying rules and constraints are generated by the backend and preserved here exactly as evaluated.
+                  </p>
+
+                  <div className="space-y-2">
+                    <h5 className="font-medium">Evaluated Rules (Read-only)</h5>
+                    <div className="border rounded-md divide-y bg-card text-xs">
+                      {advancedPolicy.rules.map((rule: MrpGeneratorRule, idx: number) => (
+                        <div key={idx} className="p-2 font-mono flex gap-2">
+                          <span className="text-muted-foreground">{idx + 1}.</span>
+                          <span>{JSON.stringify(rule)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div>
+                      <h5 className="font-medium text-xs text-muted-foreground mb-1">Hold Below Threshold</h5>
+                      <div>₹{advancedPolicy.holdBelow}</div>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-xs text-muted-foreground mb-1">Rounding</h5>
+                      <div>Nearest ₹{advancedPolicy.rounding.unit} ({advancedPolicy.rounding.direction})</div>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-xs text-muted-foreground mb-1">Margin Floors</h5>
+                      <div>{advancedPolicy.marginEnabled ? "Enabled" : "Disabled"}</div>
+                      {advancedPolicy.categoryFloors && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {Object.entries(advancedPolicy.categoryFloors).map(([cat, val]) => `${cat}: ${val}%`).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-xs text-muted-foreground mb-1">Volume Tiers</h5>
+                      <div>{advancedPolicy.volumeEnabled ? "Enabled" : "Disabled"}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          ) : policyVersion === 3 ? (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 border-b pb-4">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Three Working Modes:</strong> Competitive only (default), + margin floors (requires margin feed), + volume tiers (requires sales feed).
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="margin-enabled"
+                      checked={simplePolicy.marginEnabled}
+                      disabled={noMargin}
+                      onCheckedChange={(c) => setSimplePolicy({ ...simplePolicy, marginEnabled: !!c })}
+                    />
+                    <Label htmlFor="margin-enabled" className={`cursor-pointer ${noMargin ? 'text-muted-foreground' : ''}`}>
+                      Apply gross-margin floors
+                      <span className="block font-normal text-xs text-muted-foreground mt-0.5">
+                        Uses margin from the Sales system. Currently Apr-Jun 2026.
+                      </span>
+                      {noMargin && (
+                        <span className="block font-normal text-xs text-amber-600 mt-0.5">
+                          {marginReason} {simplePolicy.marginEnabled ? "Run requires turning this off or waiting." : ""}
+                        </span>
+                      )}
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="volume-enabled"
+                      checked={simplePolicy.volumeEnabled}
+                      disabled={noVolume}
+                      onCheckedChange={(c) => setSimplePolicy({ ...simplePolicy, volumeEnabled: !!c })}
+                    />
+                    <Label htmlFor="volume-enabled" className={`cursor-pointer ${noVolume ? 'text-muted-foreground' : ''}`}>
+                      Use volume tiers
+                      <span className="block font-normal text-xs text-muted-foreground mt-0.5">
+                        Weighs suggestions by what actually sells.
+                      </span>
+                      {noVolume && (
+                        <span className="block font-normal text-xs text-amber-600 mt-0.5">
+                          {volumeReason} {simplePolicy.volumeEnabled ? "Run requires turning this off or waiting." : ""}
+                        </span>
+                      )}
+                    </Label>
+                  </div>
+                </div>
+
+                {simplePolicy.marginEnabled && (
+                  <div className="bg-muted/10 p-4 rounded-md border border-border/50">
+                    <h4 className="font-medium text-sm mb-3">Category Gross-Margin Floors (%)</h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                      {['PTMT', 'C P', 'PLUMBING', 'SANITARYWARE', 'SINK', 'HARDWARE'].map((cat) => {
+                        const floors = simplePolicy.categoryFloors || {};
+                        const val = floors[cat];
+                        return (
+                          <div key={cat}>
+                            <Label className="text-xs truncate" title={cat}>{cat}</Label>
+                            <Input type="number" min="0" max="99.9" step="0.1"
+                              value={val !== undefined ? val : ""}
+                              onChange={(e) => {
+                                const nextFloors = { ...floors };
+                                if (e.target.value) {
+                                  nextFloors[cat] = Number(e.target.value);
+                                } else {
+                                  delete nextFloors[cat];
+                                }
+                                setSimplePolicy({ ...simplePolicy, categoryFloors: nextFloors });
+                              }}
+                              className="h-8 bg-background text-xs"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {simplePolicy.volumeEnabled && (
+                  <div className="bg-muted/10 p-3 rounded-md border border-border/50 text-xs text-muted-foreground">
+                    <strong>Volume Tiers Active:</strong> A (top 80%), B (80-95%), C (95-100%). Unsold catalog items placed in band F.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm uppercase tracking-wider text-foreground">Rule Table (Evaluated in Order)</h3>
+                    {previewData?.summary && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Preview: {previewData.summary.evaluated || 0} evaluated &middot; {previewData.summary.wouldChange || 0} would change &middot; {previewData.summary.noChange || 0} no change &middot; {previewData.summary.excluded || 0} excluded
+                      </div>
+                    )}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
+                    const nextRows = [...simplePolicy.rows];
+                    nextRows.push({
+                      id: Math.random().toString(36).slice(2, 9),
+                      order: nextRows.length + 1,
+                      label: "",
+                      competitor: { mode: "nearest" },
+                      appliesTo: { type: "all" },
+                      target: { mode: "below", percent: 5 },
+                      maxIncrease: 15,
+                      maxDecrease: 5,
+                    });
+                    setSimplePolicy({ ...simplePolicy, rows: nextRows });
+                  }}>
+                    + Add row
+                  </Button>
+                </div>
+
+                {!simplePolicy.rows.some(r => r.appliesTo.type === "all") && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900 flex items-start gap-2">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>
+                      No catch-all row found. Products matching nothing are silently untouched.
+                      {(previewData?.summary as any)?.fallthroughUntouched ? ` ${((previewData?.summary as any).fallthroughUntouched)} products currently fall through.` : " Add an \"all\" row at the end to ensure full coverage."}
+                    </span>
+                  </div>
+                )}
+
+                {simplePolicy.rows.length === 0 ? (
+                  <div className="text-center py-6 text-sm text-muted-foreground border rounded-md border-dashed">
+                    No rules defined. First match wins.
+                  </div>
+                ) : (
+                  <div className="border rounded-md overflow-hidden bg-card text-sm">
+                    <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_auto] gap-2 p-2 border-b bg-muted/20 font-semibold uppercase text-xs tracking-wider text-muted-foreground">
+                      <div className="w-8 text-center">#</div>
+                      <div>Competitor</div>
+                      <div>Applies To</div>
+                      <div>Target</div>
+                      <div>Limit</div>
+                      <div className="w-24 text-right pr-2">Actions</div>
+                    </div>
+                    {simplePolicy.rows.map((row, idx) => {
+                      const reach = previewData?.reach?.[row.id] as any;
+                      return (
+                      <div key={row.id} className="border-b last:border-0 p-2">
+                        <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+                          <div className="w-8 text-center text-muted-foreground font-medium">{idx + 1}</div>
+
+                          <div className="space-y-1">
+                            <Select value={row.competitor.mode} onValueChange={(v: any) => {
+                            const newRows = [...simplePolicy.rows];
+                            newRows[idx] = { ...row, competitor: { ...row.competitor, mode: v } };
+                            setSimplePolicy({ ...simplePolicy, rows: newRows });
+                          }}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="nearest">nearest</SelectItem>
+                              <SelectItem value="lowest">lowest</SelectItem>
+                              <SelectItem value="named">named</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {row.competitor.mode === "named" && (
+                            <Select value={row.competitor.name || "none"} onValueChange={(v) => {
+                              const newRows = [...simplePolicy.rows];
+                              newRows[idx] = { ...row, competitor: { ...row.competitor, name: v === "none" ? null : v } };
+                              setSimplePolicy({ ...simplePolicy, rows: newRows });
+                            }}>
+                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Competitor" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none" disabled>Select</SelectItem>
+                                {scopesData?.competitors?.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <Select value={row.appliesTo.type} onValueChange={(v: any) => {
+                            const newRows = [...simplePolicy.rows];
+                            newRows[idx] = { ...row, appliesTo: { type: v, value: undefined }, catchAll: v === "all" };
+                            setSimplePolicy({ ...simplePolicy, rows: newRows });
+                          }}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">everything (catch-all)</SelectItem>
+                              <SelectItem value="division">Division</SelectItem>
+                              <SelectItem value="category">Category</SelectItem>
+                              <SelectItem value="series">Series</SelectItem>
+                              <SelectItem value="explicit_codes">Item Codes</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {row.appliesTo.type !== "all" && row.appliesTo.type !== "explicit_codes" && (
+                            <Input
+                              placeholder="e.g. Black Pearl"
+                              className="h-8 text-xs"
+                              value={(Array.isArray(row.appliesTo.value) ? row.appliesTo.value.join(", ") : row.appliesTo.value) || ""}
+                              onChange={(e) => {
+                                const newRows = [...simplePolicy.rows];
+                                newRows[idx] = { ...row, appliesTo: { ...row.appliesTo, value: e.target.value } };
+                                setSimplePolicy({ ...simplePolicy, rows: newRows });
+                              }}
+                            />
+                          )}
+                          {row.appliesTo.type === "explicit_codes" && (
+                            <Input
+                              placeholder="comma separated"
+                              className="h-8 text-xs"
+                              value={(Array.isArray(row.appliesTo.value) ? row.appliesTo.value.join(", ") : row.appliesTo.value) || ""}
+                              onChange={(e) => {
+                                const newRows = [...simplePolicy.rows];
+                                newRows[idx] = { ...row, appliesTo: { ...row.appliesTo, value: e.target.value.split(",").map(s => s.trim()) } };
+                                setSimplePolicy({ ...simplePolicy, rows: newRows });
+                              }}
+                            />
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <Select value={row.target.mode} onValueChange={(v: any) => {
+                            const newRows = [...simplePolicy.rows];
+                            newRows[idx] = { ...row, target: { mode: v, percent: v === "match" ? undefined : 5 } };
+                            setSimplePolicy({ ...simplePolicy, rows: newRows });
+                          }}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="below">% below</SelectItem>
+                              <SelectItem value="match">match</SelectItem>
+                              <SelectItem value="above">% above</SelectItem>
+                              <SelectItem value="close_gap">close % gap</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {row.target.mode !== "match" && (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                className="h-8 text-xs w-full"
+                                value={row.target.percent ?? ""}
+                                onChange={(e) => {
+                                  const newRows = [...simplePolicy.rows];
+                                  newRows[idx] = { ...row, target: { ...row.target, percent: Number(e.target.value) } };
+                                  setSimplePolicy({ ...simplePolicy, rows: newRows });
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">Max+</span>
+                            <Input
+                              type="number"
+                              className="h-8 text-xs w-full"
+                              value={row.maxIncrease ?? ""}
+                              onChange={(e) => {
+                                const newRows = [...simplePolicy.rows];
+                                newRows[idx] = { ...row, maxIncrease: e.target.value ? Number(e.target.value) : null };
+                                setSimplePolicy({ ...simplePolicy, rows: newRows });
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">Max-</span>
+                            <Input
+                              type="number"
+                              className="h-8 text-xs w-full"
+                              value={row.maxDecrease ?? ""}
+                              onChange={(e) => {
+                                const newRows = [...simplePolicy.rows];
+                                newRows[idx] = { ...row, maxDecrease: e.target.value ? Number(e.target.value) : null };
+                                setSimplePolicy({ ...simplePolicy, rows: newRows });
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-1">
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                            if (idx === 0) return;
+                            const newRows = [...simplePolicy.rows];
+                            const temp = newRows[idx];
+                            newRows[idx] = newRows[idx - 1];
+                            newRows[idx - 1] = temp;
+                            // Update orders
+                            newRows.forEach((r, i) => r.order = i + 1);
+                            setSimplePolicy({ ...simplePolicy, rows: newRows });
+                          }} disabled={idx === 0}>
+                            <ArrowUp className="w-3 h-3" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                            if (idx === simplePolicy.rows.length - 1) return;
+                            const newRows = [...simplePolicy.rows];
+                            const temp = newRows[idx];
+                            newRows[idx] = newRows[idx + 1];
+                            newRows[idx + 1] = temp;
+                            // Update orders
+                            newRows.forEach((r, i) => r.order = i + 1);
+                            setSimplePolicy({ ...simplePolicy, rows: newRows });
+                          }} disabled={idx === simplePolicy.rows.length - 1}>
+                            <ArrowDown className="w-3 h-3" />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => {
+                            const newRows = simplePolicy.rows.filter((_, i) => i !== idx);
+                            newRows.forEach((r, i) => r.order = i + 1);
+                            setSimplePolicy({ ...simplePolicy, rows: newRows });
+                          }}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {reach && (
+                        <div className="mt-2 ml-10 text-xs text-muted-foreground bg-muted/10 p-1.5 rounded inline-block">
+                          {typeof reach === 'object'
+                            ? (
+                              <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                <span>Matches: {reach.scopeMatched || 0} products</span>
+                                <span>&middot;</span>
+                                <span>{reach.withCompetitorPrice || 0} have {row.competitor.name || row.competitor.mode} price</span>
+                                <span>&middot;</span>
+                                <span>{reach.wouldChange || 0} would change</span>
+                                {reach.matchedFySalesValue != null && (
+                                  <>
+                                    <span>&middot;</span>
+                                    <span className="text-emerald-700">₹{reach.matchedFySalesValue.toLocaleString()} FY Sales</span>
+                                  </>
+                                )}
+                              </div>
+                            )
+                            : `Matches: ${reach}`}
+                        </div>
+                      )}
+                      </div>
+                    )})}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 bg-muted/10 p-4 rounded-md border border-border/50">
+                <h4 className="col-span-2 font-medium text-sm">Global Thresholds</h4>
+                <div>
+                  <Label className="text-xs">Hold Below (₹)</Label>
+                  <Input type="number" step="1" value={simplePolicy.holdBelow ?? ""} onChange={e => setSimplePolicy({ ...simplePolicy, holdBelow: Number(e.target.value) })} className="h-8 bg-background" />
+                  <p className="text-xs text-muted-foreground mt-1">Products below this MRP are not reduced further.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Round Unit</Label>
+                    <Select value={simplePolicy.rounding?.unit?.toString() || "1"} onValueChange={(v) => setSimplePolicy({ ...simplePolicy, rounding: { ...simplePolicy.rounding, unit: Number(v) } })}>
+                      <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1</SelectItem>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Direction</Label>
+                    <Select value={simplePolicy.rounding?.direction || "nearest"} onValueChange={(v: any) => setSimplePolicy({ ...simplePolicy, rounding: { ...simplePolicy.rounding, direction: v } })}>
+                      <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nearest">Nearest</SelectItem>
+                        <SelectItem value="up">Up</SelectItem>
+                        <SelectItem value="down">Down</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </div>

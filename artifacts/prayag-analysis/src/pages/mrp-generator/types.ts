@@ -2,10 +2,31 @@ import type {
   MrpGeneratorScope,
   MrpGeneratorRule,
   MrpGeneratorMarginFloorRuleCategoryFloors,
-  MrpGeneratorPolicy
+  MrpGeneratorPolicy,
+  MrpGeneratorSimplePolicy,
+  MrpGeneratorSimpleRule,
+  MrpGeneratorSimpleCompetitorMode,
+  MrpGeneratorSimpleRuleAppliesToType,
+  MrpGeneratorSimpleRuleTargetMode,
+  MrpGeneratorSimplePolicyRoundingDirection,
+  MrpGeneratorAdvancedPolicy,
+  MrpGeneratorSimplePolicyCategoryFloors
 } from "@workspace/api-client-react";
 
-export type { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorMarginFloorRuleCategoryFloors, MrpGeneratorPolicy };
+export type {
+  MrpGeneratorScope,
+  MrpGeneratorRule,
+  MrpGeneratorMarginFloorRuleCategoryFloors,
+  MrpGeneratorPolicy,
+  MrpGeneratorSimplePolicy,
+  MrpGeneratorSimpleRule,
+  MrpGeneratorSimpleCompetitorMode,
+  MrpGeneratorSimpleRuleAppliesToType,
+  MrpGeneratorSimpleRuleTargetMode,
+  MrpGeneratorSimplePolicyRoundingDirection,
+  MrpGeneratorAdvancedPolicy,
+  MrpGeneratorSimplePolicyCategoryFloors
+};
 
 export const ALL_RULE_TYPES = [
   "percent_below",

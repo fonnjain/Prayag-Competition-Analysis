@@ -76,6 +76,7 @@ import type {
   DeleteCompetitorResult,
   DiscountSettings,
   DiscountSettingsUpdate,
+  DuplicateMrpGeneratorScenarioBody,
   ErrorEnvelope,
   ErrorResponse,
   ExportAdminActivityPdfParams,
@@ -119,6 +120,8 @@ import type {
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
   MrpGeneratorComparison,
+  MrpGeneratorDemotionInput,
+  MrpGeneratorDemotionResponse,
   MrpGeneratorFreshness,
   MrpGeneratorHandoffInput,
   MrpGeneratorHandoffResponse,
@@ -132,6 +135,8 @@ import type {
   MrpGeneratorScenarioInput,
   MrpGeneratorScenarioPatch,
   MrpGeneratorScopes,
+  MrpGeneratorSimplePreview,
+  MrpGeneratorSimplePreviewInput,
   MrpIncreaseList,
   MrpRevisionDetail,
   MrpRevisionPreview,
@@ -155,6 +160,8 @@ import type {
   PriceFinderSearchResponse,
   PriceHistory,
   ProductComparisonList,
+  PromoteMrpGeneratorSimpleScenario200,
+  PromoteMrpGeneratorSimpleScenarioBody,
   ReconcileSanitarywareVariantProvenanceBody,
   RecordAcceptBatch,
   ResetUserPasswordBody,
@@ -6972,6 +6979,77 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getCreateMrpGeneratorScenarioMutationOptions(options));
     }
 
+export const getPreviewMrpGeneratorSimpleScenarioUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/preview`
+}
+
+/**
+ * @summary Evaluate an unsaved P012 Simple policy without creating immutable history
+ */
+export const previewMrpGeneratorSimpleScenario = async (mrpGeneratorSimplePreviewInput: MrpGeneratorSimplePreviewInput, options?: RequestInit): Promise<MrpGeneratorSimplePreview> => {
+
+  return customFetch<MrpGeneratorSimplePreview>(getPreviewMrpGeneratorSimpleScenarioUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpGeneratorSimplePreviewInput,)
+  }
+);}
+
+
+
+
+export const getPreviewMrpGeneratorSimpleScenarioMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMrpGeneratorSimpleScenario>>, TError,{data: BodyType<MrpGeneratorSimplePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewMrpGeneratorSimpleScenario>>, TError,{data: BodyType<MrpGeneratorSimplePreviewInput>}, TContext> => {
+
+const mutationKey = ['previewMrpGeneratorSimpleScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewMrpGeneratorSimpleScenario>>, {data: BodyType<MrpGeneratorSimplePreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewMrpGeneratorSimpleScenario(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewMrpGeneratorSimpleScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof previewMrpGeneratorSimpleScenario>>>
+    export type PreviewMrpGeneratorSimpleScenarioMutationBody = BodyType<MrpGeneratorSimplePreviewInput>
+    export type PreviewMrpGeneratorSimpleScenarioMutationError = ErrorType<void>
+
+    /**
+ * @summary Evaluate an unsaved P012 Simple policy without creating immutable history
+ */
+export const usePreviewMrpGeneratorSimpleScenario = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMrpGeneratorSimpleScenario>>, TError,{data: BodyType<MrpGeneratorSimplePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewMrpGeneratorSimpleScenario>>,
+        TError,
+        {data: BodyType<MrpGeneratorSimplePreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewMrpGeneratorSimpleScenarioMutationOptions(options));
+    }
+
 export const getGetMrpGeneratorScenarioUrl = (scenarioId: number,) => {
 
 
@@ -7171,6 +7249,268 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getResetMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}/reset`
+}
+
+export const resetMrpGeneratorScenario = async (scenarioId: number, options?: RequestInit): Promise<MrpGeneratorScenario> => {
+
+  return customFetch<MrpGeneratorScenario>(getResetMrpGeneratorScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResetMrpGeneratorScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetMrpGeneratorScenario>>, TError,{scenarioId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetMrpGeneratorScenario>>, TError,{scenarioId: number}, TContext> => {
+
+const mutationKey = ['resetMrpGeneratorScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetMrpGeneratorScenario>>, {scenarioId: number}> = (props) => {
+          const {scenarioId} = props ?? {};
+
+          return  resetMrpGeneratorScenario(scenarioId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetMrpGeneratorScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof resetMrpGeneratorScenario>>>
+
+    export type ResetMrpGeneratorScenarioMutationError = ErrorType<unknown>
+
+    export const useResetMrpGeneratorScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetMrpGeneratorScenario>>, TError,{scenarioId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetMrpGeneratorScenario>>,
+        TError,
+        {scenarioId: number},
+        TContext
+      > => {
+      return useMutation(getResetMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getDuplicateMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}/duplicate`
+}
+
+export const duplicateMrpGeneratorScenario = async (scenarioId: number,
+    duplicateMrpGeneratorScenarioBody?: DuplicateMrpGeneratorScenarioBody, options?: RequestInit): Promise<MrpGeneratorScenario> => {
+
+  return customFetch<MrpGeneratorScenario>(getDuplicateMrpGeneratorScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      duplicateMrpGeneratorScenarioBody,)
+  }
+);}
+
+
+
+
+export const getDuplicateMrpGeneratorScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<DuplicateMrpGeneratorScenarioBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof duplicateMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<DuplicateMrpGeneratorScenarioBody>}, TContext> => {
+
+const mutationKey = ['duplicateMrpGeneratorScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof duplicateMrpGeneratorScenario>>, {scenarioId: number;data?: BodyType<DuplicateMrpGeneratorScenarioBody>}> = (props) => {
+          const {scenarioId,data} = props ?? {};
+
+          return  duplicateMrpGeneratorScenario(scenarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DuplicateMrpGeneratorScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof duplicateMrpGeneratorScenario>>>
+    export type DuplicateMrpGeneratorScenarioMutationBody = BodyType<DuplicateMrpGeneratorScenarioBody> | undefined
+    export type DuplicateMrpGeneratorScenarioMutationError = ErrorType<unknown>
+
+    export const useDuplicateMrpGeneratorScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<DuplicateMrpGeneratorScenarioBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof duplicateMrpGeneratorScenario>>,
+        TError,
+        {scenarioId: number;data?: BodyType<DuplicateMrpGeneratorScenarioBody>},
+        TContext
+      > => {
+      return useMutation(getDuplicateMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getPromoteMrpGeneratorSimpleScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}/promote`
+}
+
+export const promoteMrpGeneratorSimpleScenario = async (scenarioId: number,
+    promoteMrpGeneratorSimpleScenarioBody?: PromoteMrpGeneratorSimpleScenarioBody, options?: RequestInit): Promise<PromoteMrpGeneratorSimpleScenario200> => {
+
+  return customFetch<PromoteMrpGeneratorSimpleScenario200>(getPromoteMrpGeneratorSimpleScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      promoteMrpGeneratorSimpleScenarioBody,)
+  }
+);}
+
+
+
+
+export const getPromoteMrpGeneratorSimpleScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof promoteMrpGeneratorSimpleScenario>>, TError,{scenarioId: number;data?: BodyType<PromoteMrpGeneratorSimpleScenarioBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof promoteMrpGeneratorSimpleScenario>>, TError,{scenarioId: number;data?: BodyType<PromoteMrpGeneratorSimpleScenarioBody>}, TContext> => {
+
+const mutationKey = ['promoteMrpGeneratorSimpleScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof promoteMrpGeneratorSimpleScenario>>, {scenarioId: number;data?: BodyType<PromoteMrpGeneratorSimpleScenarioBody>}> = (props) => {
+          const {scenarioId,data} = props ?? {};
+
+          return  promoteMrpGeneratorSimpleScenario(scenarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PromoteMrpGeneratorSimpleScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof promoteMrpGeneratorSimpleScenario>>>
+    export type PromoteMrpGeneratorSimpleScenarioMutationBody = BodyType<PromoteMrpGeneratorSimpleScenarioBody> | undefined
+    export type PromoteMrpGeneratorSimpleScenarioMutationError = ErrorType<unknown>
+
+    export const usePromoteMrpGeneratorSimpleScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof promoteMrpGeneratorSimpleScenario>>, TError,{scenarioId: number;data?: BodyType<PromoteMrpGeneratorSimpleScenarioBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof promoteMrpGeneratorSimpleScenario>>,
+        TError,
+        {scenarioId: number;data?: BodyType<PromoteMrpGeneratorSimpleScenarioBody>},
+        TContext
+      > => {
+      return useMutation(getPromoteMrpGeneratorSimpleScenarioMutationOptions(options));
+    }
+
+export const getDemoteMrpGeneratorAdvancedScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}/demote`
+}
+
+export const demoteMrpGeneratorAdvancedScenario = async (scenarioId: number,
+    mrpGeneratorDemotionInput?: MrpGeneratorDemotionInput, options?: RequestInit): Promise<MrpGeneratorDemotionResponse> => {
+
+  return customFetch<MrpGeneratorDemotionResponse>(getDemoteMrpGeneratorAdvancedScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpGeneratorDemotionInput,)
+  }
+);}
+
+
+
+
+export const getDemoteMrpGeneratorAdvancedScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof demoteMrpGeneratorAdvancedScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorDemotionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof demoteMrpGeneratorAdvancedScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorDemotionInput>}, TContext> => {
+
+const mutationKey = ['demoteMrpGeneratorAdvancedScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof demoteMrpGeneratorAdvancedScenario>>, {scenarioId: number;data?: BodyType<MrpGeneratorDemotionInput>}> = (props) => {
+          const {scenarioId,data} = props ?? {};
+
+          return  demoteMrpGeneratorAdvancedScenario(scenarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DemoteMrpGeneratorAdvancedScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof demoteMrpGeneratorAdvancedScenario>>>
+    export type DemoteMrpGeneratorAdvancedScenarioMutationBody = BodyType<MrpGeneratorDemotionInput> | undefined
+    export type DemoteMrpGeneratorAdvancedScenarioMutationError = ErrorType<unknown>
+
+    export const useDemoteMrpGeneratorAdvancedScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof demoteMrpGeneratorAdvancedScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorDemotionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof demoteMrpGeneratorAdvancedScenario>>,
+        TError,
+        {scenarioId: number;data?: BodyType<MrpGeneratorDemotionInput>},
+        TContext
+      > => {
+      return useMutation(getDemoteMrpGeneratorAdvancedScenarioMutationOptions(options));
     }
 
 export const getRunMrpGeneratorScenarioUrl = (scenarioId: number,
