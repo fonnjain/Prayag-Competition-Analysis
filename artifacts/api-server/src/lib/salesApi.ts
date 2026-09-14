@@ -282,7 +282,9 @@ function parseMarginRow(raw: unknown): MarginRow {
   const rawQty = pick(row, "qty", "quantity");
   const qty = rawQty == null || rawQty === "" ? null : optionalNumber(rawQty);
   const discount = optionalNumber(pick(row, "discount_frac", "discountFrac", "discount_fraction"));
-  if (discount != null && (discount < 0 || discount >= 1)) throw new SalesApiError("schema", "Sales source discount must be a fraction.");
+  if (discount != null && (discount <= -1 || discount >= 1)) {
+    throw new SalesApiError("schema", "Sales source discount must be a fraction between -1 and 1.");
+  }
   return {
     itemCode: canonicalCode(item), monthLabel: month, fy, segment, qty, saleValue: sale,
     bomValue: bom, grossMarginPct: margin,

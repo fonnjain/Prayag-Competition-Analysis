@@ -28,3 +28,9 @@ Portfolio gross-margin targets are reports, not optimizers. If a policy misses i
 **Why:** Automatically solving to a portfolio number would produce recommendations that cannot be traced to one band, competitive position, and action rule.
 
 **How to apply:** Compute current and proposed portfolio gross margin only over products with usable quantity, unit cost, and discount evidence. Report omissions explicitly and leave policy changes to the administrator.
+
+Sales margin data may contain a negative discount fraction when the realized average sale is above MRP. Preserve finite values strictly between -1 and 1; do not clamp premiums to zero.
+
+**Why:** The live FY2026-27 margin feed includes legitimate above-MRP sales, so rejecting all negative discounts prevents the entire snapshot from loading and clamping would distort gross-margin calculations.
+
+**How to apply:** Validate `discount_frac` in the open interval (-1, 1), retain its sign, and use it directly in realized-sale and required-MRP formulas.

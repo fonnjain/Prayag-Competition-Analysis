@@ -37,6 +37,30 @@ describe("SalesApiClient", () => {
     expect(JSON.stringify(snapshot)).not.toContain("do-not-log");
   });
 
+  it("preserves a negative discount when realized sale is above MRP", async () => {
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async (url) => url.includes("sales-by-item")
+        ? response({ coverage, rows: [salesRow] })
+        : response({ coverage, rows: [{ ...marginRow, avg_sale: 106.67, discount_frac: -0.0667 }] }),
+    });
+    const snapshot = await client.getSnapshot();
+    expect(snapshot.marginRows[0]?.discountFrac).toBe(-0.0667);
+    expect(snapshot.marginByCode["151"]?.discountFrac).toBe(-0.0667);
+  });
+
+  it("rejects discounts outside the valid fraction interval", async () => {
+    for (const discount of [-1, 1]) {
+      const client = new SalesApiClient({
+        apiKey: "secret",
+        fetch: async (url) => url.includes("sales-by-item")
+          ? response({ coverage, rows: [salesRow] })
+          : response({ coverage, rows: [{ ...marginRow, discount_frac: discount }] }),
+      });
+      await expect(client.getSnapshot()).rejects.toMatchObject({ kind: "schema" });
+    }
+  });
+
   it("restarts both traversals from the first page after source_changed", async () => {
     let calls = 0;
     const client = new SalesApiClient({
