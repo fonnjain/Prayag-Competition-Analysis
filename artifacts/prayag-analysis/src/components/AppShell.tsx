@@ -236,7 +236,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <WorkspaceHeader activeApp="competition-analysis" />
+      <WorkspaceHeader activeApp={location.startsWith("/mrp-generator") ? "mrp-generator" : "competition-analysis"} />
       <div className="flex min-h-[calc(100vh-3.5rem)] flex-1 overflow-hidden">
       {/* ── Desktop sidebar ─────────────────────────────────────────────────── */}
       <aside className={cn(

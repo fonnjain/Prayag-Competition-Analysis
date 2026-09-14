@@ -44,6 +44,12 @@ const AnalysisIcon: HeaderIcon = (props) => (
   </IconFrame>
 );
 
+const GeneratorIcon: HeaderIcon = (props) => (
+  <IconFrame {...props}>
+    <path d="m13 2-9 12h7l-1 8 9-12h-7Z" />
+  </IconFrame>
+);
+
 const SearchIcon: HeaderIcon = (props) => (
   <IconFrame {...props}>
     <circle cx="11" cy="11" r="6.5" />
@@ -86,6 +92,7 @@ export type WorkspaceApp =
   | "home"
   | "product-database"
   | "competition-analysis"
+  | "mrp-generator"
   | "price-finder"
   | "admin";
 
@@ -112,6 +119,14 @@ const WORKSPACE_LINKS: WorkspaceLink[] = [
     href: "/analysis/",
     label: "Competition Analysis",
     icon: AnalysisIcon,
+    restrictedAllowed: false,
+  },
+  {
+    app: "mrp-generator",
+    href: "/analysis/mrp-generator",
+    label: "MRP Generator",
+    icon: GeneratorIcon,
+    adminOnly: true,
     restrictedAllowed: false,
   },
   {

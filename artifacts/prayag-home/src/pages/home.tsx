@@ -6,6 +6,7 @@ import {
   BarChart3,
   Scale,
   Search,
+  Zap,
   Users,
   ShieldCheck,
 } from "lucide-react";
@@ -40,7 +41,7 @@ export default function Home() {
           </header>
 
           {/* Apps Grid */}
-          <div className="grid md:grid-cols-3 gap-3 max-w-5xl mx-auto">
+          <div className={`grid md:grid-cols-2 ${isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-3 max-w-5xl mx-auto`}>
             {/* Product DB Card */}
             <a
               href="/product-db/"
@@ -110,6 +111,43 @@ export default function Home() {
                 </div>
               </div>
             </a>
+
+            {/* MRP Generator Card */}
+            {isAdmin && (
+              <a
+                href="/analysis/mrp-generator"
+                className="group relative bg-card rounded-xl p-5 border border-border shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col gap-3 hover:border-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                data-testid="link-mrp-generator"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
+
+                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
+                  <Zap className="w-5 h-5" />
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-semibold mb-1 text-foreground group-hover:text-primary transition-colors">
+                    MRP Generator
+                  </h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Build deterministic pricing scenarios from sales, margin,
+                    and competitor evidence before sending approved suggestions
+                    to an MRP revision preview.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-border/50">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Zap className="w-4 h-4 text-primary/60" />
+                    <span>Pricing Policy</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ShieldCheck className="w-4 h-4 text-primary/60" />
+                    <span>Admin only</span>
+                  </div>
+                </div>
+              </a>
+            )}
 
             {/* Price Finder Card */}
             <a
