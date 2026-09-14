@@ -107,6 +107,7 @@ export type SalesApiStatus =
 export class SalesApiError extends Error {
   readonly kind: "missing_credential" | "auth" | "network" | "schema" | "source_changed";
   readonly statusCode?: number;
+  readonly httpStatus?: number;
   constructor(
     kind: SalesApiError["kind"],
     message: string,
@@ -116,6 +117,7 @@ export class SalesApiError extends Error {
     this.name = "SalesApiError";
     this.kind = kind;
     this.statusCode = statusCode;
+    this.httpStatus = statusCode;
   }
 }
 
@@ -366,9 +368,14 @@ export class SalesApiClient {
 
   status(): SalesApiStatus {
     if (!this.key?.trim()) return { available: false, status: "missing_credential", reason: "Sales API credential is not configured." };
-    if (this.cached) return this.cached.availability;
-    if (this.lastFailure?.kind === "auth") return { available: false, status: "auth_failed", reason: "Sales API rejected the configured credential." };
+    if (this.lastFailure?.kind === "auth") {
+      const reason = this.lastFailure.statusCode === 403
+        ? "Sales API denied access to the endpoint (HTTP 403)."
+        : "Sales API authentication failed (HTTP 401).";
+      return { available: false, status: "auth_failed", reason };
+    }
     if (this.lastFailure) return { available: false, status: "unavailable", reason: "Sales API snapshot is unavailable." };
+    if (this.cached) return this.cached.availability;
     return { available: false, status: "unavailable", reason: "Sales API snapshot has not been authenticated." };
   }
 
@@ -382,7 +389,7 @@ export class SalesApiClient {
     }
     const state = this.status();
     if (state.status === "missing_credential") throw new SalesApiError("missing_credential", state.reason);
-    if (this.cached && this.cached.period === period && !options.refresh) return this.cached;
+    if (this.cached && !this.lastFailure && this.cached.period === period && !options.refresh) return this.cached;
     for (let restart = 0; restart <= MAX_RESTARTS; restart++) {
       try {
         // Coverage is parsed and validated before any row is accepted.
@@ -444,7 +451,12 @@ export class SalesApiClient {
       } catch {
         throw new SalesApiError("network", "Sales API network request failed.");
       }
-      if (response.status === 401 || response.status === 403) throw new SalesApiError("auth", "Sales API authentication failed.", response.status);
+      if (response.status === 401 || response.status === 403) {
+        const message = response.status === 403
+          ? "Sales API denied access to the endpoint (HTTP 403)."
+          : "Sales API authentication failed (HTTP 401).";
+        throw new SalesApiError("auth", message, response.status);
+      }
       if (response.status === 409) {
         let sourceChanged = false;
         try {

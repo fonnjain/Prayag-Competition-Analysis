@@ -206,4 +206,69 @@ describe("SalesApiClient", () => {
     expect(client.cachedSnapshot()).toBeNull();
     expect(client.status()).toMatchObject({ available: false, status: "auth_failed" });
   });
+
+  it.each([
+    [400, "network"],
+    [409, "network"],
+    [503, "network"],
+  ] as const)("classifies HTTP %s as unavailable upstream, not auth", async (status, kind) => {
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async () => response(
+        status === 409 ? { code: "other_conflict" } : { error: "upstream" },
+        status,
+      ),
+    });
+    await expect(client.getSnapshot()).rejects.toMatchObject({ kind, statusCode: status, httpStatus: status });
+    expect(client.status()).toMatchObject({ available: false, status: "unavailable" });
+    expect(client.status()).not.toMatchObject({ status: "auth_failed" });
+  });
+
+  it("retains but does not advertise a cached snapshot after non-auth upstream failure", async () => {
+    let fail = false;
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async (url) => fail
+        ? response({ error: "temporarily unavailable" }, 503)
+        : url.includes("sales-by-item")
+          ? response({ coverage, rows: [salesRow] })
+          : response({ coverage, rows: [marginRow] }),
+    });
+    await client.getSnapshot();
+    fail = true;
+    await expect(client.getSnapshot({ refresh: true })).rejects.toMatchObject({ kind: "network", httpStatus: 503 });
+    expect(client.cachedSnapshot()).not.toBeNull();
+    expect(client.status()).toMatchObject({ available: false, status: "unavailable" });
+  });
+
+  it("restarts source_changed conflicts and reports unavailable source_changed after bounded exhaustion", async () => {
+    let calls = 0;
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async () => {
+        calls++;
+        return response({ code: "source_changed" }, 409);
+      },
+    });
+    await expect(client.getSnapshot()).rejects.toMatchObject({
+      kind: "source_changed", statusCode: 409, httpStatus: 409,
+    });
+    expect(calls).toBe(3);
+    expect(client.status()).toMatchObject({ available: false, status: "unavailable" });
+  });
+
+  it.each([
+    [401, "Sales API authentication failed (HTTP 401)."],
+    [403, "Sales API denied access to the endpoint (HTTP 403)."],
+  ] as const)("classifies final HTTP %s as auth_failed with a safe reason", async (status, message) => {
+    const client = new SalesApiClient({
+      apiKey: "secret",
+      fetch: async () => response({ error: "provider secret must never escape" }, status),
+    });
+    const error = await client.getSnapshot().catch((value: unknown) => value as SalesApiError);
+    expect(error).toMatchObject({ kind: "auth", statusCode: status, httpStatus: status, message });
+    expect(client.cachedSnapshot()).toBeNull();
+    expect(client.status()).toMatchObject({ available: false, status: "auth_failed", reason: message });
+    expect(JSON.stringify(error)).not.toContain("provider secret");
+  });
 });
