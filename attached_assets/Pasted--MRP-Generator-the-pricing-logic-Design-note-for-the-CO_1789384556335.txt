@@ -1,0 +1,232 @@
+# MRP Generator — the pricing logic
+
+> Design note for the **COMPETITION** app. Recommendation and reasoning, not a prompt.
+> 14 September 2026.
+
+---
+
+## 1. What the data forces
+
+Two facts shape everything:
+
+```
+546 codes    80% of value     Rs 288.8 Cr    avg Rs 31.8 L each
+2,553 codes   1.51% of value  Rs   5.5 Cr    avg Rs 0.21 L each
+```
+
+And against the competitors mapped so far, **Prayag is usually the cheaper one**:
+
+| | Prayag cheaper | Median gap |
+|---|---:|---:|
+| Sparsh Pearl (PTMT) | 130 / 150 | +10.8% |
+| Ashirvad CPVC pipe | 40 / 40 | +43.2% |
+| Ashirvad CPVC fittings | 161 / 171 | +50.0% |
+| Ashirvad AGRI pipe | 3 / 67 | **−6.2%** |
+
+So the common case is not "we are too expensive." It is **"we are leaving money on the table."**
+
+---
+
+## 2. Why "high volume → match competition, low volume → decrease" fails
+
+Three problems, in increasing order of seriousness.
+
+**Both ends lose margin.** Matching competition on the head means coming down, since we are usually already below them — or if it means coming *up* to their level, then it is not really "matching," it is capture. And decreasing the tail loses margin too. Nothing funds either.
+
+**The tail cannot fund anything.** To recover one margin point given up on ₹288.8 Cr of head, the ₹5.5 Cr tail would need to gain **53 points**. Arithmetically impossible. Any strategy of the form *harvest the tail to defend the head* is dead on arrival at this level of skew.
+
+**Cutting slow movers usually does nothing.** A product sells slowly for one of two reasons — it is uncompetitive, or demand is simply thin. A ½" reducer bush is slow because few people need one, not because it costs ₹18. Cutting its price loses margin and changes no volume. **And we are already cheaper than competition on most items**, so "uncompetitive" is rarely the explanation.
+
+---
+
+## 3. The better frame: position, not just volume
+
+Volume alone does not tell you what to do. Volume **and** competitive position does.
+
+```
+                    Prayag well below      At parity        Prayag above
+                    competition                             competition
+
+A/B  head           CAPTURE                HOLD             DEFEND
+     (80% of value) raise toward                            at risk -
+                    competition                             reduce or accept
+
+C    middle         capture, lower         hold             review
+     (15%)          priority
+
+D/E  tail           capture, automatic     hold             leave alone
+     (5%)           low risk                                not worth the work
+```
+
+**The head-left cell is the whole opportunity.** High-value products where we are 10%, 20%, 43% below the competition. Raising toward — not to — the competitor price captures margin on the ₹288.8 Cr that actually matters, with minimal share risk because we remain the cheaper option.
+
+**The head-right cell is the real exposure.** Ashirvad AGRI pipe, where we are dearer on 64 of 67. That is where competitive response is genuinely needed, and it is a small enough set to fund from the capture.
+
+**The tail is not a pricing problem.** ₹5.5 Cr across 2,553 codes. Whatever you do to those prices, revenue barely moves. The honest question about the tail is whether to carry all 2,553 SKUs, and that is a range decision, not a pricing one.
+
+---
+
+## 4. The five bands
+
+Defined by **cumulative contribution**, computed from a period the user picks — not by percentile, which would put a ₹60 lakh code and a ₹2,000 code in the same band.
+
+| Band | Cumulative value | Approx codes | Character |
+|---|---|---:|---|
+| **A — Critical** | first 50% | ~150 | Everyone knows these prices |
+| **B — Core** | 50–80% | ~400 | Visible, frequently quoted |
+| **C — Steady** | 80–95% | ~700 | Regular but unremarkable |
+| **D — Slow** | 95–99% | ~1,200 | Occasional |
+| **E — Scarce** | last 1% | ~2,600 | Range-completion items |
+
+Counts are estimates from the known distribution; the engine computes the real ones.
+
+**A separate band F — No sales.** 2,943 catalogue codes have no FY2026-27 sales at all. They are not band E. Band E sells a little; F sells nothing, and may be new, seasonal, discontinued or mis-mapped. They must be excluded and listed, never swept into the tail.
+
+---
+
+## 5. The rules
+
+### Competitive position, per product
+
+```
+gap = (competitor price − Prayag price) / Prayag price
+```
+
+Positive means we are cheaper. Classified against user-set thresholds, default:
+
+```
+well below      gap > +8%
+at parity       −3% to +8%
+above           gap < −3%
+```
+
+Where two competitors are mapped, the user chooses: nearest, lowest, or a named one.
+
+### Action per cell
+
+**Capture (well below).** Raise toward the competitor, closing a user-set share of the gap:
+
+```
+suggested = current + capture_share × (competitor_price − current)
+```
+
+`capture_share` per band — the default I would suggest:
+
+```
+A 0.30    B 0.40    C 0.50    D 0.60    E 0.70
+```
+
+The head moves cautiously because it is visible; the tail moves further because nobody is watching. A product 43% below competition in band A rises about 13%, not 43% — still comfortably the cheaper option.
+
+**Defend (above).** Bring down toward the competitor, but only in A and B, and only subject to the margin floor:
+
+```
+suggested = max(competitor_price × (1 − target_undercut), margin_floor_price)
+```
+
+If the floor prevents reaching the target, say so — *"cannot reach Ashirvad −2% without breaching the 30% PLUMBING floor; held at ₹X."* That is a product to escalate, not to price.
+
+**Hold (parity).** No change. Report as reviewed, not as skipped.
+
+**No competitor price.** Competitive rules cannot fire. Fall back to margin-led: lift to the category floor plus a user-set target, capped by the change limit. Mark it clearly — the suggestion rests on margin alone.
+
+---
+
+## 6. The portfolio margin constraint
+
+This is what makes "maintain margins overall" real rather than aspirational.
+
+After the rules run, compute the **value-weighted margin** across the scenario, before and after:
+
+```
+portfolio_margin = Σ(qty × (price − cost)) / Σ(qty × price)
+```
+
+The user sets a target: *hold at current*, *improve by N points*, or *allow to fall by no more than N*.
+
+If the run misses the target, the engine reports the shortfall and **where the headroom is** — the capture candidates not yet taken, ranked by value. It does **not** silently adjust. The user raises a capture share or widens a band, and re-runs.
+
+**Why report rather than solve.** An engine that quietly moves prices to hit a number produces a result nobody can explain to a distributor. The user should see *"you are 0.8 points short; taking capture on these 40 band-B products closes it"* and decide.
+
+---
+
+## 7. What the user edits
+
+Everything above. Presented as a readable policy, not a form:
+
+```
+BANDS            by cumulative value, from FY2025-26
+                 A 50% · B 80% · C 95% · D 99% · E remainder
+
+COMPETITOR       Sparsh Pearl and Ashirvad, use whichever is nearest
+POSITION         well below > +8%   ·   parity −3% to +8%   ·   above < −3%
+
+CAPTURE          close this share of the gap:
+                 A 30% · B 40% · C 50% · D 60% · E 70%
+
+DEFEND           in bands A and B only, target 2% under the competitor
+
+LIMITS           no increase above 15% · no decrease below 5%
+                 no change where MRP < Rs 50
+                 no change where the competitor price is over 12 months old
+
+MARGIN FLOOR     PTMT 65% · C P 38% · SINK 40% · HARDWARE 38%
+                 SANITARYWARE 38% · PLUMBING 30%
+
+PORTFOLIO        hold total margin at or above current
+
+ROUNDING         nearest rupee
+```
+
+Saved as a **named policy**, versioned, comparable. *"September capture"* against *"Conservative"* — with the products where they differ.
+
+---
+
+## 8. What the output must show
+
+Per product, the sentence that makes it actionable:
+
+```
+151  Ball Cock 15mm     Rs 336 → Rs 344   +2.4%
+     Band B · Rs 18.2 L FY sales · Sparsh Rs 330, we are 1.8% above
+     DEFEND: target Rs 323 (2% under Sparsh)
+     Held at Rs 344 by the 38% C P margin floor
+     -> escalate: cannot meet Sparsh without breaching floor
+```
+
+And the run summary:
+
+```
+1,840 in scope    Rs 312 Cr FY sales represented
+
+  412 capture     +Rs 4.8 Cr margin     median +5.1%
+   61 defend      −Rs 0.9 Cr margin     median −3.2%
+1,204 hold
+  163 excluded    (72 no margin · 58 no competitor · 33 no sales)
+
+Portfolio margin   44.1% → 45.3%    +1.2 points    TARGET MET
+```
+
+**The portfolio line is the headline.** Everything else is how it was reached.
+
+---
+
+## 9. What I would not build
+
+**Elasticity modelling.** There is no price-experiment data here, and a demand curve fitted to observational sales would encode whatever pricing happened to be in place. It would look rigorous and be circular.
+
+**Auto-apply.** Already settled, and it should stay settled.
+
+**Optimisation across the whole catalogue.** A solver maximising margin subject to constraints would produce a mathematically better answer that nobody could explain. Every suggestion here traces to one band, one gap and one rule, and can be defended in a sentence. That is worth more than the extra tenth of a point.
+
+---
+
+## 10. The honest limits
+
+**Ashirvad is eighteen months old.** A 43% CPVC gap may be a real position or a stale list. The capture rule on Ashirvad-only products should be off by default until a current list arrives.
+
+**Margin ends June 2026 and PTMT Jan–Apr is held.** Portfolio margin is computed on what exists; the panel must say how much of the scope that covers.
+
+**Sales cover about half the catalogue.** 2,943 of 6,106 codes have no FY2026-27 sales. They cannot be banded and must not be defaulted into E.
+
+**Volume is historic; the suggestion is forward.** A product in band A earned that on last year's sales. The bands should be recomputed each time a policy runs, and the period shown.
