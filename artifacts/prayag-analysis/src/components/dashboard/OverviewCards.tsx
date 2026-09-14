@@ -3,9 +3,9 @@ import { useGetAnalysisOverview } from "@workspace/api-client-react";
 import type { DashboardFilters } from "@/pages/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  TrendingDown, TrendingUp, Minus, 
-  Target, Layers, PackageSearch 
+import {
+  TrendingDown, TrendingUp, Minus,
+  Target, Layers, PackageSearch
 } from "lucide-react";
 
 export function OverviewCards({

@@ -61,13 +61,13 @@ export function BrandComparison({ filters }: { filters: DashboardFilters }) {
           <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
             <XAxis dataKey="name" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} interval={0} />
-            <YAxis 
-              tickFormatter={(val) => `${val}%`} 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fontSize: 12 }} 
+            <YAxis
+              tickFormatter={(val) => `${val}%`}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12 }}
             />
-            <Tooltip 
+            <Tooltip
               cursor={{ fill: "hsl(var(--muted))" }}
               contentStyle={{ borderRadius: "var(--radius)", border: "1px solid hsl(var(--border))" }}
               formatter={(value: any) => [value != null ? `${Number(value).toFixed(1)}%` : "No data", "Avg Gap"]}

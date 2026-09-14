@@ -3,18 +3,18 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { 
+import {
   Card,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  DropdownMenu, 
-  DropdownMenuCheckboxItem, 
-  DropdownMenuContent, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Download, RefreshCw, Filter, ChevronDown, Settings, Scale, CalendarDays } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -149,9 +149,9 @@ export default function Dashboard() {
 
       <div className="flex-1 p-3 sm:p-4 lg:p-5 space-y-4 max-w-[1600px] mx-auto w-full">
         <FilterBar filters={baseFilters} onChange={setBaseFilters} prayagMrpDate={prayagMrpDate} competitorPeriodDate={competitorPeriodDate} snapshotLabel={snapshotLabel} />
-        
+
         <OverviewCards filters={filters} onPrayagMrpDate={handlePrayagMrpDate} onCompetitorPeriodDate={handleCompetitorPeriodDate} />
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="h-[300px] md:h-[340px]">
             <BrandComparison filters={filters} />
@@ -237,10 +237,10 @@ function FilterBar({
 
   const toggleCompetitor = (comp: string) => {
     const current = filters.competitor || [];
-    const updated = current.includes(comp) 
-      ? current.filter(c => c !== comp) 
+    const updated = current.includes(comp)
+      ? current.filter(c => c !== comp)
       : [...current, comp];
-    
+
     onChange({ ...filters, competitor: updated.length > 0 ? updated : undefined });
   };
 
@@ -257,8 +257,8 @@ function FilterBar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="w-full sm:w-[180px] h-8 justify-between text-sm font-normal">
-                {filters.competitor && filters.competitor.length > 0 
-                  ? `${filters.competitor.length} Selected` 
+                {filters.competitor && filters.competitor.length > 0
+                  ? `${filters.competitor.length} Selected`
                   : "All Competitors"}
                 <ChevronDown className="h-4 w-4 opacity-50" />
               </Button>
@@ -267,8 +267,8 @@ function FilterBar({
               <DropdownMenuLabel>Brands</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {data.competitors.map(c => (
-                <DropdownMenuCheckboxItem 
-                  key={c} 
+                <DropdownMenuCheckboxItem
+                  key={c}
                   checked={(filters.competitor || []).includes(c)}
                   onCheckedChange={() => toggleCompetitor(c)}
                 >
@@ -278,11 +278,11 @@ function FilterBar({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        
+
         <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Division</label>
-          <Select 
-            value={filters.division || "all"} 
+          <Select
+            value={filters.division || "all"}
             onValueChange={(v) => onChange({ ...filters, division: v === "all" ? undefined : v })}
           >
             <SelectTrigger className="w-full sm:w-[180px] h-8 text-sm bg-background">
@@ -297,8 +297,8 @@ function FilterBar({
 
         <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Category</label>
-          <Select 
-            value={filters.category || "all"} 
+          <Select
+            value={filters.category || "all"}
             onValueChange={(v) => onChange({ ...filters, category: v === "all" ? undefined : v })}
           >
             <SelectTrigger className="w-full sm:w-[180px] h-8 text-sm bg-background">
@@ -313,8 +313,8 @@ function FilterBar({
 
         <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Confidence</label>
-          <Select 
-            value={filters.matchConfidence || "all"} 
+          <Select
+            value={filters.matchConfidence || "all"}
             onValueChange={(v) => onChange({ ...filters, matchConfidence: v === "all" ? undefined : v })}
           >
             <SelectTrigger className="w-full sm:w-[150px] h-8 text-sm bg-background">
@@ -329,8 +329,8 @@ function FilterBar({
 
         <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Status</label>
-          <Select 
-            value={filters.matchStatus || "all"} 
+          <Select
+            value={filters.matchStatus || "all"}
             onValueChange={(v) => onChange({ ...filters, matchStatus: v === "all" ? undefined : v })}
           >
             <SelectTrigger className="w-full sm:w-[150px] h-8 text-sm bg-background">

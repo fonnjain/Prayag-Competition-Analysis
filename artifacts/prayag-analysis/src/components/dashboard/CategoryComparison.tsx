@@ -36,15 +36,15 @@ export function CategoryComparison({ filters }: { filters: DashboardFilters }) {
           <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
             <XAxis type="number" tickFormatter={(val) => `${val}%`} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-            <YAxis 
-              type="category" 
-              dataKey="category" 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fontSize: 11 }} 
+            <YAxis
+              type="category"
+              dataKey="category"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11 }}
               width={100}
             />
-            <Tooltip 
+            <Tooltip
               cursor={{ fill: "hsl(var(--muted))" }}
               contentStyle={{ borderRadius: "var(--radius)", border: "1px solid hsl(var(--border))" }}
               formatter={(value: any) => [value != null ? `${Number(value).toFixed(1)}%` : "No data", "Avg Gap"]}

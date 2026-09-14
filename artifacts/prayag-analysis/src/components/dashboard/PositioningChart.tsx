@@ -32,16 +32,16 @@ export function PositioningChart({ filters }: { filters: DashboardFilters }) {
           <BarChart data={data.buckets} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-            <YAxis 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fontSize: 12 }} 
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12 }}
             />
-            <Tooltip 
+            <Tooltip
               cursor={{ fill: "hsl(var(--muted))" }}
               contentStyle={{ borderRadius: "var(--radius)", border: "1px solid hsl(var(--border))" }}
               formatter={(value: number, name: string, props: any) => [
-                `${value} SKUs`, 
+                `${value} SKUs`,
                 props.payload.side === "cheaper" ? "Prayag Cheaper" : props.payload.side === "costlier" ? "Prayag Costlier" : "Parity"
               ]}
             />
