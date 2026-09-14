@@ -5,6 +5,431 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export type MrpGeneratorSalesApiStatusProperty = typeof MrpGeneratorSalesApiStatusProperty[keyof typeof MrpGeneratorSalesApiStatusProperty];
+
+
+export const MrpGeneratorSalesApiStatusProperty = {
+  unavailable: 'unavailable',
+} as const;
+
+export interface MrpGeneratorSalesApi {
+  available: boolean;
+  status: MrpGeneratorSalesApiStatusProperty;
+  reason: string;
+}
+
+export type MrpGeneratorDisabledRuleType = typeof MrpGeneratorDisabledRuleType[keyof typeof MrpGeneratorDisabledRuleType];
+
+
+export const MrpGeneratorDisabledRuleType = {
+  margin_floor: 'margin_floor',
+  volume_tier: 'volume_tier',
+} as const;
+
+export interface MrpGeneratorDisabledRule {
+  type: MrpGeneratorDisabledRuleType;
+  reason: string;
+}
+
+export interface MrpGeneratorMetadata {
+  stage: number;
+  deterministic: boolean;
+  salesApi: MrpGeneratorSalesApi;
+  disabledRules: MrpGeneratorDisabledRule[];
+  supportedRules: string[];
+  staleAfterMonths: number;
+  sources: string[];
+}
+
+export interface MrpGeneratorScopes {
+  divisions: string[];
+  series: string[];
+  categories: string[];
+  competitors: string[];
+}
+
+export interface MrpGeneratorScope {
+  division?: string | string[];
+  series?: string | string[];
+  category?: string | string[];
+  competitorMapped?: boolean;
+  explicitCodes?: string[];
+  itemCodes?: string[];
+  codes?: string[];
+}
+
+export interface MrpGeneratorRuleScope {
+  scope?: MrpGeneratorScope;
+}
+
+export type MrpGeneratorScopeRule = MrpGeneratorRuleScope & {
+  type: 'scope';
+};
+
+export type MrpGeneratorPercentBelowRule = MrpGeneratorRuleScope & {
+  type: 'percent_below';
+  competitor: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent: number;
+};
+
+export type MrpGeneratorMatchRule = MrpGeneratorRuleScope & {
+  type: 'match';
+  competitor: string;
+};
+
+export type MrpGeneratorPercentAboveLowestRule = MrpGeneratorRuleScope & {
+  type: 'percent_above_lowest';
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent: number;
+};
+
+export type MrpGeneratorMaxIncreaseRule = MrpGeneratorRuleScope & {
+  type: 'max_increase';
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent: number;
+};
+
+export type MrpGeneratorMaxDecreaseRule = MrpGeneratorRuleScope & {
+  type: 'max_decrease';
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent: number;
+};
+
+export type MrpGeneratorHoldBelowRule = MrpGeneratorRuleScope & {
+  type: 'hold_below';
+  /** @minimum 0 */
+  threshold: number;
+};
+
+export type MrpGeneratorRoundingRuleUnit = typeof MrpGeneratorRoundingRuleUnit[keyof typeof MrpGeneratorRoundingRuleUnit];
+
+
+export const MrpGeneratorRoundingRuleUnit = {
+  NUMBER_1: 1,
+  NUMBER_5: 5,
+  NUMBER_10: 10,
+  NUMBER_50: 50,
+} as const;
+
+export type MrpGeneratorRoundingRuleDirection = typeof MrpGeneratorRoundingRuleDirection[keyof typeof MrpGeneratorRoundingRuleDirection];
+
+
+export const MrpGeneratorRoundingRuleDirection = {
+  nearest: 'nearest',
+  up: 'up',
+  down: 'down',
+} as const;
+
+export type MrpGeneratorRoundingRule = MrpGeneratorRuleScope & {
+  type: 'rounding';
+  unit: MrpGeneratorRoundingRuleUnit;
+  direction: MrpGeneratorRoundingRuleDirection;
+};
+
+export type MrpGeneratorRule = MrpGeneratorScopeRule | MrpGeneratorPercentBelowRule | MrpGeneratorMatchRule | MrpGeneratorPercentAboveLowestRule | MrpGeneratorMaxIncreaseRule | MrpGeneratorMaxDecreaseRule | MrpGeneratorHoldBelowRule | MrpGeneratorRoundingRule;
+
+export type MrpGeneratorMarginFloorRule = MrpGeneratorRuleScope & {
+  type: 'margin_floor';
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent: number;
+};
+
+export type MrpGeneratorVolumeTierRule = MrpGeneratorRuleScope & {
+  type: 'volume_tier';
+  tier: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percentile?: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  maxIncreasePercent?: number;
+};
+
+export interface MrpGeneratorScenarioInput {
+  /** @minLength 1 */
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  scope?: MrpGeneratorScope;
+  /** @minItems 1 */
+  rules: MrpGeneratorRule[];
+}
+
+export interface MrpGeneratorScenarioPatch {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+  scope?: MrpGeneratorScope;
+  /** @minItems 1 */
+  rules?: MrpGeneratorRule[];
+}
+
+export interface MrpGeneratorRunInput {
+  asOf?: string;
+}
+
+export interface MrpGeneratorHandoffInput {
+  /** @minItems 1 */
+  itemCodes: string[];
+}
+
+export type MrpGeneratorScenario = MrpGeneratorScenarioInput & ({
+  id: number;
+  version: number;
+  /** @nullable */
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+});
+
+export interface MrpGeneratorSummary {
+  total: number;
+  suggested: number;
+  noChange: number;
+  excluded: number;
+  increases: number;
+  decreases: number;
+  /** @nullable */
+  medianIncreasePercent: number | null;
+  /** @nullable */
+  medianDecreasePercent: number | null;
+}
+
+export interface MrpGeneratorFreshnessCompetitor {
+  competitor: string;
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  ageDays: number | null;
+  stale: boolean;
+}
+
+export type MrpGeneratorSalesApiStatusStatus = typeof MrpGeneratorSalesApiStatusStatus[keyof typeof MrpGeneratorSalesApiStatusStatus];
+
+
+export const MrpGeneratorSalesApiStatusStatus = {
+  unavailable: 'unavailable',
+} as const;
+
+export interface MrpGeneratorSalesApiStatus {
+  available: boolean;
+  status: MrpGeneratorSalesApiStatusStatus;
+}
+
+export interface MrpGeneratorSourceFreshness {
+  asOf: string;
+  mrpDates: string[];
+  competitors: MrpGeneratorFreshnessCompetitor[];
+  sales: MrpGeneratorSalesApiStatus;
+}
+
+export interface MrpGeneratorRun {
+  runId: number;
+  scenarioId: number;
+  asOf: string;
+  inputFingerprint: string;
+  summary: MrpGeneratorSummary;
+  sourceFreshness: MrpGeneratorSourceFreshness;
+}
+
+export interface MrpGeneratorCompetitorValue {
+  competitor: string;
+  /** @nullable */
+  price: number | null;
+  /** @nullable */
+  effectivePrice: number | null;
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  ageDays: number | null;
+  stale: boolean;
+  matched: boolean;
+}
+
+export interface MrpGeneratorSnapshotProduct {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  seriesRange: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentDate: string | null;
+  /** @nullable */
+  currentRowId: number | null;
+  competitors: MrpGeneratorCompetitorValue[];
+}
+
+export interface MrpGeneratorInputSnapshot {
+  asOf: string;
+  products: MrpGeneratorSnapshotProduct[];
+  scope: MrpGeneratorScope;
+  rules: MrpGeneratorRule[];
+  stage: 1;
+}
+
+export interface MrpGeneratorPersistedRun {
+  id: number;
+  scenarioId: number;
+  asOf: string;
+  inputSnapshot: MrpGeneratorInputSnapshot;
+  inputFingerprint: string;
+  summary: MrpGeneratorSummary;
+  sourceFreshness: MrpGeneratorSourceFreshness;
+  /** @nullable */
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface MrpGeneratorFreshnessMrp {
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  ageDays: number | null;
+  stale: boolean;
+}
+
+export interface MrpGeneratorFreshness {
+  asOf: string;
+  mrp: MrpGeneratorFreshnessMrp;
+  competitors: MrpGeneratorFreshnessCompetitor[];
+  sales: MrpGeneratorSalesApiStatus;
+}
+
+export type MrpGeneratorTraceOutcome = typeof MrpGeneratorTraceOutcome[keyof typeof MrpGeneratorTraceOutcome];
+
+
+export const MrpGeneratorTraceOutcome = {
+  fired: 'fired',
+  blocked: 'blocked',
+  skipped: 'skipped',
+} as const;
+
+export interface MrpGeneratorTrace {
+  order: number;
+  ruleType: string;
+  outcome: MrpGeneratorTraceOutcome;
+  /** @nullable */
+  before: number | null;
+  /** @nullable */
+  after: number | null;
+  reason: string;
+  /** @nullable */
+  target?: number | null;
+}
+
+export type MrpGeneratorResultStatus = typeof MrpGeneratorResultStatus[keyof typeof MrpGeneratorResultStatus];
+
+
+export const MrpGeneratorResultStatus = {
+  suggested: 'suggested',
+  no_change: 'no_change',
+  excluded: 'excluded',
+} as const;
+
+export interface MrpGeneratorResult {
+  id: number;
+  runId: number;
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentDate: string | null;
+  /** @nullable */
+  currentRowId: number | null;
+  /** @nullable */
+  suggestedMrp: number | null;
+  status: MrpGeneratorResultStatus;
+  exclusions: string[];
+  competitorValues: MrpGeneratorCompetitorValue[];
+  trace: MrpGeneratorTrace[];
+  /** @nullable */
+  competitiveTarget: number | null;
+  /** @nullable */
+  bindingConstraint: string | null;
+  /** @nullable */
+  changePercent: number | null;
+  createdAt: string;
+}
+
+export interface MrpGeneratorScenarioSummary {
+  id: number;
+  name: string;
+}
+
+export interface MrpGeneratorRunDetail {
+  run: MrpGeneratorPersistedRun;
+  scenario: MrpGeneratorScenarioSummary;
+  results: MrpGeneratorResult[];
+}
+
+export interface MrpGeneratorResults {
+  runId: number;
+  results: MrpGeneratorResult[];
+}
+
+export type MrpGeneratorRunListItem = MrpGeneratorPersistedRun & ({
+  /** @nullable */
+  scenarioName: string | null;
+});
+
+export interface MrpGeneratorRunList {
+  runs: MrpGeneratorRunListItem[];
+  limit: number;
+}
+
+export interface MrpGeneratorComparisonDifference {
+  itemCode: string;
+  left: MrpGeneratorResult | null;
+  right: MrpGeneratorResult | null;
+}
+
+export interface MrpGeneratorComparison {
+  leftRunId: number;
+  rightRunId: number;
+  differences: MrpGeneratorComparisonDifference[];
+}
+
+export interface MrpGeneratorHandoffResponse {
+  batchId: number;
+  status: 'preview';
+  scenarioId: number;
+  runId: number;
+  rowsChanged: number;
+}
+
 export interface PriceEditorProduct {
   id: number;
   itemCode: string;
@@ -1809,10 +2234,66 @@ export interface MrpRevisionPreview {
   rows: MrpRevisionRow[];
 }
 
-export type MrpRevisionDetailBatch = { [key: string]: unknown };
+export type MrpRevisionBatchTargetType = typeof MrpRevisionBatchTargetType[keyof typeof MrpRevisionBatchTargetType];
+
+
+export const MrpRevisionBatchTargetType = {
+  mrp: 'mrp',
+  competitor: 'competitor',
+} as const;
+
+export type MrpRevisionBatchStatus = typeof MrpRevisionBatchStatus[keyof typeof MrpRevisionBatchStatus];
+
+
+export const MrpRevisionBatchStatus = {
+  preview: 'preview',
+  applied: 'applied',
+  discarded: 'discarded',
+  rolled_back: 'rolled_back',
+} as const;
+
+export interface MrpRevisionBatch {
+  id: number;
+  targetType: MrpRevisionBatchTargetType;
+  /** @nullable */
+  competitor: string | null;
+  /** @nullable */
+  lockedEffectiveDate: string | null;
+  fileName: string;
+  fileSha256: string;
+  fileSizeBytes: number;
+  /** @nullable */
+  uploadedBy: string | null;
+  /** @nullable */
+  reason: string | null;
+  status: MrpRevisionBatchStatus;
+  warningAcknowledged: boolean;
+  rowsInFile: number;
+  rowsChanged: number;
+  rowsNoop: number;
+  rowsRejected: number;
+  warningCount: number;
+  /** @nullable */
+  appliedAt: string | null;
+  /** @nullable */
+  rolledBackAt: string | null;
+  /** @nullable */
+  appliedBy: string | null;
+  /** @nullable */
+  rolledBackBy: string | null;
+  /** @nullable */
+  discardedAt: string | null;
+  /** @nullable */
+  discardedBy: string | null;
+  /** @nullable */
+  scenarioId: number | null;
+  /** @nullable */
+  runId: number | null;
+  createdAt: string;
+}
 
 export interface MrpRevisionDetail {
-  batch: MrpRevisionDetailBatch;
+  batch: MrpRevisionBatch;
   rows: MrpRevisionRow[];
 }
 
@@ -2543,5 +3024,23 @@ asOf?: string;
 
 export type GetPriceEditorEditsParams = {
 itemCode: string;
+};
+
+export type GetMrpGeneratorFreshnessParams = {
+asOf?: string;
+};
+
+export type ListMrpGeneratorRunsParams = {
+scenarioId?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+};
+
+export type CompareMrpGeneratorRunsParams = {
+leftRunId: number;
+rightRunId: number;
 };
 

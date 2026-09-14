@@ -5,6 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import DiscountSettings from "@/pages/discount-settings";
+import MrpGeneratorList from "@/pages/mrp-generator/index";
+import MrpGeneratorRun from "@/pages/mrp-generator/run";
+import MrpGeneratorCompare from "@/pages/mrp-generator/compare";
 import { useAuth, AuthProvider, PasswordChangeGate } from "@workspace/replit-auth-web";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -109,6 +112,9 @@ function Router() {
     <AppShell>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/mrp-generator" component={MrpGeneratorList} />
+        <Route path="/mrp-generator/compare" component={MrpGeneratorCompare} />
+        <Route path="/mrp-generator/runs/:id" component={MrpGeneratorRun} />
         <Route path="/settings/discounts" component={DiscountSettings} />
         <Route component={NotFound} />
       </Switch>

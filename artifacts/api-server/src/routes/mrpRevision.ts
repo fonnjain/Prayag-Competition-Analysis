@@ -626,8 +626,25 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
           `);
           const current = (await tx.select({ id: mrpPriceHistoryTable.id, mrp: mrpPriceHistoryTable.mrp })
             .from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
-          if (!current || current.mrp !== row.previousValue) {
-            throw Object.assign(new Error(`MRP row ${row.rowNumber} changed after preview; create a fresh preview.`), { httpStatus: 409 });
+          const identity = (await tx.select({
+            id: mrpPriceHistoryTable.id,
+            itemCode: mrpPriceHistoryTable.itemCode,
+            effectiveDate: mrpPriceHistoryTable.effectiveDate,
+            variant: mrpPriceHistoryTable.variant,
+            reviewStatus: mrpPriceHistoryTable.reviewStatus,
+            mrp: mrpPriceHistoryTable.mrp,
+          }).from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
+          if (
+            !current ||
+            !identity ||
+            identity.itemCode !== row.itemCode ||
+            identity.effectiveDate !== row.effectiveDate ||
+            identity.effectiveDate !== batch.lockedEffectiveDate ||
+            identity.variant !== "Standard" ||
+            identity.reviewStatus !== "approved" ||
+            current.mrp !== row.previousValue
+          ) {
+            throw Object.assign(new Error(`MRP row ${row.rowNumber} identity or value changed after preview; create a fresh preview.`), { httpStatus: 409 });
           }
           await tx.update(mrpPriceHistoryTable).set({
             mrp: row.newValue,

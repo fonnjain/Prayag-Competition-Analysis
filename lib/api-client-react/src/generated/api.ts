@@ -58,6 +58,7 @@ import type {
   CatalogFilters,
   CatalogProductDetail,
   CatalogProductList,
+  CompareMrpGeneratorRunsParams,
   ComparisonFilters,
   ComparisonList,
   ComparisonMatrix,
@@ -100,6 +101,7 @@ import type {
   GetComparisonParams,
   GetComparisonSummaryParams,
   GetMappingReviewParams,
+  GetMrpGeneratorFreshnessParams,
   GetMrpIncreasesParams,
   GetPriceEditorEditsParams,
   GetPriceEditorProductParams,
@@ -110,11 +112,26 @@ import type {
   GetPriceHistoryParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
+  ListMrpGeneratorRunsParams,
   LogoutBrowserSessionParams,
   LogoutSuccess,
   MappingReviewList,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
+  MrpGeneratorComparison,
+  MrpGeneratorFreshness,
+  MrpGeneratorHandoffInput,
+  MrpGeneratorHandoffResponse,
+  MrpGeneratorMetadata,
+  MrpGeneratorResults,
+  MrpGeneratorRun,
+  MrpGeneratorRunDetail,
+  MrpGeneratorRunInput,
+  MrpGeneratorRunList,
+  MrpGeneratorScenario,
+  MrpGeneratorScenarioInput,
+  MrpGeneratorScenarioPatch,
+  MrpGeneratorScopes,
   MrpIncreaseList,
   MrpRevisionDetail,
   MrpRevisionPreview,
@@ -229,6 +246,13 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
+
+
 export const getGetApiKeysUrl = () => {
 
 
@@ -299,6 +323,13 @@ export function useGetApiKeys<TData = Awaited<ReturnType<typeof getApiKeys>>, TE
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
+
+
 export const getCreateApiKeyUrl = () => {
 
 
@@ -6565,3 +6596,1014 @@ export function useGetPriceEditorEdits<TData = Awaited<ReturnType<typeof getPric
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
+
+
+export const getGetMrpGeneratorMetadataUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/metadata`
+}
+
+/**
+ * @summary Stage 1 MRP generator capabilities and disabled Sales rules
+ */
+export const getMrpGeneratorMetadata = async ( options?: RequestInit): Promise<MrpGeneratorMetadata> => {
+
+  return customFetch<MrpGeneratorMetadata>(getGetMrpGeneratorMetadataUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpGeneratorMetadataQueryKey = () => {
+    return [
+    `/api/mrp-generator/metadata`
+    ] as const;
+    }
+
+
+export const getGetMrpGeneratorMetadataQueryOptions = <TData = Awaited<ReturnType<typeof getMrpGeneratorMetadata>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorMetadata>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpGeneratorMetadataQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpGeneratorMetadata>>> = ({ signal }) => getMrpGeneratorMetadata({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorMetadata>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpGeneratorMetadataQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpGeneratorMetadata>>>
+export type GetMrpGeneratorMetadataQueryError = ErrorType<void>
+
+
+/**
+ * @summary Stage 1 MRP generator capabilities and disabled Sales rules
+ */
+
+export function useGetMrpGeneratorMetadata<TData = Awaited<ReturnType<typeof getMrpGeneratorMetadata>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorMetadata>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpGeneratorMetadataQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMrpGeneratorScopesUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/scopes`
+}
+
+/**
+ * @summary Available generator product scopes
+ */
+export const getMrpGeneratorScopes = async ( options?: RequestInit): Promise<MrpGeneratorScopes> => {
+
+  return customFetch<MrpGeneratorScopes>(getGetMrpGeneratorScopesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpGeneratorScopesQueryKey = () => {
+    return [
+    `/api/mrp-generator/scopes`
+    ] as const;
+    }
+
+
+export const getGetMrpGeneratorScopesQueryOptions = <TData = Awaited<ReturnType<typeof getMrpGeneratorScopes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorScopes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpGeneratorScopesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpGeneratorScopes>>> = ({ signal }) => getMrpGeneratorScopes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorScopes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpGeneratorScopesQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpGeneratorScopes>>>
+export type GetMrpGeneratorScopesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Available generator product scopes
+ */
+
+export function useGetMrpGeneratorScopes<TData = Awaited<ReturnType<typeof getMrpGeneratorScopes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorScopes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpGeneratorScopesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMrpGeneratorFreshnessUrl = (params?: GetMrpGeneratorFreshnessParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mrp-generator/freshness?${stringifiedParams}` : `/api/mrp-generator/freshness`
+}
+
+export const getMrpGeneratorFreshness = async (params?: GetMrpGeneratorFreshnessParams, options?: RequestInit): Promise<MrpGeneratorFreshness> => {
+
+  return customFetch<MrpGeneratorFreshness>(getGetMrpGeneratorFreshnessUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpGeneratorFreshnessQueryKey = (params?: GetMrpGeneratorFreshnessParams,) => {
+    return [
+    `/api/mrp-generator/freshness`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMrpGeneratorFreshnessQueryOptions = <TData = Awaited<ReturnType<typeof getMrpGeneratorFreshness>>, TError = ErrorType<unknown>>(params?: GetMrpGeneratorFreshnessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorFreshness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpGeneratorFreshnessQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpGeneratorFreshness>>> = ({ signal }) => getMrpGeneratorFreshness(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorFreshness>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpGeneratorFreshnessQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpGeneratorFreshness>>>
+export type GetMrpGeneratorFreshnessQueryError = ErrorType<unknown>
+
+
+
+export function useGetMrpGeneratorFreshness<TData = Awaited<ReturnType<typeof getMrpGeneratorFreshness>>, TError = ErrorType<unknown>>(
+ params?: GetMrpGeneratorFreshnessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorFreshness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpGeneratorFreshnessQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMrpGeneratorScenariosUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/scenarios`
+}
+
+export const listMrpGeneratorScenarios = async ( options?: RequestInit): Promise<MrpGeneratorScenario[]> => {
+
+  return customFetch<MrpGeneratorScenario[]>(getListMrpGeneratorScenariosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMrpGeneratorScenariosQueryKey = () => {
+    return [
+    `/api/mrp-generator/scenarios`
+    ] as const;
+    }
+
+
+export const getListMrpGeneratorScenariosQueryOptions = <TData = Awaited<ReturnType<typeof listMrpGeneratorScenarios>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMrpGeneratorScenarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMrpGeneratorScenariosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMrpGeneratorScenarios>>> = ({ signal }) => listMrpGeneratorScenarios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMrpGeneratorScenarios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMrpGeneratorScenariosQueryResult = NonNullable<Awaited<ReturnType<typeof listMrpGeneratorScenarios>>>
+export type ListMrpGeneratorScenariosQueryError = ErrorType<unknown>
+
+
+
+export function useListMrpGeneratorScenarios<TData = Awaited<ReturnType<typeof listMrpGeneratorScenarios>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMrpGeneratorScenarios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMrpGeneratorScenariosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateMrpGeneratorScenarioUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/scenarios`
+}
+
+export const createMrpGeneratorScenario = async (mrpGeneratorScenarioInput: MrpGeneratorScenarioInput, options?: RequestInit): Promise<MrpGeneratorScenario> => {
+
+  return customFetch<MrpGeneratorScenario>(getCreateMrpGeneratorScenarioUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpGeneratorScenarioInput,)
+  }
+);}
+
+
+
+
+export const getCreateMrpGeneratorScenarioMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMrpGeneratorScenario>>, TError,{data: BodyType<MrpGeneratorScenarioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMrpGeneratorScenario>>, TError,{data: BodyType<MrpGeneratorScenarioInput>}, TContext> => {
+
+const mutationKey = ['createMrpGeneratorScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMrpGeneratorScenario>>, {data: BodyType<MrpGeneratorScenarioInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMrpGeneratorScenario(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMrpGeneratorScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof createMrpGeneratorScenario>>>
+    export type CreateMrpGeneratorScenarioMutationBody = BodyType<MrpGeneratorScenarioInput>
+    export type CreateMrpGeneratorScenarioMutationError = ErrorType<void>
+
+    export const useCreateMrpGeneratorScenario = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMrpGeneratorScenario>>, TError,{data: BodyType<MrpGeneratorScenarioInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMrpGeneratorScenario>>,
+        TError,
+        {data: BodyType<MrpGeneratorScenarioInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getGetMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}`
+}
+
+export const getMrpGeneratorScenario = async (scenarioId: number, options?: RequestInit): Promise<MrpGeneratorScenario> => {
+
+  return customFetch<MrpGeneratorScenario>(getGetMrpGeneratorScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpGeneratorScenarioQueryKey = (scenarioId: number,) => {
+    return [
+    `/api/mrp-generator/scenarios/${scenarioId}`
+    ] as const;
+    }
+
+
+export const getGetMrpGeneratorScenarioQueryOptions = <TData = Awaited<ReturnType<typeof getMrpGeneratorScenario>>, TError = ErrorType<unknown>>(scenarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorScenario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpGeneratorScenarioQueryKey(scenarioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpGeneratorScenario>>> = ({ signal }) => getMrpGeneratorScenario(scenarioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(scenarioId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorScenario>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpGeneratorScenarioQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpGeneratorScenario>>>
+export type GetMrpGeneratorScenarioQueryError = ErrorType<unknown>
+
+
+
+export function useGetMrpGeneratorScenario<TData = Awaited<ReturnType<typeof getMrpGeneratorScenario>>, TError = ErrorType<unknown>>(
+ scenarioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorScenario>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpGeneratorScenarioQueryOptions(scenarioId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}`
+}
+
+export const updateMrpGeneratorScenario = async (scenarioId: number,
+    mrpGeneratorScenarioPatch: MrpGeneratorScenarioPatch, options?: RequestInit): Promise<MrpGeneratorScenario> => {
+
+  return customFetch<MrpGeneratorScenario>(getUpdateMrpGeneratorScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpGeneratorScenarioPatch,)
+  }
+);}
+
+
+
+
+export const getUpdateMrpGeneratorScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMrpGeneratorScenario>>, TError,{scenarioId: number;data: BodyType<MrpGeneratorScenarioPatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMrpGeneratorScenario>>, TError,{scenarioId: number;data: BodyType<MrpGeneratorScenarioPatch>}, TContext> => {
+
+const mutationKey = ['updateMrpGeneratorScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMrpGeneratorScenario>>, {scenarioId: number;data: BodyType<MrpGeneratorScenarioPatch>}> = (props) => {
+          const {scenarioId,data} = props ?? {};
+
+          return  updateMrpGeneratorScenario(scenarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMrpGeneratorScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof updateMrpGeneratorScenario>>>
+    export type UpdateMrpGeneratorScenarioMutationBody = BodyType<MrpGeneratorScenarioPatch>
+    export type UpdateMrpGeneratorScenarioMutationError = ErrorType<unknown>
+
+    export const useUpdateMrpGeneratorScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMrpGeneratorScenario>>, TError,{scenarioId: number;data: BodyType<MrpGeneratorScenarioPatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMrpGeneratorScenario>>,
+        TError,
+        {scenarioId: number;data: BodyType<MrpGeneratorScenarioPatch>},
+        TContext
+      > => {
+      return useMutation(getUpdateMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getDeleteMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}`
+}
+
+export const deleteMrpGeneratorScenario = async (scenarioId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteMrpGeneratorScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMrpGeneratorScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMrpGeneratorScenario>>, TError,{scenarioId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMrpGeneratorScenario>>, TError,{scenarioId: number}, TContext> => {
+
+const mutationKey = ['deleteMrpGeneratorScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMrpGeneratorScenario>>, {scenarioId: number}> = (props) => {
+          const {scenarioId} = props ?? {};
+
+          return  deleteMrpGeneratorScenario(scenarioId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMrpGeneratorScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMrpGeneratorScenario>>>
+
+    export type DeleteMrpGeneratorScenarioMutationError = ErrorType<unknown>
+
+    export const useDeleteMrpGeneratorScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMrpGeneratorScenario>>, TError,{scenarioId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMrpGeneratorScenario>>,
+        TError,
+        {scenarioId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getRunMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/scenarios/${scenarioId}/run`
+}
+
+export const runMrpGeneratorScenario = async (scenarioId: number,
+    mrpGeneratorRunInput?: MrpGeneratorRunInput, options?: RequestInit): Promise<MrpGeneratorRun> => {
+
+  return customFetch<MrpGeneratorRun>(getRunMrpGeneratorScenarioUrl(scenarioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpGeneratorRunInput,)
+  }
+);}
+
+
+
+
+export const getRunMrpGeneratorScenarioMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}, TContext> => {
+
+const mutationKey = ['runMrpGeneratorScenario'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, {scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}> = (props) => {
+          const {scenarioId,data} = props ?? {};
+
+          return  runMrpGeneratorScenario(scenarioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunMrpGeneratorScenarioMutationResult = NonNullable<Awaited<ReturnType<typeof runMrpGeneratorScenario>>>
+    export type RunMrpGeneratorScenarioMutationBody = BodyType<MrpGeneratorRunInput> | undefined
+    export type RunMrpGeneratorScenarioMutationError = ErrorType<unknown>
+
+    export const useRunMrpGeneratorScenario = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runMrpGeneratorScenario>>,
+        TError,
+        {scenarioId: number;data?: BodyType<MrpGeneratorRunInput>},
+        TContext
+      > => {
+      return useMutation(getRunMrpGeneratorScenarioMutationOptions(options));
+    }
+
+export const getListMrpGeneratorRunsUrl = (params?: ListMrpGeneratorRunsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mrp-generator/runs?${stringifiedParams}` : `/api/mrp-generator/runs`
+}
+
+/**
+ * @summary List immutable generator runs with scenario names
+ */
+export const listMrpGeneratorRuns = async (params?: ListMrpGeneratorRunsParams, options?: RequestInit): Promise<MrpGeneratorRunList> => {
+
+  return customFetch<MrpGeneratorRunList>(getListMrpGeneratorRunsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMrpGeneratorRunsQueryKey = (params?: ListMrpGeneratorRunsParams,) => {
+    return [
+    `/api/mrp-generator/runs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMrpGeneratorRunsQueryOptions = <TData = Awaited<ReturnType<typeof listMrpGeneratorRuns>>, TError = ErrorType<void>>(params?: ListMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMrpGeneratorRunsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMrpGeneratorRuns>>> = ({ signal }) => listMrpGeneratorRuns(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMrpGeneratorRuns>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMrpGeneratorRunsQueryResult = NonNullable<Awaited<ReturnType<typeof listMrpGeneratorRuns>>>
+export type ListMrpGeneratorRunsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List immutable generator runs with scenario names
+ */
+
+export function useListMrpGeneratorRuns<TData = Awaited<ReturnType<typeof listMrpGeneratorRuns>>, TError = ErrorType<void>>(
+ params?: ListMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMrpGeneratorRunsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMrpGeneratorRunUrl = (runId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/runs/${runId}`
+}
+
+export const getMrpGeneratorRun = async (runId: number, options?: RequestInit): Promise<MrpGeneratorRunDetail> => {
+
+  return customFetch<MrpGeneratorRunDetail>(getGetMrpGeneratorRunUrl(runId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpGeneratorRunQueryKey = (runId: number,) => {
+    return [
+    `/api/mrp-generator/runs/${runId}`
+    ] as const;
+    }
+
+
+export const getGetMrpGeneratorRunQueryOptions = <TData = Awaited<ReturnType<typeof getMrpGeneratorRun>>, TError = ErrorType<unknown>>(runId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorRun>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpGeneratorRunQueryKey(runId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpGeneratorRun>>> = ({ signal }) => getMrpGeneratorRun(runId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(runId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorRun>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpGeneratorRunQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpGeneratorRun>>>
+export type GetMrpGeneratorRunQueryError = ErrorType<unknown>
+
+
+
+export function useGetMrpGeneratorRun<TData = Awaited<ReturnType<typeof getMrpGeneratorRun>>, TError = ErrorType<unknown>>(
+ runId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorRun>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpGeneratorRunQueryOptions(runId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMrpGeneratorResultsUrl = (runId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/runs/${runId}/results`
+}
+
+export const getMrpGeneratorResults = async (runId: number, options?: RequestInit): Promise<MrpGeneratorResults> => {
+
+  return customFetch<MrpGeneratorResults>(getGetMrpGeneratorResultsUrl(runId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpGeneratorResultsQueryKey = (runId: number,) => {
+    return [
+    `/api/mrp-generator/runs/${runId}/results`
+    ] as const;
+    }
+
+
+export const getGetMrpGeneratorResultsQueryOptions = <TData = Awaited<ReturnType<typeof getMrpGeneratorResults>>, TError = ErrorType<unknown>>(runId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpGeneratorResultsQueryKey(runId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpGeneratorResults>>> = ({ signal }) => getMrpGeneratorResults(runId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(runId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorResults>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpGeneratorResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpGeneratorResults>>>
+export type GetMrpGeneratorResultsQueryError = ErrorType<unknown>
+
+
+
+export function useGetMrpGeneratorResults<TData = Awaited<ReturnType<typeof getMrpGeneratorResults>>, TError = ErrorType<unknown>>(
+ runId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpGeneratorResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpGeneratorResultsQueryOptions(runId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCompareMrpGeneratorRunsUrl = (params: CompareMrpGeneratorRunsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mrp-generator/compare?${stringifiedParams}` : `/api/mrp-generator/compare`
+}
+
+export const compareMrpGeneratorRuns = async (params: CompareMrpGeneratorRunsParams, options?: RequestInit): Promise<MrpGeneratorComparison> => {
+
+  return customFetch<MrpGeneratorComparison>(getCompareMrpGeneratorRunsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompareMrpGeneratorRunsQueryKey = (params?: CompareMrpGeneratorRunsParams,) => {
+    return [
+    `/api/mrp-generator/compare`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCompareMrpGeneratorRunsQueryOptions = <TData = Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError = ErrorType<unknown>>(params: CompareMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCompareMrpGeneratorRunsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>> = ({ signal }) => compareMrpGeneratorRuns(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CompareMrpGeneratorRunsQueryResult = NonNullable<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>>
+export type CompareMrpGeneratorRunsQueryError = ErrorType<unknown>
+
+
+
+export function useCompareMrpGeneratorRuns<TData = Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError = ErrorType<unknown>>(
+ params: CompareMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCompareMrpGeneratorRunsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getHandoffMrpGeneratorRunUrl = (runId: number,) => {
+
+
+
+
+  return `/api/mrp-generator/runs/${runId}/handoff`
+}
+
+export const handoffMrpGeneratorRun = async (runId: number,
+    mrpGeneratorHandoffInput: MrpGeneratorHandoffInput, options?: RequestInit): Promise<MrpGeneratorHandoffResponse> => {
+
+  return customFetch<MrpGeneratorHandoffResponse>(getHandoffMrpGeneratorRunUrl(runId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpGeneratorHandoffInput,)
+  }
+);}
+
+
+
+
+export const getHandoffMrpGeneratorRunMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof handoffMrpGeneratorRun>>, TError,{runId: number;data: BodyType<MrpGeneratorHandoffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof handoffMrpGeneratorRun>>, TError,{runId: number;data: BodyType<MrpGeneratorHandoffInput>}, TContext> => {
+
+const mutationKey = ['handoffMrpGeneratorRun'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof handoffMrpGeneratorRun>>, {runId: number;data: BodyType<MrpGeneratorHandoffInput>}> = (props) => {
+          const {runId,data} = props ?? {};
+
+          return  handoffMrpGeneratorRun(runId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type HandoffMrpGeneratorRunMutationResult = NonNullable<Awaited<ReturnType<typeof handoffMrpGeneratorRun>>>
+    export type HandoffMrpGeneratorRunMutationBody = BodyType<MrpGeneratorHandoffInput>
+    export type HandoffMrpGeneratorRunMutationError = ErrorType<void>
+
+    export const useHandoffMrpGeneratorRun = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof handoffMrpGeneratorRun>>, TError,{runId: number;data: BodyType<MrpGeneratorHandoffInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof handoffMrpGeneratorRun>>,
+        TError,
+        {runId: number;data: BodyType<MrpGeneratorHandoffInput>},
+        TContext
+      > => {
+      return useMutation(getHandoffMrpGeneratorRunMutationOptions(options));
+    }

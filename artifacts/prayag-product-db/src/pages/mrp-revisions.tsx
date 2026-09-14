@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ type RevisionPreview = {
   dateMismatchCount: number;
   dateMismatchDates: string[];
   status: "preview" | "applied" | "discarded" | "rolled_back";
+  scenarioId?: number | null;
+  runId?: number | null;
   rows: RevisionRow[];
 };
 
@@ -112,6 +114,47 @@ export default function MrpRevisionsPage() {
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  useEffect(() => {
+    const rawBatchId = new URLSearchParams(window.location.search).get("batchId");
+    if (!rawBatchId || !/^\d+$/.test(rawBatchId)) return;
+    let cancelled = false;
+    fetch(`/api/catalog/mrp-revisions/${rawBatchId}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load handed-off revision preview.");
+        return data;
+      })
+      .then(({ batch, rows }) => {
+        if (cancelled) return;
+        setTargetType(batch.targetType);
+        setEffectiveDate(batch.lockedEffectiveDate ?? "");
+        setReason(batch.reason ?? "");
+        setPreview({
+          batchId: batch.id,
+          targetType: batch.targetType,
+          competitor: batch.competitor,
+          effectiveDate: batch.lockedEffectiveDate,
+          fileName: batch.fileName,
+          fileSha256: batch.fileSha256,
+          rowsInFile: batch.rowsInFile,
+          rowsChanged: batch.rowsChanged,
+          rowsNoop: batch.rowsNoop,
+          rowsRejected: batch.rowsRejected,
+          warningCount: batch.warningCount,
+          hasEffectiveDateColumn: true,
+          dateMismatchCount: 0,
+          dateMismatchDates: [],
+          status: batch.status,
+          scenarioId: batch.scenarioId,
+          runId: batch.runId,
+          rows,
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) toast({ title: "Preview could not load", description: error.message, variant: "destructive" });
+      });
+    return () => { cancelled = true; };
+  }, [toast]);
   const scopes = useQuery<RevisionScopes>({
     queryKey: ["catalog", "mrp-revisions", "scopes"],
     queryFn: async () => {
@@ -283,6 +326,11 @@ export default function MrpRevisionsPage() {
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
           Choose an existing period before uploading. Workbook dates are checked against that choice, so this tool cannot create a product or a price period.
         </p>
+        {preview?.scenarioId && preview?.runId && (
+          <p className="mt-2 rounded-md border border-[#2d7c78]/30 bg-[#2d7c78]/5 px-3 py-2 text-sm text-[#215e5a]">
+            Generated from MRP Generator scenario {preview.scenarioId}, immutable run {preview.runId}. This is still a preview; no price changes until Apply.
+          </p>
+        )}
       </div>
 
       <form data-activity="mrp_revision.preview" onSubmit={previewWorkbook} className="grid min-w-0 gap-5 rounded-xl border bg-card p-5 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

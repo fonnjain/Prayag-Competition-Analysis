@@ -304,6 +304,11 @@ export const mrpRevisionBatchesTable = pgTable(
     rolledBackBy: text("rolled_back_by"),
     discardedAt: timestamp("discarded_at", { withTimezone: true }),
     discardedBy: text("discarded_by"),
+    // Nullable provenance for previews produced by the deterministic MRP
+    // generator. These columns intentionally do not change the existing
+    // revision/apply lifecycle.
+    scenarioId: integer("scenario_id"),
+    runId: integer("run_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -312,6 +317,74 @@ export const mrpRevisionBatchesTable = pgTable(
     index("mrp_revision_batches_created_idx").on(t.createdAt),
     index("mrp_revision_batches_status_idx").on(t.status),
     index("mrp_revision_batches_hash_idx").on(t.fileSha256),
+  ],
+);
+
+// Named, immutable inputs to the deterministic MRP generator. JSONB is used
+// for scope/rules so adding a validated rule type remains additive.
+export const mrpGeneratorScenariosTable = pgTable(
+  "mrp_generator_scenarios",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    scope: text("scope").notNull(),
+    rules: text("rules").notNull(),
+    version: integer("version").notNull().default(1),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("mrp_generator_scenarios_name_idx").on(t.name),
+    index("mrp_generator_scenarios_created_idx").on(t.createdAt),
+  ],
+);
+
+export const mrpGeneratorRunsTable = pgTable(
+  "mrp_generator_runs",
+  {
+    id: serial("id").primaryKey(),
+    scenarioId: integer("scenario_id").notNull().references(() => mrpGeneratorScenariosTable.id),
+    asOf: date("as_of").notNull(),
+    inputSnapshot: text("input_snapshot").notNull(),
+    inputFingerprint: text("input_fingerprint").notNull(),
+    summary: text("summary").notNull(),
+    sourceFreshness: text("source_freshness").notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("mrp_generator_runs_scenario_idx").on(t.scenarioId, t.createdAt),
+    index("mrp_generator_runs_fingerprint_idx").on(t.inputFingerprint),
+  ],
+);
+
+export const mrpGeneratorResultsTable = pgTable(
+  "mrp_generator_results",
+  {
+    id: serial("id").primaryKey(),
+    runId: integer("run_id").notNull().references(() => mrpGeneratorRunsTable.id),
+    itemCode: text("item_code").notNull(),
+    productName: text("product_name"),
+    division: text("division"),
+    category: text("category"),
+    currentMrp: doublePrecision("current_mrp"),
+    currentDate: date("current_date"),
+    currentRowId: integer("current_row_id"),
+    suggestedMrp: doublePrecision("suggested_mrp"),
+    status: text("status").notNull(),
+    exclusions: text("exclusions").notNull().default("[]"),
+    competitorValues: text("competitor_values").notNull().default("[]"),
+    trace: text("trace").notNull().default("[]"),
+    competitiveTarget: doublePrecision("competitive_target"),
+    bindingConstraint: text("binding_constraint"),
+    changePercent: doublePrecision("change_percent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("mrp_generator_results_run_idx").on(t.runId, t.itemCode),
+    uniqueIndex("mrp_generator_results_run_code_idx").on(t.runId, t.itemCode),
   ],
 );
 

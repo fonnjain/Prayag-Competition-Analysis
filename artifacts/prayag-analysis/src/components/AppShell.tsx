@@ -13,6 +13,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  Zap,
 } from "lucide-react";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
@@ -36,12 +37,16 @@ const APP_SWITCHER: AppSwitcherEntry[] = [
 // ── Analysis in-app nav ───────────────────────────────────────────────────────
 const ANALYSIS_NAV = [
   { path: "/", label: "Dashboard", icon: BarChart3 },
+  { path: "/mrp-generator", label: "MRP Generator", icon: Zap },
   { path: "/settings/discounts", label: "Discount Settings", icon: Settings },
 ] as const;
 
 // ── Breadcrumb label map keyed on wouter path ─────────────────────────────────
 const BREADCRUMB_LABELS: Record<string, string> = {
   "/": "Dashboard",
+  "/mrp-generator": "MRP Generator",
+  "/mrp-generator/runs/:id": "Run Detail",
+  "/mrp-generator/compare": "Compare Runs",
   "/settings/discounts": "Discount Settings",
 };
 
