@@ -1,0 +1,169 @@
+# P012 — COMPETITION — Make the MRP Generator usable
+
+> **P012** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P012` when reporting back.
+
+The engine is right. The way in is not. Today the page opens on *"No scenarios found. Create one to begin"*, then a modal of filters, then *"No rules defined."* Someone who knows pricing but not this tool has nothing to react to.
+
+---
+
+## 0. First, check the connection
+
+The page shows **"Sales API is currently unavailable upstream. Rules are unavailable."** But a full traversal succeeded earlier — 11,825 sales rows across 3,138 codes, 6,035 margin rows across 3,159.
+
+Report whether the snapshot is stale, the cache expired, or the call is failing again. Key 6's row now records path and status, so the answer is on it.
+
+The rest of this prompt does not depend on the answer — see section 2.
+
+---
+
+## 1. Ship a working default scenario
+
+The page must open with a scenario already in it, complete and runnable.
+
+```
+Name         Match competition, stay below
+Description  Starting point. Edit freely -- it explains itself as you change it.
+Scope        All divisions, products with a competitor mapping
+Rules        Where a competitor is mapped, price 5% below the nearest one
+             No increase above 15%, no decrease below 5%
+             No change where MRP is under Rs 50
+             Round to the nearest rupee
+```
+
+It should be **editable, duplicable, and restorable** — someone will break it while learning, and "reset to default" must bring it back.
+
+Show what it would do **before** the user runs it: *"Would evaluate 1,840 products; 412 would change."* A default that has to be run to be understood is barely better than a blank page.
+
+---
+
+## 2. Margin is optional, and off by default
+
+**The generator must work with no margin data at all.** Competitor prices alone are a complete basis for a pricing scenario, and margin data currently covers Apr–Jun 2026 with PTMT partly held.
+
+A checkbox, unticked by default:
+
+```
+[ ] Apply gross-margin floors
+    Uses margin from the Sales system. Currently Apr-Jun 2026.
+    Without this, suggestions are based on competitor prices only.
+```
+
+**When unticked**, margin rules do not appear, do not evaluate, and produce no exclusions. A product is not excluded for missing margin data when margin is not being used.
+
+**When ticked and the Sales API is unavailable**, say so at the checkbox and leave it unticked — do not disable the whole page. Today a Sales outage makes the generator unusable, and it should not.
+
+Volume tiers follow the same pattern: a separate checkbox, off by default, sales data required.
+
+**So the page has three working modes:**
+
+| Mode | Needs | Answers |
+|---|---|---|
+| Competitive only *(default)* | this app alone | where are we against the competition |
+| + margin floors | margin feed | …without going below our floor |
+| + volume tiers | sales feed | …weighted by what actually sells |
+
+Mode one must never be blocked by the other two being unavailable.
+
+---
+
+## 3. Rules as a table, not a builder
+
+This is the main change. Most of what Prayag wants to express is one sentence:
+
+> *"Against Sparsh, on Black Pearl, be 5% below."*
+
+That is a row, not a rule tree.
+
+```
+ORDER  COMPETITOR      APPLIES TO              TARGET        LIMIT
+  1    Sparsh Pearl    Black Pearl series      5% below      max +15%
+  2    Ashirvad        CPVC Fittings           match         max +15%
+  3    Ashirvad        AGRI Pipe               2% below      max +10%
+  4    nearest          everything else        8% below      max +15%
+
+                                               [ + Add row ]
+```
+
+**Columns:**
+
+- **Competitor** — a named one, or *nearest*, or *lowest*
+- **Applies to** — division, series, category, or an explicit code list. Free text search, not a nested menu.
+- **Target** — *N% below* · *match* · *N% above* · *close N% of the gap*
+- **Limit** — the maximum movement this row may cause
+
+**Rows evaluate in order, first match wins.** Put the specific rows above the general ones. Show which row matched each product in the output, by number.
+
+A **catch-all last row** is strongly advisable — without one, products matching nothing are silently untouched. Warn if the table has no catch-all, and say how many products fall through.
+
+Each row shows its reach as it is typed: *"matches 340 products, 287 have a Sparsh price."*
+
+---
+
+## 4. Advanced mode keeps everything built under P011
+
+The band model, capture shares by band, position classification, portfolio constraint and headroom reporting are all correct and must remain. They move behind **Advanced**, not away.
+
+```
+[ Simple ]  [ Advanced ]
+```
+
+Simple is the table above. Advanced is the full policy model.
+
+A simple table should be **promotable to advanced** — turn the rows into policy rules and let the user carry on. Not the reverse; an advanced policy cannot always be expressed as a table, and quietly dropping rules to fit would be worse than refusing.
+
+---
+
+## 5. What the output must say
+
+Per product, in one line, which row decided it:
+
+```
+151  Ball Cock 15mm    Rs 336 → Rs 314    −6.5%
+     Row 1: Sparsh Pearl, Black Pearl, 5% below -> Sparsh Rs 330
+```
+
+Run summary in plain terms:
+
+```
+1,840 evaluated       412 would change       1,265 no change
+  163 no competitor price -- untouched
+                       Row 1  287    Row 2  61    Row 3  44    Row 4  20
+```
+
+Row-by-row counts matter. If row 3 matched nothing, the user has written a rule that does not apply and should see that immediately.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  The page opens with a complete, runnable default scenario.
+2.  The default can be edited, duplicated, and restored after being changed.
+3.  With margin unticked, the generator runs on competitor prices alone and
+    excludes nobody for missing margin.
+4.  With the Sales API unavailable, the page still runs a competitive
+    scenario; only the margin and volume checkboxes report unavailable.
+5.  A rule table with four rows evaluates in order, first match wins, and the
+    output names the matching row per product.
+6.  A table with no catch-all row warns and reports how many products fall
+    through.
+7.  Each row shows its match count as it is edited.
+8.  Switching to Advanced preserves the rules; switching back warns if
+    anything cannot be expressed as a table.
+9.  Row-level match counts appear in the run summary.
+10. No price is written by any action.
+```
+
+Test 4 is the one that changes daily usability — the generator must not be hostage to an upstream outage. Test 10 has not changed.
+
+---
+
+## 7. Report
+
+- The default scenario as shipped, and what it evaluates against live data.
+- How the three modes appear when the Sales feed is up, and when it is down.
+- The rule table, with a worked four-row example and its match counts.
+- What Advanced shows, and what happens converting between the two.
+- Section 0: why the page reported the Sales API unavailable.
