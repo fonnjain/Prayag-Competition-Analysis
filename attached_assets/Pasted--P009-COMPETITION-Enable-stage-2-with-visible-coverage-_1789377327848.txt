@@ -1,0 +1,156 @@
+# P009 — COMPETITION — Enable stage 2 with visible coverage limits
+
+> **P009** · app: **COMPETITION** (`prayag-price.com` / `fonnjain/Prayag-Competition-Analysis`)
+> **THIS PROMPT CHANGES CODE.** It is not a read-only query.
+> Quote `P009` when reporting back.
+
+Enable the margin and volume rules. The known data gaps do not block this — they reduce how many products can be priced, and the generator is already designed to exclude and explain rather than guess.
+
+**A tool that prices 3,163 of 6,106 products and says why not the rest is more useful than no tool.** The gaps become visible constraints, not reasons to wait.
+
+---
+
+## 1. What the gaps actually are
+
+Measured, not estimated:
+
+| Gap | Size | Effect on the generator |
+|---|---|---|
+| Catalogue codes with no FY2026-27 sales | 2,943 of 6,106 | Excluded from volume rules; already designed |
+| Sold codes not resolving to the catalogue | 814, ₹9.36 Cr | Not in scope — no price to suggest |
+| Margin data ends | June 2026 | Margin rules run on Apr–Jun; state the age |
+| PTMT margin held | Jan–Apr 2026 (H1) | Excluded; hold shown with its reason |
+| FY2026-27 reconciliation | −₹10.8 L on ₹135.23 Cr | **0.08%** — see below |
+| Codes awaiting Prayag confirmation | 10, ₹2.63 Cr | Excluded until confirmed |
+
+**On the reconciliation gap.** It is 0.08% of the total, and the rules use **item-level margin percentages**, not the aggregate. A discrepancy of that size cannot move a product's margin percentage enough to change which side of a floor it falls. It must still be shown — see section 3 — but it is not a reason to hold the feature.
+
+---
+
+## 2. The Sales API credential
+
+**An administrator will place the key in Replit Secrets.** Do not attempt to generate, request or hard-code one.
+
+```
+SALES_API_KEY        the X-API-Key value for prayag-sales.com
+SALES_API_BASE_URL   https://prayag-sales.com
+```
+
+Confirm those names, or state the names you expect, before the key is set — a mismatch between what you read and what is set will look like an authentication failure and waste a round trip.
+
+**Handling:**
+
+- **Server-side only.** The key must never reach the browser, appear in a client bundle, or be returned by any endpoint. The frontend calls this application; this application calls Sales.
+- **Never logged.** Not in request logs, not in error messages, not in a failed-fetch trace.
+- **Fail loudly if absent.** If `SALES_API_KEY` is unset, margin and volume rules must be **visibly unavailable with the reason stated** — not silently skipped, and not treated as "no data" for every product. A missing credential and a product with no margin are different problems and must not look alike.
+- **Handle 401 distinctly.** An expired or revoked key must report as an authentication failure, not as empty coverage.
+
+---
+
+## 3. Enable the rules
+
+Turn on the per-category margin floors and the A/B/C and value-threshold volume tiers built under P001r2. The server currently rejects attempts to save them; remove that rejection once the client is connected and authenticating.
+
+---
+
+## 4. Coverage is part of the output, not a footnote
+
+Every run shows what it could and could not reach, **before** the suggestions:
+
+```
+SCOPE
+  6,106 catalogue products
+  3,163 have FY2026-27 sales        volume rules apply
+  2,943 have none                   excluded from volume rules
+  2,421 have June 2026 margin       margin rules apply
+
+DATA AGE
+  Prayag MRP        current
+  Sparsh Pearl      01 Jul 2026      2 months old
+  Ashirvad          01 Mar 2025      18 MONTHS OLD
+  Margin            Jun 2026         3 months old, latest available
+  Sales             FY2026-27 Apr-Aug, provisional (open months)
+
+KNOWN LIMITS IN EFFECT
+  PTMT margin Jan-Apr 2026 held (H1) — excluded
+  Sales register is Rs 10.8 L below control on Rs 135.23 Cr (0.08%)
+  10 codes await Prayag confirmation — excluded, Rs 2.63 Cr of sales
+```
+
+Nobody should have to ask how complete a run was. **If a limit is not on that panel, it does not exist as far as the user is concerned** — and a limit discovered after a price has changed is worse than one that blocked the run.
+
+---
+
+## 5. Exclusions stay first-class
+
+Already built, and must survive this change: an excluded product appears in the output **with its reason**, never silently absent and never substituted with an average.
+
+Extend the reasons to cover the new cases:
+
+```
+no FY sales                 volume tier cannot be assigned
+margin month held (H1)      margin floor cannot be evaluated
+margin data ends Jun 2026   margin figure is 3 months old   [warn, not exclude]
+code awaiting confirmation  sales attribution unresolved
+```
+
+The third is a **warning, not an exclusion**. Three-month-old margin is usable; eighteen-month-old competitor pricing is more questionable and is already flagged. Let the user decide, but make sure they are told.
+
+---
+
+## 6. One new rule worth having
+
+**Confidence tiering.** Let a scenario be restricted to products where all inputs are present and current:
+
+```
+Run only where:
+  [x] competitor price exists
+  [x] competitor price is under 12 months old
+  [x] FY sales data exists
+  [x] margin data exists and is not held
+```
+
+This is the shape most users will actually want for a first run — price the products you can be confident about, then look at the rest separately. Without it, someone will run across the whole catalogue and then work out which suggestions to trust.
+
+Report how many products pass all four filters.
+
+---
+
+## 7. Acceptance tests
+
+```
+1.  Margin floors and volume tiers can be saved and executed.
+2.  A product with no FY sales is excluded from volume rules, with reason.
+3.  A PTMT product in a held margin month is excluded, and the hold is named.
+4.  A product whose margin is from Jun 2026 is included with an age warning,
+    not excluded.
+5.  The coverage panel appears before suggestions and states sales coverage,
+    margin coverage, every data age and every known limit.
+6.  The reconciliation variance is stated on the panel.
+7.  The confidence filter restricts a run to products with all inputs present
+    and current, and reports the count.
+8.  The 10 codes awaiting confirmation are excluded and listed.
+9.  Running the same scenario twice on the same data gives identical results.
+10. No price is written by any action on this page.
+11. With SALES_API_KEY unset, margin and volume rules are visibly unavailable
+    with the reason stated — NOT reported as every product having no data.
+12. A 401 from the Sales API reports as an authentication failure, not as
+    empty coverage.
+13. The key appears in no client bundle, no log line and no API response.
+```
+
+Test 5 is the one that makes shipping with gaps defensible. Test 10 has not changed and must not.
+
+---
+
+## 8. Report
+
+- The exact Secret names you read, so they can be set correctly.
+- Which rules are now enabled, and what the server does with a rule it cannot evaluate.
+- What the page shows when the credential is missing, and when it is rejected.
+- The coverage panel as rendered, for a real run.
+- How many products pass the confidence filter.
+- The exclusion reason breakdown for a full-catalogue run.
+- Confirmation that no price is written.
+
+One clean commit.
