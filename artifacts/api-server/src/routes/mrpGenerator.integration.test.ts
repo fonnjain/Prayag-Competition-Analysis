@@ -1,6 +1,6 @@
 import express from "express";
 import supertest from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   catalogProductsTable,
@@ -27,6 +27,35 @@ const COMPETITOR = `Generator Competitor ${RUN}`;
 const DATE = "2020-01-01";
 const AS_OF = new Date().toISOString().slice(0, 10);
 
+function authenticatedSalesFixture(): SalesApiClient {
+  const coverage = {
+    requested: ["2026-04..2026-08"], returned: ["2026-04..2026-08"],
+    read_at: "2026-08-01", dataSource: "fixture-before-each",
+    held: [], unavailable: [], provisional: [],
+  };
+  return new SalesApiClient({
+    apiKey: "fixture-authenticated",
+    fetch: async (url) => url.includes("sales-by-item")
+      ? new Response(JSON.stringify({ coverage, rows: [{
+        code: CODE, month_label: "2026-04", fy: "2026-27", qty: 10,
+        amount_taxable: 1000, row_count: 1, catalogue_status: "matched",
+      }] }))
+      : new Response(JSON.stringify({ coverage, rows: [{
+        item_code: CODE, month_label: "2026-06", fy: "2026-27", segment: "PTMT",
+        qty: 10, sale_value: 1000, bom_value: 100, gross_margin_pct: 0.9,
+        mrp: 100, avg_sale: 100, discount_frac: 0,
+      }] })),
+  });
+}
+
+function unavailableSalesFixture(): SalesApiClient {
+  return new SalesApiClient({
+    fetch: async () => {
+      throw new Error("Sales fixture intentionally unavailable.");
+    },
+  });
+}
+
 function requestAs(role?: "admin" | "user") {
   const app = express();
   app.use(express.json());
@@ -52,6 +81,8 @@ let fixtureBatchId = 0;
 let scenarioId = 0;
 let rightOnlyScenarioId = 0;
 let stage2ScenarioId = 0;
+let p011ScenarioId = 0;
+let p011CompareScenarioId = 0;
 const runIds: number[] = [];
 const revisionBatchIds: number[] = [];
 
@@ -118,12 +149,23 @@ afterAll(async () => {
   if (scenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, scenarioId)));
   if (rightOnlyScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, rightOnlyScenarioId)));
   if (stage2ScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, stage2ScenarioId)));
+  if (p011ScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, p011ScenarioId)));
+  if (p011CompareScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, p011CompareScenarioId)));
   resetSalesApiClient();
   await cleanup(() => db.delete(competitorPricesTable).where(eq(competitorPricesTable.competitor, COMPETITOR)));
   await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE])));
   await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE])));
   await cleanup(() => deleteMrpFixtureBatch(fixtureBatchId));
   await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE])));
+});
+
+beforeEach(({ task }) => {
+  const authenticated = task.name.includes("Stage 2") || task.name.includes("P011");
+  setSalesApiClientForTests(authenticated ? authenticatedSalesFixture() : unavailableSalesFixture());
+});
+
+afterEach(() => {
+  resetSalesApiClient();
 });
 
 describe("MRP Generator HTTP contract and safety", () => {
@@ -179,10 +221,16 @@ describe("MRP Generator HTTP contract and safety", () => {
     scenarioId = created.body.id;
     expect(created.body).toEqual(expect.objectContaining({
       id: scenarioId,
+      policyVersion: 1,
       name: `Generator fixture ${RUN}`,
       scope: { explicitCodes: [CODE, EXCLUDED_CODE, NO_CHANGE_CODE] },
       rules: [{ type: "match", competitor: COMPETITOR }],
     }));
+    const listedLegacy = await admin.get("/api/mrp-generator/scenarios");
+    const listedLegacyScenario = listedLegacy.body.find((row: any) => row.id === scenarioId);
+    expect(listedLegacyScenario).toEqual(expect.objectContaining({ policyVersion: 1, policy: null }));
+    const fetchedLegacy = await admin.get(`/api/mrp-generator/scenarios/${scenarioId}`);
+    expect(fetchedLegacy.body).toEqual(expect.objectContaining({ policyVersion: 1, policy: null }));
     const disabledPatch = await admin.patch(`/api/mrp-generator/scenarios/${scenarioId}`).send({
       rules: [{ type: "volume_tier", tier: "top" }],
     });
@@ -194,6 +242,7 @@ describe("MRP Generator HTTP contract and safety", () => {
     const second = await admin.post(`/api/mrp-generator/scenarios/${scenarioId}/run`).send({ asOf: AS_OF });
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
+    expect(first.body.policyVersion).toBe(1);
     runIds.push(first.body.runId, second.body.runId);
     expect(first.body.inputFingerprint).toBe(second.body.inputFingerprint);
 
@@ -245,6 +294,27 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(missingBoth.status).toBe(404);
     expect(missingBoth.body.error).toContain("999999998");
     expect(missingBoth.body.error).toContain("999999999");
+
+    // Converting the mutable scenario after a legacy run must not rewrite
+    // immutable run metadata or make a legacy run appear to have a policy.
+    const converted = await admin.patch(`/api/mrp-generator/scenarios/${scenarioId}`).send({
+      policyVersion: 2,
+      policy: {
+        policyVersion: 2, period: "2026-27", maxIncreasePercent: 0,
+        competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: false },
+      },
+    });
+    expect(converted.status).toBe(200);
+    const legacyAfterConversion = await admin.get(`/api/mrp-generator/runs/${first.body.runId}`);
+    expect(legacyAfterConversion.body).toEqual(expect.objectContaining({
+      policyVersion: 1,
+      policy: null,
+    }));
+    expect(legacyAfterConversion.body.run.inputSnapshot.policyVersion).toBe(1);
+    const restored = await admin.patch(`/api/mrp-generator/scenarios/${scenarioId}`).send({
+      rules: [{ type: "match", competitor: COMPETITOR }],
+    });
+    expect(restored.status).toBe(200);
   });
 
   it("hands off only eligible suggestions to a pending revision with provenance", async () => {
@@ -342,5 +412,123 @@ describe("MRP Generator HTTP contract and safety", () => {
       salesEvidence: expect.objectContaining({ qty: 10 }),
       marginEvidence: expect.objectContaining({ unitBomValue: 10 }),
     }));
+  });
+
+  it("runs and persists a P011 policy once against an injected Sales snapshot without writing MRP history", async () => {
+    const coverage = {
+      requested: ["2026-04..2026-08"], returned: ["2026-04..2026-08"],
+      read_at: "2026-08-01", dataSource: "fixture-p011",
+      held: [], unavailable: [], provisional: [],
+    };
+    setSalesApiClientForTests(new SalesApiClient({
+      apiKey: "valid-p011",
+      fetch: async (url) => url.includes("sales-by-item")
+        ? new Response(JSON.stringify({ coverage, rows: [{
+          code: CODE, month_label: "2026-04", fy: "2026-27", qty: 10,
+          amount_taxable: 1000, row_count: 1, catalogue_status: "matched",
+        }] }))
+        : new Response(JSON.stringify({ coverage, rows: [{
+          item_code: CODE, month_label: "2026-06", fy: "2026-27", segment: "PTMT",
+          qty: 10, sale_value: 1000, bom_value: 100, gross_margin_pct: 0.9,
+          mrp: 100, avg_sale: 100, discount_frac: 0,
+        }] })),
+    }));
+    const before = await historyDigest();
+    const created = await admin.post("/api/mrp-generator/scenarios").send({
+      name: `Generator P011 ${RUN}`,
+      policyVersion: 2,
+      policy: {
+        policyVersion: 2, period: "2026-27",
+        competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: true },
+      },
+      scope: { explicitCodes: [CODE] },
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toEqual(expect.objectContaining({
+      version: 2, policyVersion: 2, policy: expect.objectContaining({ policyVersion: 2 }),
+    }));
+    p011ScenarioId = created.body.id;
+    const listed = await admin.get("/api/mrp-generator/scenarios");
+    expect(listed.body.find((row: any) => row.id === p011ScenarioId)).toEqual(expect.objectContaining({ policyVersion: 2 }));
+    const fetched = await admin.get(`/api/mrp-generator/scenarios/${p011ScenarioId}`);
+    expect(fetched.body).toEqual(expect.objectContaining({ policyVersion: 2, rules: [] }));
+    const patched = await admin.patch(`/api/mrp-generator/scenarios/${p011ScenarioId}`).send({
+      policyVersion: 2,
+      policy: { period: "2026-27", competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: true } },
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toEqual(expect.objectContaining({ policyVersion: 2, rules: [] }));
+    const harmlessEmptyRules = await admin.patch(`/api/mrp-generator/scenarios/${p011ScenarioId}`).send({
+      policyVersion: 2,
+      policy: { period: "2026-27", competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: true } },
+      rules: [],
+    });
+    expect(harmlessEmptyRules.status).toBe(200);
+    const mixed = await admin.patch(`/api/mrp-generator/scenarios/${p011ScenarioId}`).send({
+      policyVersion: 2,
+      policy: { period: "2026-27", competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: true } },
+      rules: [{ type: "match", competitor: COMPETITOR }],
+    });
+    expect(mixed.status).toBe(400);
+    const first = await admin.post(`/api/mrp-generator/scenarios/${p011ScenarioId}/run`).send({ asOf: AS_OF });
+    const second = await admin.post(`/api/mrp-generator/scenarios/${p011ScenarioId}/run`).send({ asOf: AS_OF });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(first.body.policyVersion).toBe(2);
+    runIds.push(first.body.runId, second.body.runId);
+    expect(first.body.inputFingerprint).toBe(second.body.inputFingerprint);
+    expect(first.body.summary).toEqual(expect.objectContaining({
+      policyVersion: 2,
+      actionCounts: expect.objectContaining({ MARGIN_ONLY: 1 }),
+      bandDistribution: expect.objectContaining({ E: 1 }),
+    }));
+    const mutatedScenario = await admin.patch(`/api/mrp-generator/scenarios/${p011ScenarioId}`).send({
+      policyVersion: 2,
+      policy: {
+        policyVersion: 2, period: "2026-27", maxIncreasePercent: 0,
+        competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: false },
+      },
+    });
+    expect(mutatedScenario.status).toBe(200);
+    const detail = await admin.get(`/api/mrp-generator/runs/${first.body.runId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body).toEqual(expect.objectContaining({
+      policyVersion: 2,
+      policy: expect.objectContaining({ policyVersion: 2, maxIncreasePercent: 15 }),
+      scenario: expect.objectContaining({
+        policyVersion: 2,
+        policy: expect.objectContaining({ policyVersion: 2, maxIncreasePercent: 15 }),
+      }),
+    }));
+    expect(detail.body.run.inputSnapshot.policyVersion).toBe(2);
+    expect(detail.body.results[0]).toEqual(expect.objectContaining({
+      policyVersion: 2, band: "E", action: "MARGIN_ONLY",
+    }));
+    const compareCreated = await admin.post("/api/mrp-generator/scenarios").send({
+      name: `Generator P011 compare ${RUN}`,
+      policyVersion: 2,
+      policy: {
+        policyVersion: 2, period: "2026-27", maxIncreasePercent: 0,
+        competitor: { mode: "nearest", staleAfterDays: 365, excludeStale: false },
+      },
+      scope: { explicitCodes: [CODE] },
+    });
+    expect(compareCreated.status).toBe(201);
+    p011CompareScenarioId = compareCreated.body.id;
+    const compareRun = await admin.post(`/api/mrp-generator/scenarios/${p011CompareScenarioId}/run`).send({ asOf: AS_OF });
+    expect(compareRun.status).toBe(201);
+    runIds.push(compareRun.body.runId);
+    const compare = await admin.get(`/api/mrp-generator/compare?leftRunId=${first.body.runId}&rightRunId=${compareRun.body.runId}`);
+    expect(compare.status).toBe(200);
+    expect(compare.body).toEqual(expect.objectContaining({ leftPolicyVersion: 2, rightPolicyVersion: 2 }));
+    expect(compare.body.leftPolicy).toEqual(expect.objectContaining({ policyVersion: 2, maxIncreasePercent: 15 }));
+    expect(compare.body.differences).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        itemCode: CODE,
+        left: expect.objectContaining({ action: "MARGIN_ONLY", suggestedMrp: null }),
+        right: expect.objectContaining({ action: "HOLD", suggestedMrp: null }),
+      }),
+    ]));
+    expect(await historyDigest()).toEqual(before);
   });
 });

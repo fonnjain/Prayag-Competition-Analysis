@@ -22,10 +22,14 @@ import {
   validateScenarioRules,
   canonicalItemCode,
   computeVolumeTiers,
+  evaluateP011Scenario,
+  validateP011Policy,
+  DEFAULT_P011_POLICY,
   SUPPORTED_VOLUME_PERIOD,
   type GeneratorProduct,
   type GeneratorRule,
   type GeneratorScope,
+  type P011Policy,
 } from "../lib/mrpGenerator";
 import {
   awaitingConfirmationCodes,
@@ -51,6 +55,31 @@ const json = (value: unknown): string => JSON.stringify(value);
 const parsed = <T>(value: string, fallback: T): T => {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 };
+const scenarioPolicyFromRules = (value: unknown): P011Policy | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const wrapper = value as { policyVersion?: unknown; policy?: unknown };
+  return wrapper.policyVersion === 2 && wrapper.policy && typeof wrapper.policy === "object"
+    ? wrapper.policy as P011Policy : null;
+};
+const snapshotPolicyVersion = (snapshot: {
+  policyVersion?: unknown;
+  policy?: unknown;
+  p011Results?: unknown;
+}): 1 | 2 =>
+  snapshot.policyVersion === 1 || snapshot.policyVersion === 2
+    ? snapshot.policyVersion
+    : snapshot.p011Results != null || snapshot.policy != null ? 2 : 1;
+function exposedScenario(row: typeof mrpGeneratorScenariosTable.$inferSelect) {
+  const storedRules = parsed<unknown>(row.rules, []);
+  const policy = scenarioPolicyFromRules(storedRules);
+  return {
+    ...row,
+    scope: parsed(row.scope, {}),
+    rules: policy ? [] : storedRules,
+    policy,
+    policyVersion: policy ? 2 : 1,
+  };
+}
 const actor = (req: Parameters<typeof requireAdmin>[0]) => req.user?.email ?? req.user?.id ?? null;
 const validDate = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 const median = (values: number[]): number | null => {
@@ -350,6 +379,13 @@ router.get("/mrp-generator/metadata", requireAdmin, async (_req, res) => {
   res.json({
     stage: stage2 ? 2 : 1,
     deterministic: true,
+    policyVersions: [1, 2],
+    p011: {
+      policyVersion: 2,
+      period: SUPPORTED_VOLUME_PERIOD,
+      bands: "A 0-50%, B 50-80%, C 80-95%, D 95-99%, E remainder, F no FY sales",
+      staleAfterDays: 365,
+    },
     salesApi: { ...sales, ...(salesReason ? { reason: salesReason } : {}) },
     disabledRules: stage2 ? [] : [
       {
@@ -418,28 +454,35 @@ router.get("/mrp-generator/freshness", requireAdmin, async (req, res) => {
 
 router.get("/mrp-generator/scenarios", requireAdmin, async (_req, res) => {
   const rows = await db.select().from(mrpGeneratorScenariosTable).orderBy(asc(mrpGeneratorScenariosTable.createdAt));
-  res.json(rows.map((row) => ({ ...row, scope: parsed(row.scope, {}), rules: parsed(row.rules, []) })));
+  res.json(rows.map(exposedScenario));
 });
 
 router.post("/mrp-generator/scenarios", requireAdmin, async (req, res) => {
   try {
-    const body = req.body as { name?: unknown; description?: unknown; scope?: unknown; rules?: unknown };
+    const body = req.body as { name?: unknown; description?: unknown; scope?: unknown; rules?: unknown; policy?: unknown; policyVersion?: unknown };
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) { res.status(400).json({ error: "name is required." }); return; }
     const scope = body.scope && typeof body.scope === "object" ? body.scope as GeneratorScope : {};
+    const policyInput = body.policy && typeof body.policy === "object" ? body.policy as P011Policy : null;
+    if (body.policyVersion === 2 && !policyInput) throw new Error("P011 policyVersion 2 requires a policy object.");
+    if (policyInput && Array.isArray(body.rules) && body.rules.length) throw new Error("P011 scenarios cannot combine policy with non-empty ordered rules.");
+    const policy = policyInput ? { ...DEFAULT_P011_POLICY, ...policyInput, policyVersion: 2 as const } : null;
+    if (policy) validateP011Policy(policy);
     const ruleList = Array.isArray(body.rules) ? body.rules as GeneratorRule[] : [];
+    if (!policy && body.policyVersion !== 2 && !ruleList.length) throw new Error("rules must be a non-empty ordered array.");
     const needsSales = hasSalesRules(ruleList, scope);
-    const rules = validateScenarioRules(body.rules, { salesAvailable: true });
-     if (needsSales) await requiredSalesSnapshot(false, salesPeriod(rules));
+    const rules = policy ? [] : validateScenarioRules(body.rules, { salesAvailable: true });
+     if (needsSales || policy) await requiredSalesSnapshot(false, policy?.period ?? salesPeriod(rules));
     const inserted = await db.insert(mrpGeneratorScenariosTable).values({
       name,
       description: typeof body.description === "string" ? body.description.trim() : null,
       scope: json(scope),
-      rules: json(rules),
+      rules: json(policy ? { policyVersion: 2, policy } : rules),
+      version: policy ? 2 : 1,
       createdBy: actor(req),
     }).returning();
     const row = inserted[0]!;
-    res.status(201).json({ ...row, scope, rules });
+    res.status(201).json(exposedScenario(row));
   } catch (error) {
     const status = (error as { httpStatus?: number }).httpStatus ?? 400;
     res.status(status).json({ error: error instanceof Error ? error.message : "Invalid scenario." });
@@ -451,7 +494,7 @@ router.get("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, res
   if (!Number.isInteger(id)) { res.status(400).json({ error: "scenarioId must be an integer." }); return; }
   const row = (await db.select().from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, id)).limit(1))[0];
   if (!row) { res.status(404).json({ error: "Scenario not found." }); return; }
-  res.json({ ...row, scope: parsed(row.scope, {}), rules: parsed(row.rules, []) });
+  res.json(exposedScenario(row));
 });
 
 router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, res) => {
@@ -459,7 +502,7 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
   const current = (await db.select().from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, id)).limit(1))[0];
   if (!current) { res.status(404).json({ error: "Scenario not found." }); return; }
   try {
-    const body = req.body as { name?: unknown; description?: unknown; scope?: unknown; rules?: unknown };
+    const body = req.body as { name?: unknown; description?: unknown; scope?: unknown; rules?: unknown; policy?: unknown; policyVersion?: unknown };
     const changes: Partial<typeof mrpGeneratorScenariosTable.$inferInsert> = { updatedAt: new Date() };
     if (body.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim()) throw new Error("name is required.");
@@ -467,7 +510,21 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
     }
     if (body.description !== undefined) changes.description = typeof body.description === "string" ? body.description.trim() : null;
     if (body.scope !== undefined) changes.scope = json(body.scope);
+    if (body.policy !== undefined || body.policyVersion !== undefined) {
+      const policyInput = body.policy && typeof body.policy === "object" ? body.policy as P011Policy : null;
+      if (!policyInput || body.policyVersion !== 2 && policyInput.policyVersion !== 2) throw new Error("P011 policy requires policyVersion 2 and a policy object.");
+      const policy = { ...DEFAULT_P011_POLICY, ...policyInput, policyVersion: 2 as const };
+      validateP011Policy(policy);
+      changes.rules = json({ policyVersion: 2, policy });
+      changes.version = 2;
+    }
     if (body.rules !== undefined) {
+      if (Array.isArray(body.rules) && body.rules.length && (body.policy !== undefined || body.policyVersion !== undefined)) {
+        throw new Error("P011 scenarios cannot combine policy with non-empty ordered rules.");
+      }
+      if (body.policy !== undefined || body.policyVersion !== undefined) {
+        // Empty legacy storage is harmless when a P011 policy is supplied.
+      } else {
       const scope = body.scope !== undefined
         ? body.scope && typeof body.scope === "object" ? body.scope as GeneratorScope : {}
         : parsed<GeneratorScope>(current.scope, {});
@@ -476,13 +533,14 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
       const rules = validateScenarioRules(body.rules, { salesAvailable: true });
        if (needsSales) await requiredSalesSnapshot(false, salesPeriod(rules));
       changes.rules = json(rules);
+      }
     } else if (body.scope !== undefined) {
       const scope = body.scope && typeof body.scope === "object" ? body.scope as GeneratorScope : {};
       const existingRules = parsed<GeneratorRule[]>(current.rules, []);
        if (hasSalesRules(existingRules, scope)) await requiredSalesSnapshot(false, salesPeriod(existingRules));
     }
     const updated = (await db.update(mrpGeneratorScenariosTable).set(changes).where(eq(mrpGeneratorScenariosTable.id, id)).returning())[0]!;
-    res.json({ ...updated, scope: parsed(updated.scope, {}), rules: parsed(updated.rules, []) });
+      res.json(exposedScenario(updated));
   } catch (error) {
     const status = (error as { httpStatus?: number }).httpStatus ?? 400;
     res.status(status).json({ error: error instanceof Error ? error.message : "Invalid scenario." });
@@ -508,22 +566,29 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
     const scope = parsed<GeneratorScope>(scenario.scope, {});
     const rawRules = parsed<unknown>(scenario.rules, []);
     const ruleList = Array.isArray(rawRules) ? rawRules as GeneratorRule[] : [];
-    const needsSales = hasSalesRules(ruleList, scope);
+    const storedPolicy = scenarioPolicyFromRules(rawRules);
+    const p011 = storedPolicy?.policyVersion === 2;
+    const needsSales = p011 || hasSalesRules(ruleList, scope);
     const allProducts = await productsFor(asOf);
     let snapshotSales: SalesSnapshot | null = null;
     let enrichedAll = allProducts;
     if (needsSales) {
-       snapshotSales = await requiredSalesSnapshot(refreshSales, salesPeriod(ruleList));
+       snapshotSales = await requiredSalesSnapshot(refreshSales, p011 ? storedPolicy!.period : salesPeriod(ruleList));
       enrichedAll = enrichProducts(allProducts, snapshotSales);
-      const tiers = computeVolumeTiers(enrichedAll);
-      enrichedAll = enrichedAll.map((product) => ({
-        ...product,
-        sales: product.sales ? { ...product.sales, tier: tiers.get(canonicalItemCode(product.itemCode)) ?? null } : product.sales,
-      }));
+       if (!p011) {
+         const tiers = computeVolumeTiers(enrichedAll);
+         enrichedAll = enrichedAll.map((product) => ({
+           ...product,
+           sales: product.sales ? { ...product.sales, tier: tiers.get(canonicalItemCode(product.itemCode)) ?? null } : product.sales,
+         }));
+       }
     }
-    const rules = validateScenarioRules(rawRules, { salesAvailable: needsSales });
+    const rules = p011 ? [] : validateScenarioRules(rawRules, { salesAvailable: needsSales });
     const products = enrichedAll.filter((product) => matchesScope(product, scope));
-    const results = products.map((product) => evaluateProduct(product, rules, {
+    const p011Evaluation = p011
+      ? evaluateP011Scenario(enrichedAll, storedPolicy!, scope)
+      : null;
+    const results = p011Evaluation?.results ?? products.map((product) => evaluateProduct(product, rules, {
       confidenceOnly: scope.confidenceOnly,
       ...(snapshotSales ? { volumeTiers: computeVolumeTiers(enrichedAll) } : {}),
     }));
@@ -542,6 +607,9 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
       products: products.map((p) => ({ ...p, competitors: p.competitors })),
       scope,
       rules,
+      policyVersion: p011 ? 2 : 1,
+      ...(p011 ? { policy: storedPolicy, portfolio: p011Evaluation!.portfolio } : {}),
+      ...(p011 ? { p011Results: p011Evaluation!.results } : {}),
       stage: snapshotSales ? 2 : 1,
     };
     const freshness = {
@@ -573,6 +641,18 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
       medianDecreasePercent: median(results.map((r) => r.changePercent).filter((v): v is number => v != null && v < 0)),
       confidencePassCount: coverageSummary?.confidencePassCount ?? null,
       exclusionReasonBreakdown: exclusionReasonBreakdown(results),
+      ...(p011 ? {
+        policyVersion: 2,
+        actionCounts: Object.fromEntries([...new Set(results.map((r) => r.action))].map((action) => [
+          action, results.filter((r) => r.action === action).length,
+        ])),
+        actionValueImpacts: p011Evaluation!.portfolio.actionValueImpacts,
+        bandDistribution: Object.fromEntries([...new Set(results.map((r) => r.band))].map((band) => [
+          band, results.filter((r) => r.band === band).length,
+        ])),
+        salesValueRepresented: p011Evaluation!.portfolio.coveredSalesValue,
+        portfolio: p011Evaluation!.portfolio,
+      } : {}),
     };
     const fingerprint = inputFingerprint({ scenarioId, asOf, snapshot, freshness });
     const run = await db.transaction(async (tx) => {
@@ -601,7 +681,7 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
       })));
       return runId;
     });
-    res.status(201).json({ runId: run, scenarioId, asOf, inputFingerprint: fingerprint, summary, sourceFreshness: freshness });
+    res.status(201).json({ runId: run, scenarioId, asOf, policyVersion: p011 ? 2 : 1, inputFingerprint: fingerprint, summary, sourceFreshness: freshness });
   } catch (error) {
     const status = (error as { httpStatus?: number }).httpStatus ?? 400;
     res.status(status).json({ error: error instanceof Error ? error.message : "Could not run scenario." });
@@ -645,12 +725,27 @@ function exposedRun(run: typeof mrpGeneratorRunsTable.$inferSelect) {
 function exposedResult(
   row: typeof mrpGeneratorResultsTable.$inferSelect,
   evidence?: { sales?: unknown; margin?: unknown; warnings?: string[] },
+  p011?: Record<string, unknown>,
 ) {
   return {
     ...row,
     exclusions: parsed(row.exclusions, []),
     competitorValues: parsed(row.competitorValues, []),
     trace: parsed(row.trace, []),
+    ...(p011 ? {
+      policyVersion: p011.policyVersion,
+      band: p011.band,
+      fySalesAmount: p011.fySalesAmount,
+      selectedCompetitor: p011.selectedCompetitor,
+      competitorMode: p011.competitorMode,
+      gap: p011.gap,
+      position: p011.position,
+      action: p011.action,
+      marginFloorEvidence: p011.marginFloorEvidence,
+      bindingConstraints: p011.bindingConstraints,
+      escalation: p011.escalation,
+      escalationReason: p011.escalationReason,
+    } : {}),
     salesEvidence: evidence?.sales ?? null,
     marginEvidence: evidence?.margin ?? null,
     warnings: evidence?.warnings ?? [],
@@ -661,9 +756,14 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
   const id = Number(req.params.runId);
   const run = (await db.select().from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0];
   if (!run) { res.status(404).json({ error: "Run not found." }); return; }
-  const scenario = (await db.select({ id: mrpGeneratorScenariosTable.id, name: mrpGeneratorScenariosTable.name }).from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, run.scenarioId)).limit(1))[0];
+  const scenario = (await db.select().from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, run.scenarioId)).limit(1))[0];
   const results = await db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)).orderBy(asc(mrpGeneratorResultsTable.itemCode));
-  const snapshot = parsed<{ products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }> }>(run.inputSnapshot, {});
+  const snapshot = parsed<{
+    policyVersion?: number;
+    policy?: P011Policy;
+    products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }>;
+    p011Results?: Array<Record<string, unknown>>;
+  }>(run.inputSnapshot, {});
   const evidence = new Map((snapshot.products ?? []).map((product) => [
     canonicalItemCode(product.itemCode ?? ""),
     {
@@ -673,7 +773,25 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
         ? (product.margin as { warnings: string[] }).warnings : [],
     },
   ]));
-  res.json({ run: exposedRun(run), scenario, results: results.map((row) => exposedResult(row, evidence.get(canonicalItemCode(row.itemCode)))) });
+  const p011ByCode = new Map((snapshot.p011Results ?? []).map((result) => [
+    canonicalItemCode(String(result.itemCode ?? "")), result,
+  ]));
+  const scenarioView = scenario ? exposedScenario(scenario) : null;
+  // A run is immutable: once an input snapshot has a policy/version, a later
+  // scenario edit must not rewrite any run policy metadata. Old snapshots
+  // infer P011 only from their own policy/result payload.
+  const policyVersion = snapshotPolicyVersion(snapshot);
+  const policy = snapshot.policy ?? null;
+  const immutableScenario = scenarioView
+    ? { ...scenarioView, policyVersion, policy }
+    : null;
+  res.json({
+    run: exposedRun(run),
+    policyVersion,
+    policy,
+    scenario: immutableScenario,
+    results: results.map((row) => exposedResult(row, evidence.get(canonicalItemCode(row.itemCode)), p011ByCode.get(canonicalItemCode(row.itemCode)))),
+  });
 });
 
 router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) => {
@@ -681,7 +799,7 @@ router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) 
   const rows = await db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)).orderBy(asc(mrpGeneratorResultsTable.itemCode));
   if (!rows.length && !(await db.select({ id: mrpGeneratorRunsTable.id }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0]) { res.status(404).json({ error: "Run not found." }); return; }
   const run = (await db.select({ inputSnapshot: mrpGeneratorRunsTable.inputSnapshot }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0];
-  const snapshot = parsed<{ products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }> }>(run?.inputSnapshot ?? "{}", {});
+  const snapshot = parsed<{ products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }>; p011Results?: Array<Record<string, unknown>> }>(run?.inputSnapshot ?? "{}", {});
   const evidence = new Map((snapshot.products ?? []).map((product) => [
     canonicalItemCode(product.itemCode ?? ""), {
       sales: product.sales,
@@ -690,14 +808,17 @@ router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) 
         ? (product.margin as { warnings: string[] }).warnings : [],
     },
   ]));
-  res.json({ runId: id, results: rows.map((row) => exposedResult(row, evidence.get(canonicalItemCode(row.itemCode)))) });
+  const p011ByCode = new Map((snapshot.p011Results ?? []).map((result) => [
+    canonicalItemCode(String(result.itemCode ?? "")), result,
+  ]));
+  res.json({ runId: id, results: rows.map((row) => exposedResult(row, evidence.get(canonicalItemCode(row.itemCode)), p011ByCode.get(canonicalItemCode(row.itemCode)))) });
 });
 
 router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
   const leftId = Number(req.query.leftRunId ?? req.query.runA);
   const rightId = Number(req.query.rightRunId ?? req.query.runB);
   if (!Number.isInteger(leftId) || !Number.isInteger(rightId)) { res.status(400).json({ error: "leftRunId and rightRunId are required integers." }); return; }
-  const runs = await db.select({ id: mrpGeneratorRunsTable.id }).from(mrpGeneratorRunsTable)
+  const runs = await db.select({ id: mrpGeneratorRunsTable.id, inputSnapshot: mrpGeneratorRunsTable.inputSnapshot }).from(mrpGeneratorRunsTable)
     .where(sql`${mrpGeneratorRunsTable.id} IN (${leftId}, ${rightId})`);
   const existing = new Set(runs.map((run) => run.id));
   const missing = [leftId, rightId].filter((id, index, ids) => !existing.has(id) && ids.indexOf(id) === index);
@@ -709,20 +830,42 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
     db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, leftId)),
     db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, rightId)),
   ]);
+  const runById = new Map(runs.map((run) => [run.id, parsed<{ policyVersion?: number; policy?: P011Policy; p011Results?: Array<Record<string, unknown>> }>(run.inputSnapshot, {})]));
+  const leftSnapshot = runById.get(leftId) ?? {};
+  const rightSnapshot = runById.get(rightId) ?? {};
+  const p011ByCode = (snapshot: typeof leftSnapshot) => new Map((snapshot.p011Results ?? []).map((result) => [
+    canonicalItemCode(String(result.itemCode ?? "")), result,
+  ]));
+  const leftP011 = p011ByCode(leftSnapshot);
+  const rightP011 = p011ByCode(rightSnapshot);
   const leftByCode = new Map(left.map((r) => [canonicalItemCode(r.itemCode), r]));
   const rightByCode = new Map(right.map((r) => [canonicalItemCode(r.itemCode), r]));
   const codes = [...new Set([...leftByCode.keys(), ...rightByCode.keys()])].sort((a, b) => a.localeCompare(b));
   const differences = codes.map((code) => {
     const l = leftByCode.get(code);
     const r = rightByCode.get(code);
-    return { itemCode: l?.itemCode ?? r?.itemCode ?? code, left: l ? exposedResult(l) : null, right: r ? exposedResult(r) : null };
+    return { itemCode: l?.itemCode ?? r?.itemCode ?? code, left: l ? exposedResult(l, undefined, leftP011.get(code)) : null, right: r ? exposedResult(r, undefined, rightP011.get(code)) : null };
   }).filter((entry) =>
     entry.left == null ||
     entry.right == null ||
     entry.left.suggestedMrp !== entry.right.suggestedMrp ||
-    entry.left.status !== entry.right.status,
+     entry.left.status !== entry.right.status ||
+     entry.left.policyVersion !== entry.right.policyVersion ||
+     entry.left.band !== entry.right.band ||
+     entry.left.position !== entry.right.position ||
+     entry.left.gap !== entry.right.gap ||
+     entry.left.action !== entry.right.action ||
+     entry.left.escalation !== entry.right.escalation ||
+     entry.left.escalationReason !== entry.right.escalationReason,
   );
-  res.json({ leftRunId: leftId, rightRunId: rightId, differences });
+  res.json({
+    leftRunId: leftId, rightRunId: rightId,
+    leftPolicyVersion: snapshotPolicyVersion(leftSnapshot),
+    rightPolicyVersion: snapshotPolicyVersion(rightSnapshot),
+    leftPolicy: leftSnapshot.policy ?? null,
+    rightPolicy: rightSnapshot.policy ?? null,
+    differences,
+  });
 });
 
 router.post("/mrp-generator/runs/:runId/handoff", requireAdmin, async (req, res) => {

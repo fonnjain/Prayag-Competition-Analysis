@@ -84,7 +84,7 @@ export default function MrpGeneratorCompare() {
             </div>
 
             <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
-              <div className="grid grid-cols-[minmax(0,1fr)_120px_120px_100px] items-center gap-4 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="grid grid-cols-[minmax(0,1fr)_160px_160px_100px] items-center gap-4 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div>Product</div>
                 <div className="text-right">Left Run #{submittedIds.left}</div>
                 <div className="text-right">Right Run #{submittedIds.right}</div>
@@ -109,16 +109,30 @@ export default function MrpGeneratorCompare() {
                     const diff = l != null && rt != null ? rt - l : 0;
 
                     return (
-                      <div key={diffItem.itemCode || idx} className="grid grid-cols-[minmax(0,1fr)_120px_120px_100px] items-center gap-4 p-3 text-sm hover:bg-muted/10 transition-colors">
+                      <div key={diffItem.itemCode || idx} className="grid grid-cols-[minmax(0,1fr)_160px_160px_100px] items-center gap-4 p-3 text-sm hover:bg-muted/10 transition-colors">
                         <div className="min-w-0">
                           <div className="font-medium text-foreground truncate">{diffItem.itemCode}</div>
                            <div className="text-xs text-muted-foreground truncate">{diffItem.left?.productName || diffItem.right?.productName || "No product name"}</div>
                         </div>
                         <div className="text-right">
                            {diffItem.left == null ? "Not in scope" : l != null ? `₹${l.toFixed(2)}` : diffItem.left.status}
+                           {diffItem.left?.policyVersion === 2 && (
+                             <div className="text-[10px] text-muted-foreground mt-1">
+                               {diffItem.left.action} {diffItem.left.band && `• Bnd ${diffItem.left.band}`}
+                               {diffItem.left.position && ` • ${diffItem.left.position}`}
+                               {diffItem.left.escalation && ` • ESC`}
+                             </div>
+                           )}
                         </div>
-                        <div className={cn("text-right font-medium", rt !== l && "text-primary")}>
+                        <div className={cn("text-right font-medium", (rt !== l || diffItem.right?.action !== diffItem.left?.action || diffItem.right?.band !== diffItem.left?.band || diffItem.right?.escalation !== diffItem.left?.escalation) && "text-primary")}>
                            {diffItem.right == null ? "Not in scope" : rt != null ? `₹${rt.toFixed(2)}` : diffItem.right.status}
+                           {diffItem.right?.policyVersion === 2 && (
+                             <div className="text-[10px] text-muted-foreground mt-1">
+                               {diffItem.right.action} {diffItem.right.band && `• Bnd ${diffItem.right.band}`}
+                               {diffItem.right.position && ` • ${diffItem.right.position}`}
+                               {diffItem.right.escalation && ` • ESC`}
+                             </div>
+                           )}
                         </div>
                         <div className={cn("text-right font-medium", diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-muted-foreground")}>
                           {diff !== 0 ? `${diff > 0 ? "+" : ""}₹${Math.abs(diff).toFixed(2)}` : "-"}

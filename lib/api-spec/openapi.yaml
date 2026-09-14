@@ -2392,6 +2392,8 @@ components:
           type: array
           items: { type: string }
         staleAfterMonths: { type: integer }
+        policyVersions: { type: array, items: { type: integer } }
+        p011: { type: object, additionalProperties: true }
         sources:
           type: array
           items: { type: string }
@@ -2531,12 +2533,12 @@ components:
             categoryFloors:
               type: object
               properties:
-                PTMT: { type: number, minimum: 0, maximum: 100, default: 65 }
-                C P: { type: number, minimum: 0, maximum: 100, default: 38 }
-                PLUMBING: { type: number, minimum: 0, maximum: 100, default: 30 }
-                SANITARYWARE: { type: number, minimum: 0, maximum: 100, default: 38 }
-                SINK: { type: number, minimum: 0, maximum: 100, default: 40 }
-                HARDWARE: { type: number, minimum: 0, maximum: 100, default: 38 }
+                PTMT: { type: number, minimum: 0, exclusiveMaximum: 100, default: 65 }
+                C P: { type: number, minimum: 0, exclusiveMaximum: 100, default: 38 }
+                PLUMBING: { type: number, minimum: 0, exclusiveMaximum: 100, default: 30 }
+                SANITARYWARE: { type: number, minimum: 0, exclusiveMaximum: 100, default: 38 }
+                SINK: { type: number, minimum: 0, exclusiveMaximum: 100, default: 40 }
+                HARDWARE: { type: number, minimum: 0, exclusiveMaximum: 100, default: 38 }
     MrpGeneratorVolumeTierRule:
       oneOf:
         - allOf:
@@ -2559,21 +2561,75 @@ components:
                 mode: { enum: [value_threshold, threshold] }
                 operator: { type: string, enum: [above, below] }
                 salesValue: { type: number, minimum: 0 }
+    MrpGeneratorPolicy:
+      type: object
+      required: [policyVersion, period]
+      description: >
+        P011 deterministic policy. Bands use cumulative taxable sales
+        contribution; band F is the separate no-sales exclusion.
+      properties:
+        policyVersion: { type: integer, const: 2 }
+        period: { type: string, enum: ["2026-27"] }
+        bands:
+          type: object
+          properties:
+            A: { type: number, minimum: 0, maximum: 1 }
+            B: { type: number, minimum: 0, maximum: 1 }
+            C: { type: number, minimum: 0, maximum: 1 }
+            D: { type: number, minimum: 0, maximum: 1 }
+        position:
+          type: object
+          properties:
+            wellBelowAbove: { type: number }
+            parityBelow: { type: number }
+            parityAbove: { type: number }
+        competitor:
+          type: object
+          properties:
+            mode: { type: string, enum: [nearest, lowest, named] }
+            named: { type: [string, "null"] }
+            staleAfterDays: { type: integer, minimum: 0, default: 365 }
+            excludeStale: { type: boolean, default: true }
+        captureShares:
+          type: object
+          additionalProperties: { type: number, minimum: 0, maximum: 1 }
+        defendTargetUndercut: { type: number, minimum: 0, maximum: 1 }
+        categoryFloors:
+          type: object
+          additionalProperties: { type: number, minimum: 0, exclusiveMaximum: 100 }
+        marginTargetUpliftPoints: { type: number, minimum: 0 }
+        maxIncreasePercent: { type: number, minimum: 0 }
+        maxDecreasePercent: { type: number, minimum: 0 }
+        holdThreshold: { type: number, minimum: 0, default: 50 }
+        rounding:
+          type: object
+          properties:
+            unit: { type: number, minimum: 0 }
+            direction: { type: string, enum: [nearest, up, down] }
+        portfolio:
+          type: object
+          properties:
+            mode: { type: string, enum: [hold_current, improve_by_points, allow_decline_points] }
+            points: { type: number, minimum: 0 }
     MrpGeneratorScenarioInput:
       type: object
-      required: [name, rules]
+      required: [name]
       properties:
         name: { type: string, minLength: 1 }
         description: { type: [string, "null"] }
         scope: { $ref: "#/components/schemas/MrpGeneratorScope" }
-        rules: { type: array, minItems: 1, items: { $ref: "#/components/schemas/MrpGeneratorRule" } }
+        rules: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorRule" } }
+        policyVersion: { type: integer, const: 2 }
+        policy: { $ref: "#/components/schemas/MrpGeneratorPolicy" }
     MrpGeneratorScenarioPatch:
       type: object
       properties:
         name: { type: string, minLength: 1 }
         description: { type: [string, "null"] }
         scope: { $ref: "#/components/schemas/MrpGeneratorScope" }
-        rules: { type: array, minItems: 1, items: { $ref: "#/components/schemas/MrpGeneratorRule" } }
+        rules: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorRule" } }
+        policyVersion: { type: integer, const: 2 }
+        policy: { $ref: "#/components/schemas/MrpGeneratorPolicy" }
     MrpGeneratorRunInput:
       type: object
       properties:
@@ -2588,20 +2644,22 @@ components:
       allOf:
         - $ref: "#/components/schemas/MrpGeneratorScenarioInput"
         - type: object
-          required: [id, version, createdBy, createdAt, updatedAt]
+          required: [id, version, policyVersion, createdBy, createdAt, updatedAt]
           properties:
             id: { type: integer }
             version: { type: integer }
+            policyVersion: { type: integer, enum: [1, 2] }
             createdBy: { type: [string, "null"] }
             createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
     MrpGeneratorRun:
       type: object
-      required: [runId, scenarioId, asOf, inputFingerprint, summary, sourceFreshness]
+      required: [runId, scenarioId, asOf, policyVersion, inputFingerprint, summary, sourceFreshness]
       properties:
         runId: { type: integer }
         scenarioId: { type: integer }
         asOf: { type: string, format: date }
+        policyVersion: { type: integer, enum: [1, 2] }
         inputFingerprint: { type: string }
         summary: { $ref: "#/components/schemas/MrpGeneratorSummary" }
         sourceFreshness: { $ref: "#/components/schemas/MrpGeneratorSourceFreshness" }
@@ -2651,6 +2709,9 @@ components:
         products: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorSnapshotProduct" } }
         scope: { $ref: "#/components/schemas/MrpGeneratorScope" }
         rules: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorRule" } }
+        policyVersion: { type: [integer, "null"] }
+        policy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorPolicy" }, { type: "null" }] }
+        portfolio: { type: object, additionalProperties: true }
         stage: { type: integer, enum: [1, 2] }
         salesFetchedAt: { type: [string, "null"], format: date-time }
         salesCoverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
@@ -2684,6 +2745,14 @@ components:
         medianDecreasePercent: { type: [number, "null"] }
         confidencePassCount: { type: [integer, "null"] }
         exclusionReasonBreakdown: { type: object, additionalProperties: { type: integer } }
+        policyVersion: { type: [integer, "null"] }
+        actionCounts: { type: object, additionalProperties: { type: integer } }
+        actionValueImpacts:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/MrpGeneratorActionValueImpact" }
+        bandDistribution: { type: object, additionalProperties: { type: integer } }
+        salesValueRepresented: { type: number }
+        portfolio: { $ref: "#/components/schemas/MrpGeneratorPortfolioReport" }
     MrpGeneratorFreshnessCompetitor:
       type: object
       required: [competitor, effectiveDate, ageDays, stale]
@@ -2876,6 +2945,62 @@ components:
         after: { type: [number, "null"] }
         reason: { type: string }
         target: { type: [number, "null"] }
+    MrpGeneratorFloorEvidence:
+      type: object
+      required: [category, floorPercent, minimumMrp, currentGrossMargin, discountFraction, usable]
+      properties:
+        category: { type: [string, "null"] }
+        floorPercent: { type: [number, "null"], description: Gross-margin floor as a percentage. }
+        minimumMrp: { type: [number, "null"] }
+        currentGrossMargin: { type: [number, "null"], description: Gross margin as a fraction. }
+        discountFraction: { type: [number, "null"] }
+        usable: { type: boolean }
+    MrpGeneratorActionValueImpact:
+      type: object
+      required: [count, fySalesValue, grossContributionDelta]
+      properties:
+        count: { type: integer }
+        fySalesValue: { type: number }
+        grossContributionDelta: { type: number, description: Realized gross-contribution delta, not raw MRP delta. }
+    MrpGeneratorOmittedReason:
+      type: object
+      required: [count, fySalesValue]
+      properties:
+        count: { type: integer }
+        fySalesValue: { type: number }
+    MrpGeneratorHeadroom:
+      type: object
+      required: [itemCode, band, fySalesValue, additionalRealizedSaleValue, additionalGrossContribution]
+      properties:
+        itemCode: { type: string }
+        band: { type: string, enum: [A, B, C, D, E] }
+        fySalesValue: { type: number }
+        additionalRealizedSaleValue: { type: number }
+        additionalGrossContribution: { type: number }
+    MrpGeneratorPortfolioReport:
+      type: object
+      required: [currentGrossMargin, proposedGrossMargin, deltaPoints, targetGrossMargin, targetMet, shortfallPoints, coveredProductCount, coveredSalesValue, omittedProductCount, omittedSalesValue, omittedByReason, actionValueImpacts, headroom]
+      description: Gross margins are fractions; deltaPoints and shortfallPoints are percentage points.
+      properties:
+        currentGrossMargin: { type: [number, "null"] }
+        proposedGrossMargin: { type: [number, "null"] }
+        deltaPoints: { type: [number, "null"] }
+        targetGrossMargin: { type: [number, "null"] }
+        targetMet: { type: [boolean, "null"] }
+        shortfallPoints: { type: number }
+        coveredProductCount: { type: integer }
+        coveredSalesValue: { type: number }
+        omittedProductCount: { type: integer }
+        omittedSalesValue: { type: number }
+        omittedByReason:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/MrpGeneratorOmittedReason" }
+        actionValueImpacts:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/MrpGeneratorActionValueImpact" }
+        headroom:
+          type: array
+          items: { $ref: "#/components/schemas/MrpGeneratorHeadroom" }
     MrpGeneratorResult:
       type: object
       required: [id, runId, itemCode, productName, division, category, currentMrp, currentDate, currentRowId, suggestedMrp, status, exclusions, competitorValues, trace, competitiveTarget, bindingConstraint, changePercent, warnings, createdAt]
@@ -2900,12 +3025,25 @@ components:
         salesEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorSalesEvidence" }, { type: "null" }] }
         marginEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorMarginEvidence" }, { type: "null" }] }
         warnings: { type: array, items: { type: string } }
+        policyVersion: { type: [integer, "null"] }
+        band: { type: [string, "null"], enum: [A, B, C, D, E, F, null] }
+        fySalesAmount: { type: [number, "null"] }
+        selectedCompetitor: { type: [string, "null"] }
+        competitorMode: { type: [string, "null"], enum: [nearest, lowest, named, null] }
+        gap: { type: [number, "null"] }
+        position: { type: [string, "null"], enum: [well_below, parity, above, null] }
+        action: { type: [string, "null"], enum: [CAPTURE, DEFEND, HOLD, REVIEW, LEAVE_ALONE, MARGIN_ONLY, EXCLUDED, null] }
+        marginFloorEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorFloorEvidence" }, { type: "null" }] }
+        bindingConstraints: { type: array, items: { type: string } }
+        escalation: { type: boolean }
+        escalationReason: { type: [string, "null"] }
         createdAt: { type: string, format: date-time }
     MrpGeneratorRunDetail:
       type: object
-      required: [run, scenario, results]
+      required: [run, policyVersion, scenario, results]
       properties:
         run: { $ref: "#/components/schemas/MrpGeneratorPersistedRun" }
+        policyVersion: { type: integer, enum: [1, 2] }
         scenario: { $ref: "#/components/schemas/MrpGeneratorScenarioSummary" }
         results: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorResult" } }
     MrpGeneratorResults:
@@ -2920,6 +3058,7 @@ components:
       properties:
         id: { type: integer }
         name: { type: string }
+        policy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorPolicy" }, { type: "null" }] }
     MrpGeneratorRunListItem:
       allOf:
         - $ref: "#/components/schemas/MrpGeneratorPersistedRun"
@@ -2948,10 +3087,14 @@ components:
             - { type: "null" }
     MrpGeneratorComparison:
       type: object
-      required: [leftRunId, rightRunId, differences]
+      required: [leftRunId, rightRunId, leftPolicyVersion, rightPolicyVersion, differences]
       properties:
         leftRunId: { type: integer }
         rightRunId: { type: integer }
+        leftPolicyVersion: { type: integer, enum: [1, 2] }
+        rightPolicyVersion: { type: integer, enum: [1, 2] }
+        leftPolicy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorPolicy" }, { type: "null" }] }
+        rightPolicy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorPolicy" }, { type: "null" }] }
         differences: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorComparisonDifference" } }
     MrpGeneratorHandoffResponse:
       type: object

@@ -13,7 +13,7 @@ import {
   useGetMrpGeneratorFreshness
 } from "@workspace/api-client-react";
 import { ScenarioDialog } from "./components/ScenarioDialog";
-import { MrpGeneratorScope, MrpGeneratorRule } from "./types";
+import { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorPolicy } from "./types";
 import { useToast } from "@/hooks/use-toast";
 import { formatDisplayDate } from "@/lib/date-format";
 
@@ -70,7 +70,7 @@ export default function MrpGeneratorList() {
     });
   };
 
-  const handleSave = (data: { name: string; description: string | null; scope: MrpGeneratorScope; rules: MrpGeneratorRule[] }) => {
+  const handleSave = (data: { name: string; description: string | null; scope: MrpGeneratorScope; rules?: MrpGeneratorRule[]; policyVersion?: 2; policy?: MrpGeneratorPolicy }) => {
     if (editingScenario?.id) {
       updateMutation.mutate({ scenarioId: editingScenario.id, data: { ...data, rules: data.rules as any, scope: data.scope as any } }, {
         onSuccess: () => {
@@ -208,7 +208,13 @@ export default function MrpGeneratorList() {
                     <h3 className="font-semibold text-base text-foreground truncate">{s.name}</h3>
                     {s.description && <p className="text-sm text-muted-foreground truncate">{s.description}</p>}
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      {s.rules?.length ? <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{s.rules.length} Rules</span> : null}
+                      {s.policyVersion === 2 ? (
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          P011 Policy: {s.policy?.competitor?.mode === 'named' ? s.policy.competitor.named : s.policy?.competitor?.mode} | {s.policy?.portfolio?.mode === 'improve_by_points' ? `+${s.policy.portfolio.points} pts` : s.policy?.portfolio?.mode === 'allow_decline_points' ? `-${s.policy.portfolio.points} pts` : 'Hold margin'}
+                        </span>
+                      ) : s.rules?.length ? (
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{s.rules.length} Rules</span>
+                      ) : null}
                       <span className="text-muted-foreground/80">Updated {formatDisplayDate(s.updatedAt)}</span>
                     </div>
                   </div>

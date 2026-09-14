@@ -21,6 +21,10 @@ export default function MrpGeneratorRun() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [filterBand, setFilterBand] = useState<string>("_all");
+  const [filterAction, setFilterAction] = useState<string>("_all");
+  const [filterPosition, setFilterPosition] = useState<string>("_all");
+  const [filterEscalation, setFilterEscalation] = useState<string>("_all");
 
   const isError403 = (err: any) => err && typeof err === 'object' && 'status' in err && err.status === 403;
 
@@ -69,11 +73,17 @@ export default function MrpGeneratorRun() {
     }
   };
 
-  const filteredResults = results.filter((r) =>
-    !search ||
-    r.itemCode.toLowerCase().includes(search.toLowerCase()) ||
-    (r.productName || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredResults = results.filter((r) => {
+    if (search && !r.itemCode.toLowerCase().includes(search.toLowerCase()) && !(r.productName || "").toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterBand !== "_all" && r.band !== filterBand) return false;
+    if (filterAction !== "_all" && r.action !== filterAction) return false;
+    if (filterPosition !== "_all" && r.position !== filterPosition) return false;
+    if (filterEscalation !== "_all") {
+      const isEscalated = r.escalation ? "yes" : "no";
+      if (filterEscalation !== isEscalated) return false;
+    }
+    return true;
+  });
 
   const getErrorMessage = (err: any) => {
     if (err && typeof err === 'object' && 'data' in err && err.data && typeof err.data === 'object' && 'error' in err.data) {
@@ -102,8 +112,13 @@ export default function MrpGeneratorRun() {
     const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const header = [
       "item_code", "product", "division", "category", "current_mrp", "current_date",
-      "suggested_mrp", "change_percent", "status", "binding_constraint", "exclusions",
-      "competitor_evidence", "rule_trace", "sales_evidence", "margin_evidence", "warnings"
+      "suggested_mrp", "change_percent", "status", "binding_constraints", "exclusions",
+      "competitor_evidence", "rule_trace", "sales_evidence", "margin_evidence", "warnings",
+      "p011_band", "p011_action", "p011_position", "p011_gap_percent",
+      "p011_selected_competitor", "p011_competitor_mode", "p011_competitive_target",
+      "p011_escalation", "p011_escalation_reason",
+      "p011_fy_sales", "p011_sales_qty", "p011_sales_tier",
+      "p011_margin_floor_category", "p011_margin_floor_percent", "p011_margin_floor_minimum"
     ];
     const rows = results.map((result) => [
       result.itemCode,
@@ -115,7 +130,7 @@ export default function MrpGeneratorRun() {
       result.suggestedMrp,
       result.changePercent,
       result.status,
-      result.bindingConstraint,
+      result.bindingConstraints?.join(" | ") || result.bindingConstraint || "",
       result.exclusions.join(" | "),
       result.competitorValues.map((competitor) =>
         `${competitor.competitor}: ${competitor.effectivePrice ?? "No data"} @ ${competitor.effectiveDate ?? "undated"} (${competitor.ageDays ?? "unknown"} days${competitor.stale ? ", stale" : ""})`,
@@ -123,8 +138,38 @@ export default function MrpGeneratorRun() {
       result.trace.map((trace) => `${trace.order + 1}. ${trace.ruleType} [${trace.outcome}] ${trace.reason}`).join(" | "),
       result.salesEvidence ? `Amt: ${result.salesEvidence.salesAmount}, Tier: ${result.salesEvidence.tier || "N/A"}` : "No data",
       result.marginEvidence ? `Margin: ${result.marginEvidence.grossMarginPct != null ? (result.marginEvidence.grossMarginPct * 100).toFixed(1) + '%' : "N/A"} (${result.marginEvidence.latestMonth || "N/A"})` : "No data",
-      result.warnings?.join(" | ") || ""
+      result.warnings?.join(" | ") || "",
+      result.band || "",
+      result.action || "",
+      result.position || "",
+      result.gap != null ? (result.gap * 100).toFixed(1) : "",
+      result.selectedCompetitor || "",
+      result.competitorMode || "",
+      result.competitiveTarget ?? "",
+      result.escalation ? "Yes" : "No",
+      result.escalationReason || "",
+      result.fySalesAmount ?? "",
+      result.salesEvidence?.qty ?? "",
+      result.salesEvidence?.tier || "",
+      result.marginFloorEvidence?.category || "",
+      result.marginFloorEvidence?.floorPercent != null ? result.marginFloorEvidence.floorPercent.toFixed(1) : "",
+      result.marginFloorEvidence?.minimumMrp ?? ""
     ]);
+
+    if (summary.portfolio) {
+      rows.push([]);
+      rows.push(["PORTFOLIO SUMMARY", "Current Gross Margin", "Proposed Gross Margin", "Delta Points", "Target Met", "Shortfall Points"]);
+      rows.push([
+        "",
+        summary.portfolio.currentGrossMargin != null ? `${(summary.portfolio.currentGrossMargin * 100).toFixed(1)}%` : "",
+        summary.portfolio.proposedGrossMargin != null ? `${(summary.portfolio.proposedGrossMargin * 100).toFixed(1)}%` : "",
+        summary.portfolio.deltaPoints != null ? summary.portfolio.deltaPoints.toFixed(1) : "",
+        summary.portfolio.targetMet ? "Yes" : "No",
+        (summary.portfolio.shortfallPoints ?? 0).toFixed(1)
+      ]);
+      rows.push([]);
+    }
+
     const blob = new Blob(
       [[header, ...rows].map((row) => row.map(quote).join(",")).join("\n")],
       { type: "text/csv;charset=utf-8" },
@@ -241,6 +286,114 @@ export default function MrpGeneratorRun() {
               </div>
             </div>
           )}
+
+          {summary.policyVersion === 2 && (
+            <Card className="p-4 sm:p-5 shadow-sm mt-6 border-primary/20 bg-primary/5">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-primary mb-4 flex items-center gap-2">
+                <Zap className="w-4 h-4" /> P011 Policy Analysis
+              </h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2 bg-card p-3 rounded border">
+                   <h3 className="font-semibold text-foreground border-b pb-1">Value & Action Distribution</h3>
+                   <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                     <span className="text-muted-foreground">Sales Value Represented:</span>
+                     <span className="text-right font-medium">₹{summary.salesValueRepresented?.toLocaleString() ?? "0"}</span>
+
+                     <span className="col-span-2 text-xs font-semibold uppercase mt-2 mb-1">Actions</span>
+                     {Object.entries(summary.actionCounts || {}).map(([action, count]) => {
+                       const impact = summary.actionValueImpacts?.[action];
+                       return (
+                         <React.Fragment key={action}>
+                           <span className="text-muted-foreground">{action}:</span>
+                           <span className="text-right text-xs">
+                             {count as React.ReactNode} items<br/>
+                             {impact ? (
+                               <span className="text-muted-foreground">
+                                 ₹{(impact.fySalesValue/1e5).toFixed(1)}L FY Sales<br/>
+                                 Δ ₹{(impact.grossContributionDelta/1e5).toFixed(1)}L GC
+                               </span>
+                             ) : "-"}
+                           </span>
+                         </React.Fragment>
+                       );
+                     })}
+                   </div>
+                </div>
+
+                <div className="space-y-2 bg-card p-3 rounded border">
+                   <h3 className="font-semibold text-foreground border-b pb-1">Bands & Portfolio</h3>
+                   <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                     <span className="col-span-2 text-xs font-semibold uppercase mt-1 mb-1">Bands</span>
+                     {Object.entries(summary.bandDistribution || {}).map(([band, count]) => (
+                       <React.Fragment key={band}>
+                         <span className="text-muted-foreground">Band {band}:</span>
+                         <span className="text-right">{count as React.ReactNode} items</span>
+                       </React.Fragment>
+                     ))}
+
+                     {summary.portfolio && (
+                       <>
+                         <span className="col-span-2 text-xs font-semibold uppercase mt-2 mb-1">Portfolio</span>
+                         <span className="text-muted-foreground">Current Gross Margin:</span>
+                         <span className="text-right">{summary.portfolio.currentGrossMargin != null ? `${(summary.portfolio.currentGrossMargin * 100).toFixed(1)}%` : "-"}</span>
+
+                         <span className="text-muted-foreground">Proposed Gross Margin:</span>
+                         <span className="text-right">{summary.portfolio.proposedGrossMargin != null ? `${(summary.portfolio.proposedGrossMargin * 100).toFixed(1)}%` : "-"}</span>
+
+                         <span className="text-muted-foreground">Delta Points:</span>
+                         <span className="text-right">{summary.portfolio.deltaPoints != null ? `${summary.portfolio.deltaPoints > 0 ? "+" : ""}${summary.portfolio.deltaPoints.toFixed(1)}` : "-"}</span>
+
+                         <span className="text-muted-foreground">Target Result:</span>
+                         <span className="text-right font-medium">
+                           {summary.portfolio.targetMet ? (
+                             <span className="text-emerald-600">Met Target</span>
+                           ) : (
+                             <span className="text-red-600">Shortfall: {(summary.portfolio.shortfallPoints ?? 0).toFixed(1)} pts</span>
+                           )}
+                         </span>
+
+                         <span className="text-muted-foreground">Coverage:</span>
+                         <span className="text-right text-xs">
+                            {summary.portfolio.coveredProductCount} items (₹{(summary.portfolio.coveredSalesValue/1e5).toFixed(1)}L)<br/>
+                            {summary.portfolio.omittedProductCount} omitted (₹{(summary.portfolio.omittedSalesValue/1e5).toFixed(1)}L)
+                         </span>
+                       </>
+                     )}
+                   </div>
+                </div>
+
+                {summary.portfolio?.headroom && summary.portfolio.headroom.length > 0 && (
+                  <div className="lg:col-span-2 space-y-2 bg-card p-3 rounded border">
+                    <h3 className="font-semibold text-foreground border-b pb-1">Headroom Remaining</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1">Item</th>
+                            <th className="py-1">Band</th>
+                            <th className="py-1 text-right">FY Value</th>
+                            <th className="py-1 text-right">Rem. Price Δ</th>
+                            <th className="py-1 text-right">Addl. GC</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.portfolio.headroom.map(h => (
+                            <tr key={h.itemCode} className="border-b last:border-0 border-border/50">
+                              <td className="py-1 font-medium">{h.itemCode}</td>
+                              <td className="py-1">{h.band}</td>
+                              <td className="py-1 text-right">₹{(h.fySalesValue/1e5).toFixed(1)}L</td>
+                              <td className="py-1 text-right text-emerald-600">₹{h.additionalRealizedSaleValue.toLocaleString()}</td>
+                              <td className="py-1 text-right text-emerald-600">₹{h.additionalGrossContribution.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
         </Card>
 
         {/* Coverage Panel */}
@@ -355,20 +508,56 @@ export default function MrpGeneratorRun() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Run Results</h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Input placeholder="Search item code or name..." value={search} onChange={e => setSearch(e.target.value)} className="h-8 w-64 bg-card" />
+              {summary.policyVersion === 2 && (
+                <>
+                  <select className="h-8 rounded-md border border-input bg-card px-2 text-xs" value={filterBand} onChange={e => setFilterBand(e.target.value)}>
+                    <option value="_all">All Bands</option>
+                    <option value="A">Band A</option>
+                    <option value="B">Band B</option>
+                    <option value="C">Band C</option>
+                    <option value="D">Band D</option>
+                    <option value="E">Band E</option>
+                    <option value="F">Band F</option>
+                  </select>
+                  <select className="h-8 rounded-md border border-input bg-card px-2 text-xs" value={filterAction} onChange={e => setFilterAction(e.target.value)}>
+                    <option value="_all">All Actions</option>
+                    <option value="CAPTURE">Capture</option>
+                    <option value="DEFEND">Defend</option>
+                    <option value="HOLD">Hold</option>
+                    <option value="REVIEW">Review</option>
+                    <option value="LEAVE_ALONE">Leave Alone</option>
+                    <option value="MARGIN_ONLY">Margin Only</option>
+                    <option value="EXCLUDED">Excluded</option>
+                  </select>
+                  <select className="h-8 rounded-md border border-input bg-card px-2 text-xs" value={filterPosition} onChange={e => setFilterPosition(e.target.value)}>
+                    <option value="_all">All Positions</option>
+                    <option value="well_below">Well Below</option>
+                    <option value="parity">Parity</option>
+                    <option value="above">Above</option>
+                  </select>
+                  <select className="h-8 rounded-md border border-input bg-card px-2 text-xs" value={filterEscalation} onChange={e => setFilterEscalation(e.target.value)}>
+                    <option value="_all">Escalation: Any</option>
+                    <option value="yes">Escalated</option>
+                    <option value="no">Not Escalated</option>
+                  </select>
+                </>
+              )}
             </div>
           </div>
 
           <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
-            <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px] items-center gap-2 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className={cn("grid items-center gap-2 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider", summary.policyVersion === 2 ? "grid-cols-[40px_minmax(0,1fr)_60px_100px_100px_100px_100px_100px_40px]" : "grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px]")}>
               <div className="flex justify-center">
                 <Checkbox checked={selectedRows.size > 0} onCheckedChange={selectAllEligible} aria-label="Select eligible" />
               </div>
               <div>Product</div>
+              {summary.policyVersion === 2 && <div className="text-center">Band</div>}
               <div className="text-right">Current MRP</div>
               <div className="text-right">Suggested</div>
               <div className="text-right">Change</div>
+              {summary.policyVersion === 2 && <div className="text-center">Action</div>}
               <div className="text-center">Status</div>
               <div></div>
             </div>
@@ -382,7 +571,7 @@ export default function MrpGeneratorRun() {
                   const expanded = expandedRows.has(r.itemCode);
                   return (
                     <div key={r.itemCode} className={cn("transition-colors hover:bg-muted/10", expanded && "bg-muted/10")}>
-                      <div className="grid grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px] items-center gap-2 p-3 text-sm">
+                      <div className={cn("grid items-center gap-2 p-3 text-sm", summary.policyVersion === 2 ? "grid-cols-[40px_minmax(0,1fr)_60px_100px_100px_100px_100px_100px_40px]" : "grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px]")}>
                         <div className="flex justify-center">
                           <Checkbox disabled={!isEligible} checked={selectedRows.has(r.itemCode)} onCheckedChange={() => toggleSelect(r.itemCode)} />
                         </div>
@@ -390,6 +579,9 @@ export default function MrpGeneratorRun() {
                           <div className="font-medium text-foreground truncate">{r.itemCode}</div>
                           <div className="text-xs text-muted-foreground truncate">{r.productName || "-"}</div>
                         </div>
+                        {summary.policyVersion === 2 && (
+                          <div className="text-center font-bold text-muted-foreground">{r.band || "-"}</div>
+                        )}
                         <div className="text-right text-muted-foreground">
                           {r.currentMrp != null ? `₹${r.currentMrp.toFixed(2)}` : "No data"}
                         </div>
@@ -399,6 +591,20 @@ export default function MrpGeneratorRun() {
                         <div className={cn("text-right font-medium", (r.changePercent || 0) > 0 ? "text-emerald-600" : (r.changePercent || 0) < 0 ? "text-red-600" : "text-muted-foreground")}>
                           {r.changePercent != null ? `${r.changePercent > 0 ? "+" : ""}${r.changePercent.toFixed(1)}%` : "—"}
                         </div>
+                        {summary.policyVersion === 2 && (
+                          <div className="flex justify-center">
+                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                              r.action === "CAPTURE" ? "bg-emerald-100 text-emerald-800" :
+                              r.action === "DEFEND" ? "bg-amber-100 text-amber-800" :
+                              r.action === "HOLD" ? "bg-blue-100 text-blue-800" :
+                              r.action === "REVIEW" ? "bg-purple-100 text-purple-800" :
+                              r.action === "EXCLUDED" ? "bg-muted text-muted-foreground" :
+                              "bg-gray-100 text-gray-800"
+                            )}>
+                              {r.action || "-"}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-center">
                           <span className={cn(
                             "px-2 py-0.5 rounded text-xs uppercase font-medium",
@@ -486,7 +692,51 @@ export default function MrpGeneratorRun() {
                                     <span className="text-muted-foreground">Qty Unknown:</span>
                                     <span className="text-right">{r.marginEvidence.qtyUnknown ? "Yes" : "No"}</span>
                                     <span className="text-muted-foreground">Held:</span>
-                                    <span className={cn("text-right", r.marginEvidence.held && "text-amber-700 font-medium")}>{r.marginEvidence.held ? "Yes" : "No"}</span>
+                                    <span className="text-right text-amber-700">{r.marginEvidence.held ? "Yes" : "No"}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {summary.policyVersion === 2 && (
+                                <div className="bg-primary/5 border border-primary/20 rounded p-3 space-y-2 mt-3 text-xs">
+                                  <h4 className="font-semibold uppercase tracking-wider text-primary border-b border-primary/10 pb-1">P011 Policy Reasoning</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                                     <div>
+                                       <span className="text-muted-foreground mr-2">Chosen Competitor:</span>
+                                       <span className="font-medium">{r.selectedCompetitor || "None"} ({r.competitorMode || "n/a"})</span>
+                                     </div>
+                                     <div>
+                                       <span className="text-muted-foreground mr-2">FY Sales Value:</span>
+                                       <span className="font-medium">{r.fySalesAmount != null ? `₹${r.fySalesAmount.toLocaleString()}` : "No Data"}</span>
+                                     </div>
+                                     <div>
+                                       <span className="text-muted-foreground mr-2">Gap & Position:</span>
+                                       <span className="font-medium">{r.gap != null ? `${(r.gap * 100).toFixed(1)}%` : "N/A"} → {r.position || "N/A"}</span>
+                                     </div>
+                                     <div>
+                                       <span className="text-muted-foreground mr-2">Binding Constraints:</span>
+                                       <span className="font-medium text-amber-700">{r.bindingConstraints?.join(", ") || "None"}</span>
+                                     </div>
+                                     <div className="col-span-1 md:col-span-2">
+                                       <span className="text-muted-foreground mr-2">Competitive Target:</span>
+                                       <span className="font-medium">{r.competitiveTarget != null ? `₹${r.competitiveTarget.toFixed(2)}` : "None"}</span>
+                                     </div>
+                                     {r.marginFloorEvidence && (
+                                       <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-x-2 gap-y-1 bg-muted/20 p-2 border rounded">
+                                         <span className="text-muted-foreground">Floor Category:</span>
+                                         <span className="text-right font-medium">{r.marginFloorEvidence.category || "None"}</span>
+                                         <span className="text-muted-foreground">Category Floor:</span>
+                                         <span className="text-right">{r.marginFloorEvidence.floorPercent != null ? `${r.marginFloorEvidence.floorPercent.toFixed(1)}%` : "N/A"}</span>
+                                         <span className="text-muted-foreground">Minimum MRP:</span>
+                                         <span className="text-right">{r.marginFloorEvidence.minimumMrp != null ? `₹${r.marginFloorEvidence.minimumMrp.toFixed(2)}` : "N/A"}</span>
+                                       </div>
+                                     )}
+                                     {r.escalation && (
+                                       <div className="col-span-1 md:col-span-2 flex gap-2 p-2 bg-destructive/10 text-destructive rounded mt-1">
+                                         <AlertTriangle className="w-4 h-4 shrink-0" />
+                                         <span><span className="font-bold">Escalation:</span> {r.escalationReason || "Unknown reason"}</span>
+                                       </div>
+                                     )}
                                   </div>
                                 </div>
                               )}
