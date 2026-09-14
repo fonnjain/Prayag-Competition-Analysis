@@ -1,44 +1,10 @@
-export type MrpGeneratorScope = {
-  division?: string;
-  series?: string;
-  category?: string;
-  competitorMapped?: boolean;
-  explicitCodes?: string[];
-};
+import type {
+  MrpGeneratorScope,
+  MrpGeneratorRule,
+  MrpGeneratorMarginFloorRuleCategoryFloors
+} from "@workspace/api-client-react";
 
-export type MrpMasterCategory =
-  | "PTMT"
-  | "C P"
-  | "PLUMBING"
-  | "SANITARYWARE"
-  | "SINK"
-  | "HARDWARE";
-
-export type MrpCategoryFloors = Partial<Record<MrpMasterCategory, number>>;
-
-export type MrpGeneratorRule =
-  | { type: "percent_below"; competitor: string; percent: number }
-  | { type: "match"; competitor: string }
-  | { type: "percent_above_lowest"; percent: number }
-  | { type: "max_increase"; percent: number }
-  | { type: "max_decrease"; percent: number }
-  | { type: "hold_below"; threshold: number }
-  | { type: "rounding"; unit: 1 | 5 | 10 | 50; direction: "nearest" | "up" | "down" }
-  | { type: "margin_floor"; categoryFloors: MrpCategoryFloors; scope?: MrpGeneratorScope }
-  | {
-      type: "volume_tier";
-      period: string;
-      mode: "cumulative_contribution";
-      tier: "A" | "B" | "C";
-      cumulativeValuePercent: 80 | 95 | 100;
-    }
-  | {
-      type: "volume_tier";
-      period: string;
-      mode: "value_threshold";
-      operator: "above" | "below";
-      salesValue: number;
-    };
+export type { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorMarginFloorRuleCategoryFloors };
 
 export const ALL_RULE_TYPES = [
   "percent_below",
@@ -73,7 +39,7 @@ export function getRuleDescription(rule: MrpGeneratorRule) {
     case "volume_tier":
       return rule.mode === "cumulative_contribution"
         ? `${rule.tier} tier by cumulative contribution for ${rule.period}`
-        : `FY sales ${rule.operator} ₹${rule.salesValue} for ${rule.period}`;
+        : `FY sales ${(rule as any).operator} ₹${(rule as any).salesValue} for ${(rule as any).period}`;
     default:
       return "Unknown rule";
   }

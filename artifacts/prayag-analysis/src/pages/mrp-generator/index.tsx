@@ -135,10 +135,28 @@ export default function MrpGeneratorList() {
                 <div className="flex flex-col gap-1 text-muted-foreground">
                   <div>Stage: <strong className="text-foreground">{metadata.stage}</strong></div>
                   <div>Mode: <strong className="text-foreground">{metadata.deterministic ? "Deterministic" : "Stochastic"}</strong></div>
-                  {!metadata.salesApi?.available && (
+                  {metadata.salesApi?.status === "missing_credential" && (
                     <div className="flex items-start gap-1.5 mt-2 text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
                       <ShieldAlert className="w-4 h-4 shrink-0" />
-                      <span>Sales API unavailable ({metadata.salesApi?.reason}). Margin and volume constraints are disabled.</span>
+                      <span>SALES_API_KEY is not configured and rules are unavailable.</span>
+                    </div>
+                  )}
+                  {metadata.salesApi?.status === "auth_failed" && (
+                    <div className="flex items-start gap-1.5 mt-2 text-destructive bg-destructive/10 p-1.5 rounded border border-destructive/20">
+                      <ShieldAlert className="w-4 h-4 shrink-0" />
+                      <span>Sales API authentication failed and rules are unavailable.</span>
+                    </div>
+                  )}
+                  {metadata.salesApi?.status === "unavailable" && (
+                    <div className="flex items-start gap-1.5 mt-2 text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
+                      <ShieldAlert className="w-4 h-4 shrink-0" />
+                      <span>Sales API is currently unavailable upstream. Rules are unavailable.</span>
+                    </div>
+                  )}
+                  {metadata.salesApi?.status === "authenticated" && (
+                    <div className="flex items-start gap-1.5 mt-2 text-emerald-700 bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                      <Zap className="w-4 h-4 shrink-0" />
+                      <span>Sales API authenticated. Advanced rules available.</span>
                     </div>
                   )}
                 </div>

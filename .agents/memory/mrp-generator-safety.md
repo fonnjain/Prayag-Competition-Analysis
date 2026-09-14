@@ -15,4 +15,10 @@ Future Sales-dependent rules must use independently configurable master-category
 
 **Why:** Measured category margins vary too widely for one global floor, and sales value is highly concentrated, so percentile tiers group commercially incomparable products and misclassify no-sales products as low-sales products.
 
-**How to apply:** Keep these controls visible but unavailable until the Sales API supplies period, coverage, held-period, sales-value, quantity, and margin inputs. Preserve the selected period and applied category floor in run snapshots and traces once enabled.
+**How to apply:** Enable these controls only when the Sales API authenticates and supplies period, coverage, held-period, sales-value, quantity, and margin inputs. Preserve the selected period and applied category floor in run snapshots and traces.
+
+Gross-margin floors translate to a minimum suggested MRP by first deriving per-unit BOM from the covered period, then computing `required realized sale = unit BOM / (1 - floor)` and `required MRP = required realized sale / (1 - observed discount fraction)`. Missing usable quantity, BOM, margin, or discount evidence excludes the product instead of estimating.
+
+**Why:** Period-total BOM is not dimensionally comparable with a per-unit MRP; using it directly multiplies the floor by sales quantity. Preserving the observed discount is the deterministic way to convert the required realized sale back to list MRP.
+
+**How to apply:** Use only Sales API rows with usable piece quantity; never substitute water-tank litres for pieces. Treat the computed minimum as binding, so later competitive or rounding rules cannot relax it.

@@ -2244,6 +2244,7 @@ paths:
       tags: [mrp-generator]
       parameters:
         - { name: scenarioId, in: path, required: true, schema: { type: integer } }
+        - { name: refresh, in: query, required: false, schema: { type: boolean }, description: Re-fetch the complete Sales paired snapshot instead of using the in-memory snapshot. }
       requestBody:
         required: false
         content:
@@ -2396,11 +2397,12 @@ components:
           items: { type: string }
     MrpGeneratorSalesApi:
       type: object
-      required: [available, status, reason]
+      required: [available, status]
       properties:
         available: { type: boolean }
-        status: { type: string, enum: [unavailable] }
-        reason: { type: string }
+        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable] }
+        reason: { type: [string, "null"] }
+        dataSource: { type: [string, "null"] }
     MrpGeneratorDisabledRule:
       type: object
       required: [type, reason, configurationSummary]
@@ -2435,6 +2437,7 @@ components:
         explicitCodes: { type: array, items: { type: string } }
         itemCodes: { type: array, items: { type: string } }
         codes: { type: array, items: { type: string } }
+        confidenceOnly: { type: boolean }
     MrpGeneratorRuleScope:
       type: object
       properties:
@@ -2449,6 +2452,8 @@ components:
         - $ref: "#/components/schemas/MrpGeneratorMaxDecreaseRule"
         - $ref: "#/components/schemas/MrpGeneratorHoldBelowRule"
         - $ref: "#/components/schemas/MrpGeneratorRoundingRule"
+        - $ref: "#/components/schemas/MrpGeneratorMarginFloorRule"
+        - $ref: "#/components/schemas/MrpGeneratorVolumeTierRule"
       discriminator:
         propertyName: type
     MrpGeneratorScopeRule:
@@ -2525,7 +2530,6 @@ components:
             type: { const: margin_floor }
             categoryFloors:
               type: object
-              required: [PTMT, C P, PLUMBING, SANITARYWARE, SINK, HARDWARE]
               properties:
                 PTMT: { type: number, minimum: 0, maximum: 100, default: 65 }
                 C P: { type: number, minimum: 0, maximum: 100, default: 38 }
@@ -2533,7 +2537,6 @@ components:
                 SANITARYWARE: { type: number, minimum: 0, maximum: 100, default: 38 }
                 SINK: { type: number, minimum: 0, maximum: 100, default: 40 }
                 HARDWARE: { type: number, minimum: 0, maximum: 100, default: 38 }
-              additionalProperties: false
     MrpGeneratorVolumeTierRule:
       oneOf:
         - allOf:
@@ -2542,8 +2545,8 @@ components:
               required: [type, period, mode, tier, cumulativeValuePercent]
               properties:
                 type: { const: volume_tier }
-                period: { type: string, minLength: 1 }
-                mode: { const: cumulative_contribution }
+                period: { type: string, enum: ["2026-27"], description: The only currently supported Sales period. }
+                mode: { enum: [cumulative, cumulative_contribution] }
                 tier: { type: string, enum: [A, B, C] }
                 cumulativeValuePercent: { type: integer, enum: [80, 95, 100] }
         - allOf:
@@ -2552,8 +2555,8 @@ components:
               required: [type, period, mode, operator, salesValue]
               properties:
                 type: { const: volume_tier }
-                period: { type: string, minLength: 1 }
-                mode: { const: value_threshold }
+                period: { type: string, enum: ["2026-27"], description: The only currently supported Sales period. }
+                mode: { enum: [value_threshold, threshold] }
                 operator: { type: string, enum: [above, below] }
                 salesValue: { type: number, minimum: 0 }
     MrpGeneratorScenarioInput:
@@ -2575,6 +2578,7 @@ components:
       type: object
       properties:
         asOf: { type: string, format: date }
+        refreshSales: { type: boolean }
     MrpGeneratorHandoffInput:
       type: object
       required: [itemCodes]
@@ -2601,6 +2605,29 @@ components:
         inputFingerprint: { type: string }
         summary: { $ref: "#/components/schemas/MrpGeneratorSummary" }
         sourceFreshness: { $ref: "#/components/schemas/MrpGeneratorSourceFreshness" }
+    MrpGeneratorSalesEvidence:
+      type: object
+      required: [salesAmount, qty, qtyUnknown, fySalesExists]
+      properties:
+        salesAmount: { type: number }
+        qty: { type: [number, "null"] }
+        qtyUnknown: { type: boolean }
+        fySalesExists: { type: boolean }
+        awaitingConfirmation: { type: boolean }
+        tier: { type: [string, "null"], enum: [A, B, C, null] }
+    MrpGeneratorMarginEvidence:
+      type: object
+      required: [grossMarginPct]
+      properties:
+        grossMarginPct: { type: [number, "null"] }
+        saleValue: { type: [number, "null"] }
+        bomValue: { type: [number, "null"] }
+        unitBomValue: { type: [number, "null"] }
+        qtyUnknown: { type: boolean }
+        discountFrac: { type: [number, "null"] }
+        held: { type: boolean }
+        latestMonth: { type: [string, "null"] }
+        warnings: { type: array, items: { type: string } }
     MrpGeneratorSnapshotProduct:
       type: object
       required: [itemCode, productName, division, seriesRange, category, currentMrp, currentDate, currentRowId, competitors]
@@ -2614,6 +2641,8 @@ components:
         currentDate: { type: [string, "null"], format: date }
         currentRowId: { type: [integer, "null"] }
         competitors: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorCompetitorValue" } }
+        sales: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorSalesEvidence" }, { type: "null" }] }
+        margin: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorMarginEvidence" }, { type: "null" }] }
     MrpGeneratorInputSnapshot:
       type: object
       required: [asOf, products, scope, rules, stage]
@@ -2622,7 +2651,12 @@ components:
         products: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorSnapshotProduct" } }
         scope: { $ref: "#/components/schemas/MrpGeneratorScope" }
         rules: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorRule" } }
-        stage: { type: integer, const: 1 }
+        stage: { type: integer, enum: [1, 2] }
+        salesFetchedAt: { type: [string, "null"], format: date-time }
+        salesCoverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
+        salesDataSource: { type: [string, "null"] }
+        salesCoverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
+        knownLimits: { $ref: "#/components/schemas/MrpGeneratorKnownLimits" }
     MrpGeneratorPersistedRun:
       type: object
       required: [id, scenarioId, asOf, inputSnapshot, inputFingerprint, summary, sourceFreshness, createdBy, createdAt]
@@ -2638,7 +2672,7 @@ components:
         createdAt: { type: string, format: date-time }
     MrpGeneratorSummary:
       type: object
-      required: [total, suggested, noChange, excluded, increases, decreases, medianIncreasePercent, medianDecreasePercent]
+      required: [total, suggested, noChange, excluded, increases, decreases, medianIncreasePercent, medianDecreasePercent, confidencePassCount, exclusionReasonBreakdown]
       properties:
         total: { type: integer }
         suggested: { type: integer }
@@ -2648,6 +2682,8 @@ components:
         decreases: { type: integer }
         medianIncreasePercent: { type: [number, "null"] }
         medianDecreasePercent: { type: [number, "null"] }
+        confidencePassCount: { type: [integer, "null"] }
+        exclusionReasonBreakdown: { type: object, additionalProperties: { type: integer } }
     MrpGeneratorFreshnessCompetitor:
       type: object
       required: [competitor, effectiveDate, ageDays, stale]
@@ -2656,6 +2692,120 @@ components:
         effectiveDate: { type: [string, "null"], format: date }
         ageDays: { type: [integer, "null"] }
         stale: { type: boolean }
+    MrpGeneratorCoverageReconciliation:
+      type: object
+      required: [fy, control, actual, variance, variancePct, status, reference]
+      properties:
+        fy: { type: [string, "null"] }
+        control: { type: [number, "null"] }
+        actual: { type: [number, "null"] }
+        variance: { type: [number, "null"] }
+        variancePct: { type: [number, "null"] }
+        status: { type: [string, "null"] }
+        reference: { type: [string, "null"] }
+    MrpGeneratorCoverageSummary:
+      type: object
+      required: [catalogTotal, inScopeTotal, withFySales, withoutFySales, withMargin, confidencePassCount, absentSoldCodes, awaitingConfirmation, periods, readAt, ages, latestMonths, provisional, holds, unavailable, reconciliation, dataSource]
+      properties:
+        catalogTotal: { type: integer }
+        inScopeTotal: { type: integer }
+        withFySales: { type: integer }
+        withoutFySales: { type: integer }
+        withMargin: { type: integer }
+        confidencePassCount: { type: [integer, "null"] }
+        absentSoldCodes:
+          type: object
+          required: [count, value, codes]
+          properties:
+            count: { type: integer }
+            value: { type: number }
+            codes: { type: array, items: { type: string } }
+        awaitingConfirmation:
+          type: object
+          required: [count, value, codes]
+          properties:
+            count: { type: integer }
+            value: { type: number }
+            codes: { type: array, items: { type: string } }
+        periods:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { $ref: "#/components/schemas/MrpGeneratorCoveragePeriod" }
+            margin: { $ref: "#/components/schemas/MrpGeneratorCoveragePeriod" }
+        readAt:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { type: [string, "null"], format: date-time }
+            margin: { type: [string, "null"], format: date-time }
+        ages:
+          type: object
+          required: [salesDays, marginDays]
+          properties:
+            salesDays: { type: [integer, "null"] }
+            marginDays: { type: [integer, "null"] }
+        latestMonths:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { type: [string, "null"] }
+            margin: { type: [string, "null"] }
+        provisional:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { type: array, items: { type: string } }
+            margin: { type: array, items: { type: string } }
+        holds:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { type: array, items: { type: string } }
+            margin: { type: array, items: { type: string } }
+        unavailable:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { type: array, items: { type: string } }
+            margin: { type: array, items: { type: string } }
+        reconciliation:
+          type: object
+          required: [sales, margin]
+          properties:
+            sales: { $ref: "#/components/schemas/MrpGeneratorCoverageReconciliation" }
+            margin: { $ref: "#/components/schemas/MrpGeneratorCoverageReconciliation" }
+        dataSource: { type: [string, "null"] }
+    MrpGeneratorNormalizedCoverage:
+      type: object
+      required: [requested, returned, held, unavailable, provisional, read_at, reconciliation, dataSource, last_modified]
+      properties:
+        requested: { type: array, items: { type: string } }
+        returned: { type: array, items: { type: string } }
+        held: { type: array, items: { type: string } }
+        unavailable: { type: array, items: { type: string } }
+        provisional: { type: array, items: { type: string } }
+        read_at: { type: [string, "null"], format: date-time }
+        reconciliation:
+          type: object
+          additionalProperties: { oneOf: [{ type: string }, { type: number }, { type: "null" }] }
+        dataSource: { type: [string, "null"] }
+        last_modified: { type: [string, "null"], format: date-time }
+    MrpGeneratorCoveragePeriod:
+      type: object
+      required: [fy, from, to]
+      properties:
+        fy: { type: string, enum: ["2026-27"], description: The only currently supported Sales period. }
+        from: { type: string }
+        to: { type: string }
+    MrpGeneratorKnownLimits:
+      type: object
+      required: [pageLimit, maxRestarts, salesPeriod, marginPeriod]
+      properties:
+        pageLimit: { type: integer }
+        maxRestarts: { type: integer }
+        salesPeriod: { type: array, items: { type: string, enum: ["2026-04..2026-08"] }, description: Current FY2026-27 Sales query period. }
+        marginPeriod: { type: array, items: { type: string, enum: ["2026-04..2026-06"] }, description: Current FY2026-27 margin query period. }
     MrpGeneratorSourceFreshness:
       type: object
       required: [asOf, mrpDates, competitors, sales]
@@ -2666,12 +2816,22 @@ components:
           type: array
           items: { $ref: "#/components/schemas/MrpGeneratorFreshnessCompetitor" }
         sales: { $ref: "#/components/schemas/MrpGeneratorSalesApiStatus" }
+        salesFetchedAt: { type: [string, "null"], format: date-time }
+        coverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
+        coverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
+        dataSource: { type: [string, "null"] }
+        knownLimits: { $ref: "#/components/schemas/MrpGeneratorKnownLimits" }
     MrpGeneratorSalesApiStatus:
       type: object
       required: [available, status]
       properties:
         available: { type: boolean }
-        status: { type: string, enum: [unavailable] }
+        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable] }
+        reason: { type: [string, "null"] }
+        dataSource: { type: [string, "null"] }
+        fetchedAt: { type: [string, "null"], format: date-time }
+        coverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
+        coverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
     MrpGeneratorFreshnessMrp:
       type: object
       required: [effectiveDate, ageDays, stale]
@@ -2689,6 +2849,11 @@ components:
           type: array
           items: { $ref: "#/components/schemas/MrpGeneratorFreshnessCompetitor" }
         sales: { $ref: "#/components/schemas/MrpGeneratorSalesApiStatus" }
+        salesFetchedAt: { type: [string, "null"], format: date-time }
+        coverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
+        coverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
+        dataSource: { type: [string, "null"] }
+        knownLimits: { $ref: "#/components/schemas/MrpGeneratorKnownLimits" }
     MrpGeneratorCompetitorValue:
       type: object
       required: [competitor, price, effectivePrice, effectiveDate, ageDays, stale, matched]
@@ -2713,7 +2878,7 @@ components:
         target: { type: [number, "null"] }
     MrpGeneratorResult:
       type: object
-      required: [id, runId, itemCode, productName, division, category, currentMrp, currentDate, currentRowId, suggestedMrp, status, exclusions, competitorValues, trace, competitiveTarget, bindingConstraint, changePercent, createdAt]
+      required: [id, runId, itemCode, productName, division, category, currentMrp, currentDate, currentRowId, suggestedMrp, status, exclusions, competitorValues, trace, competitiveTarget, bindingConstraint, changePercent, warnings, createdAt]
       properties:
         id: { type: integer }
         runId: { type: integer }
@@ -2732,6 +2897,9 @@ components:
         competitiveTarget: { type: [number, "null"] }
         bindingConstraint: { type: [string, "null"] }
         changePercent: { type: [number, "null"] }
+        salesEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorSalesEvidence" }, { type: "null" }] }
+        marginEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorMarginEvidence" }, { type: "null" }] }
+        warnings: { type: array, items: { type: string } }
         createdAt: { type: string, format: date-time }
     MrpGeneratorRunDetail:
       type: object

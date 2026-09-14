@@ -16,6 +16,7 @@ import {
 } from "@workspace/db";
 import routes from "./index";
 import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
+import { SalesApiClient, resetSalesApiClient, setSalesApiClientForTests } from "../lib/salesApi";
 
 const RUN = Date.now();
 const CODE = `__MRP_GENERATOR_${RUN}__`;
@@ -50,6 +51,7 @@ const user = requestAs("user");
 let fixtureBatchId = 0;
 let scenarioId = 0;
 let rightOnlyScenarioId = 0;
+let stage2ScenarioId = 0;
 const runIds: number[] = [];
 const revisionBatchIds: number[] = [];
 
@@ -115,6 +117,8 @@ afterAll(async () => {
   }
   if (scenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, scenarioId)));
   if (rightOnlyScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, rightOnlyScenarioId)));
+  if (stage2ScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, stage2ScenarioId)));
+  resetSalesApiClient();
   await cleanup(() => db.delete(competitorPricesTable).where(eq(competitorPricesTable.competitor, COMPETITOR)));
   await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE])));
   await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE])));
@@ -279,5 +283,64 @@ describe("MRP Generator HTTP contract and safety", () => {
     const futureHandoff = await admin.post(`/api/mrp-generator/runs/${futureRun.body.runId}/handoff`).send({ itemCodes: [CODE] });
     expect(futureHandoff.status).toBe(409);
     expect(futureHandoff.body.error).toContain("Future-dated");
+  });
+
+  it("bootstraps authenticated Stage 2 metadata/save/run and invalidates rejected credentials", async () => {
+    const unauthorized = new SalesApiClient({
+      apiKey: "revoked",
+      fetch: async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 }),
+    });
+    setSalesApiClientForTests(unauthorized);
+    const rejected = await admin.get("/api/mrp-generator/metadata");
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.salesApi).toEqual(expect.objectContaining({ status: "auth_failed", available: false }));
+    expect(rejected.body.stage).toBe(1);
+
+    const coverage = {
+      requested: ["2026-04..2026-08"], returned: ["2026-04..2026-08"],
+      read_at: "2026-08-01", dataSource: "fixture-sales",
+      held: null, unavailable: [], provisional: false,
+    };
+    const fixtureSales = new SalesApiClient({
+      apiKey: "valid",
+      fetch: async (url) => url.includes("sales-by-item")
+        ? new Response(JSON.stringify({ coverage, rows: [{
+          code: CODE, month_label: "2026-04", fy: "2026-27", qty: 10,
+          amount_taxable: 1000, row_count: 1, catalogue_status: "matched",
+        }] }))
+        : new Response(JSON.stringify({ coverage, rows: [{
+          item_code: CODE, month_label: "2026-06", fy: "2026-27", segment: "PTMT",
+          qty: 10, sale_value: 1000, bom_value: 100, gross_margin_pct: 0.9,
+          mrp: 100, avg_sale: 100, discount_frac: 0,
+        }] })),
+    });
+    setSalesApiClientForTests(fixtureSales);
+    const metadata = await admin.get("/api/mrp-generator/metadata");
+    expect(metadata.body.stage).toBe(2);
+    expect(metadata.body.salesApi.status).toBe("authenticated");
+    const created = await admin.post("/api/mrp-generator/scenarios").send({
+      name: `Generator Stage 2 ${RUN}`,
+      scope: { explicitCodes: [CODE] },
+      rules: [{ type: "margin_floor", categoryFloors: { PTMT: 50 } }, {
+        type: "volume_tier", period: "2026-27", mode: "cumulative", tier: "A", cumulativeValuePercent: 80,
+      }],
+    });
+    expect(created.status).toBe(201);
+    stage2ScenarioId = created.body.id;
+    const first = await admin.post(`/api/mrp-generator/scenarios/${stage2ScenarioId}/run`).send({ asOf: AS_OF });
+    const second = await admin.post(`/api/mrp-generator/scenarios/${stage2ScenarioId}/run`).send({ asOf: AS_OF });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    runIds.push(first.body.runId, second.body.runId);
+    expect(first.body.inputFingerprint).toBe(second.body.inputFingerprint);
+    expect(first.body.sourceFreshness.coverageSummary).toEqual(expect.objectContaining({
+      periods: expect.objectContaining({ sales: expect.any(Object), margin: expect.any(Object) }),
+    }));
+    expect(first.body.sourceFreshness.knownLimits).toEqual(expect.objectContaining({ pageLimit: 500, maxRestarts: 2 }));
+    const detail = await admin.get(`/api/mrp-generator/runs/${first.body.runId}`);
+    expect(detail.body.results[0]).toEqual(expect.objectContaining({
+      salesEvidence: expect.objectContaining({ qty: 10 }),
+      marginEvidence: expect.objectContaining({ unitBomValue: 10 }),
+    }));
   });
 });

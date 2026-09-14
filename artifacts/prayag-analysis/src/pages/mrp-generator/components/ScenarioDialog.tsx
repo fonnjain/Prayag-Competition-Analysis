@@ -34,10 +34,8 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
 
   const { data: scopesData } = useGetMrpGeneratorScopes();
   const { data: metadata } = useGetMrpGeneratorMetadata();
-  const disabledRules = new Set([
+  const disabledRules = new Set<string>([
     ...(metadata?.disabledRules ?? []).map((rule) => rule.type),
-    "margin_floor",
-    "volume_tier",
   ]);
 
   useEffect(() => {
@@ -94,6 +92,8 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
     if (type === "max_decrease") Object.assign(baseRule, { percent: 10 });
     if (type === "hold_below") Object.assign(baseRule, { threshold: 1000 });
     if (type === "rounding") Object.assign(baseRule, { unit: 10, direction: "nearest" });
+    if (type === "margin_floor") Object.assign(baseRule, { categoryFloors: { PTMT: 65, "C P": 38, PLUMBING: 30, SANITARYWARE: 38, SINK: 40, HARDWARE: 38 } });
+    if (type === "volume_tier") Object.assign(baseRule, { period: "2026-27", mode: "cumulative_contribution", tier: "A", cumulativeValuePercent: 80 });
     setRules([...rules, baseRule]);
   };
 
@@ -140,7 +140,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
               <div>
                 <Label>Division</Label>
                 <Select
-                  value={scope.division || "all"}
+                  value={(Array.isArray(scope.division) ? scope.division[0] : scope.division) || "all"}
                   onValueChange={(v) => setScope({ ...scope, division: v === "all" ? undefined : v })}
                 >
                   <SelectTrigger><SelectValue placeholder="All Divisions" /></SelectTrigger>
@@ -155,7 +155,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
               <div>
                 <Label>Category</Label>
                 <Select
-                  value={scope.category || "all"}
+                  value={(Array.isArray(scope.category) ? scope.category[0] : scope.category) || "all"}
                   onValueChange={(v) => setScope({ ...scope, category: v === "all" ? undefined : v })}
                 >
                   <SelectTrigger><SelectValue placeholder="All Categories" /></SelectTrigger>
@@ -187,7 +187,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
               <div>
                 <Label>Series</Label>
                 <Select
-                  value={scope.series || "all"}
+                  value={(Array.isArray(scope.series) ? scope.series[0] : scope.series) || "all"}
                   onValueChange={(value) => setScope({ ...scope, series: value === "all" ? undefined : value })}
                 >
                   <SelectTrigger><SelectValue placeholder="All Series" /></SelectTrigger>
@@ -211,10 +211,23 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                 />
               </div>
               <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                <p className="font-semibold">Sales tier scope — unavailable in Stage 1</p>
+                <p className="font-semibold">Sales tier scope</p>
                 <p className="mt-1">
                   When the Sales API is connected, scope can use A/B/C cumulative contribution or an explicit period sales-value threshold. Products with no sales will remain a separate excluded group.
                 </p>
+              </div>
+              <div className="col-span-2 flex items-start space-x-3 border rounded-md p-3 bg-muted/20">
+                <Checkbox
+                  id="confidenceOnly"
+                  checked={scope.confidenceOnly || false}
+                  onCheckedChange={(checked) => setScope({ ...scope, confidenceOnly: !!checked })}
+                  disabled={metadata?.salesApi?.status !== "authenticated"}
+                  className="mt-1"
+                />
+                <div className="grid gap-1.5 leading-tight">
+                  <Label htmlFor="confidenceOnly" className={metadata?.salesApi?.status !== "authenticated" ? "text-muted-foreground" : ""}>Confidence Pass Only</Label>
+                  <p className="text-xs text-muted-foreground">Only evaluate products with current competitor under 12 months, FY sales, and usable non-held gross margin. Failures remain visible exclusions.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -241,7 +254,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
             <div className="grid gap-2 sm:grid-cols-2">
               {(metadata?.disabledRules ?? []).map((rule) => (
                 <div key={rule.type} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  <p className="font-semibold">{rule.type === "margin_floor" ? "Margin floor" : "Volume tier"} — unavailable in Stage 1</p>
+                  <p className="font-semibold">{rule.type} rule unavailable</p>
                   <p className="mt-1">{rule.reason}</p>
                   <p className="mt-2 font-medium">{rule.configurationSummary}</p>
                 </div>
@@ -352,13 +365,72 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                             </>
                           )}
                           {rule.type === "margin_floor" && (
-                            <div className="col-span-2 rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
-                              Category floors: PTMT 65% · C P 38% · PLUMBING 30% · SANITARYWARE 38% · SINK 40% · HARDWARE 38%. Narrower scope overrides will be supported after the Sales API is connected.
+                            <div className="col-span-2 grid grid-cols-3 gap-3 rounded border bg-muted/40 p-3">
+                              <div className="col-span-3 flex justify-between items-center mb-1">
+                                <span className="text-xs font-semibold uppercase text-muted-foreground">Category Floors (%)</span>
+                                <Button type="button" variant="outline" size="sm" className="h-6 text-xs" onClick={() => updateRule(idx, { categoryFloors: { PTMT: 65, "C P": 38, PLUMBING: 30, SANITARYWARE: 38, SINK: 40, HARDWARE: 38 } })}>Fill Defaults</Button>
+                              </div>
+                              {["PTMT", "C P", "PLUMBING", "SANITARYWARE", "SINK", "HARDWARE"].map((cat) => (
+                                <div key={cat}>
+                                  <Label className="text-xs">{cat}</Label>
+                                  <Input type="number" step="0.1" value={(rule as any).categoryFloors?.[cat] ?? ""} onChange={(e) => updateRule(idx, { categoryFloors: { ...(rule as any).categoryFloors, [cat]: e.target.value ? Number(e.target.value) : undefined } })} className="h-8 bg-background" />
+                                </div>
+                              ))}
                             </div>
                           )}
                           {rule.type === "volume_tier" && (
-                            <div className="col-span-2 rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
-                              Choose a sales period, then classify by cumulative contribution (A: first 80%, B: next 15%, C: remainder) or by an explicit sales-value threshold. Products with no sales will be excluded, not placed in tier C.
+                            <div className="col-span-2 grid grid-cols-2 gap-3 rounded border bg-muted/40 p-3">
+                              <div>
+                                <Label className="text-xs">Period</Label>
+                                <Input value="2026-27" readOnly className="h-8 bg-muted text-muted-foreground" />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Mode</Label>
+                                <Select value={(rule as any).mode || ""} onValueChange={(v: "cumulative_contribution" | "value_threshold") => {
+                                  if (v === "cumulative_contribution") {
+                                    updateRule(idx, { mode: v, tier: "A", cumulativeValuePercent: 80, operator: undefined, salesValue: undefined } as any);
+                                  } else {
+                                    updateRule(idx, { mode: v, operator: "above", salesValue: 100000, tier: undefined, cumulativeValuePercent: undefined } as any);
+                                  }
+                                }}>
+                                  <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="cumulative_contribution">Cumulative Contribution</SelectItem>
+                                    <SelectItem value="value_threshold">Value Threshold</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {(rule as any).mode === "cumulative_contribution" && (
+                                <div className="col-span-2">
+                                  <Label className="text-xs">Target Tier</Label>
+                                  <Select value={(rule as any).tier || ""} onValueChange={(v: "A"|"B"|"C") => updateRule(idx, { tier: v, cumulativeValuePercent: v === "A" ? 80 : v === "B" ? 95 : 100 } as any)}>
+                                    <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="A">Tier A (Top 80%)</SelectItem>
+                                      <SelectItem value="B">Tier B (80% - 95%)</SelectItem>
+                                      <SelectItem value="C">Tier C (Bottom 5%)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                              {(rule as any).mode === "value_threshold" && (
+                                <>
+                                  <div>
+                                    <Label className="text-xs">Operator</Label>
+                                    <Select value={(rule as any).operator || ""} onValueChange={(v: "above"|"below") => updateRule(idx, { operator: v } as any)}>
+                                      <SelectTrigger className="h-8 bg-background"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="above">Above</SelectItem>
+                                        <SelectItem value="below">Below</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Sales Value (₹)</Label>
+                                    <Input type="number" step="1" value={(rule as any).salesValue ?? ""} onChange={(e) => updateRule(idx, { salesValue: Number(e.target.value) } as any)} className="h-8 bg-background" />
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

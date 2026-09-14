@@ -159,6 +159,7 @@ import type {
   RecordAcceptBatch,
   ResetUserPasswordBody,
   RollbackMrpRevisionResult,
+  RunMrpGeneratorScenarioParams,
   SanitarywareVariantReconciliationResult,
   UpdateUserRoleBody
 } from './api.schemas';
@@ -207,6 +208,7 @@ export const getHealthCheckQueryKey = () => {
     `/api/healthz`
     ] as const;
     }
+
 
 export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
@@ -7171,18 +7173,27 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getDeleteMrpGeneratorScenarioMutationOptions(options));
     }
 
-export const getRunMrpGeneratorScenarioUrl = (scenarioId: number,) => {
+export const getRunMrpGeneratorScenarioUrl = (scenarioId: number,
+    params?: RunMrpGeneratorScenarioParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/mrp-generator/scenarios/${scenarioId}/run`
+  return stringifiedParams.length > 0 ? `/api/mrp-generator/scenarios/${scenarioId}/run?${stringifiedParams}` : `/api/mrp-generator/scenarios/${scenarioId}/run`
 }
 
 export const runMrpGeneratorScenario = async (scenarioId: number,
-    mrpGeneratorRunInput?: MrpGeneratorRunInput, options?: RequestInit): Promise<MrpGeneratorRun> => {
+    mrpGeneratorRunInput?: MrpGeneratorRunInput,
+    params?: RunMrpGeneratorScenarioParams, options?: RequestInit): Promise<MrpGeneratorRun> => {
 
-  return customFetch<MrpGeneratorRun>(getRunMrpGeneratorScenarioUrl(scenarioId),
+  return customFetch<MrpGeneratorRun>(getRunMrpGeneratorScenarioUrl(scenarioId,params),
   {
     ...options,
     method: 'POST',
@@ -7196,8 +7207,8 @@ export const runMrpGeneratorScenario = async (scenarioId: number,
 
 
 export const getRunMrpGeneratorScenarioMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>;params?: RunMrpGeneratorScenarioParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>;params?: RunMrpGeneratorScenarioParams}, TContext> => {
 
 const mutationKey = ['runMrpGeneratorScenario'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -7209,10 +7220,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, {scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}> = (props) => {
-          const {scenarioId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, {scenarioId: number;data?: BodyType<MrpGeneratorRunInput>;params?: RunMrpGeneratorScenarioParams}> = (props) => {
+          const {scenarioId,data,params} = props ?? {};
 
-          return  runMrpGeneratorScenario(scenarioId,data,requestOptions)
+          return  runMrpGeneratorScenario(scenarioId,data,params,requestOptions)
         }
 
 
@@ -7227,11 +7238,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RunMrpGeneratorScenarioMutationError = ErrorType<unknown>
 
     export const useRunMrpGeneratorScenario = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runMrpGeneratorScenario>>, TError,{scenarioId: number;data?: BodyType<MrpGeneratorRunInput>;params?: RunMrpGeneratorScenarioParams}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof runMrpGeneratorScenario>>,
         TError,
-        {scenarioId: number;data?: BodyType<MrpGeneratorRunInput>},
+        {scenarioId: number;data?: BodyType<MrpGeneratorRunInput>;params?: RunMrpGeneratorScenarioParams},
         TContext
       > => {
       return useMutation(getRunMrpGeneratorScenarioMutationOptions(options));

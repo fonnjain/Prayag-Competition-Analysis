@@ -2283,8 +2283,9 @@ export const GetMrpGeneratorMetadataResponse = zod.object({
   "deterministic": zod.boolean(),
   "salesApi": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['unavailable']),
-  "reason": zod.string()
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "reason": zod.string().nullish(),
+  "dataSource": zod.string().nullish()
 }),
   "disabledRules": zod.array(zod.object({
   "type": zod.enum(['margin_floor', 'volume_tier']),
@@ -2327,8 +2328,191 @@ export const GetMrpGeneratorFreshnessResponse = zod.object({
 })),
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['unavailable'])
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "reason": zod.string().nullish(),
+  "dataSource": zod.string().nullish(),
+  "fetchedAt": zod.coerce.date().nullish(),
+  "coverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "coverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
 })
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional()
+}),
+  "salesFetchedAt": zod.coerce.date().nullish(),
+  "coverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "coverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+})
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional(),
+  "dataSource": zod.string().nullish(),
+  "knownLimits": zod.object({
+  "pageLimit": zod.number(),
+  "maxRestarts": zod.number(),
+  "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
+  "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
+}).optional()
 })
 
 
@@ -2347,6 +2531,32 @@ export const listMrpGeneratorScenariosResponseOneRulesItemSixTwoPercentMax = 100
 
 export const listMrpGeneratorScenariosResponseOneRulesItemSevenTwoThresholdMin = 0;
 
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const listMrpGeneratorScenariosResponseOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 
@@ -2360,7 +2570,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional(),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -2370,7 +2581,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -2382,7 +2594,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2396,7 +2609,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2409,7 +2623,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2422,7 +2637,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2435,7 +2651,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2448,7 +2665,8 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2461,13 +2679,69 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])).min(1)
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPTMTMin).max(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPTMTMax).default(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsCPMin).max(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsCPMax).default(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSINKMin).max(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSINKMax).default(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMin).max(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMax).default(listMrpGeneratorScenariosResponseOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(listMrpGeneratorScenariosResponseOneRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])).min(1)
 }).and(zod.object({
   "id": zod.number(),
   "version": zod.number(),
@@ -2493,6 +2767,32 @@ export const createMrpGeneratorScenarioBodyRulesItemSixTwoPercentMax = 100;
 
 export const createMrpGeneratorScenarioBodyRulesItemSevenTwoThresholdMin = 0;
 
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const createMrpGeneratorScenarioBodyRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 
@@ -2506,7 +2806,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional(),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -2516,7 +2817,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -2528,7 +2830,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2542,7 +2845,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2555,7 +2859,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2568,7 +2873,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2581,7 +2887,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2594,7 +2901,8 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2607,13 +2915,69 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])).min(1)
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMin).max(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMax).default(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMin).max(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMax).default(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMin).max(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMax).default(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMin).max(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMax).default(createMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(createMrpGeneratorScenarioBodyRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])).min(1)
 })
 
 
@@ -2636,6 +3000,32 @@ export const getMrpGeneratorScenarioResponseOneRulesItemSixTwoPercentMax = 100;
 
 export const getMrpGeneratorScenarioResponseOneRulesItemSevenTwoThresholdMin = 0;
 
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const getMrpGeneratorScenarioResponseOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 
@@ -2649,7 +3039,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional(),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -2659,7 +3050,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -2671,7 +3063,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2685,7 +3078,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2698,7 +3092,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2711,7 +3106,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2724,7 +3120,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2737,7 +3134,8 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2750,13 +3148,69 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])).min(1)
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMin).max(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMax).default(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMin).max(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMax).default(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMin).max(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMax).default(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMin).max(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMax).default(getMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(getMrpGeneratorScenarioResponseOneRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])).min(1)
 }).and(zod.object({
   "id": zod.number(),
   "version": zod.number(),
@@ -2785,6 +3239,32 @@ export const updateMrpGeneratorScenarioBodyRulesItemSixTwoPercentMax = 100;
 
 export const updateMrpGeneratorScenarioBodyRulesItemSevenTwoThresholdMin = 0;
 
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const updateMrpGeneratorScenarioBodyRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 
@@ -2798,7 +3278,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional(),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -2808,7 +3289,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -2820,7 +3302,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2834,7 +3317,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2847,7 +3331,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2860,7 +3345,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2873,7 +3359,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2886,7 +3373,8 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2899,13 +3387,69 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])).min(1).optional()
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMin).max(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTMax).default(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMin).max(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPMax).default(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMin).max(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKMax).default(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMin).max(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREMax).default(updateMrpGeneratorScenarioBodyRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(updateMrpGeneratorScenarioBodyRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])).min(1).optional()
 })
 
 
@@ -2923,6 +3467,32 @@ export const updateMrpGeneratorScenarioResponseOneRulesItemSixTwoPercentMax = 10
 
 export const updateMrpGeneratorScenarioResponseOneRulesItemSevenTwoThresholdMin = 0;
 
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const updateMrpGeneratorScenarioResponseOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 
@@ -2936,7 +3506,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional(),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -2946,7 +3517,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -2958,7 +3530,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2972,7 +3545,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2985,7 +3559,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -2998,7 +3573,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3011,7 +3587,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3024,7 +3601,8 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3037,13 +3615,69 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])).min(1)
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMin).max(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTMax).default(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMin).max(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPMax).default(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMin).max(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKMax).default(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMin).max(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREMax).default(updateMrpGeneratorScenarioResponseOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(updateMrpGeneratorScenarioResponseOneRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])).min(1)
 }).and(zod.object({
   "id": zod.number(),
   "version": zod.number(),
@@ -3062,8 +3696,13 @@ export const RunMrpGeneratorScenarioParams = zod.object({
   "scenarioId": zod.coerce.number()
 })
 
+export const RunMrpGeneratorScenarioQueryParams = zod.object({
+  "refresh": zod.coerce.boolean().optional().describe('Re-fetch the complete Sales paired snapshot instead of using the in-memory snapshot.')
+})
+
 export const RunMrpGeneratorScenarioBody = zod.object({
-  "asOf": zod.coerce.date().optional()
+  "asOf": zod.coerce.date().optional(),
+  "refreshSales": zod.boolean().optional()
 })
 
 
@@ -3094,6 +3733,32 @@ export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSixTwo
 
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSevenTwoThresholdMin = 0;
 
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 export const ListMrpGeneratorRunsResponse = zod.object({
@@ -3120,7 +3785,26 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "ageDays": zod.number().nullable(),
   "stale": zod.boolean(),
   "matched": zod.boolean()
-}))
+})),
+  "sales": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "margin": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional()
 })),
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -3129,7 +3813,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -3139,7 +3824,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -3151,7 +3837,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3165,7 +3852,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3178,7 +3866,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3191,7 +3880,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3204,7 +3894,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3217,7 +3908,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3230,14 +3922,164 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])),
-  "stage": zod.number()
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])),
+  "stage": zod.union([zod.literal(1),zod.literal(2)]),
+  "salesFetchedAt": zod.coerce.date().nullish(),
+  "salesCoverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "salesDataSource": zod.string().nullish(),
+  "salesCoverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+})
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional(),
+  "knownLimits": zod.object({
+  "pageLimit": zod.number(),
+  "maxRestarts": zod.number(),
+  "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
+  "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
+}).optional()
 }),
   "inputFingerprint": zod.string(),
   "summary": zod.object({
@@ -3248,7 +4090,9 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "increases": zod.number(),
   "decreases": zod.number(),
   "medianIncreasePercent": zod.number().nullable(),
-  "medianDecreasePercent": zod.number().nullable()
+  "medianDecreasePercent": zod.number().nullable(),
+  "confidencePassCount": zod.number().nullable(),
+  "exclusionReasonBreakdown": zod.record(zod.string(), zod.number())
 }),
   "sourceFreshness": zod.object({
   "asOf": zod.coerce.date(),
@@ -3261,8 +4105,191 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 })),
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['unavailable'])
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "reason": zod.string().nullish(),
+  "dataSource": zod.string().nullish(),
+  "fetchedAt": zod.coerce.date().nullish(),
+  "coverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "coverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
 })
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional()
+}),
+  "salesFetchedAt": zod.coerce.date().nullish(),
+  "coverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "coverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+})
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional(),
+  "dataSource": zod.string().nullish(),
+  "knownLimits": zod.object({
+  "pageLimit": zod.number(),
+  "maxRestarts": zod.number(),
+  "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
+  "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
+}).optional()
 }),
   "createdBy": zod.string().nullable(),
   "createdAt": zod.coerce.date()
@@ -3291,6 +4318,32 @@ export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemSixTwoPercentMax
 
 export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemSevenTwoThresholdMin = 0;
 
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMax = 100;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPMax = 100;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMax = 100;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMax = 100;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKMax = 100;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMax = 100;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin = 0;
+
 
 
 export const GetMrpGeneratorRunResponse = zod.object({
@@ -3317,7 +4370,26 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "ageDays": zod.number().nullable(),
   "stale": zod.boolean(),
   "matched": zod.boolean()
-}))
+})),
+  "sales": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "margin": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional()
 })),
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -3326,7 +4398,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }),
   "rules": zod.array(zod.union([zod.object({
   "scope": zod.object({
@@ -3336,7 +4409,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown()
@@ -3348,7 +4422,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3362,7 +4437,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3375,7 +4451,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3388,7 +4465,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3401,7 +4479,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3414,7 +4493,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
@@ -3427,14 +4507,164 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitorMapped": zod.boolean().optional(),
   "explicitCodes": zod.array(zod.string()).optional(),
   "itemCodes": zod.array(zod.string()).optional(),
-  "codes": zod.array(zod.string()).optional()
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
   "unit": zod.union([zod.literal(1),zod.literal(5),zod.literal(10),zod.literal(50)]),
   "direction": zod.enum(['nearest', 'up', 'down'])
-}))])),
-  "stage": zod.number()
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "categoryFloors": zod.object({
+  "PTMT": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+})
+})),zod.union([zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['cumulative', 'cumulative_contribution']),
+  "tier": zod.enum(['A', 'B', 'C']),
+  "cumulativeValuePercent": zod.union([zod.literal(80),zod.literal(95),zod.literal(100)])
+})),zod.object({
+  "scope": zod.object({
+  "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "series": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "category": zod.union([zod.string(),zod.array(zod.string())]).optional(),
+  "competitorMapped": zod.boolean().optional(),
+  "explicitCodes": zod.array(zod.string()).optional(),
+  "itemCodes": zod.array(zod.string()).optional(),
+  "codes": zod.array(zod.string()).optional(),
+  "confidenceOnly": zod.boolean().optional()
+}).optional()
+}).and(zod.object({
+  "type": zod.unknown(),
+  "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "mode": zod.enum(['value_threshold', 'threshold']),
+  "operator": zod.enum(['above', 'below']),
+  "salesValue": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin)
+}))])])),
+  "stage": zod.union([zod.literal(1),zod.literal(2)]),
+  "salesFetchedAt": zod.coerce.date().nullish(),
+  "salesCoverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "salesDataSource": zod.string().nullish(),
+  "salesCoverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+})
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional(),
+  "knownLimits": zod.object({
+  "pageLimit": zod.number(),
+  "maxRestarts": zod.number(),
+  "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
+  "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
+}).optional()
 }),
   "inputFingerprint": zod.string(),
   "summary": zod.object({
@@ -3445,7 +4675,9 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "increases": zod.number(),
   "decreases": zod.number(),
   "medianIncreasePercent": zod.number().nullable(),
-  "medianDecreasePercent": zod.number().nullable()
+  "medianDecreasePercent": zod.number().nullable(),
+  "confidencePassCount": zod.number().nullable(),
+  "exclusionReasonBreakdown": zod.record(zod.string(), zod.number())
 }),
   "sourceFreshness": zod.object({
   "asOf": zod.coerce.date(),
@@ -3458,8 +4690,191 @@ export const GetMrpGeneratorRunResponse = zod.object({
 })),
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['unavailable'])
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "reason": zod.string().nullish(),
+  "dataSource": zod.string().nullish(),
+  "fetchedAt": zod.coerce.date().nullish(),
+  "coverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "coverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
 })
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional()
+}),
+  "salesFetchedAt": zod.coerce.date().nullish(),
+  "coverage": zod.object({
+  "requested": zod.array(zod.string()),
+  "returned": zod.array(zod.string()),
+  "held": zod.array(zod.string()),
+  "unavailable": zod.array(zod.string()),
+  "provisional": zod.array(zod.string()),
+  "read_at": zod.coerce.date().nullable(),
+  "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
+  "dataSource": zod.string().nullable(),
+  "last_modified": zod.coerce.date().nullable()
+}).optional(),
+  "coverageSummary": zod.object({
+  "catalogTotal": zod.number(),
+  "inScopeTotal": zod.number(),
+  "withFySales": zod.number(),
+  "withoutFySales": zod.number(),
+  "withMargin": zod.number(),
+  "confidencePassCount": zod.number().nullable(),
+  "absentSoldCodes": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "awaitingConfirmation": zod.object({
+  "count": zod.number(),
+  "value": zod.number(),
+  "codes": zod.array(zod.string())
+}),
+  "periods": zod.object({
+  "sales": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+}),
+  "margin": zod.object({
+  "fy": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
+  "from": zod.string(),
+  "to": zod.string()
+})
+}),
+  "readAt": zod.object({
+  "sales": zod.coerce.date().nullable(),
+  "margin": zod.coerce.date().nullable()
+}),
+  "ages": zod.object({
+  "salesDays": zod.number().nullable(),
+  "marginDays": zod.number().nullable()
+}),
+  "latestMonths": zod.object({
+  "sales": zod.string().nullable(),
+  "margin": zod.string().nullable()
+}),
+  "provisional": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "holds": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "unavailable": zod.object({
+  "sales": zod.array(zod.string()),
+  "margin": zod.array(zod.string())
+}),
+  "reconciliation": zod.object({
+  "sales": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+}),
+  "margin": zod.object({
+  "fy": zod.string().nullable(),
+  "control": zod.number().nullable(),
+  "actual": zod.number().nullable(),
+  "variance": zod.number().nullable(),
+  "variancePct": zod.number().nullable(),
+  "status": zod.string().nullable(),
+  "reference": zod.string().nullable()
+})
+}),
+  "dataSource": zod.string().nullable()
+}).optional(),
+  "dataSource": zod.string().nullish(),
+  "knownLimits": zod.object({
+  "pageLimit": zod.number(),
+  "maxRestarts": zod.number(),
+  "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
+  "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
+}).optional()
 }),
   "createdBy": zod.string().nullable(),
   "createdAt": zod.coerce.date()
@@ -3502,6 +4917,26 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "salesEvidence": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "marginEvidence": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional(),
+  "warnings": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 }))
 })
@@ -3547,6 +4982,26 @@ export const GetMrpGeneratorResultsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "salesEvidence": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "marginEvidence": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional(),
+  "warnings": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 }))
 })
@@ -3596,6 +5051,26 @@ export const CompareMrpGeneratorRunsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "salesEvidence": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "marginEvidence": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional(),
+  "warnings": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 }),zod.null()]),
   "right": zod.union([zod.object({
@@ -3632,6 +5107,26 @@ export const CompareMrpGeneratorRunsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "salesEvidence": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "marginEvidence": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional(),
+  "warnings": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 }),zod.null()])
 }))

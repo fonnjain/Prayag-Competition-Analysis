@@ -8,9 +8,11 @@ export type GeneratorScope = {
   explicitCodes?: string[];
   itemCodes?: string[];
   codes?: string[];
+  confidenceOnly?: boolean;
 };
 
 export type GeneratorRule = Record<string, unknown> & { type: string };
+export const SUPPORTED_VOLUME_PERIOD = "2026-27";
 
 export type GeneratorProduct = {
   itemCode: string;
@@ -22,6 +24,29 @@ export type GeneratorProduct = {
   currentDate: string | null;
   currentRowId?: number | null;
   competitors: GeneratorCompetitor[];
+  sales?: GeneratorSalesEvidence | null;
+  margin?: GeneratorMarginEvidence | null;
+};
+
+export type GeneratorSalesEvidence = {
+  salesAmount: number;
+  qty: number | null;
+  qtyUnknown: boolean;
+  fySalesExists?: boolean;
+  awaitingConfirmation?: boolean;
+  tier?: "A" | "B" | "C" | null;
+};
+
+export type GeneratorMarginEvidence = {
+  grossMarginPct: number | null;
+  saleValue?: number | null;
+  bomValue?: number | null;
+  unitBomValue?: number | null;
+  qtyUnknown?: boolean;
+  discountFrac?: number | null;
+  held?: boolean;
+  latestMonth?: string | null;
+  warnings?: string[];
 };
 
 export type GeneratorCompetitor = {
@@ -60,6 +85,9 @@ export type GeneratorResult = {
   competitiveTarget: number | null;
   bindingConstraint: string | null;
   changePercent: number | null;
+  salesEvidence?: GeneratorSalesEvidence | null;
+  marginEvidence?: GeneratorMarginEvidence | null;
+  warnings: string[];
 };
 
 const asList = (value: unknown): string[] =>
@@ -69,6 +97,38 @@ const asList = (value: unknown): string[] =>
     .filter(Boolean);
 
 const norm = (value: string) => value.trim().toLowerCase();
+
+export function canonicalMasterCategory(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const compact = value.toUpperCase().replace(/[\s_-]+/g, "");
+  if (compact === "PTMT") return "PTMT";
+  if (compact === "CP" || compact === "CPFITTINGS" || compact === "CPFITTING") return "C P";
+  if (compact === "PLUMBING") return "PLUMBING";
+  if (compact === "SANITARYWARE" || compact === "SANITARY") return "SANITARYWARE";
+  if (compact === "SINK" || compact === "SINKS") return "SINK";
+  if (compact === "HARDWARE") return "HARDWARE";
+  return null;
+}
+
+export function computeVolumeTiers(products: GeneratorProduct[]): Map<string, "A" | "B" | "C"> {
+  const sold = products
+    .filter((product) => product.sales?.awaitingConfirmation !== true &&
+      product.sales?.fySalesExists !== false && (product.sales?.salesAmount ?? 0) > 0)
+    .sort((a, b) =>
+      (b.sales!.salesAmount - a.sales!.salesAmount) ||
+      canonicalItemCode(a.itemCode).localeCompare(canonicalItemCode(b.itemCode)),
+    );
+  const total = sold.reduce((sum, product) => sum + product.sales!.salesAmount, 0);
+  const result = new Map<string, "A" | "B" | "C">();
+  if (total <= 0) return result;
+  let cumulative = 0;
+  for (const product of sold) {
+    const before = cumulative / total;
+    result.set(canonicalItemCode(product.itemCode), before < 0.8 ? "A" : before < 0.95 ? "B" : "C");
+    cumulative += product.sales!.salesAmount;
+  }
+  return result;
+}
 
 export function canonicalItemCode(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, "").replace(/\.0$/, "");
@@ -97,6 +157,29 @@ function numberRule(rule: GeneratorRule, ...keys: string[]): number | null {
     if (Number.isFinite(n)) return n;
   }
   return null;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+}
+
+function categoryFloor(rule: GeneratorRule, category: string): number | null {
+  const configured = Object.entries(objectRecord(rule.categoryFloors))
+    .find(([key]) => canonicalMasterCategory(key) === category)?.[1];
+  const value = configured;
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
+}
+
+function confidenceRequested(
+  product: GeneratorProduct,
+  rules: GeneratorRule[],
+  explicit?: boolean,
+): boolean {
+  if (explicit) return true;
+  if (rules.some((rule) => canonicalType(rule) === "confidence_only")) return true;
+  return rules.some((rule) => objectRecord(rule.scope).confidenceOnly === true);
 }
 
 function canonicalType(rule: GeneratorRule): string {
@@ -153,6 +236,7 @@ function roundValue(value: number, unit: number, direction: "nearest" | "up" | "
 export function evaluateProduct(
   product: GeneratorProduct,
   rules: GeneratorRule[],
+  options: { volumeTiers?: Map<string, "A" | "B" | "C">; confidenceOnly?: boolean } = {},
 ): GeneratorResult {
   const trace: GeneratorTrace[] = [];
   const exclusions: string[] = [];
@@ -166,6 +250,35 @@ export function evaluateProduct(
   let maxIncreaseReason = "Maximum increase constraint";
   let maxDecreaseReason = "Maximum decrease constraint";
   let holdReason = "Hold-below constraint";
+  let marginFloorLimit: number | null = null;
+  let marginFloorReason = "Margin floor constraint";
+  const warnings = [...(product.margin?.warnings ?? [])];
+  if (product.sales?.awaitingConfirmation) {
+    exclusions.push("Code awaiting Prayag confirmation; sales attribution unresolved.");
+  }
+
+  if (confidenceRequested(product, rules, options.confidenceOnly)) {
+    if (!product.competitors.some((competitor) =>
+      competitor.matched && competitor.effectivePrice != null,
+    )) {
+      exclusions.push("Confidence filter: no mapped competitor price is present.");
+    }
+    if (product.competitors.some((competitor) =>
+      competitor.matched && (competitor.effectivePrice == null || competitor.ageDays == null || competitor.ageDays >= 365),
+    )) {
+      exclusions.push("Confidence filter: a competitor price used/current is older than 12 months.");
+    }
+    if (!product.sales?.awaitingConfirmation &&
+      (!product.sales || product.sales.fySalesExists === false || !(product.sales.salesAmount > 0))) {
+      exclusions.push("Confidence filter: FY sales are missing.");
+    }
+    if (!product.margin || product.margin.grossMarginPct == null ||
+      product.margin.unitBomValue == null || product.margin.held) {
+      exclusions.push(product.margin?.held
+        ? "Confidence filter: gross margin is held by H1 source coverage."
+        : "Confidence filter: usable gross margin is missing.");
+    }
+  }
 
   const add = (
     order: number,
@@ -181,13 +294,19 @@ export function evaluateProduct(
     if (heldValue != null && candidate !== heldValue) {
       return { value: heldValue, reason: holdReason };
     }
+    let constrainedReason: string | null = null;
     if (maxIncreaseLimit != null && candidate > maxIncreaseLimit) {
-      return { value: maxIncreaseLimit, reason: maxIncreaseReason };
+      candidate = maxIncreaseLimit;
+      constrainedReason = maxIncreaseReason;
     }
     if (maxDecreaseLimit != null && candidate < maxDecreaseLimit) {
-      return { value: maxDecreaseLimit, reason: maxDecreaseReason };
+      candidate = maxDecreaseLimit;
+      constrainedReason = maxDecreaseReason;
     }
-    return { value: candidate, reason: null };
+    if (marginFloorLimit != null && candidate < marginFloorLimit) {
+      return { value: marginFloorLimit, reason: marginFloorReason };
+    }
+    return { value: candidate, reason: constrainedReason };
   };
   const addConstrained = (
     order: number,
@@ -220,11 +339,84 @@ export function evaluateProduct(
       add(i + 1, type, "skipped", before, value, "Product is outside this rule scope.", target);
       continue;
     }
-    if (type === "margin_floor" || type === "volume_tier") {
-      const reason = type === "margin_floor"
-        ? "Disabled in Stage 1: Sales API margin data is unavailable."
-        : "Disabled in Stage 1: Sales API sales data is unavailable.";
-      add(i + 1, type, "blocked", before, value, reason);
+    if (type === "margin_floor") {
+      const category = canonicalMasterCategory(product.division);
+      const floor = category ? categoryFloor(rule, category) : null;
+      if (!category) {
+        const reason = `Master category cannot be resolved from catalog division "${product.division ?? ""}".`;
+        exclusions.push(reason);
+        add(i + 1, type, "blocked", before, value, reason);
+      } else if (floor == null) {
+        const reason = `Margin floor is missing for master category ${category}.`;
+        exclusions.push(reason);
+        add(i + 1, type, "blocked", before, value, reason);
+      } else if (!product.margin || product.margin.grossMarginPct == null) {
+        const reason = `No usable gross margin evidence for ${category}.`;
+        exclusions.push(reason);
+        add(i + 1, type, "blocked", before, value, reason);
+      } else if (product.margin.held) {
+        const reason = `Gross margin held for H1 source coverage (${category}).`;
+        exclusions.push(reason);
+        add(i + 1, type, "blocked", before, value, reason);
+      } else {
+        const currentMargin = product.margin.grossMarginPct;
+        const floorFraction = floor / 100;
+        const bom = product.margin.unitBomValue;
+        const discount = product.margin.discountFrac ?? 0;
+        const minimum = bom != null && floorFraction < 1 && discount < 1
+          ? bom / (1 - floorFraction) / (1 - discount) : null;
+        marginFloorReason = `Margin floor ${category} ${floor}% (current gross margin ${(currentMargin * 100).toFixed(2)}%)`;
+        if (minimum != null && (!marginFloorLimit || minimum > marginFloorLimit)) marginFloorLimit = minimum;
+        if (minimum != null) {
+          const constrained = constrain(value);
+          if (constrained.reason) {
+            value = constrained.value;
+            binding = constrained.reason;
+            add(i + 1, type, "fired", before, value, `${marginFloorReason}; minimum MRP ₹${minimum}.`, minimum);
+          } else add(i + 1, type, "skipped", before, value, `${marginFloorReason}; current MRP satisfies floor.`, minimum);
+        } else {
+          const reason = `${marginFloorReason}; unit BOM evidence or usable quantity is missing.`;
+          exclusions.push(reason);
+          add(i + 1, type, "blocked", before, value, reason);
+        }
+      }
+      continue;
+    }
+    if (type === "volume_tier") {
+      const sales = product.sales;
+      if (!sales || sales.fySalesExists === false || !(sales.salesAmount > 0)) {
+        const reason = sales?.awaitingConfirmation
+          ? "Code awaiting Prayag confirmation; sales attribution unresolved."
+          : "No FY sales: excluded from volume tier rule.";
+        exclusions.push(reason);
+        add(i + 1, type, "blocked", before, value, reason);
+        continue;
+      }
+      const mode = typeof rule.mode === "string" ? rule.mode.toLowerCase() : "cumulative";
+      let eligible = true;
+      let reason = "";
+      if (mode === "cumulative" || rule.tier !== undefined) {
+        const tiers = options.volumeTiers;
+        const tier = sales.tier ?? tiers?.get(canonicalItemCode(product.itemCode));
+        const wanted = typeof rule.tier === "string" ? rule.tier.toUpperCase() : "";
+        eligible = wanted === "A" || wanted === "B" || wanted === "C" ? tier === wanted : false;
+        reason = `Volume tier ${tier ?? "unknown"}; sales amount ₹${sales.salesAmount}; qty ${sales.qty ?? "unknown"}.`;
+      } else {
+        const threshold = numberRule(rule, "salesValue", "threshold", "value");
+        const operator = rule.operator === "below" ? "below" : rule.operator === "above" ? "above" : null;
+        if (threshold == null || threshold < 0 || !operator) {
+          reason = "Volume tier threshold requires operator above|below and non-negative salesValue.";
+          eligible = false;
+        } else {
+          eligible = operator === "above" ? sales.salesAmount >= threshold : sales.salesAmount < threshold;
+          reason = `Volume sales value ₹${sales.salesAmount} ${operator} ₹${threshold}; qty ${sales.qty ?? "unknown"}.`;
+        }
+      }
+      if (!eligible) {
+        const exclusion = `${reason} Product is outside volume rule eligibility.`;
+        exclusions.push(exclusion);
+        add(i + 1, type, "skipped", before, value, exclusion);
+      } else add(i + 1, type, "fired", before, value, reason);
       continue;
     }
     if (type === "percent_below" || type === "match" || type === "percent_above_lowest") {
@@ -325,6 +517,9 @@ export function evaluateProduct(
       competitiveTarget: target,
       bindingConstraint: binding,
       changePercent: null,
+      salesEvidence: product.sales ?? null,
+      marginEvidence: product.margin ?? null,
+      warnings,
     };
   }
   if (target != null && value != null && value !== target && binding == null) {
@@ -341,6 +536,9 @@ export function evaluateProduct(
     competitiveTarget: target,
     bindingConstraint: binding,
     changePercent: changed ? ((value! - product.currentMrp!) / Math.abs(product.currentMrp!)) * 100 : 0,
+    salesEvidence: product.sales ?? null,
+    marginEvidence: product.margin ?? null,
+    warnings,
   };
 }
 
@@ -355,7 +553,10 @@ export function inputFingerprint(value: unknown): string {
   return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
-export function validateScenarioRules(rules: unknown): GeneratorRule[] {
+export function validateScenarioRules(
+  rules: unknown,
+  options: { salesAvailable?: boolean } = {},
+): GeneratorRule[] {
   if (!Array.isArray(rules) || rules.length === 0) throw new Error("rules must be a non-empty ordered array.");
   return rules.map((rule, index) => {
     if (!rule || typeof rule !== "object" || typeof (rule as { type?: unknown }).type !== "string") {
@@ -365,10 +566,13 @@ export function validateScenarioRules(rules: unknown): GeneratorRule[] {
     const type = canonicalType(r);
      const supported = new Set([
       "scope", "percent_below", "match", "percent_above_lowest", "max_increase",
-       "max_decrease", "hold_below", "rounding",
+        "max_decrease", "hold_below", "rounding",
     ]);
-     if (type === "margin_floor" || type === "volume_tier") {
+     if ((type === "margin_floor" || type === "volume_tier") && options.salesAvailable !== true) {
        throw new Error(`rules[${index}] ${type} is unavailable in Stage 1 because the Sales API is unavailable.`);
+     }
+     if (options.salesAvailable === true && (type === "margin_floor" || type === "volume_tier")) {
+       supported.add(type);
      }
      if (!supported.has(type)) throw new Error(`rules[${index}] has unsupported type "${r.type}".`);
     if (["percent_below", "match"].includes(type) && !ruleCompetitor(r)) {
@@ -385,6 +589,41 @@ export function validateScenarioRules(rules: unknown): GeneratorRule[] {
       const pct = numberRule(r, "percent", "percentage", "maxPercent");
       if (pct == null || pct < 0 || pct > 100) throw new Error(`rules[${index}] percent must be between 0 and 100.`);
     }
+     if (type === "margin_floor") {
+       const floors = objectRecord(r.categoryFloors);
+       if (Object.keys(floors).length === 0) {
+         throw new Error(`rules[${index}] margin_floor requires categoryFloors; Sales API is unavailable until an authenticated snapshot is available.`);
+       }
+       for (const [category, raw] of Object.entries(floors)) {
+         if (!canonicalMasterCategory(category)) throw new Error(`rules[${index}] has unsupported master category "${category}".`);
+         const floor = Number(raw);
+         if (!Number.isFinite(floor) || floor < 0 || floor > 100) {
+           throw new Error(`rules[${index}] margin floor for ${category} must be between 0 and 100 percentage points.`);
+         }
+       }
+     }
+     if (type === "volume_tier") {
+       if (typeof r.period !== "string" || !r.period.trim()) {
+         throw new Error(`rules[${index}] volume_tier period is required (Sales API is unavailable until an authenticated snapshot is available).`);
+       }
+        if (r.period.trim().toUpperCase().replace(/^FY/, "") !== SUPPORTED_VOLUME_PERIOD) {
+          throw new Error(`rules[${index}] volume_tier period "${r.period}" is unsupported; only ${SUPPORTED_VOLUME_PERIOD} is currently available.`);
+        }
+       const mode = typeof r.mode === "string" ? r.mode.toLowerCase() : "cumulative";
+       if (mode === "cumulative" || r.tier !== undefined) {
+         if (!["A", "B", "C"].includes(String(r.tier).toUpperCase())) {
+           throw new Error(`rules[${index}] cumulative volume_tier tier must be A, B, or C (Sales API is unavailable until an authenticated snapshot is available).`);
+         }
+       } else {
+         if (r.operator !== "above" && r.operator !== "below") {
+           throw new Error(`rules[${index}] volume_tier operator must be above or below (Sales API is unavailable until an authenticated snapshot is available).`);
+         }
+         const salesValue = numberRule(r, "salesValue", "threshold", "value");
+         if (salesValue == null || salesValue < 0) {
+           throw new Error(`rules[${index}] volume_tier salesValue must be non-negative (Sales API is unavailable until an authenticated snapshot is available).`);
+         }
+       }
+     }
     return r;
   });
 }

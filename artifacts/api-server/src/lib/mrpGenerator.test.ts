@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluateProduct, inputFingerprint, matchesScope } from "./mrpGenerator";
+import { hasHeldMarginCoverage } from "./salesApi";
 
 const product = {
   itemCode: "151",
@@ -111,5 +112,36 @@ describe("Stage 1 MRP generator", () => {
       competitors: [{ ...product.competitors[0]!, effectiveDate: "2025-03-01", ageDays: 548, stale: true }],
     }, [{ type: "match", competitor: "Sparsh Pearl" }]);
     expect(result.competitorValues[0]?.stale).toBe(true);
+  });
+
+  it("uses unit BOM for margin-floor MRP and does not multiply by quantity", () => {
+    const result = evaluateProduct({
+      ...product,
+      currentMrp: 50,
+      margin: {
+        grossMarginPct: 0.2,
+        bomValue: 1000,
+        unitBomValue: 100,
+        qtyUnknown: false,
+        discountFrac: 0,
+      },
+    }, [{ type: "margin_floor", categoryFloors: { "C P": 50 } }]);
+    expect(result.suggestedMrp).toBe(200);
+    expect(result.suggestedMrp).not.toBe(2000);
+  });
+
+  it("excludes a margin-floor product when quantity is unusable", () => {
+    const result = evaluateProduct({
+      ...product,
+      margin: { grossMarginPct: 0.2, bomValue: 1000, unitBomValue: null, qtyUnknown: true },
+    }, [{ type: "margin_floor", categoryFloors: { "C P": 50 } }]);
+    expect(result.status).toBe("excluded");
+    expect(result.exclusions.join(" ")).toContain("unit BOM evidence or usable quantity is missing");
+  });
+
+  it("only treats explicitly scoped PTMT H1 coverage as a PTMT hold", () => {
+    expect(hasHeldMarginCoverage({ held: ["H1 hold"] }, "CP Fittings")).toBe(false);
+    expect(hasHeldMarginCoverage({ held: ["PTMT H1 hold"] }, "CP Fittings")).toBe(false);
+    expect(hasHeldMarginCoverage({ held: ["PTMT H1 hold"] }, "PTMT")).toBe(true);
   });
 });

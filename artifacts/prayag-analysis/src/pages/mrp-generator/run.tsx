@@ -103,7 +103,7 @@ export default function MrpGeneratorRun() {
     const header = [
       "item_code", "product", "division", "category", "current_mrp", "current_date",
       "suggested_mrp", "change_percent", "status", "binding_constraint", "exclusions",
-      "competitor_evidence", "rule_trace",
+      "competitor_evidence", "rule_trace", "sales_evidence", "margin_evidence", "warnings"
     ];
     const rows = results.map((result) => [
       result.itemCode,
@@ -121,6 +121,9 @@ export default function MrpGeneratorRun() {
         `${competitor.competitor}: ${competitor.effectivePrice ?? "No data"} @ ${competitor.effectiveDate ?? "undated"} (${competitor.ageDays ?? "unknown"} days${competitor.stale ? ", stale" : ""})`,
       ).join(" | "),
       result.trace.map((trace) => `${trace.order + 1}. ${trace.ruleType} [${trace.outcome}] ${trace.reason}`).join(" | "),
+      result.salesEvidence ? `Amt: ${result.salesEvidence.salesAmount}, Tier: ${result.salesEvidence.tier || "N/A"}` : "No data",
+      result.marginEvidence ? `Margin: ${result.marginEvidence.grossMarginPct != null ? (result.marginEvidence.grossMarginPct * 100).toFixed(1) + '%' : "N/A"} (${result.marginEvidence.latestMonth || "N/A"})` : "No data",
+      result.warnings?.join(" | ") || ""
     ]);
     const blob = new Blob(
       [[header, ...rows].map((row) => row.map(quote).join(",")).join("\n")],
@@ -196,19 +199,152 @@ export default function MrpGeneratorRun() {
                   </React.Fragment>
                 ))}
                 <span className="text-muted-foreground">Sales application:</span>
-                <span className="text-right font-medium text-amber-700">Unavailable in Stage 1</span>
+                <span className="text-right font-medium">
+                  {freshness.sales?.status === "authenticated" ? (
+                    <span className="text-emerald-700">Available</span>
+                  ) : (
+                    <span className="text-amber-700">{freshness.sales?.status || "Unavailable"}</span>
+                  )}
+                </span>
               </div>
             </div>
             <div className="space-y-2 bg-muted/20 p-3 rounded border">
-              <h3 className="font-semibold text-foreground border-b pb-1">Medians</h3>
+              <h3 className="font-semibold text-foreground border-b pb-1">Run KPIs</h3>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 <span className="text-muted-foreground">Median Increase:</span>
                 <span className="text-right font-medium text-emerald-600">
-                  {summary.medianIncreasePercent ? `+${summary.medianIncreasePercent.toFixed(1)}%` : "-"}
+                  {summary.medianIncreasePercent != null ? `+${summary.medianIncreasePercent.toFixed(1)}%` : "-"}
                 </span>
                 <span className="text-muted-foreground">Median Decrease:</span>
                 <span className="text-right font-medium text-red-600">
-                  {summary.medianDecreasePercent ? `${summary.medianDecreasePercent.toFixed(1)}%` : "-"}
+                  {summary.medianDecreasePercent != null ? `${summary.medianDecreasePercent.toFixed(1)}%` : "-"}
+                </span>
+                <span className="text-muted-foreground">Confidence Pass:</span>
+                <span className="text-right font-medium">
+                  {summary.confidencePassCount != null ? summary.confidencePassCount : "-"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Exclusion Breakdown */}
+          {Object.keys(summary.exclusionReasonBreakdown || {}).length > 0 && (
+            <div className="mt-4 bg-muted/20 p-3 rounded border text-sm">
+              <h3 className="font-semibold text-foreground border-b pb-1 mb-2">Exclusion Reasons</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {Object.entries(summary.exclusionReasonBreakdown).map(([reason, count]) => (
+                  <div key={reason} className="flex justify-between">
+                    <span className="text-muted-foreground truncate pr-2" title={reason}>{reason}</span>
+                    <span className="font-medium shrink-0">{count as React.ReactNode}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Coverage Panel */}
+        <Card className="p-4 sm:p-5 shadow-sm border-primary/20 bg-primary/5">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground mb-4">Comprehensive Coverage & Evidence Limits</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-sm">
+
+            <div className="space-y-2 bg-card p-3 rounded border">
+              <h3 className="font-semibold text-foreground border-b pb-1">Scope Counts</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <span className="text-muted-foreground">Catalog:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.catalogTotal ?? "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Sales (Has Data):</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.withFySales ?? "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Sales (No Data):</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.withoutFySales ?? "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Margin Available:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.withMargin ?? "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Confidence Pass:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.confidencePassCount ?? "Unavailable"}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 bg-card p-3 rounded border">
+              <h3 className="font-semibold text-foreground border-b pb-1">Data Age & Read Time</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <span className="text-muted-foreground">Prayag MRP:</span>
+                <span className="text-right font-medium text-xs">
+                  {freshness.mrpDates.length ? `${formatDisplayDate(freshness.mrpDates[0])}` : "Unavailable"}
+                </span>
+
+                {freshness.competitors?.map((c: MrpGeneratorFreshnessCompetitor, i: number) => (
+                  <React.Fragment key={i}>
+                    <span className="text-muted-foreground truncate">{c.competitor}:</span>
+                    <span className={cn("text-right font-medium text-xs", c.stale && "text-amber-600")} title={c.stale ? `Data is ${c.ageDays || '?'} days old` : ""}>
+                      {c.effectiveDate ? formatDisplayDate(c.effectiveDate) : "Unavailable"} {c.stale && <AlertTriangle className="inline w-3 h-3 ml-0.5" />}
+                    </span>
+                  </React.Fragment>
+                ))}
+
+                <span className="text-muted-foreground">Margin Latest Month:</span>
+                <span className="text-right font-medium text-xs">{freshness.coverageSummary?.latestMonths?.margin || "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Margin Read Age:</span>
+                <span className="text-right font-medium text-xs">{freshness.coverageSummary?.ages?.marginDays != null ? `${freshness.coverageSummary.ages.marginDays} days` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Sales Period:</span>
+                <span className="text-right font-medium text-xs">{freshness.coverageSummary?.periods?.sales?.fy || "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Sales Provisional:</span>
+                <span className="text-right font-medium text-xs">{(freshness.coverageSummary?.provisional?.sales?.length ?? 0) > 0 ? "Yes" : "No"}</span>
+
+                <span className="text-muted-foreground">Sales Read Time:</span>
+                <span className="text-right font-medium text-xs">{freshness.coverageSummary?.readAt?.sales ? new Date(freshness.coverageSummary.readAt.sales).toLocaleString() : "Unavailable"}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 bg-card p-3 rounded border">
+              <h3 className="font-semibold text-foreground border-b pb-1">Known Limits & Variance</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <span className="text-muted-foreground">Data Source:</span>
+                <span className="text-right font-medium truncate">{freshness.coverageSummary?.dataSource || "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Recon Variance:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.variance != null ? `₹${freshness.coverageSummary.reconciliation.sales.variance.toLocaleString()}` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Recon Control:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.control != null ? `₹${freshness.coverageSummary.reconciliation.sales.control.toLocaleString()}` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Recon Actual:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.actual != null ? `₹${freshness.coverageSummary.reconciliation.sales.actual.toLocaleString()}` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Recon Pct:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.variancePct != null ? `${freshness.coverageSummary.reconciliation.sales.variancePct.toFixed(2)}%` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Awaiting Conf (Count):</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.awaitingConfirmation?.count ?? "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Awaiting Conf (Value):</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.awaitingConfirmation?.value != null ? `₹${freshness.coverageSummary.awaitingConfirmation.value.toLocaleString()}` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground col-span-2 mt-1 border-t pt-1">Awaiting Conf (List):</span>
+                <span className="col-span-2 text-right font-medium text-amber-700">
+                  {((freshness.coverageSummary?.awaitingConfirmation?.codes) || []).join(", ") || "Unavailable"}
+                </span>
+
+                <span className="text-muted-foreground">Absent Sold Codes:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.absentSoldCodes?.count ?? "Unavailable"}</span>
+
+                <span className="text-muted-foreground">Absent Sold Value:</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.absentSoldCodes?.value != null ? `₹${freshness.coverageSummary.absentSoldCodes.value.toLocaleString()}` : "Unavailable"}</span>
+
+                <span className="text-muted-foreground col-span-2 mt-1 border-t pt-1">Named Holds / Reasons:</span>
+                <span className="col-span-2 text-right font-medium text-amber-700">
+                  {((freshness.coverageSummary?.holds?.margin) || []).join(", ") || "Unavailable"}
+                </span>
+
+                <span className="text-muted-foreground col-span-2 mt-1 border-t pt-1">Unavailable Months:</span>
+                <span className="col-span-2 text-right font-medium text-amber-700">
+                  {((freshness.coverageSummary?.unavailable?.margin) || []).join(", ") || "Unavailable"}
                 </span>
               </div>
             </div>
@@ -294,6 +430,78 @@ export default function MrpGeneratorRun() {
                                   </>
                                 )}
                               </div>
+
+                              {r.salesEvidence && (
+                                <div className="mt-3 space-y-1">
+                                  <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Sales Evidence</h5>
+                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs bg-muted/20 p-2 border rounded">
+                                    <span className="text-muted-foreground">Sales Amount:</span>
+                                    <span className="text-right">₹{r.salesEvidence.salesAmount?.toLocaleString() || "0"}</span>
+                                    <span className="text-muted-foreground">Quantity:</span>
+                                    <span className="text-right">{r.salesEvidence.qtyUnknown ? "Unknown" : r.salesEvidence.qty}</span>
+                                    <span className="text-muted-foreground">FY Sales Exists:</span>
+                                    <span className="text-right">{r.salesEvidence.fySalesExists ? "Yes" : "No"}</span>
+                                    {r.salesEvidence.tier && (
+                                      <>
+                                        <span className="text-muted-foreground">Tier:</span>
+                                        <span className="text-right font-medium">{r.salesEvidence.tier}</span>
+                                      </>
+                                    )}
+                                    {r.salesEvidence.awaitingConfirmation && (
+                                      <>
+                                        <span className="text-muted-foreground">Awaiting Conf:</span>
+                                        <span className="text-right text-amber-700">Yes</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {r.marginEvidence && (
+                                <div className="mt-3 space-y-1">
+                                  <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Margin Evidence</h5>
+                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs bg-muted/20 p-2 border rounded">
+                                    <span className="text-muted-foreground">Gross Margin:</span>
+                                    <span className="text-right font-medium">{r.marginEvidence.grossMarginPct != null ? `${(r.marginEvidence.grossMarginPct * 100).toFixed(1)}%` : "N/A"}</span>
+                                    <span className="text-muted-foreground">Latest Month:</span>
+                                    <span className="text-right">{r.marginEvidence.latestMonth || "N/A"}</span>
+                                    {r.marginEvidence.saleValue != null && (
+                                      <>
+                                        <span className="text-muted-foreground">Sale Value:</span>
+                                        <span className="text-right">₹{r.marginEvidence.saleValue.toFixed(2)}</span>
+                                      </>
+                                    )}
+                                    {r.marginEvidence.bomValue != null && (
+                                      <>
+                                        <span className="text-muted-foreground">BOM Value:</span>
+                                        <span className="text-right">₹{r.marginEvidence.bomValue.toFixed(2)}</span>
+                                      </>
+                                    )}
+                                    {r.marginEvidence.unitBomValue != null && (
+                                      <>
+                                        <span className="text-muted-foreground">Unit BOM Value:</span>
+                                        <span className="text-right">₹{r.marginEvidence.unitBomValue.toFixed(2)}</span>
+                                      </>
+                                    )}
+                                    <span className="text-muted-foreground">Qty Unknown:</span>
+                                    <span className="text-right">{r.marginEvidence.qtyUnknown ? "Yes" : "No"}</span>
+                                    <span className="text-muted-foreground">Held:</span>
+                                    <span className={cn("text-right", r.marginEvidence.held && "text-amber-700 font-medium")}>{r.marginEvidence.held ? "Yes" : "No"}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {r.warnings?.length > 0 && (
+                                <div className="mt-3 space-y-1">
+                                  <h5 className="text-[10px] uppercase font-semibold text-amber-700">Warnings</h5>
+                                  <ul className="list-disc pl-4 text-xs text-amber-700">
+                                    {r.warnings.map((w: string, i: number) => (
+                                      <li key={i}>{w}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
                               {r.competitorValues?.length > 0 && (
                                 <div className="mt-3 space-y-1">
                                   <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Competitors</h5>
