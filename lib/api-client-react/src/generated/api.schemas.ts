@@ -5,6 +5,147 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export type PdfCatalogueUploadPriceBasis = typeof PdfCatalogueUploadPriceBasis[keyof typeof PdfCatalogueUploadPriceBasis];
+
+
+export const PdfCatalogueUploadPriceBasis = {
+  MRP: 'MRP',
+  'Ex-GST': 'Ex-GST',
+} as const;
+
+export type ExtractionPath = typeof ExtractionPath[keyof typeof ExtractionPath];
+
+
+export const ExtractionPath = {
+  text: 'text',
+  vision: 'vision',
+  text_then_ai: 'text_then_ai',
+} as const;
+
+export interface PdfCatalogueUpload {
+  file: Blob;
+  competitor: string;
+  /**
+     * Unambiguous ISO calendar date yyyy-mm-dd.
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  effectiveDate: string;
+  priceBasis?: PdfCatalogueUploadPriceBasis;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  gstPct?: number;
+  extractionPath: ExtractionPath;
+  /**
+     * SHA returned by the read-only preflight; stale files are rejected.
+     * @pattern ^[0-9a-f]{64}$
+     */
+  preflightSha256: string;
+  overrideReason?: string;
+}
+
+export type PdfCatalogueUploadResponseStatus = typeof PdfCatalogueUploadResponseStatus[keyof typeof PdfCatalogueUploadResponseStatus];
+
+
+export const PdfCatalogueUploadResponseStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  discarded: 'discarded',
+} as const;
+
+export type PdfCatalogueUploadResponseGstSanityWarning = null | {
+  previousMedianGap: number;
+  currentMedianGap: number;
+  shiftPoints: number;
+  /** @nullable */
+  previousBasis: string | null;
+  currentBasis: string;
+  message?: string;
+};
+
+export type PdfCatalogueUploadResponseRowCounts = { [key: string]: unknown };
+
+export interface PdfCatalogueUploadResponse {
+  batchId: number;
+  status: PdfCatalogueUploadResponseStatus;
+  fileSha256: string;
+  idempotent?: boolean;
+  extractionPath?: ExtractionPath;
+  gstSanityWarning?: PdfCatalogueUploadResponseGstSanityWarning;
+  rowCounts?: PdfCatalogueUploadResponseRowCounts;
+}
+
+export interface PdfPagePreflight {
+  /** @minimum 1 */
+  page: number;
+  /** @minimum 0 */
+  characters: number;
+  /** @minimum 0 */
+  digits: number;
+  textBearing: boolean;
+}
+
+export type PdfPreflightDetectedClass = typeof PdfPreflightDetectedClass[keyof typeof PdfPreflightDetectedClass];
+
+
+export const PdfPreflightDetectedClass = {
+  text: 'text',
+  vision: 'vision',
+  uncertain: 'uncertain',
+} as const;
+
+export type PdfPreflightDuplicate = { [key: string]: unknown };
+
+export type PdfPreflightDuplicateMatchesItem = {
+  batchId: number;
+  effectiveDate: string;
+  status: string;
+  extractionPath?: ExtractionPath | null;
+};
+
+/**
+ * @nullable
+ */
+export type PdfPreflightLatestGst = { [key: string]: unknown } | null;
+
+export interface PdfPreflight {
+  /** @pattern ^[0-9a-f]{64}$ */
+  fileSha256: string;
+  /** @minimum 1 */
+  fileSizeBytes: number;
+  /** @minimum 1 */
+  totalPages: number;
+  samplePages: number[];
+  pages: PdfPagePreflight[];
+  /** @minimum 1 */
+  sampleCount: number;
+  /** @minimum 0 */
+  textBearingCount: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  textBearingShare: number;
+  /** @minimum 0 */
+  medianCharacters: number;
+  /** @minimum 0 */
+  medianDigits: number;
+  detectedClass: PdfPreflightDetectedClass;
+  recommendedPath: ExtractionPath | null;
+  textBearingPages: number[];
+  nonTextBearingPages: number[];
+  humanReason: string;
+  /** @minimum 0 */
+  assignmentTextBearingCount: number;
+  /** @minimum 0 */
+  assignmentNonTextBearingCount: number;
+  duplicate?: PdfPreflightDuplicate;
+  duplicateMatches?: PdfPreflightDuplicateMatchesItem[];
+  /** @nullable */
+  latestGst?: PdfPreflightLatestGst;
+}
+
 export type MrpGeneratorMetadataP011 = { [key: string]: unknown };
 
 export type MrpGeneratorMetadataP012 = { [key: string]: unknown };
@@ -4754,5 +4895,16 @@ export type CompareMrpGeneratorRunsParams = {
 runIds?: number[];
 leftRunId?: number;
 rightRunId?: number;
+};
+
+export type PreflightCataloguePdfBody = {
+  file: Blob;
+  competitor: string;
+  /**
+     * Unambiguous ISO calendar date yyyy-mm-dd (for example 2026-03-01).
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  effectiveDate?: string;
+  extractionPath?: ExtractionPath;
 };
 

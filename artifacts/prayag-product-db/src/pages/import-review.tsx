@@ -82,6 +82,18 @@ interface BatchData {
     pages_adjudicated?: number[];
     items_adjudicated?: number;
     passes_run?: number;
+    extractionPath?: "text" | "vision" | "text_then_ai";
+    detectedClass?: "text" | "vision" | "uncertain";
+    extractionOverride?: boolean;
+    gstSanityWarning?: {
+      previousMedianGap: number;
+      currentMedianGap: number;
+      shiftPoints: number;
+      previousBasis: string | null;
+      currentBasis: string;
+      message?: string;
+    } | null;
+    duplicate?: { message?: string; action?: string; existingBatchId?: number | null };
   } | null;
   rows: StagingRow[];
 }
@@ -470,6 +482,16 @@ export default function ImportReviewPage() {
         <div className="rounded-lg px-4 py-3 border border-amber-300 bg-amber-50 text-sm text-amber-900">
           <strong>Pending review — prices are not live.</strong> Inspect the staged rows below, then use
           {" "}Commit Prices to write the approved rows to the competitor price list.
+        </div>
+      )}
+      {batch.rowCounts?.gstSanityWarning && (
+        <div className="rounded-lg border-2 border-red-400 bg-red-50 px-4 py-3 text-sm text-red-900" data-testid="gst-sanity-warning">
+          <strong>GST sanity warning — review before committing.</strong>{" "}
+          Median business gap moved from {batch.rowCounts.gstSanityWarning.previousMedianGap.toFixed(1)}% to{" "}
+          {batch.rowCounts.gstSanityWarning.currentMedianGap.toFixed(1)}% ({batch.rowCounts.gstSanityWarning.shiftPoints > 0 ? "+" : ""}
+          {batch.rowCounts.gstSanityWarning.shiftPoints.toFixed(1)} points).
+          Basis: previous {batch.rowCounts.gstSanityWarning.previousBasis ?? "unknown"}, current {batch.rowCounts.gstSanityWarning.currentBasis}.
+          No automatic approval will occur.
         </div>
       )}
 

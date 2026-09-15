@@ -545,18 +545,45 @@ export function reconcilePrincePdf(
   };
 }
 
-export function extractPrinceTextPdf(pdfBuffer: Buffer): { items: PrincePdfItem[]; fileSha256: string } {
+export function extractPrinceTextPdf(
+  pdfBuffer: Buffer,
+  options: { pages?: number[] } = {},
+): { items: PrincePdfItem[]; fileSha256: string; pagesExecuted: number[] } {
   const dir = mkdtempSync(join(tmpdir(), "prince-pdf-"));
   const path = join(dir, "catalogue.pdf");
   try {
     writeFileSync(path, pdfBuffer);
-    const bbox = execFileSync("pdftotext", ["-bbox", "-layout", path, "-"], {
-      encoding: "utf8",
-      maxBuffer: 50 * 1024 * 1024,
-    });
+    const pages = options.pages
+      ? [...new Set(options.pages)].filter((page) => Number.isInteger(page) && page > 0).sort((a, b) => a - b)
+      : undefined;
+    const contiguous = pages && pages.length > 0 &&
+      pages.every((page, index) => index === 0 || page === pages[index - 1]! + 1);
+    const bbox = pages && !contiguous
+      ? pages.map((page) => execFileSync("pdftotext", [
+        "-bbox", "-layout", "-f", String(page), "-l", String(page), path, "-",
+      ], {
+        encoding: "utf8",
+        maxBuffer: 8 * 1024 * 1024,
+      }))
+      : null;
+    const fullBbox = bbox == null
+      ? execFileSync("pdftotext", ["-bbox", "-layout", path, "-"], {
+        encoding: "utf8",
+        maxBuffer: 50 * 1024 * 1024,
+      })
+      : null;
+    const items = bbox
+      ? bbox.flatMap((pageBbox, index) =>
+        parsePrinceBboxCatalogue(pageBbox).map((item) => ({
+          ...item,
+          page: pages![index]!,
+        })),
+      )
+      : parsePrinceBboxCatalogue(fullBbox!).filter((item) => !pages || pages.includes(item.page));
     return {
-      items: parsePrinceBboxCatalogue(bbox),
+      items,
       fileSha256: createHash("sha256").update(pdfBuffer).digest("hex"),
+      pagesExecuted: pages ?? [],
     };
   } finally {
     rmSync(dir, { recursive: true, force: true });

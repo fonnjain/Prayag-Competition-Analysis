@@ -416,6 +416,7 @@ export async function extractFromPdf(
   codeFamilies: string[],
   onProgress?: (progress: ExtractionProgress) => void,
   profile?: CatalogueProfile,
+  options: { pages?: number[] } = {},
 ): Promise<ExtractionResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
@@ -424,7 +425,11 @@ export async function extractFromPdf(
   const staticPrompt = buildStaticPrompt(targetCodes, codeFamilies);
 
   let initialPagesRequested: number[];
-  if (profile) {
+  if (options.pages) {
+    initialPagesRequested = [...new Set(options.pages)]
+      .filter((page) => Number.isInteger(page) && page > 0)
+      .sort((a, b) => a - b);
+  } else if (profile) {
     initialPagesRequested = profilePages(profile);
   } else {
     const { PDFDocument } = await import("pdf-lib");
@@ -451,7 +456,7 @@ export async function extractFromPdf(
   // same two-pass reconciliation, but only for pages outside the original
   // profile. An agreed original page is never reread just because a different
   // section needs widened coverage.
-  if (profile && targetCodes.length > 0 && coverage < COVERAGE_THRESHOLD) {
+  if (!options.pages && profile && targetCodes.length > 0 && coverage < COVERAGE_THRESHOLD) {
     pagesSupplemental = widenedPages(initialPagesRequested, 2, profile.pageCount)
       .filter((page) => !initialPagesRequested.includes(page));
     if (pagesSupplemental.length > 0) {

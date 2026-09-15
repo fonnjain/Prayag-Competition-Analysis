@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import express from "express";
 import supertest from "supertest";
 import * as XLSX from "xlsx";
@@ -13,7 +14,6 @@ import importBatchesRouter from "./importBatches.js";
 import {
   parsePrinceCompetitorMaster,
   PRINCE_COMPETITOR,
-  PRINCE_EFFECTIVE_DATE,
 } from "../lib/princeMaster.js";
 
 const app = express();
@@ -66,26 +66,47 @@ describe("Prince PDF upload idempotency", () => {
     restoreExecute?.();
   });
 
-  it("returns the existing batch for competitor + SHA + effective date and preserves mapping identities", async () => {
+  it("stages a unique source safely and preserves live batch 1946", async () => {
     const pdf = readFileSync(pdfPath);
+    const fileSha256 = createHash("sha256").update(pdf).digest("hex");
+    const protectedBatchBefore = await db.select({
+      id: importBatchesTable.id,
+      fileSha256: importBatchesTable.fileSha256,
+      rowCounts: importBatchesTable.rowCounts,
+    }).from(importBatchesTable).where(eq(importBatchesTable.id, 1946));
+    const protectedRowsBefore = await db.select()
+      .from(competitorPriceStagingTable)
+      .where(eq(competitorPriceStagingTable.batchId, 1946));
+    const effectiveDate = "2099-12-31";
     const upload = () => request
       .post("/catalog/import-batches")
       .field("competitor", PRINCE_COMPETITOR)
-      .field("effectiveDate", PRINCE_EFFECTIVE_DATE)
+      .field("effectiveDate", effectiveDate)
+      .field("extractionPath", "text")
+      .field("preflightSha256", fileSha256)
       .attach("file", pdf, { filename: "prince.pdf", contentType: "application/pdf" });
 
-    let batchId: number | undefined;
+    let createdBatchId: number | undefined;
     try {
       const first = await upload();
-      expect([200, 201]).toContain(first.status);
-      batchId = first.body.batchId;
-      if (typeof batchId !== "number") throw new Error("Prince import did not return a batch id.");
-      const createdBatchId = batchId;
-      expect(first.body.reconciliation).toBeDefined();
-      expect(first.body.reconciliation.comparisons.length).toBe(803);
-      expect(first.body.reconciliation.differences).toHaveLength(0);
-      expect(first.body.rowCounts.mappedStagingIdentities).toBe(803);
-      expect(first.body.fileSha256).toBeTruthy();
+      expect(first.status).toBe(200);
+      expect(first.headers["content-type"]).toMatch(/text\/event-stream/);
+      const batchLine = first.text.split("\n\n").find((chunk) => chunk.startsWith("event: batch"));
+      if (batchLine) {
+        const batchPayload = JSON.parse(batchLine.split("\n").find((line) => line.startsWith("data: "))!.slice(6));
+        if (typeof batchPayload.batchId === "number") createdBatchId = batchPayload.batchId;
+      }
+      const doneLine = first.text.split("\n\n").find((chunk) => chunk.startsWith("event: done"));
+      if (!doneLine) throw new Error("Prince import did not emit a done SSE event.");
+      const done = JSON.parse(doneLine.split("\n").find((line) => line.startsWith("data: "))!.slice(6));
+      if (typeof done.batchId !== "number") throw new Error("Prince import did not return a batch id.");
+      const stagedBatchId: number = done.batchId;
+      createdBatchId = stagedBatchId;
+      expect(done.reconciliation).toBeDefined();
+      expect(done.reconciliation.comparisons.length).toBe(803);
+      expect(done.reconciliation.differences).toHaveLength(0);
+      expect(done.rowCounts.mappedStagingIdentities).toBe(803);
+      expect(done.fileSha256).toBeTruthy();
 
       const staged = await db.select({
         prince: competitorPriceStagingTable.competitorCodeMaster,
@@ -93,7 +114,7 @@ describe("Prince PDF upload idempotency", () => {
         variant: competitorPriceStagingTable.variant,
         price: competitorPriceStagingTable.newMrp,
       }).from(competitorPriceStagingTable)
-        .where(eq(competitorPriceStagingTable.batchId, createdBatchId));
+        .where(eq(competitorPriceStagingTable.batchId, stagedBatchId));
       expect(staged.filter((row) => row.prayag != null)).toHaveLength(803);
       const duplicateAssignments: Record<string, Array<[string, number]>> = {
         SIM200032: [["A-86B", 1265], ["A-86A", 759]],
@@ -117,12 +138,22 @@ describe("Prince PDF upload idempotency", () => {
       const second = await upload();
       expect(second.status).toBe(200);
       expect(second.body.idempotent).toBe(true);
-      expect(second.body.batchId).toBe(first.body.batchId);
+      expect(second.body.batchId).toBe(done.batchId);
     } finally {
-      if (batchId != null) {
-        await db.delete(competitorPriceStagingTable).where(eq(competitorPriceStagingTable.batchId, batchId));
-        await db.delete(importBatchesTable).where(eq(importBatchesTable.id, batchId));
+      if (createdBatchId != null) {
+        await db.delete(competitorPriceStagingTable).where(eq(competitorPriceStagingTable.batchId, createdBatchId));
+        await db.delete(importBatchesTable).where(eq(importBatchesTable.id, createdBatchId));
       }
+      const protectedBatchAfter = await db.select({
+        id: importBatchesTable.id,
+        fileSha256: importBatchesTable.fileSha256,
+        rowCounts: importBatchesTable.rowCounts,
+      }).from(importBatchesTable).where(eq(importBatchesTable.id, 1946));
+      const protectedRowsAfter = await db.select()
+        .from(competitorPriceStagingTable)
+        .where(eq(competitorPriceStagingTable.batchId, 1946));
+      expect(protectedBatchAfter).toEqual(protectedBatchBefore);
+      expect(protectedRowsAfter).toEqual(protectedRowsBefore);
     }
   }, 180_000);
 });

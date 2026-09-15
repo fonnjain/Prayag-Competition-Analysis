@@ -14,7 +14,7 @@
 
 import { Router, type IRouter } from "express";
 import multer from "multer";
-import { and, eq, sql, desc, ilike } from "drizzle-orm";
+import { and, eq, sql, desc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -31,6 +31,7 @@ import {
   extractFromPdf,
   EXTRACTION_MODEL,
   buildPdfBatchProvenance,
+  type ExtractionProgress,
 } from "../lib/pdfExtractor.js";
 import {
   matchCatalogue,
@@ -44,6 +45,13 @@ import {
   extractPrinceTextPdf,
   reconcilePrincePdf,
 } from "../lib/princeTextPdfExtractor.js";
+import {
+  isExtractionPath,
+  preflightPdf,
+  type ExtractionPath,
+  type PdfPreflight,
+} from "../lib/pdfPreflight.js";
+import { mergeHybridItems, princeItemsToExtracted } from "../lib/pdfHybrid.js";
 
 const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
 
@@ -205,6 +213,246 @@ function resolveNewProductSeries(
   };
 }
 
+type StoredPdfDecision = {
+  extractionPath?: ExtractionPath;
+  preflight?: PdfPreflight;
+  override?: boolean;
+  overrideReason?: string | null;
+  gstSanityWarning?: {
+    previousMedianGap: number;
+    currentMedianGap: number;
+    shiftPoints: number;
+    previousBasis: string | null;
+    currentBasis: string;
+  } | null;
+};
+
+function parseRowCounts(value: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function medianNumber(values: number[]): number | null {
+  const finite = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!finite.length) return null;
+  const middle = Math.floor(finite.length / 2);
+  return finite.length % 2
+    ? finite[middle]!
+    : (finite[middle - 1]! + finite[middle]!) / 2;
+}
+
+export function buildGstSanityWarning(
+  previousMedianGap: number | null,
+  currentMedianGap: number | null,
+  previousBasis: string | null,
+  currentBasis: string,
+) {
+  const shiftPoints = previousMedianGap != null && currentMedianGap != null
+    ? currentMedianGap - previousMedianGap
+    : null;
+  return shiftPoints != null && Math.abs(shiftPoints) > 10
+    ? {
+        previousMedianGap: previousMedianGap!,
+        currentMedianGap: currentMedianGap!,
+        shiftPoints,
+        previousBasis,
+        currentBasis,
+        message: "GST likely wrong: median business gap moved by more than 10 percentage points. Review the basis before approval.",
+      }
+    : null;
+}
+
+async function previousComparableBatch(
+  competitor: string,
+  effectiveDate: string,
+) {
+  const rows = await db
+    .select()
+    .from(importBatchesTable)
+    .where(and(
+      eq(importBatchesTable.competitor, competitor),
+      eq(importBatchesTable.status, "approved"),
+      sql`${importBatchesTable.effectiveDate} < ${effectiveDate}`,
+    ))
+    .orderBy(desc(importBatchesTable.effectiveDate), desc(importBatchesTable.id))
+    .limit(1);
+  return rows[0];
+}
+
+async function gstContext(competitor: string) {
+  const rows = await db
+    .select({
+      priceBasis: importBatchesTable.priceBasis,
+      gstPct: importBatchesTable.gstPct,
+      effectiveDate: importBatchesTable.effectiveDate,
+      id: importBatchesTable.id,
+    })
+    .from(importBatchesTable)
+    .where(and(
+      eq(importBatchesTable.competitor, competitor),
+      eq(importBatchesTable.status, "approved"),
+    ))
+    .orderBy(desc(importBatchesTable.effectiveDate), desc(importBatchesTable.id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export function duplicateDecision(
+  existingRows: Array<typeof importBatchesTable.$inferSelect>,
+  competitor: string,
+  fileSha256: string,
+  effectiveDate: string,
+  extractionPath: ExtractionPath | null,
+) {
+  const sameDate = existingRows.filter((row) => row.effectiveDate === effectiveDate);
+  const selectedPathRow = sameDate.find((row) => {
+    const stored = parseRowCounts(row.rowCounts);
+    return isExtractionPath(stored.extractionPath) && stored.extractionPath === extractionPath;
+  });
+  const existing = selectedPathRow ?? sameDate[0] ?? existingRows[0];
+  if (!existing) {
+    return {
+      action: "new",
+      message: "No identical catalogue is recorded. A new review batch will be staged after you confirm the extraction path.",
+      existingBatchId: null,
+      existingMatches: [],
+    };
+  }
+  const stored = parseRowCounts(existing.rowCounts);
+  const storedPath = isExtractionPath(stored.extractionPath) ? stored.extractionPath : null;
+  const samePath = Boolean(extractionPath && storedPath && extractionPath === storedPath);
+  const exactDateAndPath = existing.effectiveDate === effectiveDate && samePath;
+  const action = exactDateAndPath ? "reuse" : existing.effectiveDate === effectiveDate ? "supersede" : "new_period";
+  return {
+    action,
+    message: action === "reuse"
+      ? `Identical ${competitor} catalogue (SHA ${fileSha256.slice(0, 12)}…) already exists as batch ${existing.id}; it will be reused and will not duplicate prices.`
+      : action === "new_period"
+        ? `Identical ${competitor} catalogue exists as batch ${existing.id} for ${existing.effectiveDate}; this upload will create a new period for ${effectiveDate} referencing the same source, not a new file.`
+        : `Identical PDF exists as batch ${existing.id} with extraction path ${storedPath}; choosing ${extractionPath} will create a superseding review batch, not duplicate approved prices.`,
+    existingBatchId: existing.id,
+    existingStatus: existing.status,
+    sameCompetitor: existing.competitor === competitor,
+    sameEffectiveDate: existing.effectiveDate === effectiveDate,
+    sameExtractionPath: samePath,
+    existingMatches: existingRows.map((row) => {
+      const rowCounts = parseRowCounts(row.rowCounts);
+      return {
+        batchId: row.id,
+        effectiveDate: row.effectiveDate,
+        status: row.status,
+        extractionPath: isExtractionPath(rowCounts.extractionPath) ? rowCounts.extractionPath : null,
+      };
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// POST /catalog/import-batches/preflight
+// ---------------------------------------------------------------------------
+// This endpoint is intentionally read-only. It hashes and samples the PDF,
+// reports the detector evidence, and checks duplicate/GST context without
+// creating an import batch or staging a price.
+router.post(
+  "/catalog/import-batches/preflight",
+  requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    const file = req.file;
+    if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
+    if ((file.originalname.toLowerCase().split(".").pop() ?? "") !== "pdf") {
+      res.status(400).json({ error: "This endpoint only accepts PDF files." });
+      return;
+    }
+    const competitor = typeof req.body.competitor === "string" ? req.body.competitor.trim() : "";
+    if (!competitor) { res.status(400).json({ error: "competitor is required" }); return; }
+    const effectiveDate =
+      typeof req.body.effectiveDate === "string" ? req.body.effectiveDate.trim() : "";
+    if (effectiveDate && !isIsoDate(effectiveDate)) {
+      res.status(400).json({
+        error: "effectiveDate must be an unambiguous ISO date in yyyy-mm-dd format (for example 2026-03-01).",
+      });
+      return;
+    }
+    try {
+      const preflight = await preflightPdf(file.buffer);
+      const existingRows = await db
+        .select()
+        .from(importBatchesTable)
+        .where(and(
+          eq(importBatchesTable.competitor, competitor),
+          eq(importBatchesTable.fileSha256, preflight.fileSha256),
+        ))
+        .orderBy(desc(importBatchesTable.id));
+      const selectedPath = isExtractionPath(req.body.extractionPath)
+        ? req.body.extractionPath
+        : preflight.recommendedPath;
+      const latestGst = await gstContext(competitor);
+      const previous = effectiveDate
+        ? await previousComparableBatch(competitor, effectiveDate)
+        : undefined;
+      const comparableRows = effectiveDate
+        ? await db.select({
+            id: importBatchesTable.id,
+            status: importBatchesTable.status,
+            effectiveDate: importBatchesTable.effectiveDate,
+            priceBasis: importBatchesTable.priceBasis,
+            gstPct: importBatchesTable.gstPct,
+            fileSha256: importBatchesTable.fileSha256,
+          }).from(importBatchesTable).where(and(
+            eq(importBatchesTable.competitor, competitor),
+            eq(importBatchesTable.effectiveDate, effectiveDate),
+            eq(importBatchesTable.status, "approved"),
+          )).orderBy(desc(importBatchesTable.id)).limit(1)
+        : [];
+      res.json({
+        ...preflight,
+        detected: preflight.detectedClass,
+        recommendedPath: preflight.recommendedPath,
+        duplicate: duplicateDecision(existingRows, competitor, preflight.fileSha256, effectiveDate, selectedPath),
+        duplicateMatches: existingRows.map((row) => {
+          const rowCounts = parseRowCounts(row.rowCounts);
+          return {
+            batchId: row.id,
+            status: row.status,
+            effectiveDate: row.effectiveDate,
+            extractionPath: isExtractionPath(rowCounts.extractionPath) ? rowCounts.extractionPath : null,
+          };
+        }),
+        existingBatch: existingRows[0] ? {
+          id: existingRows[0].id,
+          status: existingRows[0].status,
+          effectiveDate: existingRows[0].effectiveDate,
+          priceBasis: existingRows[0].priceBasis,
+          gstPct: existingRows[0].gstPct,
+        } : null,
+        existingComparableBatch: comparableRows[0] ?? null,
+        latestGst: latestGst ? {
+          batchId: latestGst.id,
+          effectiveDate: latestGst.effectiveDate,
+          priceBasis: latestGst.priceBasis,
+          gstPct: latestGst.gstPct,
+        } : null,
+        previousComparableBatch: previous ? {
+          id: previous.id,
+          effectiveDate: previous.effectiveDate,
+          priceBasis: previous.priceBasis,
+          gstPct: previous.gstPct,
+        } : null,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Could not inspect PDF." });
+    }
+  },
+);
+
 // ---------------------------------------------------------------------------
 // POST /catalog/import-batches
 // ---------------------------------------------------------------------------
@@ -231,10 +479,16 @@ router.post(
       return;
     }
 
-    const priceBasis = req.body.priceBasis === "Ex-GST" ? "Ex-GST" : "MRP";
+    const suppliedPriceBasis = req.body.priceBasis === "Ex-GST" || req.body.priceBasis === "MRP"
+      ? req.body.priceBasis
+      : null;
+    const existingGst = suppliedPriceBasis ? null : await gstContext(competitor);
+    const priceBasis = suppliedPriceBasis ?? existingGst?.priceBasis ?? "MRP";
     const gstPct =
       priceBasis === "Ex-GST"
-        ? (isNaN(Number(req.body.gstPct)) ? 18 : Number(req.body.gstPct))
+        ? (isNaN(Number(req.body.gstPct))
+          ? (existingGst?.gstPct ?? 18)
+          : Number(req.body.gstPct))
         : null;
 
     const ext = (file.originalname.toLowerCase().split(".").pop() ?? "");
@@ -243,14 +497,126 @@ router.post(
       return;
     }
 
+    // Compute the same read-only evidence exposed by /preflight as a final
+    // server-side guard. API clients cannot begin extraction without a
+    // classification and an explicit (or automatically recommended) path.
+    let preflight: PdfPreflight;
+    try {
+      preflight = await preflightPdf(file.buffer);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Could not inspect PDF." });
+      return;
+    }
+    if (!isExtractionPath(req.body.extractionPath)) {
+      res.status(400).json({
+        error: "extractionPath is required. Run PDF preflight and choose text, vision, or text_then_ai.",
+        code: "PREFLIGHT_REQUIRED",
+      });
+      return;
+    }
+    if (typeof req.body.preflightSha256 !== "string" || !/^[0-9a-f]{64}$/.test(req.body.preflightSha256)) {
+      res.status(400).json({
+        error: "preflightSha256 is required. Run PDF preflight immediately before extraction.",
+        code: "PREFLIGHT_REQUIRED",
+      });
+      return;
+    }
+    if (req.body.preflightSha256 !== preflight.fileSha256) {
+      res.status(409).json({
+        error: "The PDF changed after detection. Run Detect again before extraction.",
+        code: "PREFLIGHT_STALE",
+        preflightSha256: req.body.preflightSha256,
+        fileSha256: preflight.fileSha256,
+      });
+      return;
+    }
+    const requestedPath = req.body.extractionPath;
+    const extractionPathCandidate = requestedPath;
+    if (!isExtractionPath(extractionPathCandidate)) {
+      res.status(400).json({
+        error: "This PDF is uncertain. Choose extractionPath text, vision, or text_then_ai after preflight.",
+        preflight,
+      });
+      return;
+    }
+    const extractionPath: ExtractionPath = extractionPathCandidate;
+    if ((extractionPath === "text" || extractionPath === "text_then_ai") && competitor !== "Prince") {
+      res.status(422).json({
+        error: `Text extraction is not supported for ${competitor}. Choose vision; no compatible positional profile is configured for this competitor.`,
+        code: "UNSUPPORTED_EXTRACTION_PATH",
+        supportedPaths: ["vision"],
+      });
+      return;
+    }
+    const override = extractionPath !== preflight.recommendedPath;
+    const overrideReason =
+      typeof req.body.overrideReason === "string" ? req.body.overrideReason.trim() : "";
+    if (override && !overrideReason && preflight.detectedClass !== "uncertain") {
+      res.status(400).json({
+        error: "An overrideReason is required when overriding the detected extraction path.",
+        preflight,
+      });
+      return;
+    }
+
+    const duplicateRows = await db
+      .select()
+      .from(importBatchesTable)
+      .where(and(
+        eq(importBatchesTable.competitor, competitor),
+        eq(importBatchesTable.fileSha256, preflight.fileSha256),
+      ))
+      .orderBy(desc(importBatchesTable.id));
+    const duplicate = duplicateDecision(
+      duplicateRows,
+      competitor,
+      preflight.fileSha256,
+      effectiveDate,
+      extractionPath,
+    );
+    if (duplicate.action === "reuse" && duplicate.existingBatchId) {
+      const existing = duplicateRows.find((row) => row.id === duplicate.existingBatchId);
+      if (!existing) {
+        res.status(409).json({ error: "Duplicate batch disappeared during idempotency check." });
+        return;
+      }
+      const stored = parseRowCounts(existing.rowCounts);
+      res.status(200).json({
+        batchId: existing.id,
+        competitor,
+        effectiveDate,
+        fileSha256: preflight.fileSha256,
+        status: existing.status,
+        rowCounts: stored,
+        reconciliation: stored.reconciliation,
+        duplicate,
+        preflight,
+        idempotent: true,
+      });
+      return;
+    }
+
     // Prince catalogues are text-native. Keep this path independent of the
     // existing vision extractor: pdftotext layout/bbox is deterministic,
     // preserves side-by-side x positions, and costs no model calls.
-    if (competitor === "Prince") {
+    if (competitor === "Prince" && extractionPath === "text") {
+      res.status(200).set({
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      const sendPrinceSse = (event: string, data: unknown) => {
+        if (res.writableEnded || res.destroyed) return;
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        if (typeof (res as any).flush === "function") (res as any).flush();
+      };
+      sendPrinceSse("status", { stage: "preparing", message: "Preparing positional text extraction…" });
       try {
         const prayagMrpMap = await getCurrentPrayagMrp();
         const targets = await getTargets(competitor, prayagMrpMap);
-        const { items, fileSha256 } = extractPrinceTextPdf(file.buffer);
+        const { items, fileSha256, pagesExecuted } = extractPrinceTextPdf(file.buffer, {
+          pages: Array.from({ length: preflight.totalPages }, (_, index) => index + 1),
+        });
         const expectedRows = targets
           .filter((target) => target.competitorCode && target.existingPrice != null)
           .map((target) => ({
@@ -261,30 +627,6 @@ router.post(
             lengthMeters: target.size ? Number(target.size.replace(/[^\d.]/g, "")) || null : null,
           }));
         const reconciliation = reconcilePrincePdf(items, expectedRows);
-        const [existingBatch] = await db.select()
-          .from(importBatchesTable)
-          .where(and(
-            eq(importBatchesTable.competitor, competitor),
-            eq(importBatchesTable.effectiveDate, effectiveDate),
-            eq(importBatchesTable.fileSha256, fileSha256),
-            ilike(importBatchesTable.sourceFileName, "%.pdf"),
-          ))
-          .orderBy(desc(importBatchesTable.id))
-          .limit(1);
-        if (existingBatch) {
-          const stored = existingBatch.rowCounts ? JSON.parse(existingBatch.rowCounts) as Record<string, unknown> : {};
-          res.status(200).json({
-            batchId: existingBatch.id,
-            competitor,
-            effectiveDate,
-            fileSha256,
-            status: existingBatch.status,
-            rowCounts: stored,
-            reconciliation: stored,
-            idempotent: true,
-          });
-          return;
-        }
         const itemsByCode = new Map<string, Array<typeof items[number]>>();
         for (const item of items) {
           const code = normCode(item.cat_no);
@@ -312,16 +654,24 @@ router.post(
           pagesRequested: null,
           passesRun: 1,
           itemsAdjudicated: 0,
-          rowCounts: JSON.stringify({
+           rowCounts: JSON.stringify({
+             extractionPath,
+             detectedClass: preflight.detectedClass,
+             extractionOverride: override,
+             extractionOverrideReason: overrideReason || null,
+             preflight,
+             pagesExecuted,
+             duplicate,
             found: reconciliation.found,
             matched: reconciliation.matched,
             new: reconciliation.newCodes.length,
             missing: reconciliation.missingCodes.length,
             differences: reconciliation.differences,
-          }),
+           }),
         }).returning();
         const batch = batchRows[0];
         if (!batch) throw new Error("Failed to create Prince text extraction batch.");
+         sendPrinceSse("batch", { batchId: batch.id });
         const occurrenceCursor = new Map<string, number>();
         const expectedOrdinal = new Map<string, number>();
         const rows = targets.map((target) => {
@@ -451,7 +801,39 @@ router.post(
           });
         }
         const allStagingRows = [...uniqueStagingRows.values()];
+         const currentMedianGap = medianNumber(allStagingRows.map((row) => row.gapPct ?? NaN));
+          const previous = await previousComparableBatch(competitor, effectiveDate);
+         let previousMedianGap: number | null = null;
+         if (previous) {
+           const previousRows = await db
+             .select({ gapPct: competitorPriceStagingTable.gapPct })
+             .from(competitorPriceStagingTable)
+             .where(eq(competitorPriceStagingTable.batchId, previous.id));
+           previousMedianGap = medianNumber(previousRows.map((row) => row.gapPct ?? NaN));
+         }
+          const gstSanityWarning = buildGstSanityWarning(
+            previousMedianGap,
+            currentMedianGap,
+            previous?.priceBasis ?? null,
+            priceBasis,
+          );
         const rowCounts = {
+           extractionPath,
+           detectedClass: preflight.detectedClass,
+           extractionOverride: override,
+           extractionOverrideReason: overrideReason || null,
+           preflight,
+            pagesExecuted,
+           duplicate,
+            gstSanityWarning,
+             gstBaseline: {
+               previousBasis: previous?.priceBasis ?? null,
+               previousMedianGap,
+               currentBasis: priceBasis,
+               currentMedianGap,
+             },
+            currentMedianGap,
+            previousMedianGap,
           found: reconciliation.found,
           matched: reconciliation.matched,
           new: reconciliation.newCodes.length,
@@ -469,18 +851,24 @@ router.post(
         for (let index = 0; index < allStagingRows.length; index += 200) {
           await db.insert(competitorPriceStagingTable).values(allStagingRows.slice(index, index + 200));
         }
-        res.status(201).json({
+        sendPrinceSse("done", {
           batchId: batch.id,
           competitor,
           effectiveDate,
           fileSha256,
           status: "pending",
           rowCounts,
+         extractionPath,
+         gstSanityWarning,
           reconciliation,
+           preflight,
+           duplicate,
         });
+        res.end();
         return;
       } catch (error) {
-        res.status(400).json({ error: error instanceof Error ? error.message : "Could not extract Prince text PDF." });
+        sendPrinceSse("error", { error: error instanceof Error ? error.message : "Could not extract Prince text PDF." });
+        res.end();
         return;
       }
     }
@@ -531,8 +919,26 @@ router.post(
             priceBasis,
             gstPct,
             status: "pending",
-            extractionModel: EXTRACTION_MODEL,
+            extractionModel: extractionPath === "text" ? null : EXTRACTION_MODEL,
             ...provenance,
+            extractorVersion: extractionPath === "text"
+              ? "pdf-vision-preflight-text_then_ai-v1"
+              : `${provenance.extractorVersion}:${extractionPath}`,
+            rowCounts: JSON.stringify({
+              extractionPath,
+              detectedClass: preflight.detectedClass,
+              extractionOverride: override,
+              extractionOverrideReason: overrideReason || null,
+              preflight,
+              duplicate,
+              pageAssignment: {
+                textBearing: preflight.textBearingPages,
+                vision: extractionPath === "text" ? [] : preflight.nonTextBearingPages,
+                note: extractionPath === "text_then_ai"
+                  ? "Hybrid selection is explicit. The AI extractor receives the non-text-bearing page assignment; text-bearing assignment is retained for positional reconciliation."
+                  : null,
+              },
+            }),
           })
           .returning(),
       ]);
@@ -568,37 +974,65 @@ router.post(
           : "Starting PDF extraction…",
       });
 
-      const {
-        items: extracted,
-        failedChunks,
-        pagesSent,
-        pagesRequested,
-        pagesSupplemental,
-        pagesWidened,
-        coverage,
-        passesRun,
-        pagesAdjudicated,
-        codesFoundBothPasses,
-        codesFoundOnePassOnly,
-        itemsAdjudicated,
-        modelCalls,
-        elapsedMs,
-      } = await extractFromPdf(
-        file.buffer,
-        targetCodes,
-        profileCodeFamilies,
-        (p) => {
-          req.log.info(p, "[importBatches] extraction progress");
-          sendSse("progress", {
-            chunk: p.chunk,
-            totalChunks: p.totalChunks,
-            startPage: p.startPage,
-            endPage: p.endPage,
-            totalItemsFound: p.totalItemsFound,
-          });
-        },
-        catalogueProfile,
-      );
+       let hybridConflicts: Array<{ code: string; occurrence: number; values: number[]; pages: number[] }> = [];
+       const onExtractionProgress = (p: ExtractionProgress) => {
+         req.log.info(p, "[importBatches] extraction progress");
+         sendSse("progress", {
+           chunk: p.chunk,
+           totalChunks: p.totalChunks,
+           startPage: p.startPage,
+           endPage: p.endPage,
+           totalItemsFound: p.totalItemsFound,
+         });
+       };
+       const extraction = extractionPath === "text_then_ai"
+         ? (() => {
+             const positional = extractPrinceTextPdf(file.buffer, { pages: preflight.textBearingPages });
+             return { positional };
+           })()
+         : null;
+       const aiExtraction = extractionPath === "text_then_ai"
+         ? await extractFromPdf(
+             file.buffer,
+             targetCodes,
+             profileCodeFamilies,
+             onExtractionProgress,
+             undefined,
+             { pages: preflight.nonTextBearingPages },
+           )
+         : await extractFromPdf(
+             file.buffer,
+             targetCodes,
+             profileCodeFamilies,
+             onExtractionProgress,
+             catalogueProfile,
+             { pages: Array.from({ length: preflight.totalPages }, (_, index) => index + 1) },
+           );
+       const extracted = extraction
+         ? (() => {
+             const merged = mergeHybridItems(
+               princeItemsToExtracted(extraction.positional.items),
+               aiExtraction.items,
+             );
+             hybridConflicts = merged.conflicts;
+             return merged.items;
+           })()
+         : aiExtraction.items;
+       const {
+         failedChunks,
+         pagesSent,
+         pagesRequested,
+         pagesSupplemental,
+         pagesWidened,
+         coverage,
+         passesRun,
+         pagesAdjudicated,
+         codesFoundBothPasses,
+         codesFoundOnePassOnly,
+         itemsAdjudicated,
+         modelCalls,
+         elapsedMs,
+       } = aiExtraction;
 
       if (failedChunks.length > 0) {
         req.log.warn({ failedChunks }, "[importBatches] some PDF chunks failed extraction");
@@ -613,9 +1047,26 @@ router.post(
 
       sendSse("status", { stage: "matching", message: "Matching products…" });
 
-      const { staging, newProducts } = matchCatalogue(
+       const matched = matchCatalogue(
         competitor, targets, extracted, aliases, priceBasis, gstPct,
       );
+       const conflictCodes = new Set(hybridConflicts.map((conflict) => conflict.code));
+       const staging = matched.staging.map((row) => {
+         const rowCode = normCode(row.competitorCodeCatalogue ?? row.competitorCodeMaster ?? "");
+         if (!conflictCodes.has(rowCode)) return row;
+         return {
+           ...row,
+           status: "needs_review" as const,
+           reviewReason: `Hybrid extraction conflict for ${rowCode}; values ${hybridConflicts
+             .filter((conflict) => conflict.code === rowCode)
+             .flatMap((conflict) => conflict.values)
+             .join(" vs ")} on pages ${hybridConflicts
+             .filter((conflict) => conflict.code === rowCode)
+             .flatMap((conflict) => conflict.pages)
+             .join(", ")}. No value was silently selected.`,
+         };
+       });
+       const { newProducts } = matched;
 
       type StagingInsert = typeof competitorPriceStagingTable.$inferInsert;
 
@@ -651,7 +1102,59 @@ router.post(
         await db.insert(competitorPriceStagingTable).values(allRows.slice(i, i + 200));
       }
 
-      const counts = {
+       const currentMedianGap = medianNumber(
+         allRows.map((row) => row.gapPct ?? NaN),
+       );
+       const previous = await previousComparableBatch(competitor, effectiveDate);
+       let previousMedianGap: number | null = null;
+       if (previous) {
+         const previousRows = await db
+           .select({ gapPct: competitorPriceStagingTable.gapPct })
+           .from(competitorPriceStagingTable)
+           .where(eq(competitorPriceStagingTable.batchId, previous.id));
+         previousMedianGap = medianNumber(previousRows.map((row) => row.gapPct ?? NaN));
+       }
+       const gstSanityWarning = buildGstSanityWarning(
+         previousMedianGap,
+         currentMedianGap,
+         previous?.priceBasis ?? null,
+         priceBasis,
+       );
+       const counts = {
+         extractionPath,
+         detectedClass: preflight.detectedClass,
+         extractionOverride: override,
+         extractionOverrideReason: overrideReason || null,
+         preflight,
+         duplicate,
+         pageAssignment: {
+           textBearing: preflight.textBearingPages,
+           vision: extractionPath === "vision"
+             ? Array.from({ length: preflight.totalPages }, (_, index) => index + 1)
+             : extractionPath === "text" ? [] : preflight.nonTextBearingPages,
+           executed: extractionPath === "text_then_ai"
+             ? {
+                 text: extraction!.positional.pagesExecuted,
+                 vision: aiExtraction.pagesRequested,
+               }
+             : {
+                 text: extractionPath === "text" ? pagesRequested : [],
+                 vision: extractionPath === "vision" ? pagesRequested : [],
+               },
+           note: extractionPath === "text_then_ai"
+             ? "Hybrid selection is explicit. The AI extractor receives the non-text-bearing page assignment; text-bearing assignment is retained for positional reconciliation."
+             : null,
+         },
+         gstSanityWarning,
+         gstBaseline: {
+           previousBasis: previous?.priceBasis ?? null,
+           previousMedianGap,
+           currentBasis: priceBasis,
+           currentMedianGap,
+         },
+         hybridConflicts,
+         currentMedianGap,
+         previousMedianGap,
         ok: staging.filter((s) => s.status === "ok").length,
         needs_review: staging.filter((s) => s.status === "needs_review").length,
         not_found: staging.filter((s) => s.status === "not_found").length,
@@ -702,6 +1205,10 @@ router.post(
         rowCounts: counts,
         failedChunks: failedChunksSummary,
         coverageWarning,
+         extractionPath,
+         preflight,
+         duplicate,
+         gstSanityWarning,
       });
       closeSse();
     } catch (err) {

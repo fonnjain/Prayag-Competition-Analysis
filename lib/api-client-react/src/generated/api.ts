@@ -153,6 +153,10 @@ import type {
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
   PatchCatalogProductMrpParams,
+  PdfCatalogueUpload,
+  PdfCatalogueUploadResponse,
+  PdfPreflight,
+  PreflightCataloguePdfBody,
   PriceEditorEditRequest,
   PriceEditorEditsResponse,
   PriceEditorPreviewResponse,
@@ -8205,4 +8209,172 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getHandoffMrpGeneratorRunMutationOptions(options));
+    }
+
+export const getPreflightCataloguePdfUrl = () => {
+
+
+
+
+  return `/api/catalog/import-batches/preflight`
+}
+
+/**
+ * Read-only SHA-256, evenly-spaced Poppler text sample, extraction recommendation, duplicate decision, and existing GST context. No batch or price is written.
+ * @summary Inspect a PDF before extraction
+ */
+export const preflightCataloguePdf = async (preflightCataloguePdfBody: PreflightCataloguePdfBody, options?: RequestInit): Promise<PdfPreflight> => {
+    const formData = new FormData();
+formData.append(`file`, preflightCataloguePdfBody.file);
+formData.append(`competitor`, preflightCataloguePdfBody.competitor);
+if(preflightCataloguePdfBody.effectiveDate !== undefined) {
+ formData.append(`effectiveDate`, preflightCataloguePdfBody.effectiveDate);
+ }
+if(preflightCataloguePdfBody.extractionPath !== undefined) {
+ formData.append(`extractionPath`, preflightCataloguePdfBody.extractionPath);
+ }
+
+  return customFetch<PdfPreflight>(getPreflightCataloguePdfUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreflightCataloguePdfMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightCataloguePdf>>, TError,{data: BodyType<PreflightCataloguePdfBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preflightCataloguePdf>>, TError,{data: BodyType<PreflightCataloguePdfBody>}, TContext> => {
+
+const mutationKey = ['preflightCataloguePdf'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preflightCataloguePdf>>, {data: BodyType<PreflightCataloguePdfBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  preflightCataloguePdf(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreflightCataloguePdfMutationResult = NonNullable<Awaited<ReturnType<typeof preflightCataloguePdf>>>
+    export type PreflightCataloguePdfMutationBody = BodyType<PreflightCataloguePdfBody>
+    export type PreflightCataloguePdfMutationError = ErrorType<void>
+
+    /**
+ * @summary Inspect a PDF before extraction
+ */
+export const usePreflightCataloguePdf = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preflightCataloguePdf>>, TError,{data: BodyType<PreflightCataloguePdfBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preflightCataloguePdf>>,
+        TError,
+        {data: BodyType<PreflightCataloguePdfBody>},
+        TContext
+      > => {
+      return useMutation(getPreflightCataloguePdfMutationOptions(options));
+    }
+
+export const getUploadCataloguePdfUrl = () => {
+
+
+
+
+  return `/api/catalog/import-batches`
+}
+
+/**
+ * Requires a preflight decision. Prices remain staged until approval.
+ * @summary Stage a confirmed PDF extraction for review
+ */
+export const uploadCataloguePdf = async (pdfCatalogueUpload: PdfCatalogueUpload, options?: RequestInit): Promise<string | PdfCatalogueUploadResponse> => {
+    const formData = new FormData();
+formData.append(`file`, pdfCatalogueUpload.file);
+formData.append(`competitor`, pdfCatalogueUpload.competitor);
+formData.append(`effectiveDate`, pdfCatalogueUpload.effectiveDate);
+if(pdfCatalogueUpload.priceBasis !== undefined) {
+ formData.append(`priceBasis`, pdfCatalogueUpload.priceBasis);
+ }
+if(pdfCatalogueUpload.gstPct !== undefined) {
+ formData.append(`gstPct`, pdfCatalogueUpload.gstPct.toString())
+ }
+formData.append(`extractionPath`, pdfCatalogueUpload.extractionPath);
+formData.append(`preflightSha256`, pdfCatalogueUpload.preflightSha256);
+if(pdfCatalogueUpload.overrideReason !== undefined) {
+ formData.append(`overrideReason`, pdfCatalogueUpload.overrideReason);
+ }
+
+  return customFetch<string | PdfCatalogueUploadResponse>(getUploadCataloguePdfUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getUploadCataloguePdfMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadCataloguePdf>>, TError,{data: BodyType<PdfCatalogueUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadCataloguePdf>>, TError,{data: BodyType<PdfCatalogueUpload>}, TContext> => {
+
+const mutationKey = ['uploadCataloguePdf'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadCataloguePdf>>, {data: BodyType<PdfCatalogueUpload>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadCataloguePdf(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadCataloguePdfMutationResult = NonNullable<Awaited<ReturnType<typeof uploadCataloguePdf>>>
+    export type UploadCataloguePdfMutationBody = BodyType<PdfCatalogueUpload>
+    export type UploadCataloguePdfMutationError = ErrorType<void>
+
+    /**
+ * @summary Stage a confirmed PDF extraction for review
+ */
+export const useUploadCataloguePdf = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadCataloguePdf>>, TError,{data: BodyType<PdfCatalogueUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadCataloguePdf>>,
+        TError,
+        {data: BodyType<PdfCatalogueUpload>},
+        TContext
+      > => {
+      return useMutation(getUploadCataloguePdfMutationOptions(options));
     }

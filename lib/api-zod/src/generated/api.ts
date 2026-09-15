@@ -12208,3 +12208,115 @@ export const HandoffMrpGeneratorRunBody = zod.object({
 })
 
 
+/**
+ * Read-only SHA-256, evenly-spaced Poppler text sample, extraction recommendation, duplicate decision, and existing GST context. No batch or price is written.
+ * @summary Inspect a PDF before extraction
+ */
+export const preflightCataloguePdfBodyEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const PreflightCataloguePdfBody = zod.object({
+  "file": zod.instanceof(File),
+  "competitor": zod.string(),
+  "effectiveDate": zod.string().regex(preflightCataloguePdfBodyEffectiveDateRegExp).optional().describe('Unambiguous ISO calendar date yyyy-mm-dd (for example 2026-03-01).'),
+  "extractionPath": zod.enum(['text', 'vision', 'text_then_ai']).optional()
+})
+
+export const preflightCataloguePdfResponseFileSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+
+export const preflightCataloguePdfResponsePagesItemCharactersMin = 0;
+
+export const preflightCataloguePdfResponsePagesItemDigitsMin = 0;
+
+
+export const preflightCataloguePdfResponseTextBearingCountMin = 0;
+
+export const preflightCataloguePdfResponseTextBearingShareMin = 0;
+export const preflightCataloguePdfResponseTextBearingShareMax = 1;
+
+export const preflightCataloguePdfResponseMedianCharactersMin = 0;
+
+export const preflightCataloguePdfResponseMedianDigitsMin = 0;
+
+export const preflightCataloguePdfResponseAssignmentTextBearingCountMin = 0;
+
+export const preflightCataloguePdfResponseAssignmentNonTextBearingCountMin = 0;
+
+
+
+export const PreflightCataloguePdfResponse = zod.object({
+  "fileSha256": zod.string().regex(preflightCataloguePdfResponseFileSha256RegExp),
+  "fileSizeBytes": zod.number().min(1),
+  "totalPages": zod.number().min(1),
+  "samplePages": zod.array(zod.number()),
+  "pages": zod.array(zod.object({
+  "page": zod.number().min(1),
+  "characters": zod.number().min(preflightCataloguePdfResponsePagesItemCharactersMin),
+  "digits": zod.number().min(preflightCataloguePdfResponsePagesItemDigitsMin),
+  "textBearing": zod.boolean()
+})),
+  "sampleCount": zod.number().min(1),
+  "textBearingCount": zod.number().min(preflightCataloguePdfResponseTextBearingCountMin),
+  "textBearingShare": zod.number().min(preflightCataloguePdfResponseTextBearingShareMin).max(preflightCataloguePdfResponseTextBearingShareMax),
+  "medianCharacters": zod.number().min(preflightCataloguePdfResponseMedianCharactersMin),
+  "medianDigits": zod.number().min(preflightCataloguePdfResponseMedianDigitsMin),
+  "detectedClass": zod.enum(['text', 'vision', 'uncertain']),
+  "recommendedPath": zod.union([zod.enum(['text', 'vision', 'text_then_ai']),zod.null()]),
+  "textBearingPages": zod.array(zod.number()),
+  "nonTextBearingPages": zod.array(zod.number()),
+  "humanReason": zod.string(),
+  "assignmentTextBearingCount": zod.number().min(preflightCataloguePdfResponseAssignmentTextBearingCountMin),
+  "assignmentNonTextBearingCount": zod.number().min(preflightCataloguePdfResponseAssignmentNonTextBearingCountMin),
+  "duplicate": zod.record(zod.string(), zod.unknown()).optional(),
+  "duplicateMatches": zod.array(zod.object({
+  "batchId": zod.number(),
+  "effectiveDate": zod.coerce.date(),
+  "status": zod.string(),
+  "extractionPath": zod.union([zod.enum(['text', 'vision', 'text_then_ai']),zod.null()]).optional()
+})).optional(),
+  "latestGst": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+/**
+ * Requires a preflight decision. Prices remain staged until approval.
+ * @summary Stage a confirmed PDF extraction for review
+ */
+export const uploadCataloguePdfBodyEffectiveDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const uploadCataloguePdfBodyGstPctMin = 0;
+export const uploadCataloguePdfBodyGstPctMax = 100;
+
+export const uploadCataloguePdfBodyPreflightSha256RegExp = new RegExp('^[0-9a-f]{64}$');
+
+
+export const UploadCataloguePdfBody = zod.object({
+  "file": zod.instanceof(File),
+  "competitor": zod.string(),
+  "effectiveDate": zod.string().regex(uploadCataloguePdfBodyEffectiveDateRegExp).describe('Unambiguous ISO calendar date yyyy-mm-dd.'),
+  "priceBasis": zod.enum(['MRP', 'Ex-GST']).optional(),
+  "gstPct": zod.number().min(uploadCataloguePdfBodyGstPctMin).max(uploadCataloguePdfBodyGstPctMax).optional(),
+  "extractionPath": zod.enum(['text', 'vision', 'text_then_ai']),
+  "preflightSha256": zod.string().regex(uploadCataloguePdfBodyPreflightSha256RegExp).describe('SHA returned by the read-only preflight; stale files are rejected.'),
+  "overrideReason": zod.string().optional()
+})
+
+export const UploadCataloguePdfResponse = zod.object({
+  "batchId": zod.number(),
+  "status": zod.enum(['pending', 'approved', 'discarded']),
+  "fileSha256": zod.string(),
+  "idempotent": zod.boolean().optional(),
+  "extractionPath": zod.enum(['text', 'vision', 'text_then_ai']).optional(),
+  "gstSanityWarning": zod.union([zod.null(),zod.object({
+  "previousMedianGap": zod.number(),
+  "currentMedianGap": zod.number(),
+  "shiftPoints": zod.number(),
+  "previousBasis": zod.string().nullable(),
+  "currentBasis": zod.string(),
+  "message": zod.string().optional()
+})]).optional(),
+  "rowCounts": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+

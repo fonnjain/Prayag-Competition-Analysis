@@ -47,9 +47,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  derivePdfDuplicateDecision,
+  type PdfDuplicateMatch,
+} from "@/lib/pdf-import-decision";
 
 function formatDate(iso: string): string {
   return formatDisplayDate(iso);
+}
+
+function formatDateWords(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const date = new Date(`${iso}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("en-GB", {
+        day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+      }).format(date);
 }
 
 interface SparshMasterPeriodDraft {
@@ -58,6 +72,28 @@ interface SparshMasterPeriodDraft {
   sourceEffectiveDate: string;
   effectiveDate: string;
 }
+
+type ExtractionPath = "text" | "vision" | "text_then_ai";
+type PdfPreflight = {
+  fileSha256: string;
+  totalPages: number;
+  sampleCount: number;
+  pages: Array<{ page: number; characters: number; digits: number; textBearing: boolean }>;
+  textBearingCount: number;
+  textBearingShare: number;
+  medianCharacters: number;
+  medianDigits: number;
+  detectedClass: "text" | "vision" | "uncertain";
+  recommendedPath: ExtractionPath | null;
+  textBearingPages: number[];
+  nonTextBearingPages: number[];
+  assignmentTextBearingCount: number;
+  assignmentNonTextBearingCount: number;
+  humanReason: string;
+  duplicate?: { action: string; message: string; existingBatchId?: number | null; existingStatus?: string };
+  duplicateMatches?: PdfDuplicateMatch[];
+  latestGst?: { batchId: number; effectiveDate: string; priceBasis: "MRP" | "Ex-GST"; gstPct: number | null } | null;
+};
 
 /** Bearer token stored by the auth layer — needed for raw fetch() calls that
  *  bypass the generated API client (which injects Authorization automatically). */
@@ -75,7 +111,13 @@ export default function ImportCompetitorPage() {
   const [competitor, setCompetitor] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");
   const [priceBasis, setPriceBasis] = useState<"MRP" | "Ex-GST">("MRP");
+  const [priceBasisTouched, setPriceBasisTouched] = useState(false);
   const [gstPct, setGstPct] = useState<number>(18);
+  const [pdfPreflight, setPdfPreflight] = useState<PdfPreflight | null>(null);
+  const [pdfExtractionPath, setPdfExtractionPath] = useState<ExtractionPath | null>(null);
+  const [pdfOverrideReason, setPdfOverrideReason] = useState("");
+  const [isPreflightingPdf, setIsPreflightingPdf] = useState(false);
+  const [pdfPreflightError, setPdfPreflightError] = useState<string | null>(null);
   const [sparshPeriods, setSparshPeriods] = useState<SparshMasterPeriodDraft[]>([]);
   const [isPreviewingWorkbook, setIsPreviewingWorkbook] = useState(false);
   const [workbookPreviewError, setWorkbookPreviewError] = useState<string | null>(null);
@@ -98,6 +140,7 @@ export default function ImportCompetitorPage() {
   const [isUpdatingPeriodDate, setIsUpdatingPeriodDate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workbookPreviewSequence = useRef(0);
+  const pdfPreflightSequence = useRef(0);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -110,6 +153,32 @@ export default function ImportCompetitorPage() {
 
   const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
   const isAuthoritativeSparshMaster = sparshPeriods.length > 0;
+  const canUsePositionalText = competitor.trim() === "Prince";
+  const hasMixedAssignments = Boolean(
+    pdfPreflight &&
+    pdfPreflight.assignmentTextBearingCount > 0 &&
+    pdfPreflight.assignmentNonTextBearingCount > 0,
+  );
+  const currentDuplicateDecision = pdfPreflight
+    ? derivePdfDuplicateDecision(
+        pdfPreflight.duplicateMatches ?? [],
+        competitor.trim(),
+        pdfPreflight.fileSha256,
+        effectiveDate,
+        pdfExtractionPath,
+      )
+    : null;
+  const pdfIsOverride = Boolean(
+    pdfPreflight && pdfExtractionPath && pdfExtractionPath !== pdfPreflight.recommendedPath,
+  );
+
+  const invalidatePdfPreflight = () => {
+    pdfPreflightSequence.current += 1;
+    setPdfPreflight(null);
+    setPdfExtractionPath(null);
+    setPdfOverrideReason("");
+    setPdfPreflightError(null);
+  };
 
   const invalidateComparisonQueries = () => {
     queryClient.invalidateQueries({ queryKey: getGetComparisonQueryKey() });
@@ -164,6 +233,8 @@ export default function ImportCompetitorPage() {
     setResult(null);
     setSparshPeriods([]);
     setWorkbookPreviewError(null);
+    invalidatePdfPreflight();
+    setPriceBasisTouched(false);
 
     if (!nextFile || nextFile.name.toLowerCase().endsWith(".pdf")) {
       setIsPreviewingWorkbook(false);
@@ -194,6 +265,50 @@ export default function ImportCompetitorPage() {
       if (requestSequence === workbookPreviewSequence.current) {
         setIsPreviewingWorkbook(false);
       }
+    }
+  };
+
+  const detectPdf = async () => {
+    if (!file || !isPdf || !competitor.trim() || !effectiveDate) return;
+    const sequence = ++pdfPreflightSequence.current;
+    setIsPreflightingPdf(true);
+    setPdfPreflightError(null);
+    const body = new FormData();
+    body.append("file", file);
+    body.append("competitor", competitor.trim());
+    body.append("effectiveDate", effectiveDate);
+    if (priceBasisTouched) {
+      body.append("priceBasis", priceBasis);
+      if (priceBasis === "Ex-GST") body.append("gstPct", String(gstPct));
+    }
+    try {
+      const response = await fetch("/api/catalog/import-batches/preflight", {
+        method: "POST", body, headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not inspect PDF.");
+      if (sequence !== pdfPreflightSequence.current) return;
+      const result = data as PdfPreflight;
+      setPdfPreflight(result);
+      const recommendedPathIsSupported =
+        result.recommendedPath !== "text" &&
+        result.recommendedPath !== "text_then_ai" || competitor.trim() === "Prince";
+      setPdfExtractionPath(
+        recommendedPathIsSupported ? result.recommendedPath : "vision",
+      );
+      if (!recommendedPathIsSupported) {
+        setPdfOverrideReason("No positional extraction profile is configured for this competitor; using AI vision.");
+      }
+      if (result.latestGst && !priceBasisTouched) {
+        setPriceBasis(result.latestGst.priceBasis);
+        if (result.latestGst.gstPct != null) setGstPct(result.latestGst.gstPct);
+      }
+    } catch (error) {
+      if (sequence === pdfPreflightSequence.current) {
+        setPdfPreflightError(error instanceof Error ? error.message : "Could not inspect PDF.");
+      }
+    } finally {
+      if (sequence === pdfPreflightSequence.current) setIsPreflightingPdf(false);
     }
   };
 
@@ -302,6 +417,17 @@ export default function ImportCompetitorPage() {
       return;
     }
 
+    // PDF imports are deliberately two-step: Detect is read-only, and this
+    // submit is the explicit confirmation that starts extraction.
+    if (isPdf && (!pdfPreflight || !pdfExtractionPath)) {
+      await detectPdf();
+      return;
+    }
+    if (isPdf && pdfIsOverride && !pdfOverrideReason.trim()) {
+      setPdfPreflightError("Explain why the selected extraction path overrides the detector.");
+      return;
+    }
+
     setIsUploading(true);
     setResult(null);
     setExtractionProgress(null);
@@ -319,6 +445,11 @@ export default function ImportCompetitorPage() {
     }
     formData.append("priceBasis", priceBasis);
     if (priceBasis === "Ex-GST") formData.append("gstPct", String(gstPct));
+    if (isPdf && pdfExtractionPath && pdfPreflight) {
+      formData.append("extractionPath", pdfExtractionPath);
+      formData.append("preflightSha256", pdfPreflight.fileSha256);
+      formData.append("overrideReason", pdfOverrideReason.trim());
+    }
 
     try {
       if (isPdf) {
@@ -494,7 +625,7 @@ export default function ImportCompetitorPage() {
                 type="text"
                 placeholder="e.g. Sparsh Pearl, Astral"
                 value={competitor}
-                onChange={(e) => setCompetitor(e.target.value)}
+                 onChange={(e) => { setCompetitor(e.target.value); setPriceBasisTouched(false); if (isPdf) invalidatePdfPreflight(); }}
                 required
               />
               <datalist id="brand-suggestions">
@@ -549,13 +680,18 @@ export default function ImportCompetitorPage() {
                   id="effectiveDate"
                   type="date"
                   value={effectiveDate}
-                  onChange={(e) => setEffectiveDate(e.target.value)}
+                   onChange={(e) => { setEffectiveDate(e.target.value); if (isPdf) invalidatePdfPreflight(); }}
                   required
                   data-testid="input-competitor-effective-date"
                 />
                 <p className="text-xs text-muted-foreground">
                   The date from which these prices apply (w.e.f.).
                 </p>
+                {formatDateWords(effectiveDate) && (
+                  <p className="text-xs font-medium text-primary" data-testid="resolved-effective-date">
+                    Resolved date: {formatDateWords(effectiveDate)}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -568,7 +704,7 @@ export default function ImportCompetitorPage() {
                 <button
                   key={basis}
                   type="button"
-                  onClick={() => setPriceBasis(basis)}
+                   onClick={() => { setPriceBasis(basis); setPriceBasisTouched(true); if (isPdf) invalidatePdfPreflight(); }}
                   className={`flex-1 py-2.5 px-4 rounded-md border text-sm font-medium transition-colors ${
                     priceBasis === basis
                       ? "bg-primary text-primary-foreground border-primary"
@@ -589,7 +725,7 @@ export default function ImportCompetitorPage() {
                   max={100}
                   step={0.5}
                   value={gstPct}
-                  onChange={(e) => setGstPct(Number(e.target.value))}
+                   onChange={(e) => { setGstPct(Number(e.target.value)); if (isPdf) invalidatePdfPreflight(); }}
                   className="w-24"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -620,7 +756,7 @@ export default function ImportCompetitorPage() {
                 <span className="font-medium">{file.name}</span>
                 {isPdf ? (
                   <span className="text-amber-600">
-                    — PDF detected. Claude will extract prices; you'll review before committing.
+                    — PDF detected. Detect the document and confirm its extraction path before any extraction starts.
                     {file.size > 50 * 1024 * 1024
                       ? " Large file — extraction may take 60–90 seconds."
                       : " Extraction takes ~30 seconds."}
@@ -635,6 +771,82 @@ export default function ImportCompetitorPage() {
                   </span>
                 )}
               </div>
+            )}
+            {isPdf && pdfPreflightError && (
+              <p className="text-sm text-destructive" data-testid="text-pdf-preflight-error">
+                {pdfPreflightError}
+              </p>
+            )}
+            {isPdf && pdfPreflight && (
+              <div className="rounded-md border bg-muted/30 p-4 space-y-3" data-testid="pdf-preflight-evidence">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">Detection evidence</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Detected {pdfPreflight.detectedClass === "text" ? "text-based" : pdfPreflight.detectedClass === "vision" ? "image-only" : "mixed"} PDF:
+                      {" "}{pdfPreflight.textBearingCount} of {pdfPreflight.sampleCount} sampled pages carry extractable price text.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground">{pdfPreflight.fileSha256.slice(0, 12)}…</span>
+                </div>
+                <p className="text-sm">{pdfPreflight.humanReason}</p>
+                <p className="text-xs text-muted-foreground">
+                  Median: {pdfPreflight.medianCharacters.toLocaleString()} characters / {pdfPreflight.medianDigits.toLocaleString()} digits · {pdfPreflight.totalPages} total pages.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Full assignment: {pdfPreflight.assignmentTextBearingCount} text-bearing + {pdfPreflight.assignmentNonTextBearingCount} vision pages = {pdfPreflight.totalPages} pages.
+                </p>
+                {pdfPreflight.latestGst && (
+                  <p className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                    Latest approved {competitor} batch ({formatDate(pdfPreflight.latestGst.effectiveDate)}) uses {pdfPreflight.latestGst.priceBasis}
+                    {pdfPreflight.latestGst.gstPct != null ? ` at ${pdfPreflight.latestGst.gstPct}% GST` : ""}. This is the default unless you choose another basis.
+                  </p>
+                )}
+                {currentDuplicateDecision && (
+                  <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="pdf-duplicate-decision">
+                    {currentDuplicateDecision.message}
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label>Extraction path</Label>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {([
+                      ["text", "Positional text"],
+                      ["vision", "AI vision"],
+                      ["text_then_ai", "Text, then AI gaps"],
+                    ] as Array<[ExtractionPath, string]>).map(([candidate, label]) => {
+                      const supported = candidate === "vision" || canUsePositionalText;
+                      const offered = candidate === "vision" ||
+                        (candidate === "text" && canUsePositionalText) ||
+                        (candidate === "text_then_ai" && canUsePositionalText && (
+                          pdfPreflight.detectedClass === "uncertain" || hasMixedAssignments
+                        ));
+                      return (
+                        <button
+                          key={candidate}
+                          type="button"
+                          disabled={!supported || !offered}
+                          onClick={() => setPdfExtractionPath(candidate)}
+                          className={`rounded-md border px-3 py-2 text-left text-sm ${pdfExtractionPath === candidate ? "border-primary bg-primary/10" : "bg-background"} disabled:cursor-not-allowed disabled:opacity-40`}
+                          title={!supported ? "No positional profile is configured for this competitor." : undefined}
+                        >
+                          <span className="font-medium">{label}</span>
+                          {!supported && <span className="block text-xs">Unsupported for {competitor}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {pdfIsOverride && (
+                    <div>
+                      <Label htmlFor="pdfOverrideReason">Override reason</Label>
+                      <Input id="pdfOverrideReason" value={pdfOverrideReason} onChange={(event) => setPdfOverrideReason(event.target.value)} placeholder="Why is the recommended path not suitable?" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {isPdf && !pdfPreflight && (
+              <p className="text-xs text-muted-foreground">Choose the PDF, competitor, effective date, and basis, then press Detect. Extraction will not start yet.</p>
             )}
             {workbookPreviewError && (
               <p className="text-xs text-destructive" data-testid="text-workbook-preview-error">
@@ -682,7 +894,8 @@ export default function ImportCompetitorPage() {
               (isAuthoritativeSparshMaster
                 ? !sparshPeriods.every((period) => Boolean(period.effectiveDate))
                 : !effectiveDate) ||
-              isUploading
+              isUploading ||
+              (isPdf && isPreflightingPdf)
             }
             className="w-full"
             data-testid="button-import-competitor"
@@ -692,10 +905,15 @@ export default function ImportCompetitorPage() {
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 {isPdf ? "Extracting…" : "Uploading…"}
               </>
+            ) : isPdf && !pdfPreflight ? (
+              <>
+                <FileText className="w-4 h-4 mr-2" />
+                Detect PDF
+              </>
             ) : isPdf ? (
               <>
                 <FileText className="w-4 h-4 mr-2" />
-                Extract &amp; Stage for Review
+                Confirm {pdfExtractionPath === "text" ? "positional text" : pdfExtractionPath === "text_then_ai" ? "hybrid text + AI" : "AI vision"} extraction
               </>
             ) : (
               <>
