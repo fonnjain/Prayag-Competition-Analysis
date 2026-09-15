@@ -462,7 +462,9 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
               <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 <p className="font-semibold">Sales tier scope</p>
                 <p className="mt-1">
-                  When the Sales API is connected, scope can use A/B/C cumulative contribution or an explicit period sales-value threshold. Products with no sales will remain a separate excluded group.
+                  {metadata?.salesApi?.components?.sales?.available
+                    ? "Sales is connected. Turn on Use volume tiers in Strategy below to apply live A/B/C cumulative contribution; products with no FY sales remain a separate excluded group."
+                    : "Connect the Sales feed to use live A/B/C cumulative contribution. Products with no FY sales remain a separate excluded group."}
                 </p>
               </div>
               <div className="col-span-2 flex items-start space-x-3 border rounded-md p-3 bg-muted/20">
