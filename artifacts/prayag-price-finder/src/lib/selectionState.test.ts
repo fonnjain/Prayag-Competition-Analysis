@@ -66,3 +66,10 @@ test("comparison changes and back-to-search preserve selection and search contex
   assert.deepEqual(search.getAll("competitor"), ["Sparsh Pearl", "Vectus"]);
   assert.equal(search.get("asOf"), "2026-08-28");
 });
+
+test("comparison route state preserves Prince alongside existing competitors", () => {
+  const state = comparisonStateFromParams(new URLSearchParams(
+    "competitor=Sparsh%20Pearl&competitor=Ashirvad&competitor=Prince&competitor=Vectus",
+  ));
+  assert.deepEqual(state.competitors, ["Sparsh Pearl", "Ashirvad", "Prince", "Vectus"]);
+});

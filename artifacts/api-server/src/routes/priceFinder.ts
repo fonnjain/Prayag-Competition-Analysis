@@ -14,7 +14,7 @@ import {
 
 const router: IRouter = Router();
 
-const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Ashirvad", "Vectus"] as const;
+const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Ashirvad", "Prince", "Vectus"] as const;
 type PriceFinderCompetitor = (typeof PRICE_FINDER_COMPETITORS)[number];
 
 function queryArray(value: unknown): string[] {

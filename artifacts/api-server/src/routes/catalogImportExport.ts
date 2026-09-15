@@ -40,6 +40,11 @@ import {
   type ParsedAuthoritativeMaster,
 } from "../lib/authoritativeMrpMaster";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
+import {
+  parsePrinceCompetitorMaster,
+  PRINCE_COMPETITOR,
+  PRINCE_EFFECTIVE_DATE,
+} from "../lib/princeMaster";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -2560,7 +2565,7 @@ router.post(
     }
     const ext = file.originalname.toLowerCase().split(".").pop() ?? "";
     if (!["xlsx", "xls", "csv"].includes(ext)) {
-      res.json({ isSparshMaster: false });
+      res.json({ isSparshMaster: false, isAshirvadMaster: false, isPrinceMaster: false });
       return;
     }
 
@@ -2578,10 +2583,29 @@ router.post(
          canonical,
        );
       const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
+       const princeMaster = (() => {
+         try {
+           return parsePrinceCompetitorMaster(file.buffer, workbook, canonical);
+         } catch (error) {
+           // A workbook that is not the locked Prince snapshot is an ordinary
+           // workbook; preserve the generic preview behaviour.
+           if (error instanceof Error && /checksum/i.test(error.message)) return null;
+           throw error;
+         }
+       })();
 
       res.json({
         isSparshMaster: Boolean(sparshMaster),
          isAshirvadMaster: Boolean(ashirvadMaster),
+         isPrinceMaster: Boolean(princeMaster),
+         prince: princeMaster ? {
+           rows: princeMaster.rows.length,
+           catalogMatched: princeMaster.catalogMatchedRows.length,
+           unmatched: princeMaster.unmatchedRows.length,
+           unmatchedCodes: princeMaster.unmatchedCodes,
+           effectiveDate: princeMaster.effectiveDate,
+           sourceSha256: princeMaster.sourceSha256,
+         } : null,
         periods: sparshMaster?.periods.map((period) => ({
           key: period.key,
           label: period.label,
@@ -2620,6 +2644,14 @@ router.post(
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
       const ashirvadMaster = parseAshirvadCompetitorMaster(file.buffer, workbook, canonical);
       const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
+      const princeMaster = (() => {
+        try {
+          return parsePrinceCompetitorMaster(file.buffer, workbook, canonical);
+        } catch (error) {
+          if (error instanceof Error && /checksum/i.test(error.message)) return null;
+          throw error;
+        }
+      })();
       const sourceHash = sha256ForBuffer(file.buffer);
       const priceBasis = req.body.priceBasis === "Ex-GST" ? "Ex-GST" : "MRP";
       const gstPct = priceBasis === "Ex-GST" && !isNaN(Number(req.body.gstPct))
@@ -2655,6 +2687,47 @@ router.post(
         }
         return batch.id;
       };
+
+      if (princeMaster) {
+        if (competitor !== PRINCE_COMPETITOR) {
+          res.status(400).json({ error: `The trusted Prince master must be imported as ${PRINCE_COMPETITOR}.` });
+          return;
+        }
+        const batchId = await createBatch(
+          PRINCE_COMPETITOR,
+          PRINCE_EFFECTIVE_DATE,
+          princeMaster.rows.map((row) => ({
+            prayagCode: row.canonicalPrayagCode,
+            description: null,
+            variant: row.lengthMeters ? `${row.lengthMeters} m` : null,
+            price: row.price,
+            competitorCode: row.princeCode,
+            status: row.catalogMatched ? "ok" as const : "needs_review" as const,
+          })),
+          {
+            total: princeMaster.rows.length,
+            ok: princeMaster.catalogMatchedRows.length,
+            needs_review: princeMaster.unmatchedRows.length,
+            not_found: princeMaster.unmatchedRows.length,
+            new_products: 0,
+            unmatched_prayag_codes: princeMaster.unmatchedCodes,
+            source: "trusted_prince_competitor_master",
+            source_sha256: princeMaster.sourceSha256,
+            source_effective_date: PRINCE_EFFECTIVE_DATE,
+          },
+        );
+        res.status(201).json({
+          batchId, batchIds: [batchId], status: "pending",
+          summary: {
+            total: princeMaster.rows.length,
+            matched: princeMaster.catalogMatchedRows.length,
+            unmatched: princeMaster.unmatchedRows.length,
+            unmatchedCodes: princeMaster.unmatchedCodes,
+            effectiveDate: PRINCE_EFFECTIVE_DATE,
+          },
+        });
+        return;
+      }
 
       if (ashirvadMaster) {
         if (competitor !== ASHIRVAD_MASTER_COMPETITOR) {
@@ -2778,8 +2851,148 @@ router.post(
          canonical,
        );
       const sparshMaster = parseSparshCompetitorMaster(wb, canonical);
+       const princeMaster = (() => {
+         try {
+           return parsePrinceCompetitorMaster(file.buffer, wb, canonical);
+         } catch (error) {
+           if (error instanceof Error && /checksum/i.test(error.message)) return null;
+           throw error;
+         }
+       })();
 
-       if (ashirvadMaster) {
+        if (princeMaster) {
+          if (competitor !== PRINCE_COMPETITOR) {
+            res.status(400).json({
+              error: `The trusted Prince master must be imported as ${PRINCE_COMPETITOR}.`,
+            });
+            return;
+          }
+          const sourceHash = princeMaster.sourceSha256;
+          const existingBatch = await db
+            .select({ id: importBatchesTable.id, rowCounts: importBatchesTable.rowCounts })
+            .from(importBatchesTable)
+            .where(and(
+              eq(importBatchesTable.competitor, PRINCE_COMPETITOR),
+              eq(importBatchesTable.effectiveDate, PRINCE_EFFECTIVE_DATE),
+              eq(importBatchesTable.fileSha256, sourceHash),
+              eq(importBatchesTable.status, "approved"),
+            ))
+            .limit(1);
+          if (existingBatch.length > 0) {
+            res.json({
+              results: {
+                competitor: PRINCE_COMPETITOR,
+                file: name,
+                totalRows: princeMaster.rows.length,
+                inserted: princeMaster.catalogMatchedRows.length,
+                matched: princeMaster.catalogMatchedRows.length,
+                unmatched: princeMaster.unmatchedRows.length,
+                unmatchedCodes: princeMaster.unmatchedCodes,
+                effectiveDate: PRINCE_EFFECTIVE_DATE,
+                fileSha256: sourceHash,
+                idempotent: true,
+                batchId: existingBatch[0]!.id,
+                sourceMappings: existingBatch[0]!.rowCounts
+                  ? (JSON.parse(existingBatch[0]!.rowCounts) as { source_mappings?: unknown[] }).source_mappings ?? []
+                  : [],
+              },
+            });
+            return;
+          }
+          const values = princeMaster.catalogMatchedRows.map((row) => ({
+            competitor: PRINCE_COMPETITOR,
+            category: row.category,
+            description: null,
+            size: row.lengthMeters ? `${row.lengthMeters} m` : null,
+            price: row.price,
+            unit: "MRP",
+            competitorCode: row.princeCode,
+            effectiveDate: PRINCE_EFFECTIVE_DATE,
+            matchedPrayagCode: row.canonicalPrayagCode!,
+            matchStatus: "matched",
+            matchConfidence: "High",
+            prayagMrpAtCompare: null,
+            isCurrent: false,
+            priceBasis: "MRP",
+            gstPct: null,
+          }));
+          let insertedBatchId: number | null = null;
+          await db.transaction(async (tx) => {
+            await tx.delete(competitorPricesTable).where(and(
+              eq(competitorPricesTable.competitor, PRINCE_COMPETITOR),
+              eq(competitorPricesTable.effectiveDate, PRINCE_EFFECTIVE_DATE),
+            ));
+            const [batch] = await tx.insert(importBatchesTable).values({
+              competitor: PRINCE_COMPETITOR,
+              effectiveDate: PRINCE_EFFECTIVE_DATE,
+              sourceFileName: name,
+              priceBasis: "MRP",
+              gstPct: null,
+              status: "approved",
+              rowCounts: JSON.stringify({
+                total: princeMaster.rows.length,
+                matched: values.length,
+                unmatched: princeMaster.unmatchedRows.length,
+                unmatched_prayag_codes: princeMaster.unmatchedCodes,
+                source_mappings: princeMaster.rows.map((row) => ({
+                  sourceRow: row.sourceRow,
+                  sheet: row.sheet,
+                  category: row.category,
+                  prayagCode: row.prayagCode,
+                  princeCode: row.princeCode,
+                  lengthMeters: row.lengthMeters,
+                  price: row.price,
+                  catalogMatched: row.catalogMatched,
+                })),
+                source: "trusted_prince_competitor_master",
+                source_sha256: sourceHash,
+                source_effective_date: PRINCE_EFFECTIVE_DATE,
+              }),
+              extractionModel: null,
+              fileSha256: sourceHash,
+              fileSizeBytes: file.size,
+              extractorVersion: null,
+              catalogueProfileRevision: null,
+              promptRevision: null,
+              model: null,
+              pagesRequested: null,
+              passesRun: null,
+              itemsAdjudicated: null,
+            }).returning({ id: importBatchesTable.id });
+            insertedBatchId = batch?.id ?? null;
+            for (let index = 0; index < values.length; index += 200) {
+              await tx.insert(competitorPricesTable).values(values.slice(index, index + 200));
+            }
+            await recomputeCompetitorCurrentFlagsInTransaction(PRINCE_COMPETITOR, tx);
+          });
+          res.json({
+            results: {
+              competitor: PRINCE_COMPETITOR,
+              file: name,
+              totalRows: princeMaster.rows.length,
+              inserted: values.length,
+              matched: values.length,
+              unmatched: princeMaster.unmatchedRows.length,
+              unmatchedCodes: princeMaster.unmatchedCodes,
+              effectiveDate: PRINCE_EFFECTIVE_DATE,
+              fileSha256: sourceHash,
+              batchId: insertedBatchId,
+               sourceMappings: princeMaster.rows.map((row) => ({
+                 sourceRow: row.sourceRow,
+                 sheet: row.sheet,
+                 category: row.category,
+                 prayagCode: row.prayagCode,
+                 princeCode: row.princeCode,
+                 lengthMeters: row.lengthMeters,
+                 price: row.price,
+                 catalogMatched: row.catalogMatched,
+               })),
+            },
+          });
+          return;
+        }
+
+        if (ashirvadMaster) {
          if (competitor !== ASHIRVAD_MASTER_COMPETITOR) {
            res.status(400).json({
              error: `The trusted Ashirvad master must be imported as ${ASHIRVAD_MASTER_COMPETITOR}.`,

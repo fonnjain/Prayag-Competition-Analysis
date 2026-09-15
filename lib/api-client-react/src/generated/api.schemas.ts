@@ -4188,7 +4188,7 @@ export type GetPriceFinderComparisonParams = {
  */
 code: string[];
 /**
- * Competitor brands to include. Defaults to Sparsh Pearl.
+ * Competitor brands to include. Defaults to Sparsh Pearl. Missing competitor data is returned as no data, never as zero.
  */
 competitor?: GetPriceFinderComparisonCompetitorItem[];
 /**
@@ -4202,6 +4202,8 @@ export type GetPriceFinderComparisonCompetitorItem = typeof GetPriceFinderCompar
 
 export const GetPriceFinderComparisonCompetitorItem = {
   Sparsh_Pearl: 'Sparsh Pearl',
+  Ashirvad: 'Ashirvad',
+  Prince: 'Prince',
   Vectus: 'Vectus',
 } as const;
 
@@ -4220,6 +4222,8 @@ export type ExportPriceFinderComparisonCompetitorItem = typeof ExportPriceFinder
 
 export const ExportPriceFinderComparisonCompetitorItem = {
   Sparsh_Pearl: 'Sparsh Pearl',
+  Ashirvad: 'Ashirvad',
+  Prince: 'Prince',
   Vectus: 'Vectus',
 } as const;
 

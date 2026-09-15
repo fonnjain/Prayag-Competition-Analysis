@@ -21,6 +21,7 @@ export interface MatchTarget {
   competitorCode: string | null; // code in competitor_prices
   matchedPrayagCode: string; // the Prayag SKU this maps to
   description: string | null; // Prayag product name (expected description)
+  category?: string | null; // trusted source category, when available
   size: string | null; // size stored in competitor_prices
   existingPrice: number | null; // current price in competitor_prices
   prayagMrpCurrent: number | null; // live Prayag MRP from mrp_price_history

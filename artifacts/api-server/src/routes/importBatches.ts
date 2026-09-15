@@ -14,7 +14,7 @@
 
 import { Router, type IRouter } from "express";
 import multer from "multer";
-import { and, eq, sql, desc } from "drizzle-orm";
+import { and, eq, sql, desc, ilike } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
   db,
@@ -40,6 +40,10 @@ import {
 import type { CatalogueProfile } from "../lib/catalogueProfile.js";
 import sparshPearlProfileJson from "../lib/catalogue-profiles/sparsh-pearl.json" assert { type: "json" };
 import { isIsoDate } from "../lib/mrpProvenance.js";
+import {
+  extractPrinceTextPdf,
+  reconcilePrincePdf,
+} from "../lib/princeTextPdfExtractor.js";
 
 const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
 
@@ -122,15 +126,23 @@ async function getTargets(
   const rows = await db.execute<{
     competitor_code: string | null;
     matched_prayag_code: string | null;
+    category: string | null;
     description: string | null;
     size: string | null;
     price: number | null;
   }>(sql`
-    SELECT DISTINCT ON (matched_prayag_code)
-      competitor_code, matched_prayag_code, description, size, price
-    FROM competitor_prices
-    WHERE competitor = ${competitor} AND matched_prayag_code IS NOT NULL
-    ORDER BY matched_prayag_code, effective_date DESC NULLS LAST, id DESC
+    SELECT competitor_code, matched_prayag_code, category, description, size, price
+    FROM (
+      SELECT competitor_code, matched_prayag_code, category, description, size, price, id,
+        row_number() OVER (
+          PARTITION BY matched_prayag_code
+          ORDER BY effective_date DESC NULLS LAST, id DESC
+        ) AS rn
+      FROM competitor_prices
+      WHERE competitor = ${competitor} AND matched_prayag_code IS NOT NULL
+    ) latest
+    WHERE rn = 1
+    ORDER BY id
   `);
 
   const products = await db
@@ -141,6 +153,7 @@ async function getTargets(
   return rows.rows.map((r) => ({
     competitorCode: r.competitor_code,
     matchedPrayagCode: r.matched_prayag_code!,
+    category: r.category,
     description: nameMap.get(normCode(r.matched_prayag_code ?? "")) ?? r.description,
     size: r.size,
     existingPrice: r.price,
@@ -228,6 +241,248 @@ router.post(
     if (ext !== "pdf") {
       res.status(400).json({ error: "This endpoint only accepts PDF files. Upload Excel/CSV via /catalog/load-competitor." });
       return;
+    }
+
+    // Prince catalogues are text-native. Keep this path independent of the
+    // existing vision extractor: pdftotext layout/bbox is deterministic,
+    // preserves side-by-side x positions, and costs no model calls.
+    if (competitor === "Prince") {
+      try {
+        const prayagMrpMap = await getCurrentPrayagMrp();
+        const targets = await getTargets(competitor, prayagMrpMap);
+        const { items, fileSha256 } = extractPrinceTextPdf(file.buffer);
+        const expectedRows = targets
+          .filter((target) => target.competitorCode && target.existingPrice != null)
+          .map((target) => ({
+            princeCode: target.competitorCode!,
+            price: target.existingPrice!,
+            category: target.category ?? target.description ?? undefined,
+            sheet: target.category ?? target.description ?? undefined,
+            lengthMeters: target.size ? Number(target.size.replace(/[^\d.]/g, "")) || null : null,
+          }));
+        const reconciliation = reconcilePrincePdf(items, expectedRows);
+        const [existingBatch] = await db.select()
+          .from(importBatchesTable)
+          .where(and(
+            eq(importBatchesTable.competitor, competitor),
+            eq(importBatchesTable.effectiveDate, effectiveDate),
+            eq(importBatchesTable.fileSha256, fileSha256),
+            ilike(importBatchesTable.sourceFileName, "%.pdf"),
+          ))
+          .orderBy(desc(importBatchesTable.id))
+          .limit(1);
+        if (existingBatch) {
+          const stored = existingBatch.rowCounts ? JSON.parse(existingBatch.rowCounts) as Record<string, unknown> : {};
+          res.status(200).json({
+            batchId: existingBatch.id,
+            competitor,
+            effectiveDate,
+            fileSha256,
+            status: existingBatch.status,
+            rowCounts: stored,
+            reconciliation: stored,
+            idempotent: true,
+          });
+          return;
+        }
+        const itemsByCode = new Map<string, Array<typeof items[number]>>();
+        for (const item of items) {
+          const code = normCode(item.cat_no);
+          itemsByCode.set(code, [...(itemsByCode.get(code) ?? []), item]);
+        }
+        const expectedByCode = new Map<string, typeof expectedRows>();
+        for (const expectedRow of expectedRows) {
+          const code = normCode(expectedRow.princeCode);
+          expectedByCode.set(code, [...(expectedByCode.get(code) ?? []), expectedRow]);
+        }
+        const batchRows = await db.insert(importBatchesTable).values({
+          competitor,
+          effectiveDate,
+          sourceFileName: file.originalname,
+          priceBasis,
+          gstPct,
+          status: "pending",
+          extractionModel: null,
+          fileSha256,
+          fileSizeBytes: file.size,
+          extractorVersion: "prince-text-pdf-v1",
+          catalogueProfileRevision: "prince-positional-bbox-v1",
+          promptRevision: null,
+          model: null,
+          pagesRequested: null,
+          passesRun: 1,
+          itemsAdjudicated: 0,
+          rowCounts: JSON.stringify({
+            found: reconciliation.found,
+            matched: reconciliation.matched,
+            new: reconciliation.newCodes.length,
+            missing: reconciliation.missingCodes.length,
+            differences: reconciliation.differences,
+          }),
+        }).returning();
+        const batch = batchRows[0];
+        if (!batch) throw new Error("Failed to create Prince text extraction batch.");
+        const occurrenceCursor = new Map<string, number>();
+        const expectedOrdinal = new Map<string, number>();
+        const rows = targets.map((target) => {
+          const code = target.competitorCode ? normCode(target.competitorCode) : "";
+          const ordinal = expectedOrdinal.get(code) ?? 0;
+          const expectedRow = expectedByCode.get(code)?.[ordinal];
+          if (code) expectedOrdinal.set(code, ordinal + 1);
+          const expected = expectedRow?.price ?? null;
+          const candidates = code ? itemsByCode.get(code) ?? [] : [];
+          const expectedIndex = expectedRow ? expectedRows.indexOf(expectedRow) : -1;
+          const comparison = expectedIndex >= 0 ? reconciliation.comparisons[expectedIndex] : undefined;
+          const cursor = occurrenceCursor.get(code) ?? 0;
+          const positionalCandidates = [...candidates].sort((a, b) =>
+            a.page - b.page || a.xMin - b.xMin || (a.variant ?? "").localeCompare(b.variant ?? ""),
+          );
+          const metadataIndex = comparison && comparison.page != null
+            ? positionalCandidates.findIndex((candidate) =>
+                candidate.page === comparison.page &&
+                candidate.xMin === comparison.xMin &&
+                candidate.variant === comparison.variant,
+              )
+            : -1;
+          const occurrenceIndex = metadataIndex >= cursor ? metadataIndex : cursor;
+          const item = positionalCandidates[occurrenceIndex];
+          if (code) occurrenceCursor.set(code, occurrenceIndex + 1);
+          const difference = item && expected != null && Math.abs(item.piecePrice - expected) > 0.01;
+          return {
+            batchId: batch.id,
+            competitor,
+            competitorCodeMaster: target.competitorCode,
+            competitorCodeCatalogue: item?.cat_no ?? null,
+            matchedPrayagCode: target.matchedPrayagCode,
+            description: target.description,
+            catalogueDescription: item?.product_name ?? null,
+            variant: item?.variant ?? target.size,
+            oldMrp: expected,
+            newMrp: item?.piecePrice ?? null,
+            increasePct: item && expected ? ((item.piecePrice - expected) / expected) * 100 : null,
+            prayagMrpCurrent: target.prayagMrpCurrent,
+            gapPct: item && target.prayagMrpCurrent ? ((item.piecePrice - target.prayagMrpCurrent) / target.prayagMrpCurrent) * 100 : null,
+            page: item?.page ?? null,
+             discoveryEvidence: item ? JSON.stringify({
+               extractor: "pdftotext",
+               page: item.page,
+               xMin: item.xMin,
+               family: item.product_name,
+               variant: item.variant,
+               ratePerMetre: item.ratePerMetre,
+               piecePrice: item.piecePrice,
+               sourceTokens: item.sourceTokens,
+             }) : null,
+            adjudicated: false,
+            matchMethod: item ? "code+position" : null,
+            status: item ? (difference ? "needs_review" as const : "ok" as const) : "not_found" as const,
+            reviewReason: difference ? `Price difference: workbook ${expected}, PDF ${item.piecePrice}` : null,
+          };
+        });
+        const newItemsByCode = new Map<string, typeof items>();
+        for (const item of items) {
+          const code = normCode(item.cat_no);
+          if (!expectedRows.some((row) => normCode(row.princeCode) === code)) {
+            newItemsByCode.set(code, [...(newItemsByCode.get(code) ?? []), item]);
+          }
+        }
+        const newRows = [...newItemsByCode.values()].map((occurrences) => {
+          const item = occurrences[0]!;
+          return ({
+            batchId: batch.id,
+            competitor,
+            competitorCodeMaster: null,
+            competitorCodeCatalogue: item.cat_no,
+            matchedPrayagCode: null,
+            description: null,
+            catalogueDescription: item.product_name || null,
+            variant: item.variant,
+            oldMrp: null,
+            newMrp: item.piecePrice,
+            increasePct: null,
+            prayagMrpCurrent: null,
+            gapPct: null,
+            page: item.page,
+            discoveryEvidence: JSON.stringify({
+              extractor: "pdftotext",
+              occurrences: occurrences.map((occurrence) => ({
+                page: occurrence.page,
+                xMin: occurrence.xMin,
+                variant: occurrence.variant,
+                ratePerMetre: occurrence.ratePerMetre,
+                piecePrice: occurrence.piecePrice,
+                lengthMetres: occurrence.lengthMetres,
+                sourceTokens: occurrence.sourceTokens,
+              })),
+            }),
+            adjudicated: false,
+            matchMethod: null,
+            status: "new_product" as const,
+            reviewReason: "PDF code has no existing Prince mapping; no mapping was inferred.",
+          });
+        });
+        const uniqueStagingRows = new Map<string, (typeof rows)[number] | (typeof newRows)[number]>();
+        for (const [index, row] of [...rows, ...newRows].entries()) {
+          const key = row.matchedPrayagCode
+            ? [
+                normCode(row.competitorCodeCatalogue ?? `__missing_${index}`),
+                normCode(row.matchedPrayagCode),
+                (row.variant ?? row.description ?? "").trim().toUpperCase(),
+              ].join("|")
+            : normCode(row.competitorCodeCatalogue ?? `__missing_${index}`);
+          const prior = uniqueStagingRows.get(key);
+          if (!prior) {
+            uniqueStagingRows.set(key, row);
+            continue;
+          }
+          // PDF-only rows remain code-keyed. Mapped rows are keyed by the
+          // complete Prince/Prayag/variant identity, so one-to-many mappings
+          // cannot be collapsed during staging.
+          const priorEvidence = prior.discoveryEvidence ? JSON.parse(prior.discoveryEvidence) as Record<string, unknown> : {};
+          const duplicateEvidence = row.discoveryEvidence ? JSON.parse(row.discoveryEvidence) as Record<string, unknown> : {};
+          prior.discoveryEvidence = JSON.stringify({
+            ...priorEvidence,
+            mappedPrayagCodes: [
+              ...new Set([
+                ...((priorEvidence.mappedPrayagCodes as string[] | undefined) ?? [prior.matchedPrayagCode].filter(Boolean) as string[]),
+                ...((duplicateEvidence.mappedPrayagCodes as string[] | undefined) ?? [row.matchedPrayagCode].filter(Boolean) as string[]),
+              ]),
+            ],
+          });
+        }
+        const allStagingRows = [...uniqueStagingRows.values()];
+        const rowCounts = {
+          found: reconciliation.found,
+          matched: reconciliation.matched,
+          new: reconciliation.newCodes.length,
+          missing: reconciliation.missingCodes.length,
+          differences: reconciliation.differences,
+          comparisons: reconciliation.comparisons,
+          stagedUniqueCodes: allStagingRows.length,
+          pdfOccurrences: items.length,
+          pdfUniqueCodes: new Set(items.map((item) => normCode(item.cat_no))).size,
+          mappedStagingIdentities: allStagingRows.filter((row) => row.matchedPrayagCode != null).length,
+        };
+        await db.update(importBatchesTable)
+          .set({ rowCounts: JSON.stringify(rowCounts) })
+          .where(eq(importBatchesTable.id, batch.id));
+        for (let index = 0; index < allStagingRows.length; index += 200) {
+          await db.insert(competitorPriceStagingTable).values(allStagingRows.slice(index, index + 200));
+        }
+        res.status(201).json({
+          batchId: batch.id,
+          competitor,
+          effectiveDate,
+          fileSha256,
+          status: "pending",
+          rowCounts,
+          reconciliation,
+        });
+        return;
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : "Could not extract Prince text PDF." });
+        return;
+      }
     }
 
     // Helper to send SSE events

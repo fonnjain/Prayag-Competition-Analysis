@@ -468,12 +468,12 @@ paths:
           required: false
           style: form
           explode: true
-          description: Competitor brands to include. Defaults to Sparsh Pearl.
+          description: Competitor brands to include. Defaults to Sparsh Pearl. Missing competitor data is returned as no data, never as zero.
           schema:
             type: array
             items:
               type: string
-              enum: [Sparsh Pearl, Vectus]
+              enum: [Sparsh Pearl, Ashirvad, Prince, Vectus]
         - name: asOf
           in: query
           required: false
@@ -520,7 +520,7 @@ paths:
             type: array
             items:
               type: string
-              enum: [Sparsh Pearl, Vectus]
+              enum: [Sparsh Pearl, Ashirvad, Prince, Vectus]
         - name: asOf
           in: query
           required: false

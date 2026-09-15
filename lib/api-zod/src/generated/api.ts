@@ -480,7 +480,7 @@ export const getPriceFinderComparisonQueryCodeMax = 50;
 
 export const GetPriceFinderComparisonQueryParams = zod.object({
   "code": zod.array(zod.coerce.string()).min(1).max(getPriceFinderComparisonQueryCodeMax).describe('One or more selected Prayag item codes, maximum 50.'),
-  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Vectus'])).optional().describe('Competitor brands to include. Defaults to Sparsh Pearl.'),
+  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Ashirvad', 'Prince', 'Vectus'])).optional().describe('Competitor brands to include. Defaults to Sparsh Pearl. Missing competitor data is returned as no data, never as zero.'),
   "asOf": zod.date().optional().describe('Resolve both sides as of this date (YYYY-MM-DD). Defaults to today.')
 })
 
@@ -530,7 +530,7 @@ export const exportPriceFinderComparisonQueryCodeMax = 50;
 
 export const ExportPriceFinderComparisonQueryParams = zod.object({
   "code": zod.array(zod.coerce.string()).min(1).max(exportPriceFinderComparisonQueryCodeMax),
-  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Vectus'])).optional(),
+  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Ashirvad', 'Prince', 'Vectus'])).optional(),
   "asOf": zod.date().optional()
 })
 
