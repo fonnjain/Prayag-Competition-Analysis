@@ -1,0 +1,83 @@
+1. Poppler is now declared
+Replit’s package index did not accept poppler_utils, but accepted the current Nix package name:
+
+[nix]
+packages = [
+  # existing packages…
+  "poppler"
+]
+
+Committed as 39a43ec.
+
+After restarting the API workflow, I verified pdftotext using the API process’s own PATH:
+
+/nix/store/csm2flvv27n1hxza1jicnrhkhfaw1v7d-replit-runtime-path/bin/pdftotext
+pdftotext version 25.07.0
+Copyright 2005-2025 The Poppler Developers - http://poppler.freedesktop.org
+Copyright 1996-2011, 2022 Glyph & Cog, LLC
+
+The Prince positional-extractor and PDF-detector suites both passed: 12 tests passed.
+
+The published environment shown in your screenshot has not yet been rebuilt with this dependency. It requires publishing again; only after that rebuild can production availability be confirmed.
+
+2. How P016 actually performed reconciliation
+P016 ran in the test/workspace context where pdftotext was available through Replit’s runtime PATH, even though it had not been explicitly declared in .replit.
+
+It did not use pdfjs-dist or pdf-parse.
+
+It did not compare the workbook against itself.
+
+Extraction path
+The P016 implementation:
+
+Read the attached Prince PDF into a buffer.
+Wrote that buffer to a temporary PDF file.
+Executed:
+pdftotext -bbox -layout catalogue.pdf -
+
+Parsed Poppler’s bounding-box output into catalogue rows containing:
+Prince code
+Extracted price
+Page
+X position
+Product family
+Variant and length information
+Independently parsed the supplied Excel workbook.
+Compared each workbook expectation with the corresponding PDF-extracted occurrence.
+The extractor imported Node’s child_process, filesystem, path, crypto, and OS modules. No JavaScript PDF-text library participated.
+
+Evidence that it was not workbook-vs-workbook
+The reconciliation test called:
+
+const extractedPrince = extractPrinceTextPdf(princePdf);
+const reconciliation = reconcilePrincePdf(
+  extractedPrince.items,
+  master.rows,
+);
+
+The comparison records separate values named workbook and extracted.
+
+There is also a deliberate negative test that changes one workbook price while leaving the extracted PDF rows unchanged. It then expects one price difference. That test would not work if both sides came from the workbook.
+
+The reported figures
+The original focused test asserted:
+
+4,306 priced PDF occurrences
+4,275 unique PDF codes
+813 workbook comparison rows
+813 comparisons completed
+Zero missing comparison rows
+Zero unpriced comparison rows
+Zero price differences
+The import integration test separately asserted:
+
+803 mapped, catalogue-linked identities staged
+Zero price differences among those loaded identities
+The difference between 813 and 803 is therefore not “813 loaded prices.” The 813 figure is the full workbook reconciliation set; 803 is the mapped subset used by the import integration.
+
+Conclusion about the loaded Prince prices
+The zero-difference result was based on actual Poppler-extracted PDF values compared with independently parsed workbook values. It was not a workbook self-comparison.
+
+The underlying weakness was environmental reproducibility: Poppler happened to exist in the P016 test context but was not declared as an application dependency. That has now been corrected.
+
+The conservative all-zero guard remains active. No extraction or price write was performed during this investigation.
