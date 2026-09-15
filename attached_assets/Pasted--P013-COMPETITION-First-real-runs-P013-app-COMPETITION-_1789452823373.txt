@@ -1,0 +1,119 @@
+# P013 — COMPETITION — First real runs
+
+> **P013** · app: **COMPETITION** (`prayag-price.com`)
+> **READ-ONLY apart from section 1.** Runs are saved; no price is written.
+> Quote `P013` when reporting back.
+
+All three feeds are live. This is the first time the generator produces numbers anyone might act on, so the point is to understand them before trusting them.
+
+---
+
+## 1. One stale panel
+
+The scope section still reads *"When the Sales API is connected, scope can use A/B/C cumulative contribution or an explicit period sales-value threshold."*
+
+It **is** connected — 24 request pages for sales, 13 for margin, both available. Replace that notice with the live tier control, or correct whatever condition it is testing.
+
+Small fix, own commit.
+
+---
+
+## 2. Run the default and report the direction
+
+The default scenario reports **819 products in scope, 694 would change** — 85%. That is high enough to need explaining before anyone acts on it.
+
+Run it. Report:
+
+```
+Of the 694 changing:
+  increases       count, median %, total value movement
+  decreases       count, median %, total value movement
+  by competitor   Sparsh-matched vs Ashirvad-matched
+  by division
+```
+
+**What the answer means.**
+
+If most are **increases**, the default is capturing margin we are leaving on the table — consistent with Prayag being cheaper on 130 of 150 against Sparsh and 161 of 171 on Ashirvad CPVC. That is the expected result.
+
+If most are **decreases**, the default rule is cutting prices on products already below the competition, which nobody intends. Say so plainly if that is what you find.
+
+Also report the **125 not changing** — held by a limit, at parity, or no competitor price.
+
+---
+
+## 3. Isolate Ashirvad
+
+Ashirvad's list is **563 days old** and its CPVC gaps run +43% to +50%. Those may be a real market position or a stale price list.
+
+Run two more scenarios, identical to the default but for the competitor:
+
+```
+B — Sparsh Pearl only
+C — Ashirvad only
+```
+
+Report for each: products in scope, how many change, increases and decreases, median movement.
+
+**Then the question that matters:** how many of the default's 694 changes depend on Ashirvad being the nearest competitor? Those are the suggestions resting entirely on an eighteen-month-old list.
+
+Use the comparison feature — this is what it is for.
+
+---
+
+## 4. Turn margin floors on
+
+Re-run the default with **margin floors ticked**, everything else unchanged.
+
+```
+                        margin off    margin on
+products changing            694          ?
+escalations (floor blocks
+   the competitive target)     -          ?
+excluded, no margin data       0          ?
+```
+
+**The escalations are the valuable output.** A product whose competitive target would breach its category floor needs a decision, not a price. Report them individually — code, current MRP, competitive target, the floor that blocked it, and the gap between the two.
+
+Also report **portfolio margin before and after**, with the share of scope value it was computed on. Margin covers Apr–Jun 2026 with PTMT Apr held, so that share will not be 100% and the figure means little without it.
+
+---
+
+## 5. Sanity-check ten products by hand
+
+Pick ten changing products spanning both competitors and at least three divisions. For each, show the full chain:
+
+```
+code · current MRP and its effective date
+competitor used, its price, its date, its age
+the gap
+the rule row that matched
+the suggested price and the arithmetic
+any limit or floor that bound it
+```
+
+**This is the check that matters most.** Run totals can look reasonable while individual suggestions are wrong. If the arithmetic does not survive reading ten products end to end, the totals are not trustworthy either.
+
+Include at least one where a limit bound the result, and one escalation if section 4 produced any.
+
+---
+
+## 6. What not to do
+
+**Do not send anything to the revision flow.** These runs are for understanding, not for applying.
+
+**Do not tune the default to make the numbers look better.** If 694 of 819 is wrong, the finding is *why*, not a quieter default.
+
+**Do not enable Ashirvad-only capture.** It stays off until a current list arrives.
+
+---
+
+## 7. Report
+
+- Section 1: the panel corrected.
+- The default run: direction, split by competitor and division, and the 125 unchanged.
+- Scenarios B and C, and how many of the 694 depend on Ashirvad.
+- The margin-on comparison, with escalations listed individually.
+- Portfolio margin before and after, and its coverage share.
+- Ten products traced end to end.
+- Confirmation that nothing was written and nothing was sent to the revision flow.
