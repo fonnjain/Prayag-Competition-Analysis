@@ -15,6 +15,7 @@ import {
   mrpRevisionRowsTable,
 } from "@workspace/db";
 import routes from "./index";
+import { classifyBinaryHistoricalCompetitiveCategory } from "./mrpGenerator";
 import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 import { SalesApiClient, resetSalesApiClient, setSalesApiClientForTests, type SalesApiClientOptions } from "../lib/salesApi";
 import { DEFAULT_P012_SCENARIO, promoteP012ToAdvanced } from "../lib/mrpGenerator";
@@ -25,12 +26,20 @@ const EXCLUDED_CODE = `__MRP_GENERATOR_EXCLUDED_${RUN}__`;
 const NO_CHANGE_CODE = `__MRP_GENERATOR_NO_CHANGE_${RUN}__`;
 const RIGHT_ONLY_CODE = `__MRP_GENERATOR_RIGHT_ONLY_${RUN}__`;
 const COMPETITOR = `Generator Competitor ${RUN}`;
+const COMPETITOR_B = `Generator Competitor B ${RUN}`;
 const P012_COMPETITOR = `P012 Competitor ${RUN}`;
 const P012_CODES = [
   `__MRP_P012_DIVISION_${RUN}__`,
   `__MRP_P012_SERIES_${RUN}__`,
   `__MRP_P012_CATEGORY_${RUN}__`,
   `__MRP_P012_EXPLICIT_${RUN}__`,
+] as const;
+const HISTORICAL_CODES = [
+  `__MRP_HISTORICAL_0_${RUN}__`,
+  `__MRP_HISTORICAL_1_${RUN}__`,
+  `__MRP_HISTORICAL_2_${RUN}__`,
+  `__MRP_HISTORICAL_3_${RUN}__`,
+  `__MRP_HISTORICAL_4_${RUN}__`,
 ] as const;
 const DATE = "2020-01-01";
 const AS_OF = new Date().toISOString().slice(0, 10);
@@ -98,6 +107,8 @@ let rightOnlyScenarioId = 0;
 let stage2ScenarioId = 0;
 let p011ScenarioId = 0;
 let p011CompareScenarioId = 0;
+let historicalCompareScenarioId = 0;
+let historicalCompareScenarioBId = 0;
 const p012ScenarioIds: number[] = [];
 const runIds: number[] = [];
 const revisionBatchIds: number[] = [];
@@ -108,6 +119,16 @@ async function historyDigest() {
            COUNT(*)::int AS count
     FROM mrp_price_history h
     WHERE h.item_code IN (${sql.join([CODE, EXCLUDED_CODE, NO_CHANGE_CODE].map((code) => sql`${code}`), sql`, `)})
+  `);
+  return result.rows[0]!;
+}
+
+async function historicalHistoryDigest() {
+  const result = await db.execute<{ digest: string; count: number }>(sql`
+    SELECT md5(COALESCE(string_agg(to_jsonb(h)::text, '|' ORDER BY h.id), '')) AS digest,
+           COUNT(*)::int AS count
+    FROM mrp_price_history h
+    WHERE h.item_code IN (${sql.join(HISTORICAL_CODES.map((code) => sql`${code}`), sql`, `)})
   `);
   return result.rows[0]!;
 }
@@ -123,6 +144,10 @@ beforeAll(async () => {
     { itemCode: P012_CODES[1], productName: "P012 series", division: "P012-OTHER", category: "P012", seriesRange: "P012-SERIES" },
     { itemCode: P012_CODES[2], productName: "P012 category", division: "P012-OTHER", category: "P012-CATEGORY", seriesRange: "P012-3" },
     { itemCode: P012_CODES[3], productName: "P012 explicit", division: "P012-OTHER", category: "P012", seriesRange: "P012-4" },
+    ...HISTORICAL_CODES.map((itemCode, index) => ({
+      itemCode, productName: `Historical Helix ${index}`, division: "PTMT",
+      category: "Historical test", seriesRange: `P014 Helix ${RUN}`,
+    })),
   ]);
   await db.insert(mrpPriceHistoryTable).values([
     { itemCode: CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
@@ -130,6 +155,11 @@ beforeAll(async () => {
     { itemCode: NO_CHANGE_CODE, mrp: 150, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     { itemCode: RIGHT_ONLY_CODE, mrp: 120, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     ...P012_CODES.map((itemCode) => ({ itemCode, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId })),
+    ...HISTORICAL_CODES.flatMap((itemCode, index) => [
+      { itemCode, mrp: 858.25, priceBasis: "MRP", effectiveDate: "2025-09-01", loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
+      { itemCode, mrp: 926.45, priceBasis: "MRP", effectiveDate: "2026-03-01", loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
+      { itemCode, mrp: 1000 + index, priceBasis: "MRP", effectiveDate: "2026-09-01", loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
+    ]),
   ]);
   await db.insert(competitorPricesTable).values([
     {
@@ -159,6 +189,24 @@ beforeAll(async () => {
       matchedPrayagCode: NO_CHANGE_CODE,
       matchStatus: "matched",
     },
+    {
+      competitor: COMPETITOR,
+      competitorCode: `GEN-HISTORICAL-${RUN}`,
+      price: 100,
+      priceBasis: "MRP",
+      effectiveDate: DATE,
+      matchedPrayagCode: HISTORICAL_CODES[0],
+      matchStatus: "matched",
+    },
+    {
+      competitor: COMPETITOR_B,
+      competitorCode: `GEN-B-${RUN}`,
+      price: 300,
+      priceBasis: "MRP",
+      effectiveDate: DATE,
+      matchedPrayagCode: HISTORICAL_CODES[0],
+      matchStatus: "matched",
+    },
   ]);
 });
 
@@ -181,13 +229,15 @@ afterAll(async () => {
   if (stage2ScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, stage2ScenarioId)));
   if (p011ScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, p011ScenarioId)));
   if (p011CompareScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, p011CompareScenarioId)));
+  if (historicalCompareScenarioId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, historicalCompareScenarioId)));
+  if (historicalCompareScenarioBId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, historicalCompareScenarioBId)));
   if (p012ScenarioIds.length) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(inArray(mrpGeneratorScenariosTable.id, p012ScenarioIds)));
   resetSalesApiClient();
-  await cleanup(() => db.delete(competitorPricesTable).where(sql`${competitorPricesTable.competitor} IN (${COMPETITOR}, ${P012_COMPETITOR})`));
-  await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES])));
-  await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES])));
+  await cleanup(() => db.delete(competitorPricesTable).where(sql`${competitorPricesTable.competitor} IN (${COMPETITOR}, ${COMPETITOR_B}, ${P012_COMPETITOR})`));
+  await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
+  await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
   await cleanup(() => deleteMrpFixtureBatch(fixtureBatchId));
-  await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES])));
+  await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
 });
 
 beforeEach(({ task }) => {
@@ -303,6 +353,28 @@ describe("MRP Generator HTTP contract and safety", () => {
       expect.objectContaining({ id: first.body.runId, scenarioName: `Generator fixture ${RUN}` }),
       expect.objectContaining({ id: second.body.runId, scenarioName: `Generator fixture ${RUN}` }),
     ]));
+
+    const storedFirstSnapshot = (await db.select({ inputSnapshot: mrpGeneratorRunsTable.inputSnapshot })
+      .from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, first.body.runId)).limit(1))[0]!.inputSnapshot;
+    const legacySnapshot = JSON.parse(storedFirstSnapshot) as Record<string, unknown>;
+    delete legacySnapshot.modelKind;
+    await db.update(mrpGeneratorRunsTable).set({ inputSnapshot: JSON.stringify(legacySnapshot) })
+      .where(eq(mrpGeneratorRunsTable.id, first.body.runId));
+    const legacyList = await admin.get(`/api/mrp-generator/runs?scenarioId=${scenarioId}&limit=10`);
+    const legacyListRun = legacyList.body.runs.find((row: any) => row.id === first.body.runId);
+    expect(legacyListRun.inputSnapshot).toEqual(expect.objectContaining({ modelKind: "competitive" }));
+    const legacyDetail = await admin.get(`/api/mrp-generator/runs/${first.body.runId}`);
+    expect(legacyDetail.body.run.inputSnapshot).toEqual(expect.objectContaining({ modelKind: "competitive" }));
+    const legacyComparison = await admin.get(
+      `/api/mrp-generator/compare?runIds=${first.body.runId}&runIds=${second.body.runId}`,
+    );
+    expect(legacyComparison.body.runs.find((run: any) => run.runId === first.body.runId).inputSnapshot)
+      .toEqual(expect.objectContaining({ modelKind: "competitive" }));
+    const stillLegacy = (await db.select({ inputSnapshot: mrpGeneratorRunsTable.inputSnapshot })
+      .from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, first.body.runId)).limit(1))[0]!.inputSnapshot;
+    expect(JSON.parse(stillLegacy)).not.toHaveProperty("modelKind");
+    await db.update(mrpGeneratorRunsTable).set({ inputSnapshot: storedFirstSnapshot })
+      .where(eq(mrpGeneratorRunsTable.id, first.body.runId));
 
     const rightScenario = await admin.post("/api/mrp-generator/scenarios").send({
       name: `Generator right-only ${RUN}`,
@@ -853,5 +925,108 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(detail.body.simplePolicy.rows).toEqual(source.simpleRows);
     expect(detail.body.advancedPolicy).toEqual(expect.objectContaining({ source: "p012-simple" }));
     expect(detail.body.results[0]).toEqual(expect.objectContaining({ policyVersion: 3, matchedRowId: source.simpleRows[0].id }));
+  });
+
+  it("computes an immutable P014 historical run without changing MRP history", async () => {
+    const before = await historicalHistoryDigest();
+    const created = await admin.post("/api/mrp-generator/historical/run").send({ asOf: "2027-03-01" });
+    expect(created.status).toBe(201);
+    expect(created.body).toEqual(expect.objectContaining({
+      modelKind: "historical",
+      scenarioId: null,
+      summary: expect.objectContaining({ suggested: expect.any(Number) }),
+      series: expect.arrayContaining([
+        expect.objectContaining({
+          series: `P014 Helix ${RUN}`, productCount: 5, revisionCount: 2,
+          confidence: "MODERATE", usable: true,
+        }),
+      ]),
+    }));
+    runIds.push(created.body.runId);
+    const detail = await admin.get(`/api/mrp-generator/runs/${created.body.runId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body).toEqual(expect.objectContaining({
+      modelKind: "historical",
+      policyVersion: null,
+      scenario: null,
+    }));
+    expect(detail.body.run.inputSnapshot).toEqual(expect.objectContaining({
+      modelKind: "historical",
+      asOf: "2027-03-01",
+      products: expect.any(Array),
+      history: expect.any(Array),
+      seriesAnalyses: expect.any(Array),
+      summary: expect.any(Object),
+    }));
+    expect(detail.body.results.find((row: any) => row.itemCode === HISTORICAL_CODES[0])).toEqual(expect.objectContaining({
+      modelKind: "historical",
+      status: "suggested",
+      confidence: "MODERATE",
+      historicalEvidence: expect.objectContaining({ typicalRate: expect.closeTo(7.94, 0.02) }),
+    }));
+    const handoff = await admin.post(`/api/mrp-generator/runs/${created.body.runId}/handoff`)
+      .send({ itemCodes: [HISTORICAL_CODES[0]] });
+    expect(handoff.status).toBe(409);
+    expect(handoff.body.error).toContain("read-only");
+    expect(await historicalHistoryDigest()).toEqual(before);
+  });
+
+  it("compares three runs across all selected values without a merge or apply action", async () => {
+    const historical = await admin.post("/api/mrp-generator/historical/run").send({ asOf: "2027-03-01" });
+    expect(historical.status).toBe(201);
+    runIds.push(historical.body.runId);
+    const scenario = await admin.post("/api/mrp-generator/scenarios").send({
+      name: `Historical comparison competitive ${RUN}`,
+      scope: { explicitCodes: [HISTORICAL_CODES[0]] },
+      rules: [{ type: "match", competitor: COMPETITOR }],
+    });
+    expect(scenario.status).toBe(201);
+    historicalCompareScenarioId = scenario.body.id;
+    const first = await admin.post(`/api/mrp-generator/scenarios/${historicalCompareScenarioId}/run`)
+      .send({ asOf: "2027-03-01" });
+    expect(first.status).toBe(201);
+    runIds.push(first.body.runId);
+    const scenarioB = await admin.post("/api/mrp-generator/scenarios").send({
+      name: `Historical comparison competitive B ${RUN}`,
+      scope: { explicitCodes: [HISTORICAL_CODES[0]] },
+      rules: [{ type: "match", competitor: COMPETITOR_B }],
+    });
+    expect(scenarioB.status).toBe(201);
+    historicalCompareScenarioBId = scenarioB.body.id;
+    const second = await admin.post(`/api/mrp-generator/scenarios/${historicalCompareScenarioBId}/run`)
+      .send({ asOf: "2027-03-01" });
+    expect(second.status).toBe(201);
+    runIds.push(second.body.runId);
+    const comparison = await admin.get(
+      `/api/mrp-generator/compare?runIds=${historical.body.runId}&runIds=${first.body.runId}&runIds=${second.body.runId}`,
+    );
+    expect(comparison.status).toBe(200);
+    expect(comparison.body.runIds).toEqual([historical.body.runId, first.body.runId, second.body.runId]);
+    expect(comparison.body.runs).toHaveLength(3);
+    expect(comparison.body.products).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        itemCode: HISTORICAL_CODES[0],
+        values: expect.objectContaining({
+          [String(historical.body.runId)]: expect.objectContaining({ modelKind: "historical" }),
+        }),
+      }),
+    ]));
+    expect(comparison.body.categoryCounts).toEqual(expect.any(Object));
+    expect(comparison.body.products.find((product: any) => product.itemCode === HISTORICAL_CODES[0]).category).toBe("disagreement");
+    expect(comparison.body.categoryCounts.disagreement).toBeGreaterThan(0);
+    expect(comparison.body.largestDisagreements[0].absoluteDifference).toBeGreaterThan(0);
+    expect(comparison.body).not.toHaveProperty("merge");
+    expect(comparison.body).not.toHaveProperty("apply");
+    expect(comparison.body).not.toHaveProperty("combinedRunId");
+
+    expect(classifyBinaryHistoricalCompetitiveCategory(200, null)).toBe("historical_only");
+    expect(classifyBinaryHistoricalCompetitiveCategory(null, 200)).toBe("competitive_only");
+    expect(classifyBinaryHistoricalCompetitiveCategory(100, 100)).toBe("agree");
+    expect(classifyBinaryHistoricalCompetitiveCategory(200, 100)).toBe("historical_above_competitive");
+    expect(classifyBinaryHistoricalCompetitiveCategory(100, 200)).toBe("historical_below_competitive");
+
+    // Across the complete catalog, the historical run suggests for products
+    // that the scoped competitive runs do not contain: these are one-sided.
+    expect(comparison.body.categoryCounts.one_sided).toBeGreaterThan(0);
   });
 });

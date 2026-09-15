@@ -2339,6 +2339,24 @@ paths:
       responses:
         "200": { description: Run history, content: { application/json: { schema: { $ref: "#/components/schemas/MrpGeneratorRunList" } } } }
         "403": { description: Administrator access required }
+  /mrp-generator/historical/run:
+    post:
+      operationId: computeHistoricalMrp
+      tags: [mrp-generator]
+      summary: Compute an immutable, read-only series-level historical MRP run
+      description: P014 historical analysis never writes MRP prices and is not attached to a mutable competitive scenario.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MrpHistoricalRunInput" }
+      responses:
+        "201":
+          description: Immutable historical run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MrpHistoricalRunResponse" }
+        "403": { description: Administrator access required }
   /mrp-generator/runs/{runId}:
     get:
       operationId: getMrpGeneratorRun
@@ -2360,8 +2378,9 @@ paths:
       operationId: compareMrpGeneratorRuns
       tags: [mrp-generator]
       parameters:
-        - { name: leftRunId, in: query, required: true, schema: { type: integer } }
-        - { name: rightRunId, in: query, required: true, schema: { type: integer } }
+        - { name: runIds, in: query, required: false, style: form, explode: true, description: Two or more run IDs; comma-separated values are also accepted., schema: { type: array, minItems: 2, items: { type: integer } } }
+        - { name: leftRunId, in: query, required: false, schema: { type: integer } }
+        - { name: rightRunId, in: query, required: false, schema: { type: integer } }
       responses:
         "200": { description: Run comparison, content: { application/json: { schema: { $ref: "#/components/schemas/MrpGeneratorComparison" } } } }
   /mrp-generator/runs/{runId}/handoff:
@@ -2489,6 +2508,10 @@ components:
         available: { type: boolean }
         status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable, rate_limited] }
         reason: { type: [string, "null"] }
+        confidence: { type: [string, "null"], enum: [STRONG, MODERATE, WEAK, NONE, null] }
+        seriesRate: { type: [number, "null"] }
+        due: { type: [boolean, "null"] }
+        overdue: { type: [boolean, "null"] }
         dataSource: { type: [string, "null"] }
         endpoint: { type: [string, "null"] }
         upstreamStatus: { type: [integer, "null"] }
@@ -2884,6 +2907,115 @@ components:
       properties:
         simplePolicy: { $ref: "#/components/schemas/MrpGeneratorSimplePolicy" }
         unsaved: { type: boolean, const: true }
+    MrpHistoricalRunInput:
+      type: object
+      properties:
+        asOf: { type: string, format: date }
+    MrpHistoricalEvidence:
+      type: object
+      properties:
+        series: { type: string }
+        revisionDates: { type: array, items: { type: string, format: date } }
+        eventDistributions:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              productCount: { type: integer }
+              rates: { type: array, items: { type: number } }
+              typicalRate: { type: [number, "null"] }
+              p10Rate: { type: [number, "null"] }
+              p90Rate: { type: [number, "null"] }
+        cadenceMonths: { type: [number, "null"] }
+        typicalRate: { type: [number, "null"] }
+        p10Rate: { type: [number, "null"] }
+        p90Rate: { type: [number, "null"] }
+        spreadPoints: { type: [number, "null"] }
+        confidence: { type: string, enum: [STRONG, MODERATE, WEAK, NONE] }
+        status: { type: string, enum: [DUE, OVERDUE, NOT_DUE, PATTERN_NOT_USABLE] }
+        monthsSinceLast: { type: [number, "null"] }
+        nextExpectedDate: { type: [string, "null"], format: date }
+        product:
+          $ref: "#/components/schemas/MrpHistoricalProductEvidence"
+        seriesAnalysis:
+          $ref: "#/components/schemas/MrpHistoricalSeries"
+    MrpHistoricalProductEvidence:
+      type: object
+      required: [lastRevisionDate, monthsSinceLast, nextExpectedDate, due, overdue, status, reason]
+      properties:
+        lastRevisionDate: { type: [string, "null"], format: date }
+        monthsSinceLast: { type: [number, "null"] }
+        nextExpectedDate: { type: [string, "null"], format: date }
+        due: { type: boolean }
+        overdue: { type: boolean }
+        status: { type: string, enum: [DUE, OVERDUE, NOT_DUE, PATTERN_NOT_USABLE] }
+        reason: { type: [string, "null"] }
+    MrpHistoricalSeries:
+      type: object
+      required: [series, productCount, revisionCount, revisionDates, confidence, usable, status]
+      properties:
+        series: { type: string }
+        productCount: { type: integer }
+        revisionCount: { type: integer }
+        revisionDates: { type: array, items: { type: string, format: date } }
+        cadenceMonths: { type: [number, "null"] }
+        typicalRate: { type: [number, "null"] }
+        p10Rate: { type: [number, "null"] }
+        p90Rate: { type: [number, "null"] }
+        spreadPoints: { type: [number, "null"] }
+        uniform: { type: boolean }
+        usable: { type: boolean }
+        confidence: { type: string, enum: [STRONG, MODERATE, WEAK, NONE] }
+        lastRevisionDate: { type: [string, "null"], format: date }
+        monthsSinceLast: { type: [number, "null"] }
+        status: { type: string, enum: [DUE, OVERDUE, NOT_DUE, PATTERN_NOT_USABLE] }
+        due: { type: boolean }
+        overdue: { type: boolean }
+        nextExpectedDate: { type: [string, "null"], format: date }
+        reason: { type: [string, "null"] }
+    MrpHistoricalRunResponse:
+      type: object
+      required: [runId, modelKind, scenarioId, asOf, inputFingerprint, summary, sourceFreshness, series]
+      properties:
+        runId: { type: integer }
+        modelKind: { type: string, const: historical }
+        scenarioId: { type: [integer, "null"] }
+        asOf: { type: string, format: date }
+        policyVersion: { type: [integer, "null"] }
+        inputFingerprint: { type: string }
+        summary: { type: object, additionalProperties: true }
+        sourceFreshness: { type: object, additionalProperties: true }
+        series: { type: array, items: { $ref: "#/components/schemas/MrpHistoricalSeries" } }
+    MrpHistoricalSourceFreshness:
+      type: object
+      required: [asOf, modelKind, source, historyRows, latestDate]
+      properties:
+        asOf: { type: string, format: date }
+        modelKind: { type: string, const: historical }
+        source: { type: string }
+        historyRows: { type: integer }
+        latestDate: { type: [string, "null"], format: date }
+        coverageSummary: { type: object, additionalProperties: true }
+    MrpHistoricalInputSnapshot:
+      type: object
+      required: [modelKind, asOf, products, history, seriesAnalyses, summary]
+      properties:
+        modelKind: { type: string, const: historical }
+        asOf: { type: string, format: date }
+        products: { type: array, items: { type: object, additionalProperties: true } }
+        history: { type: array, items: { type: object, additionalProperties: true } }
+        seriesAnalyses: { type: array, items: { $ref: "#/components/schemas/MrpHistoricalSeries" } }
+        summary: { type: object, additionalProperties: true }
+    MrpGeneratorInputSnapshot:
+      oneOf:
+        - $ref: "#/components/schemas/MrpCompetitiveInputSnapshot"
+        - $ref: "#/components/schemas/MrpHistoricalInputSnapshot"
+      discriminator:
+        propertyName: modelKind
+        mapping:
+          competitive: "#/components/schemas/MrpCompetitiveInputSnapshot"
+          historical: "#/components/schemas/MrpHistoricalInputSnapshot"
     MrpGeneratorRunInput:
       type: object
       properties:
@@ -2910,12 +3042,13 @@ components:
             canReset: { type: boolean }
     MrpGeneratorRun:
       type: object
-      required: [runId, scenarioId, asOf, policyVersion, inputFingerprint, summary, sourceFreshness]
+      required: [runId, scenarioId, modelKind, asOf, policyVersion, inputFingerprint, summary, sourceFreshness]
       properties:
         runId: { type: integer }
-        scenarioId: { type: integer }
+        scenarioId: { type: [integer, "null"] }
+        modelKind: { type: string, enum: [competitive, historical] }
         asOf: { type: string, format: date }
-        policyVersion: { type: integer, enum: [1, 2, 3] }
+        policyVersion: { type: [integer, "null"], enum: [1, 2, 3, null] }
         inputFingerprint: { type: string }
         summary: { $ref: "#/components/schemas/MrpGeneratorSummary" }
         sourceFreshness: { $ref: "#/components/schemas/MrpGeneratorSourceFreshness" }
@@ -2957,10 +3090,11 @@ components:
         competitors: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorCompetitorValue" } }
         sales: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorSalesEvidence" }, { type: "null" }] }
         margin: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorMarginEvidence" }, { type: "null" }] }
-    MrpGeneratorInputSnapshot:
+    MrpCompetitiveInputSnapshot:
       type: object
-      required: [asOf, products, scope, rules, stage]
+      required: [modelKind, asOf, products, scope, rules, stage]
       properties:
+        modelKind: { type: string, const: competitive }
         asOf: { type: string, format: date }
         products: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorSnapshotProduct" } }
         scope: { $ref: "#/components/schemas/MrpGeneratorScope" }
@@ -2977,12 +3111,15 @@ components:
         salesDataSource: { type: [string, "null"] }
         salesCoverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
         knownLimits: { $ref: "#/components/schemas/MrpGeneratorKnownLimits" }
+        history: { type: array, items: { type: object, additionalProperties: true } }
+        seriesAnalyses: { type: array, items: { $ref: "#/components/schemas/MrpHistoricalSeries" } }
     MrpGeneratorPersistedRun:
       type: object
-      required: [id, scenarioId, asOf, inputSnapshot, inputFingerprint, summary, sourceFreshness, createdBy, createdAt]
+      required: [id, scenarioId, modelKind, asOf, inputSnapshot, inputFingerprint, summary, sourceFreshness, createdBy, createdAt]
       properties:
         id: { type: integer }
-        scenarioId: { type: integer }
+        scenarioId: { type: [integer, "null"] }
+        modelKind: { type: string, enum: [competitive, historical] }
         asOf: { type: string, format: date }
         inputSnapshot: { $ref: "#/components/schemas/MrpGeneratorInputSnapshot" }
         inputFingerprint: { type: string }
@@ -3149,6 +3286,10 @@ components:
       required: [asOf, mrpDates, competitors, sales]
       properties:
         asOf: { type: string, format: date }
+        modelKind: { type: [string, "null"], enum: [competitive, historical, null] }
+        source: { type: [string, "null"] }
+        historyRows: { type: [integer, "null"] }
+        latestDate: { type: [string, "null"], format: date }
         mrpDates: { type: array, items: { type: string, format: date } }
         competitors:
           type: array
@@ -3310,6 +3451,14 @@ components:
         competitiveTarget: { type: [number, "null"] }
         bindingConstraint: { type: [string, "null"] }
         changePercent: { type: [number, "null"] }
+        modelKind: { type: [string, "null"], enum: [competitive, historical, null] }
+        series: { type: [string, "null"] }
+        reason: { type: [string, "null"] }
+        historicalEvidence:
+          oneOf:
+            - { $ref: "#/components/schemas/MrpHistoricalEvidence" }
+            - { type: object }
+            - { type: "null" }
         salesEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorSalesEvidence" }, { type: "null" }] }
         marginEvidence: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorMarginEvidence" }, { type: "null" }] }
         warnings: { type: array, items: { type: string } }
@@ -3335,11 +3484,15 @@ components:
         createdAt: { type: string, format: date-time }
     MrpGeneratorRunDetail:
       type: object
-      required: [run, policyVersion, scenario, results]
+      required: [run, policyVersion, modelKind, scenario, results]
       properties:
         run: { $ref: "#/components/schemas/MrpGeneratorPersistedRun" }
-        policyVersion: { type: integer, enum: [1, 2, 3] }
-        scenario: { $ref: "#/components/schemas/MrpGeneratorScenarioSummary" }
+        policyVersion: { type: [integer, "null"], enum: [1, 2, 3, null] }
+        modelKind: { type: string, enum: [competitive, historical] }
+        scenario:
+          oneOf:
+            - { $ref: "#/components/schemas/MrpGeneratorScenarioSummary" }
+            - { type: "null" }
         simplePolicy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorSimplePolicy" }, { type: "null" }] }
         advancedPolicy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorAdvancedPolicy" }, { type: "null" }] }
         results: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorResult" } }
@@ -3388,15 +3541,22 @@ components:
             - { type: "null" }
     MrpGeneratorComparison:
       type: object
-      required: [leftRunId, rightRunId, leftPolicyVersion, rightPolicyVersion, differences]
+      required: [leftRunId, rightRunId, leftPolicyVersion, rightPolicyVersion, differences, runIds, products, categoryCounts]
       properties:
         leftRunId: { type: integer }
         rightRunId: { type: integer }
-        leftPolicyVersion: { type: integer, enum: [1, 2] }
-        rightPolicyVersion: { type: integer, enum: [1, 2] }
+        leftPolicyVersion: { type: [integer, "null"], enum: [1, 2, 3, null] }
+        rightPolicyVersion: { type: [integer, "null"], enum: [1, 2, 3, null] }
         leftPolicy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorPolicy" }, { type: "null" }] }
         rightPolicy: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorPolicy" }, { type: "null" }] }
         differences: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorComparisonDifference" } }
+        runIds: { type: array, minItems: 2, items: { type: integer } }
+        runs: { type: array, items: { type: object, additionalProperties: true } }
+        products: { type: array, items: { type: object, additionalProperties: true } }
+        categories: { type: object, additionalProperties: { type: integer } }
+        categoryCounts: { type: object, additionalProperties: { type: integer } }
+        disagreementCounts: { type: object, additionalProperties: { type: integer } }
+        largestDisagreements: { type: array, items: { type: object, additionalProperties: true } }
     MrpGeneratorHandoffResponse:
       type: object
       required: [batchId, status, scenarioId, runId, rowsChanged]

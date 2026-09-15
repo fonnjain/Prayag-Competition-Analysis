@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -39,6 +39,7 @@ import {
   type P012SimplePolicy,
   type P012AdvancedRepresentation,
 } from "../lib/mrpGenerator";
+import { evaluateHistoricalMrp, type HistoricalPriceRow } from "../lib/historicalMrp";
 import {
   awaitingConfirmationCodes,
   getSalesApiStatus,
@@ -115,6 +116,19 @@ const snapshotPolicyVersion = (snapshot: {
     ? snapshot.policyVersion
     : snapshot.p012Results != null || snapshot.simplePolicy != null ? 3
       : snapshot.p011Results != null || snapshot.policy != null ? 2 : 1;
+const snapshotModelKind = (snapshot: { modelKind?: unknown }): "competitive" | "historical" =>
+  snapshot.modelKind === "historical" ? "historical" : "competitive";
+export function classifyBinaryHistoricalCompetitiveCategory(
+  historicalValue: number | null,
+  competitiveValue: number | null,
+): "competitive_only" | "historical_only" | "agree" | "historical_above_competitive" | "historical_below_competitive" | "disagreement" {
+  if (historicalValue == null && competitiveValue != null) return "competitive_only";
+  if (historicalValue != null && competitiveValue == null) return "historical_only";
+  if (historicalValue === competitiveValue) return "agree";
+  if (historicalValue != null && competitiveValue != null && historicalValue > competitiveValue) return "historical_above_competitive";
+  if (historicalValue != null && competitiveValue != null && historicalValue < competitiveValue) return "historical_below_competitive";
+  return "disagreement";
+}
 function exposedScenario(row: typeof mrpGeneratorScenariosTable.$inferSelect) {
   const storedRules = parsed<unknown>(row.rules, []);
   const isCanonicalDefault = Boolean(storedRules && typeof storedRules === "object" && !Array.isArray(storedRules) &&
@@ -569,6 +583,110 @@ router.get("/mrp-generator/freshness", requireAdmin, async (req, res) => {
   });
 });
 
+/**
+ * P014 historical model. This endpoint intentionally has no scenario and no
+ * handoff/apply path: the run is an immutable read-only analysis snapshot.
+ */
+router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
+  const asOf = validDate(req.body?.asOf) ? req.body.asOf : today();
+  try {
+    const products = await productsFor(asOf);
+    const historyRows = await db.execute<{
+      id: number; item_code: string; mrp: number | null; effective_date: string;
+      review_status: string | null; variant: string | null;
+    }>(sql`
+      SELECT id, item_code, mrp, effective_date, review_status, variant
+      FROM mrp_price_history
+      WHERE effective_date <= ${asOf}
+        AND review_status = 'approved'
+        AND variant = 'Standard'
+      ORDER BY item_code, effective_date, id
+    `);
+    const history: HistoricalPriceRow[] = historyRows.rows.map((row) => ({
+      id: row.id, itemCode: row.item_code, mrp: row.mrp,
+      effectiveDate: row.effective_date, reviewStatus: row.review_status,
+      variant: row.variant,
+    }));
+    const evaluation = evaluateHistoricalMrp(products, history, asOf);
+    const snapshot = {
+      modelKind: "historical",
+      asOf,
+      products: products.map((product) => ({
+        itemCode: product.itemCode, productName: product.productName,
+        division: product.division, category: product.category,
+        seriesRange: product.seriesRange, currentMrp: product.currentMrp,
+        currentDate: product.currentDate, currentRowId: product.currentRowId,
+      })),
+      history,
+      seriesAnalyses: evaluation.series,
+      summary: evaluation.summary,
+    };
+    const freshness = {
+      asOf,
+      modelKind: "historical",
+      mrpDates: [...new Set(products.map((product) => product.currentDate).filter(Boolean))].sort(),
+      competitors: [],
+      sales: getSalesApiStatus(),
+      source: "approved Standard Prayag MRP history",
+      historyRows: history.length,
+      latestDate: history.map((row) => row.effectiveDate).sort().at(-1) ?? null,
+    };
+    const summary = { ...evaluation.summary, modelKind: "historical" };
+    const fingerprint = inputFingerprint({ modelKind: "historical", asOf, snapshot, freshness });
+    const runId = await db.transaction(async (tx) => {
+      const inserted = await tx.insert(mrpGeneratorRunsTable).values({
+        scenarioId: null,
+        modelKind: "historical",
+        asOf,
+        inputSnapshot: stableJson(snapshot),
+        inputFingerprint: fingerprint,
+        summary: json(summary),
+        sourceFreshness: json(freshness),
+        createdBy: actor(req),
+      }).returning({ id: mrpGeneratorRunsTable.id });
+      const id = inserted[0]!.id;
+      if (evaluation.products.length) {
+        const rows = evaluation.products.map((result) => ({
+          runId: id,
+          itemCode: result.itemCode,
+          productName: result.productName ?? null,
+          division: result.division ?? null,
+          category: result.category ?? null,
+          currentMrp: result.currentMrp,
+          currentDate: result.currentDate,
+          currentRowId: result.currentRowId,
+          suggestedMrp: result.suggestedMrp,
+          status: result.status,
+          exclusions: json(result.suggestedMrp == null ? [result.reason] : []),
+          competitorValues: "[]",
+          trace: json([{ ruleType: "historical_series_rate", outcome: result.suggestedMrp == null ? "blocked" : "fired", before: result.currentMrp, after: result.suggestedMrp, reason: result.reason }]),
+          competitiveTarget: null,
+          bindingConstraint: result.suggestedMrp == null ? result.reason : null,
+          changePercent: result.suggestedMrp != null && result.currentMrp
+            ? ((result.suggestedMrp - result.currentMrp) / result.currentMrp) * 100 : null,
+          modelKind: "historical",
+          series: result.series,
+          reason: result.reason,
+          evidence: json(result.evidence),
+        }));
+        // Historical runs cover the complete catalog. Keep each insert below
+        // PostgreSQL's 16-bit bind-parameter limit.
+        for (let offset = 0; offset < rows.length; offset += 500) {
+          await tx.insert(mrpGeneratorResultsTable).values(rows.slice(offset, offset + 500));
+        }
+      }
+      return id;
+    });
+    res.status(201).json({
+      runId, scenarioId: null, modelKind: "historical", asOf,
+      policyVersion: null, inputFingerprint: fingerprint, summary,
+      sourceFreshness: freshness, series: evaluation.series,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not compute historical MRP." });
+  }
+});
+
 async function ensureDefaultP012Scenario(createdBy: string | null = null) {
   const existingRows = await db.select().from(mrpGeneratorScenariosTable);
   const marked = existingRows.find((row) => {
@@ -927,6 +1045,7 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
       ? salesCoverageSummary(enrichedAll, products, snapshotSales, scope.confidenceOnly === true)
       : null;
     const snapshot = {
+      modelKind: "competitive" as const,
       asOf,
       ...(snapshotSales ? {
         salesFetchedAt: snapshotSales.fetchedAt,
@@ -1025,10 +1144,11 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
         competitiveTarget: r.competitiveTarget,
         bindingConstraint: r.bindingConstraint,
         changePercent: r.changePercent,
+        modelKind: "competitive",
       })));
       return runId;
     });
-    res.status(201).json({ runId: run, scenarioId, asOf, policyVersion: p011 ? 2 : p012 ? 3 : 1, inputFingerprint: fingerprint, summary, sourceFreshness: freshness });
+    res.status(201).json({ runId: run, scenarioId, modelKind: "competitive", asOf, policyVersion: p011 ? 2 : p012 ? 3 : 1, inputFingerprint: fingerprint, summary, sourceFreshness: freshness });
   } catch (error) {
     const status = (error as { httpStatus?: number }).httpStatus ?? 400;
     const option = (error as { option?: string }).option;
@@ -1062,10 +1182,11 @@ router.get("/mrp-generator/runs", requireAdmin, async (req, res) => {
     runs: rows.map(({ run, scenarioName }) => ({
       ...run,
       scenarioName: scenarioName ?? null,
-      inputSnapshot: parsed(run.inputSnapshot, {}),
+      inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
       summary: parsed(run.summary, {}),
       sourceFreshness: parsed(run.sourceFreshness, {}),
-      policyVersion: snapshotPolicyVersion(parsed(run.inputSnapshot, {})),
+      policyVersion: run.modelKind === "historical" ? null : snapshotPolicyVersion(parsed(run.inputSnapshot, {})),
+      modelKind: run.modelKind ?? snapshotModelKind(parsed(run.inputSnapshot, {})),
       simplePolicy: (parsed<{ simplePolicy?: P012SimplePolicy }>(run.inputSnapshot, {}).simplePolicy ?? null),
       advancedPolicy: (parsed<{ advancedPolicy?: unknown }>(run.inputSnapshot, {}).advancedPolicy ?? null),
     })),
@@ -1073,8 +1194,25 @@ router.get("/mrp-generator/runs", requireAdmin, async (req, res) => {
   });
 });
 
+function exposedInputSnapshot(
+  raw: string | null | undefined,
+  persistedModelKind?: string | null,
+) {
+  const snapshot = parsed<{ modelKind?: unknown }>(raw ?? "{}", {});
+  return {
+    ...snapshot,
+    modelKind: persistedModelKind === "historical" || snapshot.modelKind === "historical"
+      ? "historical" : "competitive",
+  };
+}
+
 function exposedRun(run: typeof mrpGeneratorRunsTable.$inferSelect) {
-  return { ...run, summary: parsed(run.summary, {}), sourceFreshness: parsed(run.sourceFreshness, {}), inputSnapshot: parsed(run.inputSnapshot, {}) };
+  return {
+    ...run,
+    summary: parsed(run.summary, {}),
+    sourceFreshness: parsed(run.sourceFreshness, {}),
+    inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
+  };
 }
 function exposedResult(
   row: typeof mrpGeneratorResultsTable.$inferSelect,
@@ -1117,6 +1255,17 @@ function exposedResult(
     salesEvidence: evidence?.sales ?? null,
     marginEvidence: evidence?.margin ?? null,
     warnings: evidence?.warnings ?? [],
+    ...(row.modelKind === "historical" || row.evidence || row.reason || row.series ? {
+      modelKind: row.modelKind ?? "historical",
+      series: row.series,
+      reason: row.reason,
+      historicalEvidence: parsed(row.evidence ?? "{}", {}),
+      confidence: parsed<{ confidence?: unknown }>(row.evidence ?? "{}", {}).confidence ?? null,
+      seriesRate: parsed<{ typicalRate?: unknown }>(row.evidence ?? "{}", {}).typicalRate ?? null,
+      due: parsed<{ status?: unknown }>(row.evidence ?? "{}", {}).status === "DUE" ||
+        parsed<{ status?: unknown }>(row.evidence ?? "{}", {}).status === "OVERDUE",
+      overdue: parsed<{ status?: unknown }>(row.evidence ?? "{}", {}).status === "OVERDUE",
+    } : {}),
   };
 }
 
@@ -1124,9 +1273,11 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
   const id = Number(req.params.runId);
   const run = (await db.select().from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0];
   if (!run) { res.status(404).json({ error: "Run not found." }); return; }
-  const scenario = (await db.select().from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, run.scenarioId)).limit(1))[0];
+  const scenario = run.scenarioId == null ? undefined :
+    (await db.select().from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, run.scenarioId)).limit(1))[0];
   const results = await db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)).orderBy(asc(mrpGeneratorResultsTable.itemCode));
   const snapshot = parsed<{
+    modelKind?: "competitive" | "historical";
     policyVersion?: number;
     policy?: P011Policy;
     products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }>;
@@ -1154,7 +1305,8 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
   // A run is immutable: once an input snapshot has a policy/version, a later
   // scenario edit must not rewrite any run policy metadata. Old snapshots
   // infer P011 only from their own policy/result payload.
-  const policyVersion = snapshotPolicyVersion(snapshot);
+  const modelKind = run.modelKind ?? snapshotModelKind(snapshot);
+  const policyVersion = modelKind === "historical" ? null : snapshotPolicyVersion(snapshot);
   const policy = snapshot.policy ?? null;
   const simplePolicy = snapshot.simplePolicy ?? null;
   const advancedPolicy = snapshot.advancedPolicy ?? null;
@@ -1164,6 +1316,7 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
   res.json({
     run: exposedRun(run),
     policyVersion,
+    modelKind,
     policy,
     scenario: immutableScenario,
     simplePolicy,
@@ -1196,72 +1349,120 @@ router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) 
 });
 
 router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
+  const queryIds = req.query.runIds ?? req.query.runs;
+  const rawIds = queryIds == null ? [] : Array.isArray(queryIds) ? queryIds : String(queryIds).split(",");
+  const parsedIds = rawIds.flatMap((value) => String(value).split(","))
+    .map((value) => Number(value)).filter((value) => Number.isInteger(value));
   const leftId = Number(req.query.leftRunId ?? req.query.runA);
   const rightId = Number(req.query.rightRunId ?? req.query.runB);
-  if (!Number.isInteger(leftId) || !Number.isInteger(rightId)) { res.status(400).json({ error: "leftRunId and rightRunId are required integers." }); return; }
-  const runs = await db.select({ id: mrpGeneratorRunsTable.id, inputSnapshot: mrpGeneratorRunsTable.inputSnapshot }).from(mrpGeneratorRunsTable)
-    .where(sql`${mrpGeneratorRunsTable.id} IN (${leftId}, ${rightId})`);
+  const runIds = [...new Set(parsedIds.length ? parsedIds : [leftId, rightId])];
+  if (runIds.length < 2 || runIds.some((id) => !Number.isInteger(id))) {
+    res.status(400).json({ error: "runIds must contain at least two integer run IDs." });
+    return;
+  }
+  const runs = await db.select().from(mrpGeneratorRunsTable).where(inArray(mrpGeneratorRunsTable.id, runIds));
   const existing = new Set(runs.map((run) => run.id));
-  const missing = [leftId, rightId].filter((id, index, ids) => !existing.has(id) && ids.indexOf(id) === index);
+  const missing = runIds.filter((id) => !existing.has(id));
   if (missing.length) {
     res.status(404).json({ error: `Generator run(s) not found: ${missing.join(", ")}.` });
     return;
   }
-  const [left, right] = await Promise.all([
-    db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, leftId)),
-    db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, rightId)),
-  ]);
-  const runById = new Map(runs.map((run) => [run.id, parsed<{
-    policyVersion?: number; policy?: P011Policy; simplePolicy?: P012SimplePolicy; advancedPolicy?: unknown;
-    p011Results?: Array<Record<string, unknown>>; p012Results?: Array<Record<string, unknown>>;
-  }>(run.inputSnapshot, {})]));
-  const leftSnapshot = runById.get(leftId) ?? {};
-  const rightSnapshot = runById.get(rightId) ?? {};
-  const p011ByCode = (snapshot: typeof leftSnapshot) => new Map((snapshot.p011Results ?? []).map((result) => [
-    canonicalItemCode(String(result.itemCode ?? "")), result,
-  ]));
-  const p012ByCode = (snapshot: typeof leftSnapshot) => new Map((snapshot.p012Results ?? []).map((result) => [
-    canonicalItemCode(String(result.itemCode ?? "")), result,
-  ]));
-  const leftP011 = p011ByCode(leftSnapshot);
-  const rightP011 = p011ByCode(rightSnapshot);
-  const leftP012 = p012ByCode(leftSnapshot);
-  const rightP012 = p012ByCode(rightSnapshot);
-  const leftByCode = new Map(left.map((r) => [canonicalItemCode(r.itemCode), r]));
-  const rightByCode = new Map(right.map((r) => [canonicalItemCode(r.itemCode), r]));
-  const codes = [...new Set([...leftByCode.keys(), ...rightByCode.keys()])].sort((a, b) => a.localeCompare(b));
-  const differences = codes.map((code) => {
-    const l = leftByCode.get(code);
-    const r = rightByCode.get(code);
+  // Keep one query per run rather than relying on a database-specific
+  // multi-key result ordering. This also preserves the legacy binary compare
+  // contract exactly (including rows present on only the right).
+  const resultSets = await Promise.all(runIds.map((id) =>
+    db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)),
+  ));
+  const resultRows = resultSets.flat();
+  const byRun = new Map<number, typeof resultRows>();
+  for (const row of resultRows) byRun.set(row.runId, [...(byRun.get(row.runId) ?? []), row]);
+  const runById = new Map(runs.map((run) => [run.id, run]));
+  const exposedByRun = new Map<number, Map<string, any>>();
+  for (const id of runIds) {
+    const run = runById.get(id)!;
+    const snapshot = parsed<{
+      modelKind?: unknown; policyVersion?: number; policy?: P011Policy; simplePolicy?: P012SimplePolicy;
+      advancedPolicy?: unknown; p011Results?: Array<Record<string, unknown>>; p012Results?: Array<Record<string, unknown>>;
+    }>(run.inputSnapshot, {});
+    const p011 = new Map((snapshot.p011Results ?? []).map((result) => [canonicalItemCode(String(result.itemCode ?? "")), result]));
+    const p012 = new Map((snapshot.p012Results ?? []).map((result) => [canonicalItemCode(String(result.itemCode ?? "")), result]));
+    exposedByRun.set(id, new Map((byRun.get(id) ?? []).map((row) => [
+      canonicalItemCode(row.itemCode), exposedResult(row, undefined, p011.get(canonicalItemCode(row.itemCode)) ?? p012.get(canonicalItemCode(row.itemCode))),
+    ])));
+  }
+  const legacyLeft = runIds[0]!;
+  const legacyRight = runIds[1]!;
+  const codes = [...new Set(resultRows.map((row) => canonicalItemCode(row.itemCode)))].sort();
+  const products = codes.map((code) => {
+    const values = Object.fromEntries(runIds.map((id) => [String(id), exposedByRun.get(id)?.get(code) ?? null]));
+    const suggestions = runIds.map((id) => (values[String(id)] as { suggestedMrp?: number | null } | null)?.suggestedMrp ?? null);
+    const historical = runIds.find((id) => (runById.get(id)?.modelKind ?? "competitive") === "historical");
+    const competitive = runIds.find((id) => (runById.get(id)?.modelKind ?? "competitive") !== "historical");
+    const historicalIds = runIds.filter((id) => (runById.get(id)?.modelKind ?? "competitive") === "historical");
+    const competitiveIds = runIds.filter((id) => (runById.get(id)?.modelKind ?? "competitive") !== "historical");
+    const historicalValue = historical == null ? null : (values[String(historical)] as { suggestedMrp?: number | null } | null)?.suggestedMrp ?? null;
+    const competitiveValue = competitive == null ? null : (values[String(competitive)] as { suggestedMrp?: number | null } | null)?.suggestedMrp ?? null;
+    const signatures = runIds.map((id) => {
+      const value = values[String(id)] as {
+        suggestedMrp?: number | null; status?: string; action?: string | null;
+        band?: string | null; position?: string | null; gap?: number | null;
+        escalation?: boolean; escalationReason?: string | null;
+      } | null;
+      return JSON.stringify({
+        suggestedMrp: value?.suggestedMrp ?? null, status: value?.status ?? null,
+        action: value?.action ?? null, band: value?.band ?? null,
+        position: value?.position ?? null, gap: value?.gap ?? null,
+        escalation: value?.escalation ?? null, escalationReason: value?.escalationReason ?? null,
+      });
+    });
+    const allAgree = signatures.every((value) => value === signatures[0]);
+    const nonNullSuggestions = suggestions.filter((value): value is number => value != null);
+    const distinctSuggestions = new Set(nonNullSuggestions);
+    const oneSided = nonNullSuggestions.length > 0 && nonNullSuggestions.length < runIds.length;
+    const suggestionDisagreement = distinctSuggestions.size > 1;
+    const exactHistoricalCompetitivePair = runIds.length === 2 && historicalIds.length === 1 && competitiveIds.length === 1;
+    // Keep the established directional categories for the binary historical vs
+    // competitive comparison. For every other shape, classify using all
+    // selected runs so a third run can never be hidden by the first pair.
+    const category = exactHistoricalCompetitivePair
+      ? classifyBinaryHistoricalCompetitiveCategory(historicalValue, competitiveValue)
+      : oneSided ? "one_sided"
+        : suggestionDisagreement ? "disagreement"
+          : allAgree ? "agree" : "disagreement";
     return {
-      itemCode: l?.itemCode ?? r?.itemCode ?? code,
-      left: l ? exposedResult(l, undefined, leftP011.get(code) ?? leftP012.get(code)) : null,
-      right: r ? exposedResult(r, undefined, rightP011.get(code) ?? rightP012.get(code)) : null,
+      itemCode: (resultRows.find((row) => canonicalItemCode(row.itemCode) === code)?.itemCode ?? code),
+      values, category, comparisonChanged: !allAgree,
+      left: values[String(legacyLeft)] ?? null, right: values[String(legacyRight)] ?? null,
     };
-  }).filter((entry) =>
-    entry.left == null ||
-    entry.right == null ||
-    entry.left.suggestedMrp !== entry.right.suggestedMrp ||
-     entry.left.status !== entry.right.status ||
-     entry.left.policyVersion !== entry.right.policyVersion ||
-     entry.left.band !== entry.right.band ||
-     entry.left.position !== entry.right.position ||
-     entry.left.gap !== entry.right.gap ||
-     entry.left.action !== entry.right.action ||
-     entry.left.escalation !== entry.right.escalation ||
-     entry.left.escalationReason !== entry.right.escalationReason,
-  );
+  });
+  const differences = products.filter((product) => product.comparisonChanged)
+    .map(({ comparisonChanged: _comparisonChanged, ...product }) => product);
+  const categoryCounts = Object.fromEntries(["agree", "historical_above_competitive", "historical_below_competitive", "historical_only", "competitive_only", "one_sided", "disagreement"]
+    .map((category) => [category, products.filter((product) => product.category === category).length]));
+  const largestDisagreements = differences.map((product) => {
+    const amounts = runIds.map((id) => (product.values[String(id)] as { suggestedMrp?: number | null } | null)?.suggestedMrp ?? null)
+      .filter((value): value is number => value != null);
+    const absoluteDifference = amounts.length > 1 ? Math.max(...amounts) - Math.min(...amounts) : 0;
+    return { ...product, absoluteDifference, valueDifference: absoluteDifference };
+  }).filter((product) => product.absoluteDifference > 0)
+    .sort((a, b) => b.absoluteDifference - a.absoluteDifference).slice(0, 25);
+  const runSummaries = runIds.map((id) => ({
+    runId: id, modelKind: runById.get(id)!.modelKind ?? "competitive",
+    inputSnapshot: exposedInputSnapshot(runById.get(id)!.inputSnapshot, runById.get(id)!.modelKind),
+    summary: parsed(runById.get(id)!.summary, {}),
+    policyVersion: (runById.get(id)!.modelKind ?? "competitive") === "historical" ? null : snapshotPolicyVersion(parsed(runById.get(id)!.inputSnapshot, {})),
+  }));
+  const legacyLeftSnapshot = parsed<{ policy?: unknown; simplePolicy?: unknown; advancedPolicy?: unknown }>(runById.get(legacyLeft)!.inputSnapshot, {});
+  const legacyRightSnapshot = parsed<{ policy?: unknown; simplePolicy?: unknown; advancedPolicy?: unknown }>(runById.get(legacyRight)!.inputSnapshot, {});
   res.json({
-    leftRunId: leftId, rightRunId: rightId,
-    leftPolicyVersion: snapshotPolicyVersion(leftSnapshot),
-    rightPolicyVersion: snapshotPolicyVersion(rightSnapshot),
-    leftPolicy: leftSnapshot.policy ?? null,
-    rightPolicy: rightSnapshot.policy ?? null,
-    leftSimplePolicy: leftSnapshot.simplePolicy ?? null,
-    rightSimplePolicy: rightSnapshot.simplePolicy ?? null,
-    leftAdvancedPolicy: leftSnapshot.advancedPolicy ?? null,
-    rightAdvancedPolicy: rightSnapshot.advancedPolicy ?? null,
-    differences,
+    runIds, runs: runSummaries, summaries: runSummaries,
+    leftRunId: legacyLeft, rightRunId: legacyRight,
+    leftPolicyVersion: runSummaries[0]!.policyVersion, rightPolicyVersion: runSummaries[1]!.policyVersion,
+    leftPolicy: legacyLeftSnapshot.policy ?? null, rightPolicy: legacyRightSnapshot.policy ?? null,
+    leftSimplePolicy: legacyLeftSnapshot.simplePolicy ?? null, rightSimplePolicy: legacyRightSnapshot.simplePolicy ?? null,
+    leftAdvancedPolicy: legacyLeftSnapshot.advancedPolicy ?? null, rightAdvancedPolicy: legacyRightSnapshot.advancedPolicy ?? null,
+    products, differences, categories: categoryCounts, categoryCounts,
+    disagreementCounts: categoryCounts, largestDisagreements,
   });
 });
 
@@ -1269,6 +1470,10 @@ router.post("/mrp-generator/runs/:runId/handoff", requireAdmin, async (req, res)
   const runId = Number(req.params.runId);
   const run = (await db.select().from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, runId)).limit(1))[0];
   if (!run) { res.status(404).json({ error: "Run not found." }); return; }
+  if (run.modelKind === "historical") {
+    res.status(409).json({ error: "Historical runs are read-only and cannot be handed off or applied." });
+    return;
+  }
   const selected = Array.isArray(req.body?.itemCodes) ? req.body.itemCodes.filter((x: unknown): x is string => typeof x === "string") : [];
   if (!selected.length) { res.status(400).json({ error: "itemCodes must contain at least one selected code." }); return; }
   if (run.asOf > today()) {

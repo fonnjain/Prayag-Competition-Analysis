@@ -2285,6 +2285,10 @@ export const GetMrpGeneratorMetadataResponse = zod.object({
   "available": zod.boolean(),
   "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
+  "confidence": zod.union([zod.literal('STRONG'),zod.literal('MODERATE'),zod.literal('WEAK'),zod.literal('NONE'),zod.literal(null)]).nullish(),
+  "seriesRate": zod.number().nullish(),
+  "due": zod.boolean().nullish(),
+  "overdue": zod.boolean().nullish(),
   "dataSource": zod.string().nullish(),
   "endpoint": zod.string().nullish(),
   "upstreamStatus": zod.number().nullish(),
@@ -4015,6 +4019,62 @@ export const PreviewMrpGeneratorSimpleScenarioResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -7842,158 +7902,160 @@ export const ListMrpGeneratorRunsQueryParams = zod.object({
   "limit": zod.coerce.number().min(1).max(listMrpGeneratorRunsQueryLimitMax).default(listMrpGeneratorRunsQueryLimitDefault)
 })
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemTwoTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemTwoTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemTwoTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemTwoTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFourTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFourTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFourTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFourTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFiveTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFiveTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFiveTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFiveTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSixTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSixTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemSixTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemSixTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSevenTwoThresholdMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemSevenTwoThresholdMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault = 38;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault = 40;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsAMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsAMax = 1;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsAMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsAMax = 1;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsBMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsBMax = 1;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsBMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsBMax = 1;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsCMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsCMax = 1;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsCMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsCMax = 1;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsDMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsDMax = 1;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsDMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsDMax = 1;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCompetitorStaleAfterDaysDefault = 365;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCompetitorStaleAfterDaysMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCompetitorStaleAfterDaysDefault = 365;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCompetitorStaleAfterDaysMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCompetitorExcludeStaleDefault = true;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCaptureSharesMinOne = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCaptureSharesMaxOne = 1;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCompetitorExcludeStaleDefault = true;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCaptureSharesMinOne = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCaptureSharesMaxOne = 1;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneDefendTargetUndercutMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneDefendTargetUndercutMax = 1;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneDefendTargetUndercutMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneDefendTargetUndercutMax = 1;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCategoryFloorsMinOne = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCategoryFloorsMinOne = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneMarginTargetUpliftPointsMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneMarginTargetUpliftPointsMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneMaxIncreasePercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneMaxIncreasePercentMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneMaxDecreasePercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneMaxDecreasePercentMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneHoldThresholdDefault = 50;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneHoldThresholdMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneHoldThresholdDefault = 50;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneHoldThresholdMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneRoundingUnitMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneRoundingUnitMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOnePortfolioPointsMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOnePortfolioPointsMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneHoldBelowMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneHoldBelowMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRoundingUnitMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRoundingUnitMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneCategoryFloorsMinOne = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneCategoryFloorsMinOne = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRowsItemTargetPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemTargetPercentMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRowsItemMaxIncreaseMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxIncreaseMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRowsItemMaxDecreaseMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemSevenTwoThresholdMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemSevenTwoThresholdMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneHoldBelowMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneHoldBelowMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRoundingUnitExclusiveMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRoundingUnitExclusiveMin = 0;
 
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneCategoryFloorsMinOne = 0;
-export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneCategoryFloorsMinOne = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
 
 
 export const ListMrpGeneratorRunsResponse = zod.object({
   "runs": zod.array(zod.object({
   "id": zod.number(),
-  "scenarioId": zod.number(),
+  "scenarioId": zod.number().nullable(),
+  "modelKind": zod.enum(['competitive', 'historical']),
   "asOf": zod.coerce.date(),
-  "inputSnapshot": zod.object({
+  "inputSnapshot": zod.union([zod.object({
+  "modelKind": zod.enum(['competitive']),
   "asOf": zod.coerce.date(),
   "products": zod.array(zod.object({
   "itemCode": zod.string(),
@@ -8070,7 +8132,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "competitor": zod.string(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemTwoTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemTwoTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemTwoTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemTwoTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8098,7 +8160,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFourTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFourTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFourTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFourTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8112,7 +8174,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFiveTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemFiveTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFiveTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemFiveTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8126,7 +8188,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSixTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSixTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemSixTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemSixTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8140,7 +8202,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "threshold": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemSevenTwoThresholdMin)
+  "threshold": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemSevenTwoThresholdMin)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8170,12 +8232,12 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "categoryFloors": zod.object({
-  "PTMT": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault),
-  "C P": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault),
-  "PLUMBING": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
-  "SANITARYWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
-  "SINK": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault),
-  "HARDWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+  "PTMT": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsCPMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
 })
 })),zod.union([zod.object({
   "scope": zod.object({
@@ -8210,17 +8272,17 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
   "mode": zod.enum(['value_threshold', 'threshold']),
   "operator": zod.enum(['above', 'below']),
-  "salesValue": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin)
+  "salesValue": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneRulesItemOnezeroTwoTwoSalesValueMin)
 }))])])),
   "policyVersion": zod.number().nullish(),
   "policy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "period": zod.enum(['2026-27']),
   "bands": zod.object({
-  "A": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsAMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsAMax).optional(),
-  "B": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsBMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsBMax).optional(),
-  "C": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsCMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsCMax).optional(),
-  "D": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsDMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneBandsDMax).optional()
+  "A": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsAMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsAMax).optional(),
+  "B": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsBMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsBMax).optional(),
+  "C": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsCMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsCMax).optional(),
+  "D": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsDMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneBandsDMax).optional()
 }).optional(),
   "position": zod.object({
   "wellBelowAbove": zod.number().optional(),
@@ -8230,36 +8292,36 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitor": zod.object({
   "mode": zod.enum(['nearest', 'lowest', 'named']).optional(),
   "named": zod.string().nullish(),
-  "staleAfterDays": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCompetitorStaleAfterDaysMin).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCompetitorStaleAfterDaysDefault),
-  "excludeStale": zod.boolean().default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCompetitorExcludeStaleDefault)
+  "staleAfterDays": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCompetitorStaleAfterDaysMin).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCompetitorStaleAfterDaysDefault),
+  "excludeStale": zod.boolean().default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCompetitorExcludeStaleDefault)
 }).optional(),
-  "captureShares": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCaptureSharesMinOne).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCaptureSharesMaxOne)).optional(),
-  "defendTargetUndercut": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneDefendTargetUndercutMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneDefendTargetUndercutMax).optional(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCategoryFloorsMinOne).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
-  "marginTargetUpliftPoints": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneMarginTargetUpliftPointsMin).optional(),
-  "maxIncreasePercent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneMaxIncreasePercentMin).optional(),
-  "maxDecreasePercent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneMaxDecreasePercentMin).optional(),
-  "holdThreshold": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneHoldThresholdMin).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneHoldThresholdDefault),
+  "captureShares": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCaptureSharesMinOne).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCaptureSharesMaxOne)).optional(),
+  "defendTargetUndercut": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneDefendTargetUndercutMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneDefendTargetUndercutMax).optional(),
+  "categoryFloors": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCategoryFloorsMinOne).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
+  "marginTargetUpliftPoints": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneMarginTargetUpliftPointsMin).optional(),
+  "maxIncreasePercent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneMaxIncreasePercentMin).optional(),
+  "maxDecreasePercent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneMaxDecreasePercentMin).optional(),
+  "holdThreshold": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneHoldThresholdMin).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneHoldThresholdDefault),
   "rounding": zod.object({
-  "unit": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOneRoundingUnitMin).optional(),
+  "unit": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOneRoundingUnitMin).optional(),
   "direction": zod.enum(['nearest', 'up', 'down']).optional()
 }).optional(),
   "portfolio": zod.object({
   "mode": zod.enum(['hold_current', 'improve_by_points', 'allow_decline_points']).optional(),
-  "points": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotPolicyOnePortfolioPointsMin).optional()
+  "points": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOnePolicyOnePortfolioPointsMin).optional()
 }).optional()
 }).describe('P011 deterministic policy. Bands use cumulative taxable sales contribution; band F is the separate no-sales exclusion.\n'),zod.null()]).optional(),
   "simplePolicy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "mode": zod.literal("simple"),
-  "holdBelow": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneHoldBelowMin),
+  "holdBelow": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneHoldBelowMin),
   "rounding": zod.object({
-  "unit": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRoundingUnitMin),
+  "unit": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRoundingUnitMin),
   "direction": zod.enum(['nearest', 'up', 'down'])
 }),
   "marginEnabled": zod.boolean(),
   "volumeEnabled": zod.boolean(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneCategoryFloorsMinOne).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
+  "categoryFloors": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneCategoryFloorsMinOne).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
   "rows": zod.array(zod.object({
   "id": zod.string(),
   "order": zod.number(),
@@ -8274,10 +8336,10 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }),
   "target": zod.object({
   "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRowsItemTargetPercentMin).nullish()
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
-  "maxIncrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
-  "maxDecrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "maxIncrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
+  "maxDecrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -8299,10 +8361,10 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }),
   "target": zod.object({
   "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
 }),
-  "maxIncrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
-  "maxDecrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "maxIncrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
+  "maxDecrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -8332,7 +8394,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "competitor": zod.string(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8360,7 +8422,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8374,7 +8436,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8388,7 +8450,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMax)
+  "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8402,7 +8464,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "threshold": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemSevenTwoThresholdMin)
+  "threshold": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemSevenTwoThresholdMin)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -8432,12 +8494,12 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "categoryFloors": zod.object({
-  "PTMT": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault),
-  "C P": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault),
-  "PLUMBING": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
-  "SANITARYWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
-  "SINK": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault),
-  "HARDWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+  "PTMT": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
 })
 })),zod.union([zod.object({
   "scope": zod.object({
@@ -8472,16 +8534,16 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
   "mode": zod.enum(['value_threshold', 'threshold']),
   "operator": zod.enum(['above', 'below']),
-  "salesValue": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin)
+  "salesValue": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin)
 }))])])),
-  "holdBelow": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneHoldBelowMin),
+  "holdBelow": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneHoldBelowMin),
   "rounding": zod.object({
-  "unit": zod.number().gt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneRoundingUnitExclusiveMin),
+  "unit": zod.number().gt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRoundingUnitExclusiveMin),
   "direction": zod.enum(['nearest', 'up', 'down'])
 }),
   "marginEnabled": zod.boolean(),
   "volumeEnabled": zod.boolean(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneCategoryFloorsMinOne).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotAdvancedPolicyOneCategoryFloorsExclusiveMaxOne)).optional()
+  "categoryFloors": zod.record(zod.string(), zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneCategoryFloorsMinOne).lt(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneCategoryFloorsExclusiveMaxOne)).optional()
 }),zod.null()]).optional(),
   "p012Results": zod.array(zod.object({
   "id": zod.number(),
@@ -8517,6 +8579,62 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -8664,8 +8782,57 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
-}).optional()
-}),
+}).optional(),
+  "history": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "seriesAnalyses": zod.array(zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+})).optional()
+}),zod.object({
+  "modelKind": zod.enum(['historical']),
+  "asOf": zod.coerce.date(),
+  "products": zod.array(zod.record(zod.string(), zod.unknown())),
+  "history": zod.array(zod.record(zod.string(), zod.unknown())),
+  "seriesAnalyses": zod.array(zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+})),
+  "summary": zod.record(zod.string(), zod.unknown())
+})]),
   "inputFingerprint": zod.string(),
   "summary": zod.object({
   "total": zod.number(),
@@ -8730,6 +8897,10 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }),
   "sourceFreshness": zod.object({
   "asOf": zod.coerce.date(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "source": zod.string().nullish(),
+  "historyRows": zod.number().nullish(),
+  "latestDate": zod.coerce.date().nullish(),
   "mrpDates": zod.array(zod.coerce.date()),
   "competitors": zod.array(zod.object({
   "competitor": zod.string(),
@@ -8954,257 +9125,266 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 })
 
 
+/**
+ * P014 historical analysis never writes MRP prices and is not attached to a mutable competitive scenario.
+ * @summary Compute an immutable, read-only series-level historical MRP run
+ */
+export const ComputeHistoricalMrpBody = zod.object({
+  "asOf": zod.coerce.date().optional()
+})
+
+
 export const GetMrpGeneratorRunParams = zod.object({
   "runId": zod.coerce.number()
 })
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemTwoTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemTwoTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemTwoTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemTwoTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemFourTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemFourTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFourTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFourTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemFiveTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemFiveTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFiveTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFiveTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemSixTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemSixTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemSixTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemSixTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemSevenTwoThresholdMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemSevenTwoThresholdMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault = 38;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault = 40;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsAMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsAMax = 1;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsAMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsAMax = 1;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsBMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsBMax = 1;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsBMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsBMax = 1;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsCMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsCMax = 1;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsCMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsCMax = 1;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsDMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsDMax = 1;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsDMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsDMax = 1;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCompetitorStaleAfterDaysDefault = 365;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCompetitorStaleAfterDaysMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCompetitorStaleAfterDaysDefault = 365;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCompetitorStaleAfterDaysMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCompetitorExcludeStaleDefault = true;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCaptureSharesMinOne = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCaptureSharesMaxOne = 1;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCompetitorExcludeStaleDefault = true;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCaptureSharesMinOne = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCaptureSharesMaxOne = 1;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneDefendTargetUndercutMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneDefendTargetUndercutMax = 1;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneDefendTargetUndercutMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneDefendTargetUndercutMax = 1;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCategoryFloorsMinOne = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCategoryFloorsMinOne = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneMarginTargetUpliftPointsMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneMarginTargetUpliftPointsMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneMaxIncreasePercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneMaxIncreasePercentMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneMaxDecreasePercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneMaxDecreasePercentMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneHoldThresholdDefault = 50;
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneHoldThresholdMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneHoldThresholdDefault = 50;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneHoldThresholdMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOneRoundingUnitMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneRoundingUnitMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotPolicyOnePortfolioPointsMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOnePortfolioPointsMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneHoldBelowMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneHoldBelowMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRoundingUnitMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRoundingUnitMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneCategoryFloorsMinOne = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneCategoryFloorsMinOne = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRowsItemTargetPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemTargetPercentMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRowsItemMaxIncreaseMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxIncreaseMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRowsItemMaxDecreaseMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemSevenTwoThresholdMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemSevenTwoThresholdMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneHoldBelowMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneHoldBelowMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRoundingUnitExclusiveMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRoundingUnitExclusiveMin = 0;
 
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneCategoryFloorsMinOne = 0;
-export const getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneCategoryFloorsMinOne = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsAMin = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsAMax = 1;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsAMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsAMax = 1;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsBMin = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsBMax = 1;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsBMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsBMax = 1;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsCMin = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsCMax = 1;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsCMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsCMax = 1;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsDMin = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneBandsDMax = 1;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsDMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsDMax = 1;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneCompetitorStaleAfterDaysDefault = 365;
-export const getMrpGeneratorRunResponseScenarioPolicyOneCompetitorStaleAfterDaysMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCompetitorStaleAfterDaysDefault = 365;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCompetitorStaleAfterDaysMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneCompetitorExcludeStaleDefault = true;
-export const getMrpGeneratorRunResponseScenarioPolicyOneCaptureSharesMinOne = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneCaptureSharesMaxOne = 1;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCompetitorExcludeStaleDefault = true;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCaptureSharesMinOne = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCaptureSharesMaxOne = 1;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneDefendTargetUndercutMin = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneDefendTargetUndercutMax = 1;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneDefendTargetUndercutMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneDefendTargetUndercutMax = 1;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneCategoryFloorsMinOne = 0;
-export const getMrpGeneratorRunResponseScenarioPolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCategoryFloorsMinOne = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneMarginTargetUpliftPointsMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneMarginTargetUpliftPointsMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneMaxIncreasePercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneMaxIncreasePercentMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneMaxDecreasePercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneMaxDecreasePercentMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneHoldThresholdDefault = 50;
-export const getMrpGeneratorRunResponseScenarioPolicyOneHoldThresholdMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneHoldThresholdDefault = 50;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneHoldThresholdMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOneRoundingUnitMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOneRoundingUnitMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioPolicyOnePortfolioPointsMin = 0;
+export const getMrpGeneratorRunResponseScenarioOnePolicyOnePortfolioPointsMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneHoldBelowMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneHoldBelowMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneRoundingUnitMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRoundingUnitMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneCategoryFloorsMinOne = 0;
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneCategoryFloorsExclusiveMaxOne = 100;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneCategoryFloorsMinOne = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneCategoryFloorsExclusiveMaxOne = 100;
 
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneRowsItemTargetPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemTargetPercentMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneRowsItemMaxIncreaseMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxIncreaseMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioSimplePolicyOneRowsItemMaxDecreaseMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneSimpleRowsItemTargetPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemTargetPercentMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneSimpleRowsItemMaxIncreaseMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxIncreaseMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneSimpleRowsItemMaxDecreaseMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxDecreaseMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemTwoTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemTwoTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemTwoTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemTwoTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFourTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFourTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFourTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFourTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFiveTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFiveTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFiveTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFiveTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemSixTwoPercentMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemSixTwoPercentMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemSixTwoPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemSixTwoPercentMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemSevenTwoThresholdMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemSevenTwoThresholdMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPTMTDefault = 65;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPTMTMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsCPMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsCPDefault = 38;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsCPMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsCPExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault = 30;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault = 38;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSINKDefault = 40;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSINKMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREDefault = 38;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax = 100;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemOnezeroTwoTwoSalesValueMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneHoldBelowMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneHoldBelowMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneRoundingUnitExclusiveMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRoundingUnitExclusiveMin = 0;
 
-export const getMrpGeneratorRunResponseScenarioAdvancedOneCategoryFloorsMinOne = 0;
-export const getMrpGeneratorRunResponseScenarioAdvancedOneCategoryFloorsExclusiveMaxOne = 100;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneCategoryFloorsMinOne = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneCategoryFloorsExclusiveMaxOne = 100;
 
 export const getMrpGeneratorRunResponseSimplePolicyOneHoldBelowMin = 0;
 
@@ -9277,9 +9457,11 @@ export const getMrpGeneratorRunResponseAdvancedPolicyOneCategoryFloorsExclusiveM
 export const GetMrpGeneratorRunResponse = zod.object({
   "run": zod.object({
   "id": zod.number(),
-  "scenarioId": zod.number(),
+  "scenarioId": zod.number().nullable(),
+  "modelKind": zod.enum(['competitive', 'historical']),
   "asOf": zod.coerce.date(),
-  "inputSnapshot": zod.object({
+  "inputSnapshot": zod.union([zod.object({
+  "modelKind": zod.enum(['competitive']),
   "asOf": zod.coerce.date(),
   "products": zod.array(zod.object({
   "itemCode": zod.string(),
@@ -9356,7 +9538,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "competitor": zod.string(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemTwoTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemTwoTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemTwoTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemTwoTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9384,7 +9566,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemFourTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemFourTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFourTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFourTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9398,7 +9580,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemFiveTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemFiveTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFiveTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemFiveTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9412,7 +9594,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemSixTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotRulesItemSixTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemSixTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemSixTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9426,7 +9608,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "threshold": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemSevenTwoThresholdMin)
+  "threshold": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemSevenTwoThresholdMin)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9456,12 +9638,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "categoryFloors": zod.object({
-  "PTMT": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTMin).lt(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPTMTDefault),
-  "C P": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPMin).lt(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsCPDefault),
-  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
-  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
-  "SINK": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKMin).lt(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsSINKDefault),
-  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+  "PTMT": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsCPMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
 })
 })),zod.union([zod.object({
   "scope": zod.object({
@@ -9496,17 +9678,17 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
   "mode": zod.enum(['value_threshold', 'threshold']),
   "operator": zod.enum(['above', 'below']),
-  "salesValue": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotRulesItemOnezeroTwoTwoSalesValueMin)
+  "salesValue": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneRulesItemOnezeroTwoTwoSalesValueMin)
 }))])])),
   "policyVersion": zod.number().nullish(),
   "policy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "period": zod.enum(['2026-27']),
   "bands": zod.object({
-  "A": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsAMin).max(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsAMax).optional(),
-  "B": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsBMin).max(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsBMax).optional(),
-  "C": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsCMin).max(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsCMax).optional(),
-  "D": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsDMin).max(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneBandsDMax).optional()
+  "A": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsAMin).max(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsAMax).optional(),
+  "B": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsBMin).max(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsBMax).optional(),
+  "C": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsCMin).max(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsCMax).optional(),
+  "D": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsDMin).max(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneBandsDMax).optional()
 }).optional(),
   "position": zod.object({
   "wellBelowAbove": zod.number().optional(),
@@ -9516,36 +9698,36 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitor": zod.object({
   "mode": zod.enum(['nearest', 'lowest', 'named']).optional(),
   "named": zod.string().nullish(),
-  "staleAfterDays": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCompetitorStaleAfterDaysMin).default(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCompetitorStaleAfterDaysDefault),
-  "excludeStale": zod.boolean().default(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCompetitorExcludeStaleDefault)
+  "staleAfterDays": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCompetitorStaleAfterDaysMin).default(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCompetitorStaleAfterDaysDefault),
+  "excludeStale": zod.boolean().default(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCompetitorExcludeStaleDefault)
 }).optional(),
-  "captureShares": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCaptureSharesMinOne).max(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCaptureSharesMaxOne)).optional(),
-  "defendTargetUndercut": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneDefendTargetUndercutMin).max(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneDefendTargetUndercutMax).optional(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
-  "marginTargetUpliftPoints": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneMarginTargetUpliftPointsMin).optional(),
-  "maxIncreasePercent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneMaxIncreasePercentMin).optional(),
-  "maxDecreasePercent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneMaxDecreasePercentMin).optional(),
-  "holdThreshold": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneHoldThresholdMin).default(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneHoldThresholdDefault),
+  "captureShares": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCaptureSharesMinOne).max(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCaptureSharesMaxOne)).optional(),
+  "defendTargetUndercut": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneDefendTargetUndercutMin).max(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneDefendTargetUndercutMax).optional(),
+  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
+  "marginTargetUpliftPoints": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneMarginTargetUpliftPointsMin).optional(),
+  "maxIncreasePercent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneMaxIncreasePercentMin).optional(),
+  "maxDecreasePercent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneMaxDecreasePercentMin).optional(),
+  "holdThreshold": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneHoldThresholdMin).default(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneHoldThresholdDefault),
   "rounding": zod.object({
-  "unit": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOneRoundingUnitMin).optional(),
+  "unit": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOneRoundingUnitMin).optional(),
   "direction": zod.enum(['nearest', 'up', 'down']).optional()
 }).optional(),
   "portfolio": zod.object({
   "mode": zod.enum(['hold_current', 'improve_by_points', 'allow_decline_points']).optional(),
-  "points": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotPolicyOnePortfolioPointsMin).optional()
+  "points": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOnePolicyOnePortfolioPointsMin).optional()
 }).optional()
 }).describe('P011 deterministic policy. Bands use cumulative taxable sales contribution; band F is the separate no-sales exclusion.\n'),zod.null()]).optional(),
   "simplePolicy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "mode": zod.literal("simple"),
-  "holdBelow": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneHoldBelowMin),
+  "holdBelow": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneHoldBelowMin),
   "rounding": zod.object({
-  "unit": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRoundingUnitMin),
+  "unit": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRoundingUnitMin),
   "direction": zod.enum(['nearest', 'up', 'down'])
 }),
   "marginEnabled": zod.boolean(),
   "volumeEnabled": zod.boolean(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
+  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
   "rows": zod.array(zod.object({
   "id": zod.string(),
   "order": zod.number(),
@@ -9560,10 +9742,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }),
   "target": zod.object({
   "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRowsItemTargetPercentMin).nullish()
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
-  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
-  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
+  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -9585,10 +9767,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }),
   "target": zod.object({
   "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
 }),
-  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
-  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
+  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -9618,7 +9800,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "competitor": zod.string(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemTwoTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9646,7 +9828,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFourTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFourTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9660,7 +9842,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemFiveTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemFiveTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9674,7 +9856,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemSixTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemSixTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9688,7 +9870,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "threshold": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemSevenTwoThresholdMin)
+  "threshold": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemSevenTwoThresholdMin)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -9718,12 +9900,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "categoryFloors": zod.object({
-  "PTMT": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault),
-  "C P": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault),
-  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
-  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
-  "SINK": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault),
-  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+  "PTMT": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
 })
 })),zod.union([zod.object({
   "scope": zod.object({
@@ -9758,16 +9940,16 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
   "mode": zod.enum(['value_threshold', 'threshold']),
   "operator": zod.enum(['above', 'below']),
-  "salesValue": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin)
+  "salesValue": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemOnezeroTwoTwoSalesValueMin)
 }))])])),
-  "holdBelow": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneHoldBelowMin),
+  "holdBelow": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneHoldBelowMin),
   "rounding": zod.object({
-  "unit": zod.number().gt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneRoundingUnitExclusiveMin),
+  "unit": zod.number().gt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRoundingUnitExclusiveMin),
   "direction": zod.enum(['nearest', 'up', 'down'])
 }),
   "marginEnabled": zod.boolean(),
   "volumeEnabled": zod.boolean(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseRunInputSnapshotAdvancedPolicyOneCategoryFloorsExclusiveMaxOne)).optional()
+  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneCategoryFloorsExclusiveMaxOne)).optional()
 }),zod.null()]).optional(),
   "p012Results": zod.array(zod.object({
   "id": zod.number(),
@@ -9803,6 +9985,62 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -9950,8 +10188,57 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
-}).optional()
-}),
+}).optional(),
+  "history": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "seriesAnalyses": zod.array(zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+})).optional()
+}),zod.object({
+  "modelKind": zod.enum(['historical']),
+  "asOf": zod.coerce.date(),
+  "products": zod.array(zod.record(zod.string(), zod.unknown())),
+  "history": zod.array(zod.record(zod.string(), zod.unknown())),
+  "seriesAnalyses": zod.array(zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+})),
+  "summary": zod.record(zod.string(), zod.unknown())
+})]),
   "inputFingerprint": zod.string(),
   "summary": zod.object({
   "total": zod.number(),
@@ -10016,6 +10303,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }),
   "sourceFreshness": zod.object({
   "asOf": zod.coerce.date(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "source": zod.string().nullish(),
+  "historyRows": zod.number().nullish(),
+  "latestDate": zod.coerce.date().nullish(),
   "mrpDates": zod.array(zod.coerce.date()),
   "competitors": zod.array(zod.object({
   "competitor": zod.string(),
@@ -10234,18 +10525,19 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "createdBy": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 }),
-  "policyVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3)]),
-  "scenario": zod.object({
+  "policyVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3),zod.literal(null)]).nullable(),
+  "modelKind": zod.enum(['competitive', 'historical']),
+  "scenario": zod.union([zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "policy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "period": zod.enum(['2026-27']),
   "bands": zod.object({
-  "A": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneBandsAMin).max(getMrpGeneratorRunResponseScenarioPolicyOneBandsAMax).optional(),
-  "B": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneBandsBMin).max(getMrpGeneratorRunResponseScenarioPolicyOneBandsBMax).optional(),
-  "C": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneBandsCMin).max(getMrpGeneratorRunResponseScenarioPolicyOneBandsCMax).optional(),
-  "D": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneBandsDMin).max(getMrpGeneratorRunResponseScenarioPolicyOneBandsDMax).optional()
+  "A": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsAMin).max(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsAMax).optional(),
+  "B": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsBMin).max(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsBMax).optional(),
+  "C": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsCMin).max(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsCMax).optional(),
+  "D": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsDMin).max(getMrpGeneratorRunResponseScenarioOnePolicyOneBandsDMax).optional()
 }).optional(),
   "position": zod.object({
   "wellBelowAbove": zod.number().optional(),
@@ -10255,36 +10547,36 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitor": zod.object({
   "mode": zod.enum(['nearest', 'lowest', 'named']).optional(),
   "named": zod.string().nullish(),
-  "staleAfterDays": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneCompetitorStaleAfterDaysMin).default(getMrpGeneratorRunResponseScenarioPolicyOneCompetitorStaleAfterDaysDefault),
-  "excludeStale": zod.boolean().default(getMrpGeneratorRunResponseScenarioPolicyOneCompetitorExcludeStaleDefault)
+  "staleAfterDays": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneCompetitorStaleAfterDaysMin).default(getMrpGeneratorRunResponseScenarioOnePolicyOneCompetitorStaleAfterDaysDefault),
+  "excludeStale": zod.boolean().default(getMrpGeneratorRunResponseScenarioOnePolicyOneCompetitorExcludeStaleDefault)
 }).optional(),
-  "captureShares": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneCaptureSharesMinOne).max(getMrpGeneratorRunResponseScenarioPolicyOneCaptureSharesMaxOne)).optional(),
-  "defendTargetUndercut": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneDefendTargetUndercutMin).max(getMrpGeneratorRunResponseScenarioPolicyOneDefendTargetUndercutMax).optional(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioPolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
-  "marginTargetUpliftPoints": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneMarginTargetUpliftPointsMin).optional(),
-  "maxIncreasePercent": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneMaxIncreasePercentMin).optional(),
-  "maxDecreasePercent": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneMaxDecreasePercentMin).optional(),
-  "holdThreshold": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneHoldThresholdMin).default(getMrpGeneratorRunResponseScenarioPolicyOneHoldThresholdDefault),
+  "captureShares": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneCaptureSharesMinOne).max(getMrpGeneratorRunResponseScenarioOnePolicyOneCaptureSharesMaxOne)).optional(),
+  "defendTargetUndercut": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneDefendTargetUndercutMin).max(getMrpGeneratorRunResponseScenarioOnePolicyOneDefendTargetUndercutMax).optional(),
+  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioOnePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
+  "marginTargetUpliftPoints": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneMarginTargetUpliftPointsMin).optional(),
+  "maxIncreasePercent": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneMaxIncreasePercentMin).optional(),
+  "maxDecreasePercent": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneMaxDecreasePercentMin).optional(),
+  "holdThreshold": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneHoldThresholdMin).default(getMrpGeneratorRunResponseScenarioOnePolicyOneHoldThresholdDefault),
   "rounding": zod.object({
-  "unit": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOneRoundingUnitMin).optional(),
+  "unit": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOneRoundingUnitMin).optional(),
   "direction": zod.enum(['nearest', 'up', 'down']).optional()
 }).optional(),
   "portfolio": zod.object({
   "mode": zod.enum(['hold_current', 'improve_by_points', 'allow_decline_points']).optional(),
-  "points": zod.number().min(getMrpGeneratorRunResponseScenarioPolicyOnePortfolioPointsMin).optional()
+  "points": zod.number().min(getMrpGeneratorRunResponseScenarioOnePolicyOnePortfolioPointsMin).optional()
 }).optional()
 }).describe('P011 deterministic policy. Bands use cumulative taxable sales contribution; band F is the separate no-sales exclusion.\n'),zod.null()]).optional(),
   "simplePolicy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "mode": zod.literal("simple"),
-  "holdBelow": zod.number().min(getMrpGeneratorRunResponseScenarioSimplePolicyOneHoldBelowMin),
+  "holdBelow": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneHoldBelowMin),
   "rounding": zod.object({
-  "unit": zod.number().min(getMrpGeneratorRunResponseScenarioSimplePolicyOneRoundingUnitMin),
+  "unit": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRoundingUnitMin),
   "direction": zod.enum(['nearest', 'up', 'down'])
 }),
   "marginEnabled": zod.boolean(),
   "volumeEnabled": zod.boolean(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioSimplePolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioSimplePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
+  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneCategoryFloorsExclusiveMaxOne)).optional(),
   "rows": zod.array(zod.object({
   "id": zod.string(),
   "order": zod.number(),
@@ -10299,10 +10591,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }),
   "target": zod.object({
   "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
-  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioSimplePolicyOneRowsItemTargetPercentMin).nullish()
+  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
-  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseScenarioSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
-  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseScenarioSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
+  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -10324,10 +10616,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }),
   "target": zod.object({
   "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
-  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneSimpleRowsItemTargetPercentMin).nullish()
+  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemTargetPercentMin).nullish()
 }),
-  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneSimpleRowsItemMaxIncreaseMin).nullish(),
-  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "maxIncrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxIncreaseMin).nullish(),
+  "maxDecrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxDecreaseMin).nullish(),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -10357,7 +10649,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "competitor": zod.string(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemTwoTwoPercentMin).max(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemTwoTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemTwoTwoPercentMin).max(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemTwoTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -10385,7 +10677,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFourTwoPercentMin).max(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFourTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFourTwoPercentMin).max(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFourTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -10399,7 +10691,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFiveTwoPercentMin).max(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemFiveTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFiveTwoPercentMin).max(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemFiveTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -10413,7 +10705,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemSixTwoPercentMin).max(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemSixTwoPercentMax)
+  "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemSixTwoPercentMin).max(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemSixTwoPercentMax)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -10427,7 +10719,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional()
 }).and(zod.object({
   "type": zod.unknown(),
-  "threshold": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemSevenTwoThresholdMin)
+  "threshold": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemSevenTwoThresholdMin)
 })),zod.object({
   "scope": zod.object({
   "division": zod.union([zod.string(),zod.array(zod.string())]).optional(),
@@ -10457,12 +10749,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).and(zod.object({
   "type": zod.unknown(),
   "categoryFloors": zod.object({
-  "PTMT": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPTMTDefault),
-  "C P": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsCPMin).lt(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsCPDefault),
-  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
-  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
-  "SINK": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSINKMin).lt(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsSINKDefault),
-  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
+  "PTMT": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPTMTMin).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPTMTExclusiveMax).default(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPTMTDefault),
+  "C P": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsCPMin).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsCPExclusiveMax).default(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsCPDefault),
+  "PLUMBING": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGMin).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGExclusiveMax).default(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsPLUMBINGDefault),
+  "SANITARYWARE": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREMin).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREExclusiveMax).default(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSANITARYWAREDefault),
+  "SINK": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSINKMin).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSINKExclusiveMax).default(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsSINKDefault),
+  "HARDWARE": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREMin).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREExclusiveMax).default(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemNineTwoCategoryFloorsHARDWAREDefault)
 })
 })),zod.union([zod.object({
   "scope": zod.object({
@@ -10497,20 +10789,20 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "period": zod.enum(['2026-27']).describe('The only currently supported Sales period.'),
   "mode": zod.enum(['value_threshold', 'threshold']),
   "operator": zod.enum(['above', 'below']),
-  "salesValue": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneRulesItemOnezeroTwoTwoSalesValueMin)
+  "salesValue": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemOnezeroTwoTwoSalesValueMin)
 }))])])),
-  "holdBelow": zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneHoldBelowMin),
+  "holdBelow": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneHoldBelowMin),
   "rounding": zod.object({
-  "unit": zod.number().gt(getMrpGeneratorRunResponseScenarioAdvancedOneRoundingUnitExclusiveMin),
+  "unit": zod.number().gt(getMrpGeneratorRunResponseScenarioOneAdvancedOneRoundingUnitExclusiveMin),
   "direction": zod.enum(['nearest', 'up', 'down'])
 }),
   "marginEnabled": zod.boolean(),
   "volumeEnabled": zod.boolean(),
-  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioAdvancedOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioAdvancedOneCategoryFloorsExclusiveMaxOne)).optional()
+  "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneCategoryFloorsExclusiveMaxOne)).optional()
 }),zod.null()]).optional(),
   "isDefault": zod.boolean().optional(),
   "canReset": zod.boolean().optional()
-}),
+}),zod.null()]),
   "simplePolicy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "mode": zod.literal("simple"),
@@ -10779,6 +11071,62 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -10870,6 +11218,62 @@ export const GetMrpGeneratorResultsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -10921,9 +11325,14 @@ export const GetMrpGeneratorResultsResponse = zod.object({
 })
 
 
+export const compareMrpGeneratorRunsQueryRunIdsMin = 2;
+
+
+
 export const CompareMrpGeneratorRunsQueryParams = zod.object({
-  "leftRunId": zod.coerce.number(),
-  "rightRunId": zod.coerce.number()
+  "runIds": zod.array(zod.coerce.number()).min(compareMrpGeneratorRunsQueryRunIdsMin).optional().describe('Two or more run IDs; comma-separated values are also accepted.'),
+  "leftRunId": zod.coerce.number().optional(),
+  "rightRunId": zod.coerce.number().optional()
 })
 
 export const compareMrpGeneratorRunsResponseLeftPolicyOneBandsAMin = 0;
@@ -11002,13 +11411,15 @@ export const compareMrpGeneratorRunsResponseRightPolicyOneRoundingUnitMin = 0;
 
 export const compareMrpGeneratorRunsResponseRightPolicyOnePortfolioPointsMin = 0;
 
+export const compareMrpGeneratorRunsResponseRunIdsMin = 2;
+
 
 
 export const CompareMrpGeneratorRunsResponse = zod.object({
   "leftRunId": zod.number(),
   "rightRunId": zod.number(),
-  "leftPolicyVersion": zod.union([zod.literal(1),zod.literal(2)]),
-  "rightPolicyVersion": zod.union([zod.literal(1),zod.literal(2)]),
+  "leftPolicyVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3),zod.literal(null)]).nullable(),
+  "rightPolicyVersion": zod.union([zod.literal(1),zod.literal(2),zod.literal(3),zod.literal(null)]).nullable(),
   "leftPolicy": zod.union([zod.object({
   "policyVersion": zod.number(),
   "period": zod.enum(['2026-27']),
@@ -11117,6 +11528,62 @@ export const CompareMrpGeneratorRunsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -11199,6 +11666,62 @@ export const CompareMrpGeneratorRunsResponse = zod.object({
   "competitiveTarget": zod.number().nullable(),
   "bindingConstraint": zod.string().nullable(),
   "changePercent": zod.number().nullable(),
+  "modelKind": zod.union([zod.literal('competitive'),zod.literal('historical'),zod.literal(null)]).nullish(),
+  "series": zod.string().nullish(),
+  "reason": zod.string().nullish(),
+  "historicalEvidence": zod.union([zod.object({
+  "series": zod.string().optional(),
+  "revisionDates": zod.array(zod.coerce.date()).optional(),
+  "eventDistributions": zod.array(zod.object({
+  "date": zod.coerce.date().optional(),
+  "productCount": zod.number().optional(),
+  "rates": zod.array(zod.number()).optional(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish()
+})).optional(),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']).optional(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']).optional(),
+  "monthsSinceLast": zod.number().nullish(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "product": zod.object({
+  "lastRevisionDate": zod.coerce.date().nullable(),
+  "monthsSinceLast": zod.number().nullable(),
+  "nextExpectedDate": zod.coerce.date().nullable(),
+  "due": zod.boolean(),
+  "overdue": zod.boolean(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "reason": zod.string().nullable()
+}).optional(),
+  "seriesAnalysis": zod.object({
+  "series": zod.string(),
+  "productCount": zod.number(),
+  "revisionCount": zod.number(),
+  "revisionDates": zod.array(zod.coerce.date()),
+  "cadenceMonths": zod.number().nullish(),
+  "typicalRate": zod.number().nullish(),
+  "p10Rate": zod.number().nullish(),
+  "p90Rate": zod.number().nullish(),
+  "spreadPoints": zod.number().nullish(),
+  "uniform": zod.boolean().optional(),
+  "usable": zod.boolean(),
+  "confidence": zod.enum(['STRONG', 'MODERATE', 'WEAK', 'NONE']),
+  "lastRevisionDate": zod.coerce.date().nullish(),
+  "monthsSinceLast": zod.number().nullish(),
+  "status": zod.enum(['DUE', 'OVERDUE', 'NOT_DUE', 'PATTERN_NOT_USABLE']),
+  "due": zod.boolean().optional(),
+  "overdue": zod.boolean().optional(),
+  "nextExpectedDate": zod.coerce.date().nullish(),
+  "reason": zod.string().nullish()
+}).optional()
+}),zod.object({
+
+}).passthrough(),zod.null()]).optional(),
   "salesEvidence": zod.union([zod.object({
   "salesAmount": zod.number(),
   "qty": zod.number().nullable(),
@@ -11247,7 +11770,14 @@ export const CompareMrpGeneratorRunsResponse = zod.object({
   "volumeTier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal('F'),zod.literal(null)]).nullish(),
   "createdAt": zod.coerce.date()
 }),zod.null()])
-}))
+})),
+  "runIds": zod.array(zod.number()).min(compareMrpGeneratorRunsResponseRunIdsMin),
+  "runs": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "products": zod.array(zod.record(zod.string(), zod.unknown())),
+  "categories": zod.record(zod.string(), zod.number()).optional(),
+  "categoryCounts": zod.record(zod.string(), zod.number()),
+  "disagreementCounts": zod.record(zod.string(), zod.number()).optional(),
+  "largestDisagreements": zod.array(zod.record(zod.string(), zod.unknown())).optional()
 })
 
 

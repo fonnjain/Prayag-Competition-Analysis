@@ -345,7 +345,9 @@ export const mrpGeneratorRunsTable = pgTable(
   "mrp_generator_runs",
   {
     id: serial("id").primaryKey(),
-    scenarioId: integer("scenario_id").notNull().references(() => mrpGeneratorScenariosTable.id),
+    // Historical runs are independent of mutable competitive scenarios.
+    scenarioId: integer("scenario_id").references(() => mrpGeneratorScenariosTable.id),
+    modelKind: text("model_kind").notNull().default("competitive"), // competitive | historical
     asOf: date("as_of").notNull(),
     inputSnapshot: text("input_snapshot").notNull(),
     inputFingerprint: text("input_fingerprint").notNull(),
@@ -380,6 +382,12 @@ export const mrpGeneratorResultsTable = pgTable(
     competitiveTarget: doublePrecision("competitive_target"),
     bindingConstraint: text("binding_constraint"),
     changePercent: doublePrecision("change_percent"),
+    // P014 evidence is immutable JSON captured with the result; these fields
+    // are nullable so all pre-P014 rows remain readable.
+    modelKind: text("model_kind"),
+    series: text("series"),
+    reason: text("reason"),
+    evidence: text("evidence"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

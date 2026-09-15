@@ -1,58 +1,137 @@
-import React, { useState } from "react";
-import { useCompareMrpGeneratorRuns, getCompareMrpGeneratorRunsQueryKey, useListMrpGeneratorRuns } from "@workspace/api-client-react";
+import React, { useState, useMemo } from "react";
+import { useCompareMrpGeneratorRuns, getCompareMrpGeneratorRunsQueryKey, useListMrpGeneratorRuns, MrpGeneratorComparison } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, Plus, Trash2, ChevronDown, Check, X, ChevronRight, Filter } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
+type FilterState = {
+  disagreementsOnly: boolean;
+  oneHasSuggestion: boolean;
+  minDifference: number | "";
+};
+
 export default function MrpGeneratorCompare() {
-  const [leftRunId, setLeftRunId] = useState("");
-  const [rightRunId, setRightRunId] = useState("");
-  const [submittedIds, setSubmittedIds] = useState<{ left: number; right: number } | null>(null);
+  const [runIdsInput, setRunIdsInput] = useState<string[]>(["", ""]);
+  const [submittedIds, setSubmittedIds] = useState<number[] | null>(null);
+
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [filters, setFilters] = useState<FilterState>({
+    disagreementsOnly: true,
+    oneHasSuggestion: false,
+    minDifference: "",
+  });
 
   const { data: runsData } = useListMrpGeneratorRuns({ limit: 10 });
   const recentRuns = runsData?.runs || [];
 
   const { data, isLoading, error } = useCompareMrpGeneratorRuns(
-    { leftRunId: submittedIds?.left as number, rightRunId: submittedIds?.right as number },
-    { query: { enabled: !!submittedIds, queryKey: submittedIds ? getCompareMrpGeneratorRunsQueryKey({ leftRunId: submittedIds.left, rightRunId: submittedIds.right }) : ["compare-mrp-runs", "none"] } }
+    { runIds: submittedIds as number[] },
+    { query: { enabled: !!submittedIds && submittedIds.length >= 2, queryKey: submittedIds ? getCompareMrpGeneratorRunsQueryKey({ runIds: submittedIds }) : ["compare-mrp-runs", "none"] } }
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const l = parseInt(leftRunId);
-    const r = parseInt(rightRunId);
-    if (!isNaN(l) && !isNaN(r)) {
-      setSubmittedIds({ left: l, right: r });
+    const parsed = runIdsInput.map(id => parseInt(id)).filter(id => !isNaN(id));
+    if (parsed.length >= 2) {
+      setSubmittedIds(parsed);
+      setExpandedRows(new Set());
     }
   };
 
-  const differences = data?.differences || [];
+  const addRunInput = () => {
+    setRunIdsInput(prev => [...prev, ""]);
+  };
+
+  const removeRunInput = (index: number) => {
+    setRunIdsInput(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateRunInput = (index: number, value: string) => {
+    setRunIdsInput(prev => prev.map((item, i) => i === index ? value : item));
+  };
+
+  const toggleRow = (itemCode: string) => {
+    const next = new Set(expandedRows);
+    if (next.has(itemCode)) next.delete(itemCode);
+    else next.add(itemCode);
+    setExpandedRows(next);
+  };
+
+  // Ensure data exists before trying to access it
+  const comparisonData = data as MrpGeneratorComparison | undefined;
+
+  const products = comparisonData?.products || [];
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p: any) => {
+      if (filters.disagreementsOnly) {
+        if (p.category === "agree") return false;
+      }
+
+      const values = submittedIds ? submittedIds.map(id => p.values[String(id)]?.suggestedMrp) : [];
+      if (filters.oneHasSuggestion) {
+        if (p.category === "one_sided" || p.category === "historical_only" || p.category === "competitive_only") {
+          // Handled by category
+        } else {
+          const hasSuggestion = values.some(v => v != null);
+          const someMissing = values.some(v => v == null);
+          if (!(hasSuggestion && someMissing)) return false;
+        }
+      }
+
+      if (filters.minDifference !== "") {
+        const minDiff = Number(filters.minDifference);
+        if (!isNaN(minDiff) && minDiff > 0) {
+          const validValues = values.filter((v): v is number => v != null);
+          if (validValues.length < 2) return false;
+          const max = Math.max(...validValues);
+          const min = Math.min(...validValues);
+          if ((max - min) < minDiff) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [products, filters, submittedIds]);
 
   return (
     <div className="flex flex-col min-h-full bg-muted/20">
       <div className="border-b bg-card px-4 py-3 sm:px-6">
         <h1 className="text-lg font-semibold text-foreground">Compare Scenarios</h1>
-        <p className="text-sm text-muted-foreground">Compare the results of two different generator runs side-by-side.</p>
+        <p className="text-sm text-muted-foreground">Compare the results of multiple generator runs side-by-side.</p>
       </div>
 
       <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full space-y-6">
         <div className="bg-card border p-4 sm:p-5 rounded-lg shadow-sm">
-          <form onSubmit={handleSubmit} className="flex flex-col md:flex-row items-end gap-4">
-            <div className="flex-1 w-full space-y-1">
-              <Label>Left Run ID</Label>
-              <Input required type="number" value={leftRunId} onChange={e => setLeftRunId(e.target.value)} placeholder="e.g. 12" />
+          <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+            <div className="flex flex-wrap items-end gap-4">
+              {runIdsInput.map((val, idx) => (
+                <div key={idx} className="flex items-end gap-2">
+                  <div className="w-32 space-y-1">
+                    <Label>Run ID {idx + 1}</Label>
+                    <Input required type="number" value={val} onChange={e => updateRunInput(idx, e.target.value)} placeholder="e.g. 12" />
+                  </div>
+                  {runIdsInput.length > 2 && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeRunInput(idx)} className="mb-0.5" title="Remove">
+                      <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                  {idx < runIdsInput.length - 1 && (
+                    <div className="hidden md:flex shrink-0 mb-2 px-1 text-muted-foreground">
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <Button type="button" variant="outline" onClick={addRunInput} className="mb-0.5">
+                <Plus className="w-4 h-4 mr-2" /> Add Run
+              </Button>
+              <Button type="submit" className="mb-0.5 ml-auto">Compare</Button>
             </div>
-            <div className="hidden md:flex shrink-0 mb-2 px-2 text-muted-foreground">
-              <ArrowRightLeft className="w-5 h-5" />
-            </div>
-            <div className="flex-1 w-full space-y-1">
-              <Label>Right Run ID</Label>
-              <Input required type="number" value={rightRunId} onChange={e => setRightRunId(e.target.value)} placeholder="e.g. 13" />
-            </div>
-            <Button type="submit" className="w-full md:w-auto shrink-0">Compare</Button>
           </form>
 
           {recentRuns.length > 0 && (
@@ -64,9 +143,13 @@ export default function MrpGeneratorCompare() {
                   type="button"
                   className="px-2 py-1 bg-muted rounded border hover:border-primary transition-colors text-xs"
                   onClick={() => {
-                    if (!leftRunId) setLeftRunId(r.id.toString());
-                    else if (!rightRunId) setRightRunId(r.id.toString());
-                    else { setLeftRunId(r.id.toString()); setRightRunId(""); }
+                    // find first empty slot
+                    const idx = runIdsInput.findIndex(v => v === "");
+                    if (idx !== -1) {
+                      updateRunInput(idx, r.id.toString());
+                    } else {
+                      setRunIdsInput(prev => [...prev, r.id.toString()]);
+                    }
                   }}
                 >
                   #{r.id} ({r.scenarioName || "Run"})
@@ -76,71 +159,195 @@ export default function MrpGeneratorCompare() {
           )}
         </div>
 
-        {submittedIds && (
+        {submittedIds && submittedIds.length >= 2 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Comparison Results</h2>
-              <p className="text-xs text-muted-foreground">Only showing products with differing suggested prices.</p>
+            {/* Runs Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {comparisonData?.runs?.map((r: any) => (
+                <div key={r.runId} className="bg-card border rounded-lg p-4 shadow-sm text-sm">
+                  <h3 className="font-semibold text-foreground border-b pb-2 mb-2">Run #{r.runId} <span className="font-normal text-muted-foreground ml-1">({r.modelKind})</span></h3>
+                  <div className="flex flex-col gap-1 text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Evaluated:</span>
+                      <strong className="text-foreground">{r.summary?.evaluated ?? r.summary?.total ?? 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Would Change:</span>
+                      <strong className="text-foreground text-emerald-600">{r.summary?.wouldChange ?? r.summary?.suggested ?? 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Median Change:</span>
+                      <strong className="text-foreground">{r.summary?.medianIncreasePercent != null ? `+${r.summary.medianIncreasePercent}%` : "-"} / {r.summary?.medianDecreasePercent != null ? `${r.summary.medianDecreasePercent}%` : "-"}</strong>
+                    </div>
+                    {r.summary?.portfolio?.deltaPoints != null && (
+                      <div className="flex justify-between">
+                        <span>Total Value Movement:</span>
+                        <strong className="text-foreground">{r.summary.portfolio.deltaPoints > 0 ? "+" : ""}{r.summary.portfolio.deltaPoints.toFixed(1)} pts</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {comparisonData?.categoryCounts && (
+                <div className="bg-card border rounded-lg p-4 shadow-sm text-sm">
+                  <h3 className="font-semibold text-foreground border-b pb-2 mb-2">Comparison Overview</h3>
+                  <div className="flex flex-col gap-1 text-muted-foreground">
+                    {Object.entries(comparisonData.categoryCounts).map(([cat, count]) => (
+                      count > 0 && (
+                        <div key={cat} className="flex justify-between">
+                          <span className="capitalize">{cat.replace(/_/g, ' ')}:</span>
+                          <strong className="text-foreground">{count as number}</strong>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
-              <div className="grid grid-cols-[minmax(0,1fr)_160px_160px_100px] items-center gap-4 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <div>Product</div>
-                <div className="text-right">Left Run #{submittedIds.left}</div>
-                <div className="text-right">Right Run #{submittedIds.right}</div>
-                <div className="text-right">Variance</div>
+            {/* Filters */}
+            <div className="bg-card border p-3 rounded-lg shadow-sm flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                <Filter className="w-4 h-4" /> Filters:
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={filters.disagreementsOnly} onChange={e => setFilters(f => ({ ...f, disagreementsOnly: e.target.checked }))} className="rounded border-input" />
+                Disagreements Only
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={filters.oneHasSuggestion} onChange={e => setFilters(f => ({ ...f, oneHasSuggestion: e.target.checked }))} className="rounded border-input" />
+                At Least One Suggestion
+              </label>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-normal">Min absolute diff (₹):</Label>
+                <Input type="number" min="0" value={filters.minDifference} onChange={e => setFilters(f => ({ ...f, minDifference: e.target.value ? Number(e.target.value) : "" }))} className="w-24 h-8 text-sm" />
+              </div>
+            </div>
 
-              <div className="divide-y max-h-[600px] overflow-y-auto">
-                {isLoading ? (
-                  <div className="p-4 space-y-3">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
+            {/* Comparison Table */}
+            <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
+              <div className="flex overflow-x-auto">
+                <div className="min-w-max w-full">
+                  <div className="grid border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider p-3"
+                    style={{ gridTemplateColumns: `minmax(200px, 1.5fr) repeat(${submittedIds.length}, minmax(140px, 1fr)) 60px` }}
+                  >
+                    <div>Product</div>
+                    {submittedIds.map(id => (
+                      <div key={id} className="text-right">Run #{id}</div>
+                    ))}
+                    <div></div>
                   </div>
-                ) : error ? (
-                  <div className="p-8 text-center text-destructive">Failed to load comparison data.</div>
-                ) : differences.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">No differences found between these runs.</div>
-                ) : (
-                  differences.map((diffItem, idx: number) => {
-                    const l = diffItem.left?.suggestedMrp;
-                    const rt = diffItem.right?.suggestedMrp;
-                    const diff = l != null && rt != null ? rt - l : 0;
 
-                    return (
-                      <div key={diffItem.itemCode || idx} className="grid grid-cols-[minmax(0,1fr)_160px_160px_100px] items-center gap-4 p-3 text-sm hover:bg-muted/10 transition-colors">
-                        <div className="min-w-0">
-                          <div className="font-medium text-foreground truncate">{diffItem.itemCode}</div>
-                           <div className="text-xs text-muted-foreground truncate">{diffItem.left?.productName || diffItem.right?.productName || "No product name"}</div>
-                        </div>
-                        <div className="text-right">
-                           {diffItem.left == null ? "Not in scope" : l != null ? `₹${l.toFixed(2)}` : diffItem.left.status}
-                           {diffItem.left?.policyVersion === 2 && (
-                             <div className="text-[10px] text-muted-foreground mt-1">
-                               {diffItem.left.action} {diffItem.left.band && `• Bnd ${diffItem.left.band}`}
-                               {diffItem.left.position && ` • ${diffItem.left.position}`}
-                               {diffItem.left.escalation && ` • ESC`}
-                             </div>
-                           )}
-                        </div>
-                        <div className={cn("text-right font-medium", (rt !== l || diffItem.right?.action !== diffItem.left?.action || diffItem.right?.band !== diffItem.left?.band || diffItem.right?.escalation !== diffItem.left?.escalation) && "text-primary")}>
-                           {diffItem.right == null ? "Not in scope" : rt != null ? `₹${rt.toFixed(2)}` : diffItem.right.status}
-                           {diffItem.right?.policyVersion === 2 && (
-                             <div className="text-[10px] text-muted-foreground mt-1">
-                               {diffItem.right.action} {diffItem.right.band && `• Bnd ${diffItem.right.band}`}
-                               {diffItem.right.position && ` • ${diffItem.right.position}`}
-                               {diffItem.right.escalation && ` • ESC`}
-                             </div>
-                           )}
-                        </div>
-                        <div className={cn("text-right font-medium", diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-muted-foreground")}>
-                          {diff !== 0 ? `${diff > 0 ? "+" : ""}₹${Math.abs(diff).toFixed(2)}` : "-"}
-                        </div>
+                  <div className="divide-y">
+                    {isLoading ? (
+                      <div className="p-4 space-y-3">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
                       </div>
-                    );
-                  })
-                )}
+                    ) : error ? (
+                      <div className="p-8 text-center text-destructive">Failed to load comparison data.</div>
+                    ) : filteredProducts.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">No differences found matching your filters.</div>
+                    ) : (
+                      filteredProducts.map((p: any, idx: number) => {
+                        const expanded = expandedRows.has(p.itemCode);
+                        const firstVal = submittedIds.map(id => p.values[String(id)]).find(v => v);
+                        const productName = firstVal?.productName || "No product name";
+
+                        return (
+                          <div key={p.itemCode || idx} className={cn("transition-colors hover:bg-muted/10", expanded && "bg-muted/10")}>
+                            <div className="grid p-3 text-sm items-center" style={{ gridTemplateColumns: `minmax(200px, 1.5fr) repeat(${submittedIds.length}, minmax(140px, 1fr)) 60px` }}>
+                              <div className="min-w-0 pr-4">
+                                <div className="font-medium text-foreground truncate">{p.itemCode}</div>
+                                <div className="text-xs text-muted-foreground truncate">{productName}</div>
+                              </div>
+
+                              {submittedIds.map((id, i) => {
+                                const val = p.values[String(id)];
+                                const isDiff = p.comparisonChanged; // we can highlight differences
+
+                                return (
+                                  <div key={id} className={cn("text-right px-2", isDiff ? "font-medium" : "")}>
+                                    {val == null ? "Not in scope" : val.suggestedMrp != null ? `₹${val.suggestedMrp.toFixed(2)}` : val.status}
+                                    {val?.action && (
+                                      <div className="text-[10px] text-muted-foreground mt-1">
+                                        {val.action} {val.band && `• Bnd ${val.band}`}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              <button onClick={() => toggleRow(p.itemCode)} className="ml-auto p-1 rounded hover:bg-accent flex justify-center text-muted-foreground">
+                                <ChevronDown className={cn("w-4 h-4 transition-transform", expanded && "rotate-180")} />
+                              </button>
+                            </div>
+
+                            {/* Expanded Details */}
+                            {expanded && (
+                              <div className="px-3 pb-4 pt-1 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mt-2">
+                                  {submittedIds.map((id) => {
+                                    const val = p.values[String(id)];
+                                    if (!val) return null;
+
+                                    return (
+                                      <div key={id} className="bg-background border rounded p-3 space-y-2">
+                                        <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground border-b pb-1">Run #{id} Evidence</h4>
+                                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                                          <span className="text-muted-foreground">Status:</span>
+                                          <span className="text-right font-medium">{val.status}</span>
+                                          {val.currentMrp != null && (
+                                            <>
+                                              <span className="text-muted-foreground">Current MRP:</span>
+                                              <span className="text-right">₹{val.currentMrp.toFixed(2)}</span>
+                                            </>
+                                          )}
+                                        </div>
+
+                                        {val.historicalEvidence ? (
+                                          <div className="mt-2 space-y-1 bg-muted/20 p-2 border rounded text-xs">
+                                            <div className="font-semibold text-[10px] uppercase text-muted-foreground mb-1">Historical Series</div>
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                                              <span className="text-muted-foreground">Series:</span>
+                                              <span className="text-right font-medium">{val.historicalEvidence.series || "None"}</span>
+                                              <span className="text-muted-foreground">Reason/Status:</span>
+                                              <span className="text-right">{val.historicalEvidence.status || val.reason || "-"}</span>
+                                              {val.reason && (
+                                                <>
+                                                  <span className="text-muted-foreground">Product Reason:</span>
+                                                  <span className="text-right">{val.reason}</span>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-1 mt-2">
+                                            <div className="font-semibold text-[10px] uppercase text-muted-foreground mb-1">Deciding Rule</div>
+                                            {val.decisionSentence ? (
+                                              <div className="text-xs">{val.decisionSentence}</div>
+                                            ) : val.trace?.filter((t: any) => t.outcome === "fired").map((t: any, i: number) => (
+                                              <div key={i} className="text-xs bg-primary/5 border border-primary/20 p-1.5 rounded">
+                                                <span className="font-medium mr-1">{t.ruleType}:</span>
+                                                {t.reason}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

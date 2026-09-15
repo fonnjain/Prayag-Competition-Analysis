@@ -137,6 +137,8 @@ import type {
   MrpGeneratorScopes,
   MrpGeneratorSimplePreview,
   MrpGeneratorSimplePreviewInput,
+  MrpHistoricalRunInput,
+  MrpHistoricalRunResponse,
   MrpIncreaseList,
   MrpRevisionDetail,
   MrpRevisionPreview,
@@ -7672,6 +7674,78 @@ export function useListMrpGeneratorRuns<TData = Awaited<ReturnType<typeof listMr
 
 
 
+export const getComputeHistoricalMrpUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/historical/run`
+}
+
+/**
+ * P014 historical analysis never writes MRP prices and is not attached to a mutable competitive scenario.
+ * @summary Compute an immutable, read-only series-level historical MRP run
+ */
+export const computeHistoricalMrp = async (mrpHistoricalRunInput?: MrpHistoricalRunInput, options?: RequestInit): Promise<MrpHistoricalRunResponse> => {
+
+  return customFetch<MrpHistoricalRunResponse>(getComputeHistoricalMrpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpHistoricalRunInput,)
+  }
+);}
+
+
+
+
+export const getComputeHistoricalMrpMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof computeHistoricalMrp>>, TError,{data?: BodyType<MrpHistoricalRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof computeHistoricalMrp>>, TError,{data?: BodyType<MrpHistoricalRunInput>}, TContext> => {
+
+const mutationKey = ['computeHistoricalMrp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof computeHistoricalMrp>>, {data?: BodyType<MrpHistoricalRunInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  computeHistoricalMrp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ComputeHistoricalMrpMutationResult = NonNullable<Awaited<ReturnType<typeof computeHistoricalMrp>>>
+    export type ComputeHistoricalMrpMutationBody = BodyType<MrpHistoricalRunInput> | undefined
+    export type ComputeHistoricalMrpMutationError = ErrorType<void>
+
+    /**
+ * @summary Compute an immutable, read-only series-level historical MRP run
+ */
+export const useComputeHistoricalMrp = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof computeHistoricalMrp>>, TError,{data?: BodyType<MrpHistoricalRunInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof computeHistoricalMrp>>,
+        TError,
+        {data?: BodyType<MrpHistoricalRunInput>},
+        TContext
+      > => {
+      return useMutation(getComputeHistoricalMrpMutationOptions(options));
+    }
+
 export const getGetMrpGeneratorRunUrl = (runId: number,) => {
 
 
@@ -7814,10 +7888,18 @@ export function useGetMrpGeneratorResults<TData = Awaited<ReturnType<typeof getM
 
 
 
-export const getCompareMrpGeneratorRunsUrl = (params: CompareMrpGeneratorRunsParams,) => {
+export const getCompareMrpGeneratorRunsUrl = (params?: CompareMrpGeneratorRunsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["runIds"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
 
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : value.toString())
@@ -7829,7 +7911,7 @@ export const getCompareMrpGeneratorRunsUrl = (params: CompareMrpGeneratorRunsPar
   return stringifiedParams.length > 0 ? `/api/mrp-generator/compare?${stringifiedParams}` : `/api/mrp-generator/compare`
 }
 
-export const compareMrpGeneratorRuns = async (params: CompareMrpGeneratorRunsParams, options?: RequestInit): Promise<MrpGeneratorComparison> => {
+export const compareMrpGeneratorRuns = async (params?: CompareMrpGeneratorRunsParams, options?: RequestInit): Promise<MrpGeneratorComparison> => {
 
   return customFetch<MrpGeneratorComparison>(getCompareMrpGeneratorRunsUrl(params),
   {
@@ -7851,7 +7933,7 @@ export const getCompareMrpGeneratorRunsQueryKey = (params?: CompareMrpGeneratorR
     }
 
 
-export const getCompareMrpGeneratorRunsQueryOptions = <TData = Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError = ErrorType<unknown>>(params: CompareMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getCompareMrpGeneratorRunsQueryOptions = <TData = Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError = ErrorType<unknown>>(params?: CompareMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -7875,7 +7957,7 @@ export type CompareMrpGeneratorRunsQueryError = ErrorType<unknown>
 
 
 export function useCompareMrpGeneratorRuns<TData = Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError = ErrorType<unknown>>(
- params: CompareMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: CompareMrpGeneratorRunsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareMrpGeneratorRuns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 

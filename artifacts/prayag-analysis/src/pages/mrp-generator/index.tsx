@@ -13,7 +13,8 @@ import {
   useListMrpGeneratorRuns,
   useGetMrpGeneratorMetadata,
   useGetMrpGeneratorFreshness,
-  usePreviewMrpGeneratorSimpleScenario
+  usePreviewMrpGeneratorSimpleScenario,
+  useComputeHistoricalMrp
 } from "@workspace/api-client-react";
 import { ScenarioDialog } from "./components/ScenarioDialog";
 import { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorPolicy, MrpGeneratorSimplePolicy } from "./types";
@@ -65,6 +66,7 @@ export default function MrpGeneratorList() {
   const runMutation = useRunMrpGeneratorScenario();
   const duplicateMutation = useDuplicateMrpGeneratorScenario();
   const resetMutation = useResetMrpGeneratorScenario();
+  const computeHistoricalMutation = useComputeHistoricalMrp();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<any>(null);
@@ -173,6 +175,19 @@ export default function MrpGeneratorList() {
               <Activity className="w-4 h-4 mr-2" />
               Compare Runs
             </Link>
+          </Button>
+          <Button variant="outline" onClick={() => {
+            if (!confirm("Compute historical MRP baseline based on current catalog patterns?")) return;
+            computeHistoricalMutation.mutate({}, {
+              onSuccess: (res) => {
+                refetchRuns();
+                setLocation(`/mrp-generator/runs/${res.runId}`);
+              },
+              onError: (err: any) => toast({ title: "Historical Run Failed", description: getErrorMessage(err), variant: "destructive" })
+            });
+          }} disabled={computeHistoricalMutation.isPending}>
+            <History className="w-4 h-4 mr-2" />
+            Compute Historical
           </Button>
           <Button onClick={() => { setEditingScenario(null); setDialogOpen(true); }}>
             <Plus className="w-4 h-4 mr-2" />

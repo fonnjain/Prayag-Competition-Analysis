@@ -49,6 +49,9 @@ export default function MrpGeneratorRun() {
   const { run, scenario, results } = data;
   const summary = run.summary;
   const freshness = run.sourceFreshness;
+  const isHistorical = run.modelKind === "historical";
+  const historicalSnapshot = isHistorical ? (run.inputSnapshot as any) : null;
+  const historicalSeries = historicalSnapshot?.seriesAnalyses || [];
 
   const toggleRow = (itemCode: string) => {
     const next = new Set(expandedRows);
@@ -200,27 +203,52 @@ export default function MrpGeneratorRun() {
         {/* Summary Card */}
         <Card className="p-4 sm:p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Run Summary</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
-              <div className="text-2xl font-bold">{summary.policyVersion === 3 ? (summary.evaluated ?? summary.total) : summary.total || 0}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Evaluated</div>
+          {!isHistorical ? (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{summary.policyVersion === 3 ? (summary.evaluated ?? summary.total) : summary.total || 0}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Evaluated</div>
+              </div>
+              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
+                <div className="text-2xl font-bold text-emerald-700">{summary.policyVersion === 3 ? (summary.wouldChange ?? summary.suggested) : summary.suggested || 0}</div>
+                <div className="text-xs text-emerald-600/80 uppercase tracking-wide">Would Change</div>
+              </div>
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{summary.noChange || 0}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">No Change</div>
+              </div>
+              <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
+                <div className="text-2xl font-bold text-red-700">{summary.excluded || 0}</div>
+                <div className="text-xs text-red-600/80 uppercase tracking-wide">Excluded</div>
+              </div>
             </div>
-            <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
-              <div className="text-2xl font-bold text-emerald-700">{summary.policyVersion === 3 ? (summary.wouldChange ?? summary.suggested) : summary.suggested || 0}</div>
-              <div className="text-xs text-emerald-600/80 uppercase tracking-wide">Would Change</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{historicalSeries.filter((s: any) => s.usable).length}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Usable Series</div>
+              </div>
+              <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
+                <div className="text-2xl font-bold text-red-700">{historicalSeries.filter((s: any) => !s.usable).length}</div>
+                <div className="text-xs text-red-600/80 uppercase tracking-wide">Unusable Series</div>
+              </div>
+              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
+                <div className="text-2xl font-bold text-emerald-700">{results.filter((r) => r.historicalEvidence?.status === "DUE" || r.historicalEvidence?.status === "OVERDUE").length}</div>
+                <div className="text-xs text-emerald-600/80 uppercase tracking-wide">Products Due</div>
+              </div>
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{results.filter((r) => r.historicalEvidence?.status === "NOT_DUE").length}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Products Not Due</div>
+              </div>
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{results.filter((r) => r.historicalEvidence?.status === "PATTERN_NOT_USABLE" || !r.historicalEvidence).length}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Pattern Unusable / Missing</div>
+              </div>
             </div>
-            <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
-              <div className="text-2xl font-bold">{summary.noChange || 0}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">No Change</div>
-            </div>
-            <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-700">{summary.excluded || 0}</div>
-              <div className="text-xs text-red-600/80 uppercase tracking-wide">Excluded</div>
-            </div>
-          </div>
+          )}
 
           {/* Simple Policy Summary Rows */}
-          {summary.policyVersion === 3 && (
+          {!isHistorical && summary.policyVersion === 3 && (
             <div className="bg-muted/10 p-4 rounded border mb-6 text-sm">
               <div className="flex flex-wrap gap-x-8 gap-y-2 mb-3 pb-3 border-b">
                 {summary.noCompetitorUntouched != null && (
@@ -565,6 +593,68 @@ export default function MrpGeneratorRun() {
           </div>
         </Card>
 
+        {/* Historical Series Analysis */}
+        {isHistorical && historicalSeries.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Historical Series Analysis</h2>
+            <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/40 text-muted-foreground uppercase tracking-wider">
+                    <tr className="border-b">
+                      <th className="p-3 font-semibold">Series</th>
+                      <th className="p-3 font-semibold text-right">Products</th>
+                      <th className="p-3 font-semibold text-right">Revisions</th>
+                      <th className="p-3 font-semibold text-right">Cadence</th>
+                      <th className="p-3 font-semibold text-right">Typ. Rate</th>
+                      <th className="p-3 font-semibold text-right">Spread (P10-P90)</th>
+                      <th className="p-3 font-semibold">Confidence</th>
+                      <th className="p-3 font-semibold">Last Revised</th>
+                      <th className="p-3 font-semibold">Status / Next Expected</th>
+                      <th className="p-3 font-semibold">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {historicalSeries.map((s: any, idx: number) => (
+                      <tr key={idx} className={cn("hover:bg-muted/10 transition-colors", !s.usable && "text-muted-foreground")}>
+                        <td className="p-3 font-medium text-foreground">{s.series}</td>
+                        <td className="p-3 text-right">{s.productCount}</td>
+                        <td className="p-3 text-right">
+                          <div title={s.revisionDates?.map((d: string) => formatDisplayDate(d)).join(", ")}>
+                            {s.revisionCount}
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">{s.cadenceMonths != null ? `${s.cadenceMonths} mo` : "-"}</td>
+                        <td className={cn("p-3 text-right", s.usable && "font-medium text-primary")}>
+                          {s.typicalRate != null ? `${Number(s.typicalRate).toFixed(1)}%` : "-"}
+                        </td>
+                        <td className="p-3 text-right">
+                          {s.p10Rate != null && s.p90Rate != null ? `${Number(s.p10Rate).toFixed(1)}% - ${Number(s.p90Rate).toFixed(1)}%` : "-"}
+                        </td>
+                        <td className="p-3 font-medium">{s.confidence?.replace(/_/g, " ") || "-"}</td>
+                        <td className="p-3">{s.lastRevisionDate ? formatDisplayDate(s.lastRevisionDate) : "-"}</td>
+                        <td className="p-3">
+                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase mr-2",
+                            s.status === "DUE" || s.status === "OVERDUE" ? "bg-amber-100 text-amber-800" :
+                            s.status === "NOT_DUE" ? "bg-emerald-100 text-emerald-800" :
+                            "bg-muted text-muted-foreground"
+                          )}>
+                            {s.status?.replace(/_/g, " ") || "-"}
+                          </span>
+                          {s.nextExpectedDate ? formatDisplayDate(s.nextExpectedDate) : ""}
+                        </td>
+                        <td className="p-3">
+                          {!s.usable && s.reason ? <span className="text-destructive/80">{s.reason}</span> : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Results */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -609,17 +699,33 @@ export default function MrpGeneratorRun() {
           </div>
 
           <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
-            <div className={cn("grid items-center gap-2 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider", summary.policyVersion === 2 ? "grid-cols-[40px_minmax(0,1fr)_60px_100px_100px_100px_100px_100px_40px]" : "grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px]")}>
-              <div className="flex justify-center">
-                <Checkbox checked={selectedRows.size > 0} onCheckedChange={selectAllEligible} aria-label="Select eligible" />
-              </div>
+            <div className={cn("grid items-center gap-2 p-3 border-b bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider",
+              isHistorical ? "grid-cols-[minmax(0,1fr)_100px_100px_100px_120px_120px_40px]" :
+              summary.policyVersion === 2 ? "grid-cols-[40px_minmax(0,1fr)_60px_100px_100px_100px_100px_100px_40px]" :
+              "grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px]")}>
+              {!isHistorical && (
+                <div className="flex justify-center">
+                  <Checkbox checked={selectedRows.size > 0} onCheckedChange={selectAllEligible} aria-label="Select eligible" />
+                </div>
+              )}
               <div>Product</div>
-              {summary.policyVersion === 2 && <div className="text-center">Band</div>}
+              {!isHistorical && summary.policyVersion === 2 && <div className="text-center">Band</div>}
               <div className="text-right">Current MRP</div>
-              <div className="text-right">Suggested</div>
-              <div className="text-right">Change</div>
-              {summary.policyVersion === 2 && <div className="text-center">Action</div>}
-              <div className="text-center">Status</div>
+              {isHistorical ? (
+                <>
+                  <div className="text-right">Suggested</div>
+                  <div className="text-right">Typ. Rate</div>
+                  <div className="text-right">Next Expected</div>
+                  <div className="text-center">Hist. Status</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-right">Suggested</div>
+                  <div className="text-right">Change</div>
+                  {summary.policyVersion === 2 && <div className="text-center">Action</div>}
+                  <div className="text-center">Status</div>
+                </>
+              )}
               <div></div>
             </div>
 
@@ -630,52 +736,83 @@ export default function MrpGeneratorRun() {
                 filteredResults.map((r) => {
                   const isEligible = r.status === "suggested";
                   const expanded = expandedRows.has(r.itemCode);
+                  const historicalEvidence = r.historicalEvidence as any;
                   return (
                     <div key={r.itemCode} className={cn("transition-colors hover:bg-muted/10", expanded && "bg-muted/10")}>
-                      <div className={cn("grid items-center gap-2 p-3 text-sm", summary.policyVersion === 2 ? "grid-cols-[40px_minmax(0,1fr)_60px_100px_100px_100px_100px_100px_40px]" : "grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px]")}>
-                        <div className="flex justify-center">
-                          <Checkbox disabled={!isEligible} checked={selectedRows.has(r.itemCode)} onCheckedChange={() => toggleSelect(r.itemCode)} />
-                        </div>
+                      <div className={cn("grid items-center gap-2 p-3 text-sm",
+                        isHistorical ? "grid-cols-[minmax(0,1fr)_100px_100px_100px_120px_120px_40px]" :
+                        summary.policyVersion === 2 ? "grid-cols-[40px_minmax(0,1fr)_60px_100px_100px_100px_100px_100px_40px]" :
+                        "grid-cols-[40px_minmax(0,1fr)_120px_120px_120px_100px_40px]")}>
+                        {!isHistorical && (
+                          <div className="flex justify-center">
+                            <Checkbox disabled={!isEligible} checked={selectedRows.has(r.itemCode)} onCheckedChange={() => toggleSelect(r.itemCode)} />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <div className="font-medium text-foreground truncate">{r.itemCode}</div>
                           <div className="text-xs text-muted-foreground truncate">{r.productName || "-"}</div>
                         </div>
-                        {summary.policyVersion === 2 && (
+                        {!isHistorical && summary.policyVersion === 2 && (
                           <div className="text-center font-bold text-muted-foreground">{r.band || "-"}</div>
                         )}
                         <div className="text-right text-muted-foreground">
                           {r.currentMrp != null ? `₹${r.currentMrp.toFixed(2)}` : "No data"}
                         </div>
-                        <div className="text-right font-semibold">
-                          {r.suggestedMrp != null ? `₹${r.suggestedMrp.toFixed(2)}` : "No data"}
-                        </div>
-                        <div className={cn("text-right font-medium", (r.changePercent || 0) > 0 ? "text-emerald-600" : (r.changePercent || 0) < 0 ? "text-red-600" : "text-muted-foreground")}>
-                          {r.changePercent != null ? `${r.changePercent > 0 ? "+" : ""}${r.changePercent.toFixed(1)}%` : "—"}
-                        </div>
-                        {summary.policyVersion === 2 && (
-                          <div className="flex justify-center">
-                            <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                              r.action === "CAPTURE" ? "bg-emerald-100 text-emerald-800" :
-                              r.action === "DEFEND" ? "bg-amber-100 text-amber-800" :
-                              r.action === "HOLD" ? "bg-blue-100 text-blue-800" :
-                              r.action === "REVIEW" ? "bg-purple-100 text-purple-800" :
-                              r.action === "EXCLUDED" ? "bg-muted text-muted-foreground" :
-                              "bg-gray-100 text-gray-800"
-                            )}>
-                              {r.action || "-"}
-                            </span>
-                          </div>
+                        {isHistorical ? (
+                          <>
+                            <div className="text-right font-semibold">
+                              {r.suggestedMrp != null ? `₹${r.suggestedMrp.toFixed(2)}` : "No data"}
+                            </div>
+                            <div className="text-right text-muted-foreground">
+                              {historicalEvidence?.typicalRate != null ? `${(historicalEvidence.typicalRate).toFixed(1)}%` : "-"}
+                            </div>
+                            <div className="text-right text-muted-foreground">
+                              {historicalEvidence?.nextExpectedDate ? formatDisplayDate(historicalEvidence.nextExpectedDate as string) : "-"}
+                            </div>
+                            <div className="flex justify-center">
+                              <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                historicalEvidence?.status === "DUE" || historicalEvidence?.status === "OVERDUE" ? "bg-amber-100 text-amber-800" :
+                                historicalEvidence?.status === "NOT_DUE" ? "bg-emerald-100 text-emerald-800" :
+                                "bg-muted text-muted-foreground"
+                              )}>
+                                {String(historicalEvidence?.status || "-").replace(/_/g, " ")}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-right font-semibold">
+                              {r.suggestedMrp != null ? `₹${r.suggestedMrp.toFixed(2)}` : "No data"}
+                            </div>
+                            <div className={cn("text-right font-medium", (r.changePercent || 0) > 0 ? "text-emerald-600" : (r.changePercent || 0) < 0 ? "text-red-600" : "text-muted-foreground")}>
+                              {r.changePercent != null ? `${r.changePercent > 0 ? "+" : ""}${r.changePercent.toFixed(1)}%` : "—"}
+                            </div>
+                            {summary.policyVersion === 2 && (
+                              <div className="flex justify-center">
+                                <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                  r.action === "CAPTURE" ? "bg-emerald-100 text-emerald-800" :
+                                  r.action === "DEFEND" ? "bg-amber-100 text-amber-800" :
+                                  r.action === "HOLD" ? "bg-blue-100 text-blue-800" :
+                                  r.action === "REVIEW" ? "bg-purple-100 text-purple-800" :
+                                  r.action === "EXCLUDED" ? "bg-muted text-muted-foreground" :
+                                  "bg-gray-100 text-gray-800"
+                                )}>
+                                  {r.action || "-"}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex justify-center">
+                              <span className={cn(
+                                "px-2 py-0.5 rounded text-xs uppercase font-medium",
+                                r.status === "suggested" ? "bg-primary/10 text-primary" :
+                                r.status === "excluded" ? "bg-muted text-muted-foreground" :
+                                "bg-border/50 text-foreground"
+                              )}>
+                                {r.status === "no_change" ? "No Change" : r.status}
+                              </span>
+                            </div>
+                          </>
                         )}
-                        <div className="flex justify-center">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-xs uppercase font-medium",
-                            r.status === "suggested" ? "bg-primary/10 text-primary" :
-                            r.status === "excluded" ? "bg-muted text-muted-foreground" :
-                            "bg-border/50 text-foreground"
-                          )}>
-                            {r.status === "no_change" ? "No Change" : r.status}
-                          </span>
-                        </div>
                         <button onClick={() => toggleRow(r.itemCode)} className="p-1 rounded hover:bg-accent flex justify-center text-muted-foreground">
                           <ChevronDown className={cn("w-4 h-4 transition-transform", expanded && "rotate-180")} />
                         </button>
@@ -719,6 +856,56 @@ export default function MrpGeneratorRun() {
                                   </>
                                 )}
                               </div>
+
+                              {historicalEvidence && (
+                                <div className="mt-3 space-y-1">
+                                  <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Historical Evidence</h5>
+                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs bg-muted/20 p-2 border rounded">
+                                    <span className="text-muted-foreground">Series:</span>
+                                    <span className="text-right font-medium">{historicalEvidence.series || "None"}</span>
+                                    <span className="text-muted-foreground">Revision Count:</span>
+                                    <span className="text-right">{historicalEvidence.revisionDates?.length || 0}</span>
+                                    {historicalEvidence.cadenceMonths != null && (
+                                      <>
+                                        <span className="text-muted-foreground">Cadence:</span>
+                                        <span className="text-right">{historicalEvidence.cadenceMonths} months</span>
+                                      </>
+                                    )}
+                                    {historicalEvidence.typicalRate != null && (
+                                      <>
+                                        <span className="text-muted-foreground">Typical Rate:</span>
+                                        <span className="text-right font-medium text-primary">{Number(historicalEvidence.typicalRate).toFixed(1)}%</span>
+                                      </>
+                                    )}
+                                    {historicalEvidence.p10Rate != null && historicalEvidence.p90Rate != null && (
+                                      <>
+                                        <span className="text-muted-foreground">P10 - P90 Spread:</span>
+                                        <span className="text-right text-muted-foreground">{Number(historicalEvidence.p10Rate).toFixed(1)}% - {Number(historicalEvidence.p90Rate).toFixed(1)}%</span>
+                                      </>
+                                    )}
+                                    {historicalEvidence.spreadPoints != null && (
+                                      <>
+                                        <span className="text-muted-foreground">Spread Points:</span>
+                                        <span className="text-right">{Number(historicalEvidence.spreadPoints).toFixed(1)}</span>
+                                      </>
+                                    )}
+                                    <span className="text-muted-foreground">Confidence:</span>
+                                    <span className="text-right font-medium">{historicalEvidence.confidence || "-"}</span>
+                                    {historicalEvidence.monthsSinceLast != null && (
+                                      <>
+                                        <span className="text-muted-foreground">Months Since Last:</span>
+                                        <span className="text-right">{historicalEvidence.monthsSinceLast}</span>
+                                      </>
+                                    )}
+                                    {r.reason && (
+                                      <>
+                                        <span className="text-muted-foreground">Reason:</span>
+                                        <span className="text-right text-muted-foreground">{r.reason}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
 
                               {r.salesEvidence && (
                                 <div className="mt-3 space-y-1">
@@ -858,37 +1045,39 @@ export default function MrpGeneratorRun() {
                             </div>
 
                             {/* Rule Trace Panel */}
-                            <div className="bg-background border rounded p-3 space-y-2">
-                              <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground border-b pb-1">Rule Trace</h4>
-                              <div className="space-y-1.5 mt-2">
-                                {r.trace?.map((t: MrpGeneratorTrace, i: number) => (
-                                  <div key={i} className={cn("text-xs flex items-start gap-2 p-1.5 rounded border-l-2",
-                                    t.outcome === "fired" ? "border-primary bg-primary/5" :
-                                    t.outcome === "blocked" ? "border-destructive bg-destructive/5 text-muted-foreground" :
-                                    "border-muted bg-muted/30 text-muted-foreground opacity-70"
-                                  )}>
-                                    <div className="shrink-0 pt-0.5">
-                                      {t.outcome === "fired" ? <Check className="w-3 h-3 text-primary" /> :
-                                       t.outcome === "blocked" ? <X className="w-3 h-3 text-destructive" /> :
-                                       <ChevronRight className="w-3 h-3" />}
+                            {!isHistorical && (
+                              <div className="bg-background border rounded p-3 space-y-2">
+                                <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground border-b pb-1">Rule Trace</h4>
+                                <div className="space-y-1.5 mt-2">
+                                  {r.trace?.map((t: MrpGeneratorTrace, i: number) => (
+                                    <div key={i} className={cn("text-xs flex items-start gap-2 p-1.5 rounded border-l-2",
+                                      t.outcome === "fired" ? "border-primary bg-primary/5" :
+                                      t.outcome === "blocked" ? "border-destructive bg-destructive/5 text-muted-foreground" :
+                                      "border-muted bg-muted/30 text-muted-foreground opacity-70"
+                                    )}>
+                                      <div className="shrink-0 pt-0.5">
+                                        {t.outcome === "fired" ? <Check className="w-3 h-3 text-primary" /> :
+                                         t.outcome === "blocked" ? <X className="w-3 h-3 text-destructive" /> :
+                                         <ChevronRight className="w-3 h-3" />}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <span className="font-medium mr-1">{t.ruleType}:</span>
+                                        <span>{t.reason}</span>
+                                        {t.target !== undefined && t.target !== null && t.outcome === "fired" && (
+                                          <span className="block mt-0.5 font-mono text-[10px] text-foreground">→ ₹{t.target.toFixed(2)}</span>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                      <span className="font-medium mr-1">{t.ruleType}:</span>
-                                      <span>{t.reason}</span>
-                                      {t.target !== undefined && t.target !== null && t.outcome === "fired" && (
-                                        <span className="block mt-0.5 font-mono text-[10px] text-foreground">→ ₹{t.target.toFixed(2)}</span>
-                                      )}
+                                  ))}
+                                  {r.bindingConstraint && (
+                                    <div className="text-xs bg-amber-50 text-amber-800 border border-amber-200 p-1.5 rounded mt-2 flex items-center gap-1.5">
+                                      <Zap className="w-3 h-3 shrink-0" />
+                                      <span>Binding Constraint: <strong>{r.bindingConstraint}</strong></span>
                                     </div>
-                                  </div>
-                                ))}
-                                {r.bindingConstraint && (
-                                  <div className="text-xs bg-amber-50 text-amber-800 border border-amber-200 p-1.5 rounded mt-2 flex items-center gap-1.5">
-                                    <Zap className="w-3 h-3 shrink-0" />
-                                    <span>Binding Constraint: <strong>{r.bindingConstraint}</strong></span>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -902,7 +1091,7 @@ export default function MrpGeneratorRun() {
       </div>
 
       {/* Floating Handoff Bar */}
-      {selectedRows.size > 0 && (
+      {!isHistorical && selectedRows.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-10 border-t bg-card/95 backdrop-blur shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.1)] p-4 md:left-56 lg:left-56">
           <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm font-medium">

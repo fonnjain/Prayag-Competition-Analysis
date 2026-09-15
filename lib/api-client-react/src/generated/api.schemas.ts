@@ -88,6 +88,19 @@ export const MrpGeneratorSalesApiStatusProperty = {
   rate_limited: 'rate_limited',
 } as const;
 
+/**
+ * @nullable
+ */
+export type MrpGeneratorSalesApiConfidence = typeof MrpGeneratorSalesApiConfidence[keyof typeof MrpGeneratorSalesApiConfidence] | null;
+
+
+export const MrpGeneratorSalesApiConfidence = {
+  STRONG: 'STRONG',
+  MODERATE: 'MODERATE',
+  WEAK: 'WEAK',
+  NONE: 'NONE',
+} as const;
+
 export type MrpGeneratorSalesApiComponents = {
   sales?: MrpGeneratorOptionStatus;
   margin?: MrpGeneratorOptionStatus;
@@ -98,6 +111,14 @@ export interface MrpGeneratorSalesApi {
   status: MrpGeneratorSalesApiStatusProperty;
   /** @nullable */
   reason?: string | null;
+  /** @nullable */
+  confidence?: MrpGeneratorSalesApiConfidence;
+  /** @nullable */
+  seriesRate?: number | null;
+  /** @nullable */
+  due?: boolean | null;
+  /** @nullable */
+  overdue?: boolean | null;
   /** @nullable */
   dataSource?: string | null;
   /** @nullable */
@@ -663,6 +684,148 @@ export interface MrpGeneratorTrace {
 /**
  * @nullable
  */
+export type MrpGeneratorResultModelKind = typeof MrpGeneratorResultModelKind[keyof typeof MrpGeneratorResultModelKind] | null;
+
+
+export const MrpGeneratorResultModelKind = {
+  competitive: 'competitive',
+  historical: 'historical',
+} as const;
+
+export type MrpHistoricalEvidenceConfidence = typeof MrpHistoricalEvidenceConfidence[keyof typeof MrpHistoricalEvidenceConfidence];
+
+
+export const MrpHistoricalEvidenceConfidence = {
+  STRONG: 'STRONG',
+  MODERATE: 'MODERATE',
+  WEAK: 'WEAK',
+  NONE: 'NONE',
+} as const;
+
+export type MrpHistoricalEvidenceStatus = typeof MrpHistoricalEvidenceStatus[keyof typeof MrpHistoricalEvidenceStatus];
+
+
+export const MrpHistoricalEvidenceStatus = {
+  DUE: 'DUE',
+  OVERDUE: 'OVERDUE',
+  NOT_DUE: 'NOT_DUE',
+  PATTERN_NOT_USABLE: 'PATTERN_NOT_USABLE',
+} as const;
+
+export type MrpHistoricalProductEvidenceStatus = typeof MrpHistoricalProductEvidenceStatus[keyof typeof MrpHistoricalProductEvidenceStatus];
+
+
+export const MrpHistoricalProductEvidenceStatus = {
+  DUE: 'DUE',
+  OVERDUE: 'OVERDUE',
+  NOT_DUE: 'NOT_DUE',
+  PATTERN_NOT_USABLE: 'PATTERN_NOT_USABLE',
+} as const;
+
+export interface MrpHistoricalProductEvidence {
+  /** @nullable */
+  lastRevisionDate: string | null;
+  /** @nullable */
+  monthsSinceLast: number | null;
+  /** @nullable */
+  nextExpectedDate: string | null;
+  due: boolean;
+  overdue: boolean;
+  status: MrpHistoricalProductEvidenceStatus;
+  /** @nullable */
+  reason: string | null;
+}
+
+export type MrpHistoricalSeriesConfidence = typeof MrpHistoricalSeriesConfidence[keyof typeof MrpHistoricalSeriesConfidence];
+
+
+export const MrpHistoricalSeriesConfidence = {
+  STRONG: 'STRONG',
+  MODERATE: 'MODERATE',
+  WEAK: 'WEAK',
+  NONE: 'NONE',
+} as const;
+
+export type MrpHistoricalSeriesStatus = typeof MrpHistoricalSeriesStatus[keyof typeof MrpHistoricalSeriesStatus];
+
+
+export const MrpHistoricalSeriesStatus = {
+  DUE: 'DUE',
+  OVERDUE: 'OVERDUE',
+  NOT_DUE: 'NOT_DUE',
+  PATTERN_NOT_USABLE: 'PATTERN_NOT_USABLE',
+} as const;
+
+export interface MrpHistoricalSeries {
+  series: string;
+  productCount: number;
+  revisionCount: number;
+  revisionDates: string[];
+  /** @nullable */
+  cadenceMonths?: number | null;
+  /** @nullable */
+  typicalRate?: number | null;
+  /** @nullable */
+  p10Rate?: number | null;
+  /** @nullable */
+  p90Rate?: number | null;
+  /** @nullable */
+  spreadPoints?: number | null;
+  uniform?: boolean;
+  usable: boolean;
+  confidence: MrpHistoricalSeriesConfidence;
+  /** @nullable */
+  lastRevisionDate?: string | null;
+  /** @nullable */
+  monthsSinceLast?: number | null;
+  status: MrpHistoricalSeriesStatus;
+  due?: boolean;
+  overdue?: boolean;
+  /** @nullable */
+  nextExpectedDate?: string | null;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export type MrpHistoricalEvidenceEventDistributionsItem = {
+  date?: string;
+  productCount?: number;
+  rates?: number[];
+  /** @nullable */
+  typicalRate?: number | null;
+  /** @nullable */
+  p10Rate?: number | null;
+  /** @nullable */
+  p90Rate?: number | null;
+};
+
+export interface MrpHistoricalEvidence {
+  series?: string;
+  revisionDates?: string[];
+  eventDistributions?: MrpHistoricalEvidenceEventDistributionsItem[];
+  /** @nullable */
+  cadenceMonths?: number | null;
+  /** @nullable */
+  typicalRate?: number | null;
+  /** @nullable */
+  p10Rate?: number | null;
+  /** @nullable */
+  p90Rate?: number | null;
+  /** @nullable */
+  spreadPoints?: number | null;
+  confidence?: MrpHistoricalEvidenceConfidence;
+  status?: MrpHistoricalEvidenceStatus;
+  /** @nullable */
+  monthsSinceLast?: number | null;
+  /** @nullable */
+  nextExpectedDate?: string | null;
+  product?: MrpHistoricalProductEvidence;
+  seriesAnalysis?: MrpHistoricalSeries;
+}
+
+/**
+ * @nullable
+ */
 export type MrpGeneratorSalesEvidenceTier = typeof MrpGeneratorSalesEvidenceTier[keyof typeof MrpGeneratorSalesEvidenceTier] | null;
 
 
@@ -789,6 +952,8 @@ export const MrpGeneratorResultVolumeTier = {
   F: 'F',
 } as const;
 
+export type MrpGeneratorResultHistoricalEvidence = MrpHistoricalEvidence | { [key: string]: unknown } | null;
+
 export interface MrpGeneratorResult {
   id: number;
   runId: number;
@@ -817,6 +982,13 @@ export interface MrpGeneratorResult {
   bindingConstraint: string | null;
   /** @nullable */
   changePercent: number | null;
+  /** @nullable */
+  modelKind?: MrpGeneratorResultModelKind;
+  /** @nullable */
+  series?: string | null;
+  /** @nullable */
+  reason?: string | null;
+  historicalEvidence?: MrpGeneratorResultHistoricalEvidence;
   salesEvidence?: MrpGeneratorSalesEvidence | null;
   marginEvidence?: MrpGeneratorMarginEvidence | null;
   warnings: string[];
@@ -896,164 +1068,96 @@ export interface MrpGeneratorDemotionResponse {
   unsaved: true;
 }
 
-export interface MrpGeneratorRunInput {
+export interface MrpHistoricalRunInput {
   asOf?: string;
-  refreshSales?: boolean;
 }
 
-export interface MrpGeneratorHandoffInput {
-  /** @minItems 1 */
-  itemCodes: string[];
-}
+export type MrpHistoricalRunResponseSummary = { [key: string]: unknown };
 
-export type MrpGeneratorScenarioPolicyVersion = typeof MrpGeneratorScenarioPolicyVersion[keyof typeof MrpGeneratorScenarioPolicyVersion];
+export type MrpHistoricalRunResponseSourceFreshness = { [key: string]: unknown };
 
-
-export const MrpGeneratorScenarioPolicyVersion = {
-  NUMBER_1: 1,
-  NUMBER_2: 2,
-  NUMBER_3: 3,
-} as const;
-
-export type MrpGeneratorScenario = MrpGeneratorScenarioInput & ({
-  id: number;
-  version: number;
-  policyVersion: MrpGeneratorScenarioPolicyVersion;
+export interface MrpHistoricalRunResponse {
+  runId: number;
+  modelKind: 'historical';
   /** @nullable */
-  createdBy: string | null;
-  createdAt: string;
-  updatedAt: string;
-  isDefault?: boolean;
-  canReset?: boolean;
-});
-
-export type MrpGeneratorRunPolicyVersion = typeof MrpGeneratorRunPolicyVersion[keyof typeof MrpGeneratorRunPolicyVersion];
-
-
-export const MrpGeneratorRunPolicyVersion = {
-  NUMBER_1: 1,
-  NUMBER_2: 2,
-  NUMBER_3: 3,
-} as const;
-
-export interface MrpGeneratorActionValueImpact {
-  count: number;
-  fySalesValue: number;
-  /** Realized gross-contribution delta */
-  grossContributionDelta: number;
-}
-
-export interface MrpGeneratorOmittedReason {
-  count: number;
-  fySalesValue: number;
-}
-
-export type MrpGeneratorHeadroomBand = typeof MrpGeneratorHeadroomBand[keyof typeof MrpGeneratorHeadroomBand];
-
-
-export const MrpGeneratorHeadroomBand = {
-  A: 'A',
-  B: 'B',
-  C: 'C',
-  D: 'D',
-  E: 'E',
-} as const;
-
-export interface MrpGeneratorHeadroom {
-  itemCode: string;
-  band: MrpGeneratorHeadroomBand;
-  fySalesValue: number;
-  additionalRealizedSaleValue: number;
-  additionalGrossContribution: number;
-}
-
-export type MrpGeneratorPortfolioReportOmittedByReason = {[key: string]: MrpGeneratorOmittedReason};
-
-export type MrpGeneratorPortfolioReportActionValueImpacts = {[key: string]: MrpGeneratorActionValueImpact};
-
-/**
- * Gross margins are fractions; deltaPoints and shortfallPoints are percentage points.
- */
-export interface MrpGeneratorPortfolioReport {
-  /** @nullable */
-  currentGrossMargin: number | null;
-  /** @nullable */
-  proposedGrossMargin: number | null;
-  /** @nullable */
-  deltaPoints: number | null;
-  /** @nullable */
-  targetGrossMargin: number | null;
-  /** @nullable */
-  targetMet: boolean | null;
-  shortfallPoints: number;
-  coveredProductCount: number;
-  coveredSalesValue: number;
-  omittedProductCount: number;
-  omittedSalesValue: number;
-  omittedByReason: MrpGeneratorPortfolioReportOmittedByReason;
-  actionValueImpacts: MrpGeneratorPortfolioReportActionValueImpacts;
-  headroom: MrpGeneratorHeadroom[];
-}
-
-export type MrpGeneratorSummaryExclusionReasonBreakdown = {[key: string]: number};
-
-export type MrpGeneratorSummaryActionCounts = {[key: string]: number};
-
-export type MrpGeneratorSummaryActionValueImpacts = {[key: string]: MrpGeneratorActionValueImpact};
-
-export type MrpGeneratorSummaryBandDistribution = {[key: string]: number};
-
-export type MrpGeneratorSummaryRowCounts = {[key: string]: MrpGeneratorSimplePreviewRowCounts};
-
-export type MrpGeneratorSummaryTierDistribution = {[key: string]: number};
-
-export interface MrpGeneratorSummary {
-  total: number;
-  suggested: number;
-  noChange: number;
-  excluded: number;
-  increases: number;
-  decreases: number;
-  /** @nullable */
-  medianIncreasePercent: number | null;
-  /** @nullable */
-  medianDecreasePercent: number | null;
-  /** @nullable */
-  confidencePassCount: number | null;
-  exclusionReasonBreakdown: MrpGeneratorSummaryExclusionReasonBreakdown;
+  scenarioId: number | null;
+  asOf: string;
   /** @nullable */
   policyVersion?: number | null;
-  actionCounts?: MrpGeneratorSummaryActionCounts;
-  actionValueImpacts?: MrpGeneratorSummaryActionValueImpacts;
-  bandDistribution?: MrpGeneratorSummaryBandDistribution;
-  salesValueRepresented?: number;
-  portfolio?: MrpGeneratorPortfolioReport;
-  evaluated?: number;
-  wouldChange?: number;
-  noCompetitorUntouched?: number;
-  fallthroughUntouched?: number;
-  rowCounts?: MrpGeneratorSummaryRowCounts;
-  tierDistribution?: MrpGeneratorSummaryTierDistribution;
+  inputFingerprint: string;
+  summary: MrpHistoricalRunResponseSummary;
+  sourceFreshness: MrpHistoricalRunResponseSourceFreshness;
+  series: MrpHistoricalSeries[];
 }
 
-export interface MrpGeneratorFreshnessCompetitor {
-  competitor: string;
+export type MrpHistoricalSourceFreshnessCoverageSummary = { [key: string]: unknown };
+
+export interface MrpHistoricalSourceFreshness {
+  asOf: string;
+  modelKind: 'historical';
+  source: string;
+  historyRows: number;
   /** @nullable */
-  effectiveDate: string | null;
-  /** @nullable */
-  ageDays: number | null;
-  stale: boolean;
+  latestDate: string | null;
+  coverageSummary?: MrpHistoricalSourceFreshnessCoverageSummary;
 }
 
-export type MrpGeneratorSalesApiStatusStatus = typeof MrpGeneratorSalesApiStatusStatus[keyof typeof MrpGeneratorSalesApiStatusStatus];
+export type MrpHistoricalInputSnapshotModelKind = typeof MrpHistoricalInputSnapshotModelKind[keyof typeof MrpHistoricalInputSnapshotModelKind];
 
 
-export const MrpGeneratorSalesApiStatusStatus = {
-  authenticated: 'authenticated',
-  missing_credential: 'missing_credential',
-  auth_failed: 'auth_failed',
-  unavailable: 'unavailable',
-  rate_limited: 'rate_limited',
+export const MrpHistoricalInputSnapshotModelKind = {
+  historical: 'historical',
+} as const;
+
+export type MrpHistoricalInputSnapshotProductsItem = { [key: string]: unknown };
+
+export type MrpHistoricalInputSnapshotHistoryItem = { [key: string]: unknown };
+
+export type MrpHistoricalInputSnapshotSummary = { [key: string]: unknown };
+
+export interface MrpHistoricalInputSnapshot {
+  modelKind: MrpHistoricalInputSnapshotModelKind;
+  asOf: string;
+  products: MrpHistoricalInputSnapshotProductsItem[];
+  history: MrpHistoricalInputSnapshotHistoryItem[];
+  seriesAnalyses: MrpHistoricalSeries[];
+  summary: MrpHistoricalInputSnapshotSummary;
+}
+
+export type MrpCompetitiveInputSnapshotModelKind = typeof MrpCompetitiveInputSnapshotModelKind[keyof typeof MrpCompetitiveInputSnapshotModelKind];
+
+
+export const MrpCompetitiveInputSnapshotModelKind = {
+  competitive: 'competitive',
+} as const;
+
+export interface MrpGeneratorSnapshotProduct {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  seriesRange: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentDate: string | null;
+  /** @nullable */
+  currentRowId: number | null;
+  competitors: MrpGeneratorCompetitorValue[];
+  sales?: MrpGeneratorSalesEvidence | null;
+  margin?: MrpGeneratorMarginEvidence | null;
+}
+
+export type MrpCompetitiveInputSnapshotStage = typeof MrpCompetitiveInputSnapshotStage[keyof typeof MrpCompetitiveInputSnapshotStage];
+
+
+export const MrpCompetitiveInputSnapshotStage = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
 } as const;
 
 export type MrpGeneratorNormalizedCoverageReconciliation = {[key: string]: string | number | null};
@@ -1187,29 +1291,6 @@ export interface MrpGeneratorCoverageSummary {
   dataSource: string | null;
 }
 
-export interface MrpGeneratorSalesApiStatus {
-  available: boolean;
-  status: MrpGeneratorSalesApiStatusStatus;
-  /** @nullable */
-  reason?: string | null;
-  /** @nullable */
-  dataSource?: string | null;
-  /** @nullable */
-  fetchedAt?: string | null;
-  coverage?: MrpGeneratorNormalizedCoverage;
-  coverageSummary?: MrpGeneratorCoverageSummary;
-  requestMetrics?: MrpGeneratorRequestMetrics;
-  /** @nullable */
-  retryAt?: string | null;
-  /** @nullable */
-  retryAfterSeconds?: number | null;
-  pageSize?: number;
-  requestsMade?: number;
-  completedPages?: number;
-  requestLimit?: number;
-  requestWindowSeconds?: number;
-}
-
 export type MrpGeneratorKnownLimitsSalesPeriodItem = typeof MrpGeneratorKnownLimitsSalesPeriodItem[keyof typeof MrpGeneratorKnownLimitsSalesPeriodItem];
 
 
@@ -1239,8 +1320,252 @@ export interface MrpGeneratorKnownLimits {
   marginPeriod: MrpGeneratorKnownLimitsMarginPeriodItem[];
 }
 
+export type MrpCompetitiveInputSnapshotPortfolio = { [key: string]: unknown };
+
+export type MrpCompetitiveInputSnapshotHistoryItem = { [key: string]: unknown };
+
+export interface MrpCompetitiveInputSnapshot {
+  modelKind: MrpCompetitiveInputSnapshotModelKind;
+  asOf: string;
+  products: MrpGeneratorSnapshotProduct[];
+  scope: MrpGeneratorScope;
+  rules: MrpGeneratorRule[];
+  /** @nullable */
+  policyVersion?: number | null;
+  policy?: MrpGeneratorPolicy | null;
+  simplePolicy?: MrpGeneratorSimplePolicy | null;
+  advancedPolicy?: MrpGeneratorAdvancedPolicy | null;
+  p012Results?: MrpGeneratorResult[];
+  portfolio?: MrpCompetitiveInputSnapshotPortfolio;
+  stage: MrpCompetitiveInputSnapshotStage;
+  /** @nullable */
+  salesFetchedAt?: string | null;
+  salesCoverage?: MrpGeneratorNormalizedCoverage;
+  /** @nullable */
+  salesDataSource?: string | null;
+  salesCoverageSummary?: MrpGeneratorCoverageSummary;
+  knownLimits?: MrpGeneratorKnownLimits;
+  history?: MrpCompetitiveInputSnapshotHistoryItem[];
+  seriesAnalyses?: MrpHistoricalSeries[];
+}
+
+export type MrpGeneratorInputSnapshot = MrpCompetitiveInputSnapshot | MrpHistoricalInputSnapshot;
+
+export interface MrpGeneratorRunInput {
+  asOf?: string;
+  refreshSales?: boolean;
+}
+
+export interface MrpGeneratorHandoffInput {
+  /** @minItems 1 */
+  itemCodes: string[];
+}
+
+export type MrpGeneratorScenarioPolicyVersion = typeof MrpGeneratorScenarioPolicyVersion[keyof typeof MrpGeneratorScenarioPolicyVersion];
+
+
+export const MrpGeneratorScenarioPolicyVersion = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+} as const;
+
+export type MrpGeneratorScenario = MrpGeneratorScenarioInput & ({
+  id: number;
+  version: number;
+  policyVersion: MrpGeneratorScenarioPolicyVersion;
+  /** @nullable */
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isDefault?: boolean;
+  canReset?: boolean;
+});
+
+export type MrpGeneratorRunModelKind = typeof MrpGeneratorRunModelKind[keyof typeof MrpGeneratorRunModelKind];
+
+
+export const MrpGeneratorRunModelKind = {
+  competitive: 'competitive',
+  historical: 'historical',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MrpGeneratorRunPolicyVersion = typeof MrpGeneratorRunPolicyVersion[keyof typeof MrpGeneratorRunPolicyVersion] | null;
+
+
+export const MrpGeneratorRunPolicyVersion = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+} as const;
+
+export interface MrpGeneratorActionValueImpact {
+  count: number;
+  fySalesValue: number;
+  /** Realized gross-contribution delta */
+  grossContributionDelta: number;
+}
+
+export interface MrpGeneratorOmittedReason {
+  count: number;
+  fySalesValue: number;
+}
+
+export type MrpGeneratorHeadroomBand = typeof MrpGeneratorHeadroomBand[keyof typeof MrpGeneratorHeadroomBand];
+
+
+export const MrpGeneratorHeadroomBand = {
+  A: 'A',
+  B: 'B',
+  C: 'C',
+  D: 'D',
+  E: 'E',
+} as const;
+
+export interface MrpGeneratorHeadroom {
+  itemCode: string;
+  band: MrpGeneratorHeadroomBand;
+  fySalesValue: number;
+  additionalRealizedSaleValue: number;
+  additionalGrossContribution: number;
+}
+
+export type MrpGeneratorPortfolioReportOmittedByReason = {[key: string]: MrpGeneratorOmittedReason};
+
+export type MrpGeneratorPortfolioReportActionValueImpacts = {[key: string]: MrpGeneratorActionValueImpact};
+
+/**
+ * Gross margins are fractions; deltaPoints and shortfallPoints are percentage points.
+ */
+export interface MrpGeneratorPortfolioReport {
+  /** @nullable */
+  currentGrossMargin: number | null;
+  /** @nullable */
+  proposedGrossMargin: number | null;
+  /** @nullable */
+  deltaPoints: number | null;
+  /** @nullable */
+  targetGrossMargin: number | null;
+  /** @nullable */
+  targetMet: boolean | null;
+  shortfallPoints: number;
+  coveredProductCount: number;
+  coveredSalesValue: number;
+  omittedProductCount: number;
+  omittedSalesValue: number;
+  omittedByReason: MrpGeneratorPortfolioReportOmittedByReason;
+  actionValueImpacts: MrpGeneratorPortfolioReportActionValueImpacts;
+  headroom: MrpGeneratorHeadroom[];
+}
+
+export type MrpGeneratorSummaryExclusionReasonBreakdown = {[key: string]: number};
+
+export type MrpGeneratorSummaryActionCounts = {[key: string]: number};
+
+export type MrpGeneratorSummaryActionValueImpacts = {[key: string]: MrpGeneratorActionValueImpact};
+
+export type MrpGeneratorSummaryBandDistribution = {[key: string]: number};
+
+export type MrpGeneratorSummaryRowCounts = {[key: string]: MrpGeneratorSimplePreviewRowCounts};
+
+export type MrpGeneratorSummaryTierDistribution = {[key: string]: number};
+
+export interface MrpGeneratorSummary {
+  total: number;
+  suggested: number;
+  noChange: number;
+  excluded: number;
+  increases: number;
+  decreases: number;
+  /** @nullable */
+  medianIncreasePercent: number | null;
+  /** @nullable */
+  medianDecreasePercent: number | null;
+  /** @nullable */
+  confidencePassCount: number | null;
+  exclusionReasonBreakdown: MrpGeneratorSummaryExclusionReasonBreakdown;
+  /** @nullable */
+  policyVersion?: number | null;
+  actionCounts?: MrpGeneratorSummaryActionCounts;
+  actionValueImpacts?: MrpGeneratorSummaryActionValueImpacts;
+  bandDistribution?: MrpGeneratorSummaryBandDistribution;
+  salesValueRepresented?: number;
+  portfolio?: MrpGeneratorPortfolioReport;
+  evaluated?: number;
+  wouldChange?: number;
+  noCompetitorUntouched?: number;
+  fallthroughUntouched?: number;
+  rowCounts?: MrpGeneratorSummaryRowCounts;
+  tierDistribution?: MrpGeneratorSummaryTierDistribution;
+}
+
+/**
+ * @nullable
+ */
+export type MrpGeneratorSourceFreshnessModelKind = typeof MrpGeneratorSourceFreshnessModelKind[keyof typeof MrpGeneratorSourceFreshnessModelKind] | null;
+
+
+export const MrpGeneratorSourceFreshnessModelKind = {
+  competitive: 'competitive',
+  historical: 'historical',
+} as const;
+
+export interface MrpGeneratorFreshnessCompetitor {
+  competitor: string;
+  /** @nullable */
+  effectiveDate: string | null;
+  /** @nullable */
+  ageDays: number | null;
+  stale: boolean;
+}
+
+export type MrpGeneratorSalesApiStatusStatus = typeof MrpGeneratorSalesApiStatusStatus[keyof typeof MrpGeneratorSalesApiStatusStatus];
+
+
+export const MrpGeneratorSalesApiStatusStatus = {
+  authenticated: 'authenticated',
+  missing_credential: 'missing_credential',
+  auth_failed: 'auth_failed',
+  unavailable: 'unavailable',
+  rate_limited: 'rate_limited',
+} as const;
+
+export interface MrpGeneratorSalesApiStatus {
+  available: boolean;
+  status: MrpGeneratorSalesApiStatusStatus;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  dataSource?: string | null;
+  /** @nullable */
+  fetchedAt?: string | null;
+  coverage?: MrpGeneratorNormalizedCoverage;
+  coverageSummary?: MrpGeneratorCoverageSummary;
+  requestMetrics?: MrpGeneratorRequestMetrics;
+  /** @nullable */
+  retryAt?: string | null;
+  /** @nullable */
+  retryAfterSeconds?: number | null;
+  pageSize?: number;
+  requestsMade?: number;
+  completedPages?: number;
+  requestLimit?: number;
+  requestWindowSeconds?: number;
+}
+
 export interface MrpGeneratorSourceFreshness {
   asOf: string;
+  /** @nullable */
+  modelKind?: MrpGeneratorSourceFreshnessModelKind;
+  /** @nullable */
+  source?: string | null;
+  /** @nullable */
+  historyRows?: number | null;
+  /** @nullable */
+  latestDate?: string | null;
   mrpDates: string[];
   competitors: MrpGeneratorFreshnessCompetitor[];
   sales: MrpGeneratorSalesApiStatus;
@@ -1255,70 +1580,30 @@ export interface MrpGeneratorSourceFreshness {
 
 export interface MrpGeneratorRun {
   runId: number;
-  scenarioId: number;
+  /** @nullable */
+  scenarioId: number | null;
+  modelKind: MrpGeneratorRunModelKind;
   asOf: string;
+  /** @nullable */
   policyVersion: MrpGeneratorRunPolicyVersion;
   inputFingerprint: string;
   summary: MrpGeneratorSummary;
   sourceFreshness: MrpGeneratorSourceFreshness;
 }
 
-export interface MrpGeneratorSnapshotProduct {
-  itemCode: string;
-  /** @nullable */
-  productName: string | null;
-  /** @nullable */
-  division: string | null;
-  /** @nullable */
-  seriesRange: string | null;
-  /** @nullable */
-  category: string | null;
-  /** @nullable */
-  currentMrp: number | null;
-  /** @nullable */
-  currentDate: string | null;
-  /** @nullable */
-  currentRowId: number | null;
-  competitors: MrpGeneratorCompetitorValue[];
-  sales?: MrpGeneratorSalesEvidence | null;
-  margin?: MrpGeneratorMarginEvidence | null;
-}
-
-export type MrpGeneratorInputSnapshotPortfolio = { [key: string]: unknown };
-
-export type MrpGeneratorInputSnapshotStage = typeof MrpGeneratorInputSnapshotStage[keyof typeof MrpGeneratorInputSnapshotStage];
+export type MrpGeneratorPersistedRunModelKind = typeof MrpGeneratorPersistedRunModelKind[keyof typeof MrpGeneratorPersistedRunModelKind];
 
 
-export const MrpGeneratorInputSnapshotStage = {
-  NUMBER_1: 1,
-  NUMBER_2: 2,
+export const MrpGeneratorPersistedRunModelKind = {
+  competitive: 'competitive',
+  historical: 'historical',
 } as const;
-
-export interface MrpGeneratorInputSnapshot {
-  asOf: string;
-  products: MrpGeneratorSnapshotProduct[];
-  scope: MrpGeneratorScope;
-  rules: MrpGeneratorRule[];
-  /** @nullable */
-  policyVersion?: number | null;
-  policy?: MrpGeneratorPolicy | null;
-  simplePolicy?: MrpGeneratorSimplePolicy | null;
-  advancedPolicy?: MrpGeneratorAdvancedPolicy | null;
-  p012Results?: MrpGeneratorResult[];
-  portfolio?: MrpGeneratorInputSnapshotPortfolio;
-  stage: MrpGeneratorInputSnapshotStage;
-  /** @nullable */
-  salesFetchedAt?: string | null;
-  salesCoverage?: MrpGeneratorNormalizedCoverage;
-  /** @nullable */
-  salesDataSource?: string | null;
-  salesCoverageSummary?: MrpGeneratorCoverageSummary;
-  knownLimits?: MrpGeneratorKnownLimits;
-}
 
 export interface MrpGeneratorPersistedRun {
   id: number;
-  scenarioId: number;
+  /** @nullable */
+  scenarioId: number | null;
+  modelKind: MrpGeneratorPersistedRunModelKind;
   asOf: string;
   inputSnapshot: MrpGeneratorInputSnapshot;
   inputFingerprint: string;
@@ -1351,13 +1636,24 @@ export interface MrpGeneratorFreshness {
   knownLimits?: MrpGeneratorKnownLimits;
 }
 
-export type MrpGeneratorRunDetailPolicyVersion = typeof MrpGeneratorRunDetailPolicyVersion[keyof typeof MrpGeneratorRunDetailPolicyVersion];
+/**
+ * @nullable
+ */
+export type MrpGeneratorRunDetailPolicyVersion = typeof MrpGeneratorRunDetailPolicyVersion[keyof typeof MrpGeneratorRunDetailPolicyVersion] | null;
 
 
 export const MrpGeneratorRunDetailPolicyVersion = {
   NUMBER_1: 1,
   NUMBER_2: 2,
   NUMBER_3: 3,
+} as const;
+
+export type MrpGeneratorRunDetailModelKind = typeof MrpGeneratorRunDetailModelKind[keyof typeof MrpGeneratorRunDetailModelKind];
+
+
+export const MrpGeneratorRunDetailModelKind = {
+  competitive: 'competitive',
+  historical: 'historical',
 } as const;
 
 export interface MrpGeneratorScenarioSummary {
@@ -1372,8 +1668,10 @@ export interface MrpGeneratorScenarioSummary {
 
 export interface MrpGeneratorRunDetail {
   run: MrpGeneratorPersistedRun;
+  /** @nullable */
   policyVersion: MrpGeneratorRunDetailPolicyVersion;
-  scenario: MrpGeneratorScenarioSummary;
+  modelKind: MrpGeneratorRunDetailModelKind;
+  scenario: MrpGeneratorScenarioSummary | null;
   simplePolicy?: MrpGeneratorSimplePolicy | null;
   advancedPolicy?: MrpGeneratorAdvancedPolicy | null;
   results: MrpGeneratorResult[];
@@ -1400,30 +1698,60 @@ export interface MrpGeneratorComparisonDifference {
   right: MrpGeneratorResult | null;
 }
 
-export type MrpGeneratorComparisonLeftPolicyVersion = typeof MrpGeneratorComparisonLeftPolicyVersion[keyof typeof MrpGeneratorComparisonLeftPolicyVersion];
+/**
+ * @nullable
+ */
+export type MrpGeneratorComparisonLeftPolicyVersion = typeof MrpGeneratorComparisonLeftPolicyVersion[keyof typeof MrpGeneratorComparisonLeftPolicyVersion] | null;
 
 
 export const MrpGeneratorComparisonLeftPolicyVersion = {
   NUMBER_1: 1,
   NUMBER_2: 2,
+  NUMBER_3: 3,
 } as const;
 
-export type MrpGeneratorComparisonRightPolicyVersion = typeof MrpGeneratorComparisonRightPolicyVersion[keyof typeof MrpGeneratorComparisonRightPolicyVersion];
+/**
+ * @nullable
+ */
+export type MrpGeneratorComparisonRightPolicyVersion = typeof MrpGeneratorComparisonRightPolicyVersion[keyof typeof MrpGeneratorComparisonRightPolicyVersion] | null;
 
 
 export const MrpGeneratorComparisonRightPolicyVersion = {
   NUMBER_1: 1,
   NUMBER_2: 2,
+  NUMBER_3: 3,
 } as const;
+
+export type MrpGeneratorComparisonRunsItem = { [key: string]: unknown };
+
+export type MrpGeneratorComparisonProductsItem = { [key: string]: unknown };
+
+export type MrpGeneratorComparisonCategories = {[key: string]: number};
+
+export type MrpGeneratorComparisonCategoryCounts = {[key: string]: number};
+
+export type MrpGeneratorComparisonDisagreementCounts = {[key: string]: number};
+
+export type MrpGeneratorComparisonLargestDisagreementsItem = { [key: string]: unknown };
 
 export interface MrpGeneratorComparison {
   leftRunId: number;
   rightRunId: number;
+  /** @nullable */
   leftPolicyVersion: MrpGeneratorComparisonLeftPolicyVersion;
+  /** @nullable */
   rightPolicyVersion: MrpGeneratorComparisonRightPolicyVersion;
   leftPolicy?: MrpGeneratorPolicy | null;
   rightPolicy?: MrpGeneratorPolicy | null;
   differences: MrpGeneratorComparisonDifference[];
+  /** @minItems 2 */
+  runIds: number[];
+  runs?: MrpGeneratorComparisonRunsItem[];
+  products: MrpGeneratorComparisonProductsItem[];
+  categories?: MrpGeneratorComparisonCategories;
+  categoryCounts: MrpGeneratorComparisonCategoryCounts;
+  disagreementCounts?: MrpGeneratorComparisonDisagreementCounts;
+  largestDisagreements?: MrpGeneratorComparisonLargestDisagreementsItem[];
 }
 
 export interface MrpGeneratorHandoffResponse {
@@ -4066,7 +4394,12 @@ limit?: number;
 };
 
 export type CompareMrpGeneratorRunsParams = {
-leftRunId: number;
-rightRunId: number;
+/**
+ * Two or more run IDs; comma-separated values are also accepted.
+ * @minItems 2
+ */
+runIds?: number[];
+leftRunId?: number;
+rightRunId?: number;
 };
 
