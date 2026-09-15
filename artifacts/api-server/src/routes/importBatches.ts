@@ -606,7 +606,7 @@ router.post(
     }
 
     // Prince catalogues are text-native. Keep this path independent of the
-    // existing vision extractor: pdftotext layout/bbox is deterministic,
+    // existing vision extractor: bundled PDF.js coordinates are deterministic,
     // preserves side-by-side x positions, and costs no model calls.
     if (competitor === "Prince" && extractionPath === "text") {
       res.status(200).set({
@@ -623,7 +623,7 @@ router.post(
       try {
         const prayagMrpMap = await getCurrentPrayagMrp();
         const targets = await getTargets(competitor, prayagMrpMap);
-        const { items, fileSha256, pagesExecuted } = extractPrinceTextPdf(file.buffer, {
+        const { items, fileSha256, pagesExecuted } = await extractPrinceTextPdf(file.buffer, {
           pages: Array.from({ length: preflight.totalPages }, (_, index) => index + 1),
         });
         const expectedRows = targets
@@ -657,7 +657,7 @@ router.post(
           fileSha256,
           fileSizeBytes: file.size,
           extractorVersion: "prince-text-pdf-v1",
-          catalogueProfileRevision: "prince-positional-bbox-v1",
+          catalogueProfileRevision: "prince-positional-pdfjs-v2",
           promptRevision: null,
           model: null,
           pagesRequested: null,
@@ -723,7 +723,7 @@ router.post(
             gapPct: item && target.prayagMrpCurrent ? ((item.piecePrice - target.prayagMrpCurrent) / target.prayagMrpCurrent) * 100 : null,
             page: item?.page ?? null,
              discoveryEvidence: item ? JSON.stringify({
-               extractor: "pdftotext",
+               extractor: "pdfjs-dist",
                page: item.page,
                xMin: item.xMin,
                family: item.product_name,
@@ -763,7 +763,7 @@ router.post(
             gapPct: null,
             page: item.page,
             discoveryEvidence: JSON.stringify({
-              extractor: "pdftotext",
+              extractor: "pdfjs-dist",
               occurrences: occurrences.map((occurrence) => ({
                 page: occurrence.page,
                 xMin: occurrence.xMin,
@@ -995,8 +995,8 @@ router.post(
          });
        };
        const extraction = extractionPath === "text_then_ai"
-         ? (() => {
-             const positional = extractPrinceTextPdf(file.buffer, { pages: preflight.textBearingPages });
+         ? await (async () => {
+             const positional = await extractPrinceTextPdf(file.buffer, { pages: preflight.textBearingPages });
              return { positional };
            })()
          : null;

@@ -1,16 +1,7 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { extractPdfJsPages, type PdfJsWord } from "./pdfJsText.js";
 
-export type PrincePdfWord = {
-  text: string;
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
-};
+export type PrincePdfWord = PdfJsWord;
 
 export type PrincePdfItem = {
   cat_no: string;
@@ -293,8 +284,15 @@ export function parsePrinceBboxCatalogue(
   bbox: string,
   options: { perMetrePages?: Set<number> } = {},
 ): PrincePdfItem[] {
+  return parsePrinceWordsCatalogue(parsePrinceBboxWords(bbox), options);
+}
+
+export function parsePrinceWordsCatalogue(
+  pages: Map<number, PrincePdfWord[]>,
+  options: { perMetrePages?: Set<number> } = {},
+): PrincePdfItem[] {
   const items: PrincePdfItem[] = [];
-  for (const [page, words] of parsePrinceBboxWords(bbox)) {
+  for (const [page, words] of pages) {
     const pageText = words.map((word) => word.text).join(" ");
     const pageLength = lengthFromText(pageText);
     const rateXs = rateColumns(words);
@@ -545,47 +543,15 @@ export function reconcilePrincePdf(
   };
 }
 
-export function extractPrinceTextPdf(
+export async function extractPrinceTextPdf(
   pdfBuffer: Buffer,
   options: { pages?: number[] } = {},
-): { items: PrincePdfItem[]; fileSha256: string; pagesExecuted: number[] } {
-  const dir = mkdtempSync(join(tmpdir(), "prince-pdf-"));
-  const path = join(dir, "catalogue.pdf");
-  try {
-    writeFileSync(path, pdfBuffer);
-    const pages = options.pages
-      ? [...new Set(options.pages)].filter((page) => Number.isInteger(page) && page > 0).sort((a, b) => a - b)
-      : undefined;
-    const contiguous = pages && pages.length > 0 &&
-      pages.every((page, index) => index === 0 || page === pages[index - 1]! + 1);
-    const bbox = pages && !contiguous
-      ? pages.map((page) => execFileSync("pdftotext", [
-        "-bbox", "-layout", "-f", String(page), "-l", String(page), path, "-",
-      ], {
-        encoding: "utf8",
-        maxBuffer: 8 * 1024 * 1024,
-      }))
-      : null;
-    const fullBbox = bbox == null
-      ? execFileSync("pdftotext", ["-bbox", "-layout", path, "-"], {
-        encoding: "utf8",
-        maxBuffer: 50 * 1024 * 1024,
-      })
-      : null;
-    const items = bbox
-      ? bbox.flatMap((pageBbox, index) =>
-        parsePrinceBboxCatalogue(pageBbox).map((item) => ({
-          ...item,
-          page: pages![index]!,
-        })),
-      )
-      : parsePrinceBboxCatalogue(fullBbox!).filter((item) => !pages || pages.includes(item.page));
-    return {
-      items,
-      fileSha256: createHash("sha256").update(pdfBuffer).digest("hex"),
-      pagesExecuted: pages ?? [],
-    };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+): Promise<{ items: PrincePdfItem[]; fileSha256: string; pagesExecuted: number[] }> {
+  const extracted = await extractPdfJsPages(pdfBuffer, options.pages);
+  const wordsByPage = new Map(extracted.pages.map((page) => [page.page, page.words]));
+  return {
+    items: parsePrinceWordsCatalogue(wordsByPage),
+    fileSha256: createHash("sha256").update(pdfBuffer).digest("hex"),
+    pagesExecuted: extracted.pages.map((page) => page.page),
+  };
 }

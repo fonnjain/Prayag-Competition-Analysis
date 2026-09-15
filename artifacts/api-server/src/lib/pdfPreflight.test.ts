@@ -72,7 +72,7 @@ describe("PDF preflight detector", () => {
 
   it("detects the attached Prince catalogue without writing anything", async () => {
     // This is a mandatory workspace-root fixture: silently skipping it would
-    // allow a broken Poppler/preflight setup to pass CI.
+    // allow a broken bundled text-extraction setup to pass CI.
     const path = new URL(
       "../../../../attached_assets/Prince_Pipes_-_Pan_India_-_Pricelist_1789458928833.pdf",
       import.meta.url,

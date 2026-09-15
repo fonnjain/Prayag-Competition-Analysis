@@ -5,12 +5,8 @@
  * the database.  It is safe to call from both the preflight endpoint and the
  * upload route (the latter is a guard for API clients which skip the UI).
  */
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { PDFDocument } from "pdf-lib";
+import { extractPdfJsPages } from "./pdfJsText.js";
 
 export const EXTRACTION_PATHS = ["text", "vision", "text_then_ai"] as const;
 export type ExtractionPath = (typeof EXTRACTION_PATHS)[number];
@@ -48,7 +44,7 @@ export type PdfPreflight = {
 
 const SAMPLE_SIZE = 12;
 const TEXT_EXTRACTION_UNAVAILABLE_MESSAGE =
-  "Text extraction unavailable: every sampled page returned zero characters. The PDF was not classified as image-only and AI vision was not recommended. Check the Poppler/pdftotext runtime before extracting.";
+  "Text extraction unavailable: every sampled page returned zero characters. The PDF was not classified as image-only and AI vision was not recommended. Extraction was not started.";
 
 export class PdfTextExtractionUnavailableError extends Error {
   readonly code = "PDF_TEXT_EXTRACTION_UNAVAILABLE";
@@ -82,37 +78,6 @@ export function samplePdfPages(totalPages: number, sampleSize = SAMPLE_SIZE): nu
   return [...pages].sort((a, b) => a - b);
 }
 
-function pageText(pdfPath: string, page: number): string {
-  return execFileSync("pdftotext", [
-    "-layout", "-f", String(page), "-l", String(page), pdfPath, "-",
-  ], {
-    encoding: "utf8",
-    maxBuffer: 8 * 1024 * 1024,
-  });
-}
-
-/** Read every page in one Poppler pass; form-feed is pdftotext's page delimiter. */
-function allPageText(pdfPath: string, totalPages: number): string[] {
-  try {
-    const output = execFileSync("pdftotext", ["-layout", pdfPath, "-"], {
-      encoding: "utf8",
-      maxBuffer: Math.max(8 * 1024 * 1024, totalPages * 512 * 1024),
-    });
-    const pages = output.split("\f");
-    while (pages.length < totalPages) pages.push("");
-    return pages.slice(0, totalPages);
-  } catch (bulkError) {
-    try {
-      return Array.from({ length: totalPages }, (_, index) => pageText(pdfPath, index + 1));
-    } catch (pageError) {
-      throw new PdfTextExtractionUnavailableError(
-        "Text extraction unavailable: pdftotext failed while reading the PDF. AI vision was not recommended and extraction was not started. Check the Poppler/pdftotext runtime.",
-        { cause: pageError ?? bulkError },
-      );
-    }
-  }
-}
-
 function classifyText(text: string): { characters: number; digits: number; textBearing: boolean } {
   const characters = text.length;
   const digits = [...text].filter((character) => /\p{Nd}/u.test(character)).length;
@@ -121,15 +86,12 @@ function classifyText(text: string): { characters: number; digits: number; textB
 
 export async function preflightPdf(pdfBuffer: Buffer): Promise<PdfPreflight> {
   if (!pdfBuffer.length) throw new Error("The uploaded PDF is empty.");
-  const dir = mkdtempSync(join(tmpdir(), "pdf-preflight-"));
-  const pdfPath = join(dir, "catalogue.pdf");
   try {
-    writeFileSync(pdfPath, pdfBuffer);
-    const document = await PDFDocument.load(pdfBuffer, { ignoreEncryption: false });
-    const totalPages = document.getPageCount();
+    const extracted = await extractPdfJsPages(pdfBuffer);
+    const totalPages = extracted.totalPages;
     if (totalPages < 1) throw new Error("The uploaded PDF has no pages.");
     const samplePages = samplePdfPages(totalPages);
-    const allClassifications = allPageText(pdfPath, totalPages).map(classifyText);
+    const allClassifications = extracted.pages.map((page) => classifyText(page.text));
     const pages = samplePages.map((page) => ({ page, ...allClassifications[page - 1]! }));
     if (pages.every((page) => page.characters === 0)) {
       throw new PdfTextExtractionUnavailableError();
@@ -173,8 +135,15 @@ export async function preflightPdf(pdfBuffer: Buffer): Promise<PdfPreflight> {
       assignmentNonTextBearingCount: nonTextBearingPages.length,
       humanReason,
     };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
+  } catch (error) {
+    if (error instanceof PdfTextExtractionUnavailableError) throw error;
+    const detail = error instanceof Error
+      ? `${error.name}${"code" in error && error.code ? ` ${(error as NodeJS.ErrnoException).code}` : ""}: ${error.message}`
+      : String(error);
+    throw new PdfTextExtractionUnavailableError(
+      `Text extraction unavailable: pdfjs-dist could not read the PDF (${detail}). AI vision was not recommended and extraction was not started.`,
+      { cause: error },
+    );
   }
 }
 

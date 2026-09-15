@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import * as XLSX from "xlsx";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { parsePrinceCompetitorMaster } from "./princeMaster.js";
 import {
   extractPrinceTextPdf,
@@ -17,10 +17,14 @@ const workbookPath = fileURLToPath(new URL(
   import.meta.url,
 ));
 const princePdf = readFileSync(pdfPath);
-const extractedPrince = extractPrinceTextPdf(princePdf);
+let extractedPrince: Awaited<ReturnType<typeof extractPrinceTextPdf>>;
 
 describe("Prince text-native PDF extraction", () => {
-  it("uses pdftotext positional extraction and preserves occurrence/unique counts", () => {
+  beforeAll(async () => {
+    extractedPrince = await extractPrinceTextPdf(princePdf);
+  });
+
+  it("uses bundled PDF.js positional extraction and preserves occurrence/unique counts", () => {
     const result = extractedPrince;
     expect(result.items).toHaveLength(4306);
     expect(new Set(result.items.map((item) => item.cat_no)).size).toBe(4275);
