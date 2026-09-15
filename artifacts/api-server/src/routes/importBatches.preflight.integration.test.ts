@@ -70,6 +70,8 @@ describe("PDF preflight route", () => {
     expect(response.body.recommendedPath).toBe("text");
     expect(response.body.totalPages).toBe(108);
     expect(response.body.sampleCount).toBe(12);
+    expect(response.body.textBearingCount).toBe(11);
+    expect(response.body.fileSha256).toBe("4afa4f95debfd6581cd584707e2bcd65ac320a430c268e734c0f0cd9784fd31c");
     const matching = await db.select({ id: importBatchesTable.id })
       .from(importBatchesTable)
       .where(and(
@@ -80,10 +82,10 @@ describe("PDF preflight route", () => {
     expect(matching).toHaveLength(0);
   }, 60_000);
 
-  it("returns vision for image-only and uncertain for mixed pages", async () => {
+  it("reports all-zero text extraction as unavailable and uncertain for mixed pages", async () => {
     const imageOnly = await syntheticPdf("");
     const mixed = await syntheticPdf(`${"PRICE TABLE ".repeat(30)} ${Array.from({ length: 80 }, (_, i) => i + 100).join(" ")}`, 6);
-    const vision = await request
+    const unavailable = await request
       .post("/catalog/import-batches/preflight")
       .field("competitor", "__p018_preflight_image__")
       .attach("file", imageOnly, { filename: "image.pdf", contentType: "application/pdf" });
@@ -91,8 +93,11 @@ describe("PDF preflight route", () => {
       .post("/catalog/import-batches/preflight")
       .field("competitor", "Prince")
       .attach("file", mixed, { filename: "mixed.pdf", contentType: "application/pdf" });
-    expect(vision.body.detectedClass).toBe("vision");
-    expect(vision.body.recommendedPath).toBe("vision");
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.body.code).toBe("PDF_TEXT_EXTRACTION_UNAVAILABLE");
+    expect(unavailable.body.error).toContain("Text extraction unavailable");
+    expect(unavailable.body.detectedClass).toBeUndefined();
+    expect(unavailable.body.recommendedPath).toBeUndefined();
     expect(uncertain.body.detectedClass).toBe("uncertain");
     expect(uncertain.body.recommendedPath).toBeNull();
   }, 60_000);

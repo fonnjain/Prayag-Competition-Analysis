@@ -47,6 +47,17 @@ export type PdfPreflight = {
 };
 
 const SAMPLE_SIZE = 12;
+const TEXT_EXTRACTION_UNAVAILABLE_MESSAGE =
+  "Text extraction unavailable: every sampled page returned zero characters. The PDF was not classified as image-only and AI vision was not recommended. Check the Poppler/pdftotext runtime before extracting.";
+
+export class PdfTextExtractionUnavailableError extends Error {
+  readonly code = "PDF_TEXT_EXTRACTION_UNAVAILABLE";
+
+  constructor(message = TEXT_EXTRACTION_UNAVAILABLE_MESSAGE, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "PdfTextExtractionUnavailableError";
+  }
+}
 
 function median(values: number[]): number {
   if (!values.length) return 0;
@@ -72,18 +83,12 @@ export function samplePdfPages(totalPages: number, sampleSize = SAMPLE_SIZE): nu
 }
 
 function pageText(pdfPath: string, page: number): string {
-  try {
-    return execFileSync("pdftotext", [
-      "-layout", "-f", String(page), "-l", String(page), pdfPath, "-",
-    ], {
-      encoding: "utf8",
-      maxBuffer: 8 * 1024 * 1024,
-    });
-  } catch {
-    // A page which Poppler cannot read is evidence of no extractable text, not
-    // a reason to make the entire upload unavailable for a vision path.
-    return "";
-  }
+  return execFileSync("pdftotext", [
+    "-layout", "-f", String(page), "-l", String(page), pdfPath, "-",
+  ], {
+    encoding: "utf8",
+    maxBuffer: 8 * 1024 * 1024,
+  });
 }
 
 /** Read every page in one Poppler pass; form-feed is pdftotext's page delimiter. */
@@ -96,8 +101,15 @@ function allPageText(pdfPath: string, totalPages: number): string[] {
     const pages = output.split("\f");
     while (pages.length < totalPages) pages.push("");
     return pages.slice(0, totalPages);
-  } catch {
-    return Array.from({ length: totalPages }, (_, index) => pageText(pdfPath, index + 1));
+  } catch (bulkError) {
+    try {
+      return Array.from({ length: totalPages }, (_, index) => pageText(pdfPath, index + 1));
+    } catch (pageError) {
+      throw new PdfTextExtractionUnavailableError(
+        "Text extraction unavailable: pdftotext failed while reading the PDF. AI vision was not recommended and extraction was not started. Check the Poppler/pdftotext runtime.",
+        { cause: pageError ?? bulkError },
+      );
+    }
   }
 }
 
@@ -119,6 +131,9 @@ export async function preflightPdf(pdfBuffer: Buffer): Promise<PdfPreflight> {
     const samplePages = samplePdfPages(totalPages);
     const allClassifications = allPageText(pdfPath, totalPages).map(classifyText);
     const pages = samplePages.map((page) => ({ page, ...allClassifications[page - 1]! }));
+    if (pages.every((page) => page.characters === 0)) {
+      throw new PdfTextExtractionUnavailableError();
+    }
     const sampledTextBearingPages = pages.filter((page) => page.textBearing).map((page) => page.page);
     const textBearingPages = allClassifications
       .map((classification, index) => classification.textBearing ? index + 1 : null)

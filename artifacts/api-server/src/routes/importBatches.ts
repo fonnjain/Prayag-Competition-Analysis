@@ -47,6 +47,7 @@ import {
 } from "../lib/princeTextPdfExtractor.js";
 import {
   isExtractionPath,
+  PdfTextExtractionUnavailableError,
   preflightPdf,
   type ExtractionPath,
   type PdfPreflight,
@@ -448,6 +449,10 @@ router.post(
         } : null,
       });
     } catch (error) {
+      if (error instanceof PdfTextExtractionUnavailableError) {
+        res.status(503).json({ error: error.message, code: error.code });
+        return;
+      }
       res.status(400).json({ error: error instanceof Error ? error.message : "Could not inspect PDF." });
     }
   },
@@ -504,6 +509,10 @@ router.post(
     try {
       preflight = await preflightPdf(file.buffer);
     } catch (error) {
+      if (error instanceof PdfTextExtractionUnavailableError) {
+        res.status(503).json({ error: error.message, code: error.code });
+        return;
+      }
       res.status(400).json({ error: error instanceof Error ? error.message : "Could not inspect PDF." });
       return;
     }

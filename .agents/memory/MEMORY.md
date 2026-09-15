@@ -27,3 +27,4 @@
 - [Scrollable tab arrows](scrollable-tab-arrows.md) — keep arrow slots mounted; inserting an arrow during smooth scrolling shifts the viewport and clips the first visible tab.
 - [Single-row price edit safety](single-price-edit-safety.md) — serialize by product/series; mutate price, recompute flags, and audit atomically; undo only an unchanged target.
 - [MRP Generator safety boundary](mrp-generator-safety.md) — immutable deterministic runs never write prices; exact-current, single-period suggestions can only enter the revision preview.
+- [PDF detector failure policy](pdf-detector-failure-policy.md) — all-zero sampled text is extractor failure, never evidence for silently recommending vision.

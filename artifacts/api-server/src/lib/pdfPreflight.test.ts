@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { preflightPdf, samplePdfPages } from "./pdfPreflight.js";
+import {
+  PdfTextExtractionUnavailableError,
+  preflightPdf,
+  samplePdfPages,
+} from "./pdfPreflight.js";
 
 async function textPdf(pageCount: number, text: string, textPages = pageCount) {
   const pdf = await PDFDocument.create();
@@ -37,11 +41,12 @@ describe("PDF preflight detector", () => {
     expect(result.medianDigits).toBeGreaterThan(20);
   });
 
-  it("routes an image-only PDF to vision", async () => {
-    const result = await preflightPdf(await textPdf(12, ""));
-    expect(result.detectedClass).toBe("vision");
-    expect(result.recommendedPath).toBe("vision");
-    expect(result.textBearingCount).toBe(0);
+  it("does not mistake an all-zero sample for an image-only PDF", async () => {
+    await expect(preflightPdf(await textPdf(12, ""))).rejects.toMatchObject({
+      name: "PdfTextExtractionUnavailableError",
+      code: "PDF_TEXT_EXTRACTION_UNAVAILABLE",
+      message: expect.stringContaining("Text extraction unavailable"),
+    } satisfies Partial<PdfTextExtractionUnavailableError>);
   });
 
   it("does not mistake text headers for a priced text catalogue", async () => {
@@ -73,11 +78,14 @@ describe("PDF preflight detector", () => {
       import.meta.url,
     );
     const result = await preflightPdf(readFileSync(path));
+    expect(result.fileSha256).toBe("4afa4f95debfd6581cd584707e2bcd65ac320a430c268e734c0f0cd9784fd31c");
     expect(result.detectedClass).toBe("text");
     expect(result.recommendedPath).toBe("text");
     expect(result.totalPages).toBeGreaterThan(1);
     expect(result.sampleCount).toBeLessThanOrEqual(12);
     expect(result.totalPages).toBe(108);
+    expect(result.textBearingCount).toBe(11);
+    expect(result.sampleCount).toBe(12);
     expect(result.textBearingPages.length + result.nonTextBearingPages.length).toBe(108);
     expect(new Set([...result.textBearingPages, ...result.nonTextBearingPages]).size).toBe(108);
     expect([...result.textBearingPages, ...result.nonTextBearingPages].sort((a, b) => a - b))
