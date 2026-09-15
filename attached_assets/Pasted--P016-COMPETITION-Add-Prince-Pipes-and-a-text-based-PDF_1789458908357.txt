@@ -1,0 +1,184 @@
+# P016 — COMPETITION — Add Prince Pipes, and a text-based PDF extraction path
+
+> **P016** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P016` when reporting back.
+
+Prince Pipes becomes the third mapped competitor, and the most significant one so far. It also arrives as a **text-based PDF**, which is a different and much easier extraction problem than Sparsh.
+
+---
+
+## 1. Prince is the real competition
+
+```
+                 median gap     Prayag cheaper
+Sparsh Pearl        +10.8%       130 / 150   (87%)
+Ashirvad            +13.2%       497 / 669   (74%)
+Prince               −0.6%       391 / 803   (49%)
+```
+
+**Prayag is marginally more expensive than Prince overall**, and cheaper on only half the range.
+
+Concentrated by category:
+
+| Prince cheaper | | Prayag cheaper | |
+|---|---:|---|---:|
+| **Casing Pipe** | −19.8% (15/15) | SWR Fittings | +12.5% (77/96) |
+| **AGRI Smart** | −17.8% (8/9) | SWR Pipe | +8.1% (103/125) |
+| **AGRI Fittings** | −12.4% (25/29) | CPVC Pipe | +6.9% (36/40) |
+| **UPVC Pipe** | −12.0% (52/52) | UPVC Fittings | +4.0% (98/169) |
+| **AGRI Pipe** | −11.2% (90/90) | | |
+
+**Prince undercuts Prayag on every UPVC Pipe, AGRI Pipe and Casing Pipe product** — 157 products with no exception. That is a concentrated exposure, not scattered noise.
+
+This matters for the MRP Generator: the capture opportunity that holds against Sparsh and Ashirvad largely disappears against Prince, and in AGRI and UPVC pipe the question becomes defence.
+
+---
+
+## 2. Load the mapping
+
+From `Competitor Master - Plumbing.xlsx`, Prince columns. **813 mapped products** across eleven sheets.
+
+```
+CPVC PIPE            40      SWR PIPE             125
+CPVC FITTINGS       172      SWR FITTINGS          96
+UPVC PIPE            52      CASING PIPE           18
+UPVC FITTINGS       169      UGD PIPE              14
+AGRI PIPE            90      AGRI SMART Fittings    9
+AGRI FITTINGS        29
+```
+
+**Effective date: 01 March 2026.** Six months old — materially fresher than Ashirvad's eighteen.
+
+### Column layout varies by sheet
+
+Not uniform, so read per sheet rather than assuming:
+
+```
+most sheets              Prayag code col 4, price col 5   Prince code col 6, price col 7
+AGRI FITTINGS, SMART     Prayag code col 3, price col 4   Prince code col 5, price col 6
+SWR PIPE                 Prayag code col 6, price col 7   Prince code col 8, price col 9
+CASING, UGD PIPE         Prayag code col 3, price col 5   Prince code col 6, price col 8
+```
+
+### Casing and UGD are priced per metre — take the dated column
+
+Those two sheets carry **both** a per-metre rate and a piece price:
+
+```
+PMR-1   Rs 309.33 per mtr   Rs 928 per 3-metre pipe
+        Prince SIM200860    Rs 247.95 per mtr   Rs 743.85
+```
+
+**Use the dated columns** (Prayag col 5, Prince col 8), which are piece prices on both sides. Taking the per-metre column on one side and the piece price on the other would produce a 3× error that looks like a catastrophic gap.
+
+### The file is clean
+
+All **803 comparable Prayag prices match our catalogue exactly**. No reconciliation needed.
+
+**Ten Prayag codes are not in our catalogue** and must be reported, not created:
+
+```
+C133   PMR-8   PMR-9   U-11CS   U-13CS   U-14CS
+U-15CS   U-16CS   U-13BS   U-14BS
+```
+
+Mostly Casing and UGD. Some may be products we do not carry; some may be a mapping gap.
+
+---
+
+## 3. Three competitors now
+
+Whatever was written for two must hold for three. Check and report:
+
+- The competitor filter must select any combination of the three
+- *Nearest* and *lowest* selection must consider all three
+- Comparison and exports need a competitor dimension, not two hard-coded columns
+- The Price Finder inline gap line — decide what it shows with three, and state it
+
+**Coverage differs sharply**, so "no data" must stay distinct from "no difference":
+
+```
+Sparsh Pearl    150 products    PTMT
+Ashirvad        669             plumbing
+Prince          813             plumbing
+```
+
+---
+
+## 4. The PDF path — text extraction, not vision
+
+Future Prince catalogues arrive as PDF, and this one is **text-based**. `pdftotext -layout` returns clean rows:
+
+```
+15   1/2   SIM105474   120   600   13.00
+20   3/4   SIM105475    80   375   18.00
+```
+
+**Do not build a vision pipeline for this.** Sparsh needed one because its catalogue is image-only; Prince does not, and vision extraction would be slower, costlier and less accurate on a document that is already machine-readable.
+
+### Two layout complications, both real
+
+**Multiple product families per page, side by side.** Page 6 carries End Cap, Cross Over and Male Threaded Adapter as three column groups on one page. Column position identifies which family a row belongs to — so the extractor must segment by horizontal position, not read left to right.
+
+**One row spanning several pack sizes.** Page 22:
+
+```
+Size    3mtr code     Pkg    5mtr code     Pkg    6mtr code     Pkg    Rate/Mtr
+25      SIM201337     70     SIM201413     40     SIM201399     35     118.00
+```
+
+Three item codes, one rate per metre. That is **three products** sharing a rate, and they must be emitted as three rows — not one, and not with the rate assigned to whichever code appears first.
+
+A dash means that size is not offered in that length. Emit nothing, not zero.
+
+### Verification against the known set
+
+The 813 codes already mapped in the spreadsheet are ground truth. **Extract the PDF and reconcile against them**: how many match exactly, how many differ, how many are new. Report any price difference individually — a mismatch means either the extractor or the spreadsheet is wrong, and it matters which.
+
+**Do not auto-create mappings from the PDF.** Extraction yields Prince codes and prices; mapping a Prince code to a Prayag product is a judgement, and the 813 existing mappings came from someone making it.
+
+---
+
+## 5. Acceptance tests
+
+```
+1.  813 Prince prices load, effective 2026-03-01.
+2.  No catalog_products row is created or modified.
+3.  No mrp_price_history row is created or modified.
+4.  PMR-1 compares Rs 928 against Prince Rs 743.85 — piece against piece,
+    not against the Rs 247.95 per-metre rate.
+5.  The 10 unmatched Prayag codes are reported, not created.
+6.  The competitor filter selects any combination of Sparsh, Ashirvad, Prince.
+7.  Nearest and lowest consider all three.
+8.  A product mapped to only one competitor shows "no data" for the others,
+    never a zero gap.
+9.  All 150 Sparsh and 669 Ashirvad mappings still resolve.
+10. PDF extraction produces three rows from a 3mtr/5mtr/6mtr line, each
+    carrying the shared rate per metre.
+11. A dash in a length column produces no row.
+12. Page 6's three side-by-side families are segmented correctly, with each
+    row attributed to the right family.
+13. Extracted prices reconcile against the 813 known codes, with differences
+    reported individually.
+```
+
+Test 4 is the one that would otherwise produce a 3× error looking like a real finding. Test 10 is where a naive reader loses two thirds of the pipe range.
+
+---
+
+## 6. Report
+
+- Prince rows loaded, batch id, and the median gap by category.
+- The ten unmatched Prayag codes.
+- What changed to support three competitors.
+- PDF extraction: codes found, reconciliation against the 813, and every price difference.
+- Confirmation that Prayag prices, the catalogue and the other two competitors are untouched.
+
+---
+
+## Worth flagging before anyone reads the numbers
+
+Prayag is **more expensive than Prince on 410 of 803 products**, and on every one of the 157 UPVC Pipe, AGRI Pipe and Casing Pipe items.
+
+That is a different competitive picture from Sparsh and Ashirvad, and it may be the more accurate one — Prince's list is six months old, against Ashirvad's eighteen. Present it as a finding for the business, not as a problem with the data.

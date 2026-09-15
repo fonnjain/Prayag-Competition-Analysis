@@ -1,0 +1,193 @@
+# P015 — COMPETITION — Matching MRP workbench, category scope, and margin in comparison
+
+> **P015** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P015` when reporting back.
+
+Three additions. A **Matching MRP** view for working through a category by hand. **Category scoping** everywhere. And **collective margin** in the comparison, so scenarios can be judged on money rather than on counts.
+
+---
+
+## 1. Matching MRP — a workbench, not a rule engine
+
+The scenario builder answers *"apply this policy across the catalogue."* This answers a different question: **"show me this category against these competitors, and let me decide product by product."**
+
+Both are needed. A pricing manager working through CP Fittings does not want to write a rule; they want to see the list and make calls.
+
+### The flow
+
+```
+1. Pick a category          the same browse control as Price Finder
+                            CP Fittings / Faucets 1040 · Pipes & Fittings 2278 ...
+
+2. Pick competitors         one or several. Sparsh Pearl, Ashirvad, or both
+
+3. See where we stand       every product in the category, current MRP
+                            against each selected competitor
+
+4. Decide, per product      match · less by N% · leave · set a price
+```
+
+### The table
+
+```
+CODE     PRODUCT              PRAYAG   SPARSH   ASHIRVAD   POSITION    ACTION
+1218D    Sink Cock 15mm        2,490    2,310      2,180    +14.2% ▲   [ match ▾ ]
+151      Ball Cock 15mm          336      330          -     +1.8% ▲   [ -3%   ▾ ]
+124-V    Bib Cock Long           422      468          -    -9.8% ▼    [ leave ▾ ]
+```
+
+**Default the sort to where Prayag is most above the competition.** That is what the view is for, and it should open on the answer rather than on an alphabetical list.
+
+**Show both directions.** Where Prayag is *below* the competition is where the money is — 130 of 150 against Sparsh, 161 of 171 on Ashirvad CPVC. Provide a filter: *above only* · *below only* · *all*. Default to *above only*, since that is the stated need, but do not hide the rest.
+
+### Per-product action
+
+```
+match                 set to the selected competitor's price
+less by N%            competitor price minus N
+leave                 no change, recorded as reviewed
+set                   type a price directly
+```
+
+With several competitors selected, the user chooses which drives the action — lowest, highest, or a named one — per product or for the whole view.
+
+**Bulk actions on the current filter**, because working 1,040 products one at a time is not realistic: *apply "3% less than Sparsh" to everything currently shown*, then adjust individuals.
+
+### It produces a scenario
+
+The result saves as a scenario like any other — immutable, comparable, and handed off through the existing revision preview. **It is a different way to build a scenario, not a different way to write prices.**
+
+Record per product that the action was manual, and by whom. A hand-set price and a rule-derived price should not look alike six weeks later.
+
+---
+
+## 2. Category scope everywhere
+
+Add the same category selector to the scenario builder and to Compute MRP (Historical).
+
+Today scope offers division, series and explicit codes. Category is the level people actually think in — *"CP Fittings"*, not *"CP Fittings / Faucets | PTMT & Plastic Fittings"*.
+
+Note the catalogue has **compound divisions** — `Ceramic Sanitaryware | PTMT & Plastic Fittings` with 50 products, and three more. Decide whether a product in a compound division appears under each of its parts or only under the compound, and say which. Either is defensible; silently picking one is not.
+
+---
+
+## 3. Comparison across all three types
+
+The comparison tab must accept any mixture of:
+
+- rule-based scenarios
+- Compute MRP (Historical) runs
+- Matching MRP sessions
+
+Select any two or more. They are all runs with suggestions; the comparison should not care how they were produced.
+
+Show the type alongside each, because a hand-built session and a policy run deserve different scrutiny.
+
+---
+
+## 4. Collective margin — yes, with two assumptions on the face of it
+
+This is possible, and it is the figure that makes comparison meaningful. Counts do not tell you which scenario is better; money does.
+
+### The calculation
+
+```
+unit_cost      = bom_value / qty                    from the margin feed
+current        = (avg_sale − unit_cost) / avg_sale
+
+new_avg_sale   = avg_sale × (suggested_mrp / current_mrp)
+projected      = (new_avg_sale − unit_cost) / new_avg_sale
+
+collective     = Σ(qty × (price − unit_cost)) / Σ(qty × price)
+                 weighted by sales quantity from the chosen period
+```
+
+### The two assumptions, stated on screen
+
+**Discount holds.** An 8% MRP increase is assumed to lift the realised price 8%. That holds if dealer discounts are a constant percentage. If they are absolute amounts, or get renegotiated when MRP moves, it does not.
+
+**Volume holds.** No elasticity data exists, so the projection assumes quantities are unchanged. Raising prices 8% may well reduce volume; nothing here can say by how much.
+
+**Both must appear beside the number, not in a footnote.** A projected margin is a conditional statement, and presenting it as a forecast would be the single most misleading thing this application could do.
+
+### Coverage must travel with it
+
+```
+margin feed   3,159 codes, Apr-Jun 2026, PTMT Apr held
+sales feed    3,138 codes, Apr-Aug 2026
+catalogue     6,106 codes
+```
+
+Computable only on products that have **margin, sales, and a suggestion**. Report the count and, more importantly, **the share of scope value it covers**:
+
+```
+Collective margin    44.1% → 45.3%    +1.2 points
+                     computed on 1,847 products = 61% of scope value
+                     assumes discount % and volume unchanged
+```
+
+A +1.2 point improvement on 61% of value is a different claim from one on 95%, and the reader must be able to tell them apart.
+
+### In the comparison table
+
+```
+                         Default   Sparsh only   Historical   CP matching
+products changing            694          503          887           212
+median change             +6.2%        +5.8%        +8.0%         -2.1%
+collective margin         +1.2pt       +0.9pt       +1.8pt        -0.4pt
+  coverage                   61%          58%          64%           71%
+value at risk           Rs 2.1 Cr    Rs 1.4 Cr    Rs 3.8 Cr    Rs 0.6 Cr
+```
+
+**Value at risk** — the sales value of products whose price rises, which is where volume loss would bite if the volume assumption fails. Not a prediction, an exposure.
+
+---
+
+## 5. What not to build
+
+**No elasticity estimate.** Fitting demand to observational sales data would encode past pricing and look rigorous while being circular.
+
+**No single "best scenario" score.** Ranking scenarios by projected margin invites picking the number without reading the assumptions under it.
+
+**No merging.** Comparison stays read-only. A combined output traceable to no single policy is what the immutable-run design exists to prevent.
+
+**No auto-apply.** Unchanged.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  Matching MRP opens on a category and lists every product against the
+    selected competitors.
+2.  Default sort is most-above-competition first; the filter offers above,
+    below and all.
+3.  Per-product actions work: match, less by N%, leave, set.
+4.  A bulk action applies to the current filter only, and individuals can be
+    changed afterwards.
+5.  A Matching MRP session saves as a comparable scenario, with manual
+    actions recorded as manual and attributed.
+6.  Category scope appears in the scenario builder and in Historical, and
+    compound divisions behave as documented.
+7.  Comparison accepts a mixture of rule, historical and matching runs.
+8.  Collective margin is reported with its coverage share and both
+    assumptions visible.
+9.  A product without margin or sales data is excluded from the margin
+    figure and counted, not assumed.
+10. Value at risk is reported per scenario.
+11. No merge, no ranking, no auto-apply.
+12. No price is written by any of it.
+```
+
+Test 8 is the one that keeps this defensible. Test 12 has not changed.
+
+---
+
+## 7. Report
+
+- Matching MRP on CP Fittings / Faucets against both competitors: how many are above, how many below, and the largest gaps each way.
+- Whether compound divisions appear once or under each part.
+- A comparison of four runs with collective margin, coverage and value at risk.
+- How the assumptions are shown on screen.
+- Confirmation that nothing is written and no merge exists.

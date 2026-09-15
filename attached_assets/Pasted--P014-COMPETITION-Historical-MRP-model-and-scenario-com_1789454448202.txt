@@ -1,0 +1,198 @@
+# P014 — COMPETITION — Historical MRP model and scenario comparison
+
+> **P014** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P014` when reporting back.
+
+Two additions. **Compute MRP (Historical)** — a second, independent way to suggest prices, built from how Prayag has actually revised MRP rather than from what competitors charge. And a **Comparison tab** for putting scenarios side by side.
+
+---
+
+## 1. The pattern is real, and it is at series level
+
+Measured across the 01 Sep 2026 revision, 5,580 products with a prior price:
+
+```
+series with 5+ products                      110
+of which apply a NEAR-UNIFORM increase        92
+```
+
+Examples — p10 to p90 spread inside a single series:
+
+```
+1200 Series 304 Super Steel    n=41    7.99%    7.95% - 8.09%
+Garden Pipe                    n=45    8.04%    7.89% - 8.09%
+Helix                          n=31    7.94%    7.65% - 8.20%
+Diamond                        n=29    8.04%    7.63% - 8.47%
+304 Super Steel (0.85 Mm)      n=83    5.95%    5.36% - 6.25%
+```
+
+**Prayag sets a target percentage per series per revision.** That is a learnable rule, and 92 of 110 series follow it closely.
+
+The 18 that do not are mostly Hardware — `SET` at 41.4% spanning 6.6% to 59.7%, `NOS` at 39.0% spanning 11.7% to 97.8%. Those were resets, not routine revisions, and the model must say so rather than averaging them.
+
+**By period, the house rate is visible too:**
+
+```
+01 Sep 2026   median  8.02%      01 Aug 2026   median  9.31%
+10 Aug 2026   median 14.97%      01 May 2026   median  4.67%
+01 Feb 2026   median  0.00%   <- most products unchanged
+```
+
+### The constraint that shapes the design
+
+**The median product has only two price points.** A per-product trend line fitted to two observations is not a trend, it is a straight line through two dots.
+
+So the model works **at series level** — where there are 29 to 124 products moving together — and applies the series rate to the individual product. Never fit a curve to a single product's history.
+
+---
+
+## 2. Compute MRP (Historical)
+
+A button beside **New Scenario**. It produces a run like any other, with its own analysis.
+
+### What it computes
+
+For each series:
+
+```
+revision cadence     months between revisions, and how many observed
+typical rate         median increase per revision for this series
+consistency          p10-p90 spread; is the series uniform or not
+months since last    for each product
+due                  cadence - months since last
+```
+
+Then per product:
+
+```
+suggested = current × (1 + series_rate)
+```
+
+Applied only where the series is **uniform** and the product is **due or overdue**. Elsewhere, report and suggest nothing.
+
+### What the analysis must show
+
+This is the more valuable half. Per series:
+
+```
+Helix                                          31 products
+  Revisions observed     2  (05 Mar 2026, 01 Sep 2026)
+  Cadence                ~6 months
+  Typical rate           7.94%   consistent (7.65% - 8.20%)
+  Last revised           01 Sep 2026, 0 months ago
+  Status                 NOT DUE - next expected around Mar 2027
+
+SET                                           124 products
+  Revisions observed     2
+  Typical rate           41.4%   INCONSISTENT (6.6% - 59.7%)
+  Status                 PATTERN NOT USABLE - this was a reset,
+                         not a routine revision. No suggestion made.
+```
+
+**Say plainly where the pattern does not hold.** A series with an inconsistent history should produce no suggestion and an explanation, not an average of unlike things.
+
+### Confidence, stated per series
+
+```
+STRONG     3+ revisions, spread under 1.5 points, consistent cadence
+MODERATE   2 revisions, spread under 1.5 points
+WEAK       2 revisions, spread 1.5-4 points
+NONE       spread over 4 points, or fewer than 5 products, or one revision
+```
+
+Most series will be **MODERATE** today — two revisions is what the history holds. Say so rather than implying more.
+
+---
+
+## 3. Where the two models disagree — the real output
+
+The historical model and the competitive model answer different questions. **Where they disagree is where a human should look.**
+
+```
+code   current   historical   competitive   note
+151     336        363         314          historical +8%, competition says cut
+1218D   2,490      2,690       2,910        competition has more room than our pattern
+```
+
+| Pattern | Means |
+|---|---|
+| Historical **above** competitive | Our usual increase would put us above the market |
+| Historical **below** competitive | Competition has moved more than we have — headroom |
+| The two agree | Strong signal; low-risk change |
+| Historical only | No competitor mapped — pattern is the only guide |
+| Competitive only | No usable series history |
+
+Report the count in each, and list the largest disagreements by value.
+
+**This is why the historical model is worth building.** On its own it just continues what Prayag already does. Against the competitive model it becomes a cross-check: two independent methods agreeing is worth more than either alone.
+
+---
+
+## 4. Comparison tab
+
+A tab alongside the scenario list. Select **two or more** runs and compare.
+
+```
+                          Default    Sparsh only   Historical
+products evaluated           819          712          1,904
+would change                 694          503            887
+median change             +6.2%        +5.8%          +8.0%
+total value movement     +Rs 4.8 Cr   +Rs 3.1 Cr    +Rs 9.2 Cr
+
+products where they differ                          412
+  historical higher                                  287
+  competitive higher                                 125
+```
+
+**Per product, on expansion:** what each run suggested and why — the rule or series that decided it.
+
+Filters that matter: show only where they disagree, only where one has a suggestion and another does not, only products above a value threshold.
+
+**Comparison must be read-only.** No merging, no "apply the best of each." A combined output nobody can trace to one policy is exactly what the immutable-run design exists to prevent.
+
+---
+
+## 5. What not to build
+
+**No per-product trend fitting.** Two points is not a trend. Series level only.
+
+**No extrapolation beyond one revision.** Suggesting what a price should be in three revisions' time compounds an estimate on an estimate.
+
+**No blending the two models into one number.** Report both and their difference. A weighted average of a historical rate and a competitive target is defensible to nobody.
+
+**No auto-apply.** Unchanged, and it stays unchanged.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  Compute MRP (Historical) produces a run with per-series analysis.
+2.  A uniform series (Helix, 7.94%, spread 7.65-8.20) yields suggestions at
+    its own rate, marked MODERATE.
+3.  An inconsistent series (SET, spread 6.6-59.7) yields NO suggestion, with
+    the reason stated.
+4.  A series revised 0 months ago is marked NOT DUE, with the next expected
+    date.
+5.  No product-level trend is fitted; the series rate is applied.
+6.  The comparison tab accepts two or more runs and reports where they differ.
+7.  Products where historical and competitive disagree are listed, with both
+    figures and both reasons.
+8.  Comparison offers no merge or combined-apply action.
+9.  Confidence is stated per series and reflects the number of revisions.
+10. No price is written by either feature.
+```
+
+Test 3 is the one that keeps the model honest. A model that produces a number for every series, including the ones it cannot explain, is worse than one that admits where it does not know.
+
+---
+
+## 7. Report
+
+- Series analysis for the ten largest series: cadence, rate, spread, confidence.
+- How many series are usable, and how many are not, with reasons.
+- Products suggested by the historical model, and how many are due versus overdue.
+- The disagreement table against the default competitive run, with counts.
+- The comparison tab with three runs side by side.
+- Confirmation that nothing is written and no merge action exists.
