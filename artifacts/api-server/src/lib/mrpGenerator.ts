@@ -1720,10 +1720,12 @@ export function evaluateProduct(
 }
 
 export function stableJson(value: unknown): string {
+  if (value === undefined) return "null";
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  return `{${Object.keys(value as Record<string, unknown>).sort().map((key) =>
-    `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
+  return `{${Object.keys(value as Record<string, unknown>).sort()
+    .filter((key) => (value as Record<string, unknown>)[key] !== undefined)
+    .map((key) => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
 }
 
 export function inputFingerprint(value: unknown): string {

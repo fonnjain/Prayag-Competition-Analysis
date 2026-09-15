@@ -415,6 +415,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-muted-foreground mt-1 leading-tight">Exact catalogue category; compound divisions stay one stored compound value and products appear once.</p>
               </div>
               <div>
                 <Label>Competitor mapping</Label>

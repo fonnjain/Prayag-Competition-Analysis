@@ -104,6 +104,7 @@ import type {
   GetMappingReviewParams,
   GetMrpGeneratorFreshnessParams,
   GetMrpIncreasesParams,
+  GetMrpMatchingWorkbenchParams,
   GetPriceEditorEditsParams,
   GetPriceEditorProductParams,
   GetPriceFinderBrowseParams,
@@ -140,6 +141,9 @@ import type {
   MrpHistoricalRunInput,
   MrpHistoricalRunResponse,
   MrpIncreaseList,
+  MrpMatchingSessionInput,
+  MrpMatchingSessionResponse,
+  MrpMatchingWorkbench,
   MrpRevisionDetail,
   MrpRevisionPreview,
   MrpRevisionPreviewInput,
@@ -6766,6 +6770,169 @@ export function useGetMrpGeneratorScopes<TData = Awaited<ReturnType<typeof getMr
 
 
 
+
+export const getGetMrpMatchingWorkbenchUrl = (params: GetMrpMatchingWorkbenchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["competitors"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mrp-generator/matching?${stringifiedParams}` : `/api/mrp-generator/matching`
+}
+
+/**
+ * @summary Read-only Price Finder hierarchy matching workbench
+ */
+export const getMrpMatchingWorkbench = async (params: GetMrpMatchingWorkbenchParams, options?: RequestInit): Promise<MrpMatchingWorkbench> => {
+
+  return customFetch<MrpMatchingWorkbench>(getGetMrpMatchingWorkbenchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMrpMatchingWorkbenchQueryKey = (params?: GetMrpMatchingWorkbenchParams,) => {
+    return [
+    `/api/mrp-generator/matching`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMrpMatchingWorkbenchQueryOptions = <TData = Awaited<ReturnType<typeof getMrpMatchingWorkbench>>, TError = ErrorType<void>>(params: GetMrpMatchingWorkbenchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpMatchingWorkbench>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMrpMatchingWorkbenchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMrpMatchingWorkbench>>> = ({ signal }) => getMrpMatchingWorkbench(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMrpMatchingWorkbench>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMrpMatchingWorkbenchQueryResult = NonNullable<Awaited<ReturnType<typeof getMrpMatchingWorkbench>>>
+export type GetMrpMatchingWorkbenchQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read-only Price Finder hierarchy matching workbench
+ */
+
+export function useGetMrpMatchingWorkbench<TData = Awaited<ReturnType<typeof getMrpMatchingWorkbench>>, TError = ErrorType<void>>(
+ params: GetMrpMatchingWorkbenchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMrpMatchingWorkbench>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMrpMatchingWorkbenchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveMrpMatchingSessionUrl = () => {
+
+
+
+
+  return `/api/mrp-generator/matching`
+}
+
+/**
+ * @summary Save immutable manual matching session; never writes MRP
+ */
+export const saveMrpMatchingSession = async (mrpMatchingSessionInput: MrpMatchingSessionInput, options?: RequestInit): Promise<MrpMatchingSessionResponse> => {
+
+  return customFetch<MrpMatchingSessionResponse>(getSaveMrpMatchingSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mrpMatchingSessionInput,)
+  }
+);}
+
+
+
+
+export const getSaveMrpMatchingSessionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMrpMatchingSession>>, TError,{data: BodyType<MrpMatchingSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveMrpMatchingSession>>, TError,{data: BodyType<MrpMatchingSessionInput>}, TContext> => {
+
+const mutationKey = ['saveMrpMatchingSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveMrpMatchingSession>>, {data: BodyType<MrpMatchingSessionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveMrpMatchingSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveMrpMatchingSessionMutationResult = NonNullable<Awaited<ReturnType<typeof saveMrpMatchingSession>>>
+    export type SaveMrpMatchingSessionMutationBody = BodyType<MrpMatchingSessionInput>
+    export type SaveMrpMatchingSessionMutationError = ErrorType<void>
+
+    /**
+ * @summary Save immutable manual matching session; never writes MRP
+ */
+export const useSaveMrpMatchingSession = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMrpMatchingSession>>, TError,{data: BodyType<MrpMatchingSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveMrpMatchingSession>>,
+        TError,
+        {data: BodyType<MrpMatchingSessionInput>},
+        TContext
+      > => {
+      return useMutation(getSaveMrpMatchingSessionMutationOptions(options));
+    }
 
 export const getGetMrpGeneratorFreshnessUrl = (params?: GetMrpGeneratorFreshnessParams,) => {
   const normalizedParams = new URLSearchParams();

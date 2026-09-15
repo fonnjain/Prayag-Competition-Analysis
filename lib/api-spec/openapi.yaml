@@ -2192,6 +2192,32 @@ paths:
       summary: Available generator product scopes
       responses:
         "200": { description: Scopes, content: { application/json: { schema: { $ref: "#/components/schemas/MrpGeneratorScopes" } } } }
+  /mrp-generator/matching:
+    get:
+      operationId: getMrpMatchingWorkbench
+      tags: [mrp-generator]
+      summary: Read-only Price Finder hierarchy matching workbench
+      parameters:
+        - { name: division, in: query, required: false, description: Required for new callers; exact Price Finder browse division value., schema: { type: string } }
+        - { name: category, in: query, required: false, description: Optional exact catalog product category within division., schema: { type: string } }
+        - { name: competitors, in: query, required: true, style: form, explode: true, schema: { type: array, minItems: 1, items: { type: string } } }
+        - { name: driver, in: query, required: false, schema: { type: string } }
+        - { name: filter, in: query, required: false, schema: { type: string, enum: [above, below, all], default: above } }
+        - { name: asOf, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200": { description: Matching workbench data, content: { application/json: { schema: { $ref: "#/components/schemas/MrpMatchingWorkbench" } } } }
+        "400": { description: Invalid category or competitors }
+    post:
+      operationId: saveMrpMatchingSession
+      tags: [mrp-generator]
+      summary: Save immutable manual matching session; never writes MRP
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: "#/components/schemas/MrpMatchingSessionInput" } }
+      responses:
+        "201": { description: Comparable matching run, content: { application/json: { schema: { $ref: "#/components/schemas/MrpMatchingSessionResponse" } } } }
+        "400": { description: "Invalid action, target, driver, or evidence" }
   /mrp-generator/freshness:
     get:
       operationId: getMrpGeneratorFreshness
@@ -2558,11 +2584,21 @@ components:
         configurationSummary: { type: string }
     MrpGeneratorScopes:
       type: object
-      required: [divisions, series, categories, competitors]
+      required: [divisions, series, categories, categoryPairs, competitors]
       properties:
         divisions: { type: array, items: { type: string } }
         series: { type: array, items: { type: string } }
         categories: { type: array, items: { type: string } }
+        categoryPairs:
+          type: array
+          description: Active Price Finder browse division/category combinations; null category denotes uncategorised products.
+          items:
+            type: object
+            required: [division, category, count]
+            properties:
+              division: { type: string }
+              category: { type: [string, "null"] }
+              count: { type: integer }
         competitors: { type: array, items: { type: string } }
     MrpGeneratorScope:
       type: object
@@ -2911,6 +2947,135 @@ components:
       type: object
       properties:
         asOf: { type: string, format: date }
+        category: { type: string, description: Exact catalog category; compound divisions remain one stored value. }
+    MrpMatchingAction:
+      type: object
+      required: [itemCode, action]
+      properties:
+        itemCode: { type: string }
+        action: { type: string, enum: [match, less_by_percent, leave, set, set_exact_price] }
+        percent: { type: number, minimum: 0, maximum: 100 }
+        price: { type: number, exclusiveMinimum: 0 }
+        exactPrice: { type: number, exclusiveMinimum: 0 }
+        driver:
+          oneOf:
+            - { type: string }
+            - { type: object, required: [named], properties: { named: { type: string, minLength: 1 } } }
+    MrpMatchingBulkAction:
+      type: object
+      required: [action, filter, visibleCodes]
+      properties:
+        id: { type: string }
+        description: { type: string }
+        visibleCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+          description: Canonical item codes currently visible in the UI; the server rejects codes outside the recomputed category/competitor/direction set.
+        filteredCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
+          deprecated: true
+          description: Deprecated compatibility alias for visibleCodes.
+        action: { type: string, enum: [match, less_by_percent, leave, set, set_exact_price] }
+        percent: { type: number, minimum: 0, maximum: 100 }
+        price: { type: number, exclusiveMinimum: 0 }
+        driver:
+          oneOf:
+            - { type: string }
+            - { type: object, required: [named], properties: { named: { type: string, minLength: 1 } } }
+        filter: { type: string, enum: [above, below, all] }
+    MrpMatchingSessionInput:
+      anyOf:
+        - $ref: "#/components/schemas/MrpMatchingSessionInputWithDivision"
+        - $ref: "#/components/schemas/MrpMatchingSessionInputWithCategory"
+    MrpMatchingSessionInputWithDivision:
+      type: object
+      required: [division, selectedCompetitors]
+      properties:
+        division: { type: string, description: Required for new matching callers; browse division value reused from Price Finder. }
+        category: { type: string, description: Optional exact catalog product category within division; category-only callers remain supported. }
+        selectedCompetitors: { type: array, minItems: 1, items: { type: string } }
+        competitors: { type: array, items: { type: string } }
+        driver:
+          oneOf:
+            - { type: string }
+            - { type: object, required: [named], properties: { named: { type: string, minLength: 1 } } }
+        asOf: { type: string, format: date }
+        actions: { type: array, items: { $ref: "#/components/schemas/MrpMatchingAction" } }
+        bulkActions: { type: array, items: { $ref: "#/components/schemas/MrpMatchingBulkAction" } }
+    MrpMatchingSessionInputWithCategory:
+      type: object
+      required: [category, selectedCompetitors]
+      properties:
+        division: { type: string, description: Browse division value reused from Price Finder; optional for legacy category-only callers. }
+        category: { type: string, description: Exact catalog product category. }
+        selectedCompetitors: { type: array, minItems: 1, items: { type: string } }
+        competitors: { type: array, items: { type: string } }
+        driver:
+          oneOf:
+            - { type: string }
+            - { type: object, required: [named], properties: { named: { type: string, minLength: 1 } } }
+        asOf: { type: string, format: date }
+        actions: { type: array, items: { $ref: "#/components/schemas/MrpMatchingAction" } }
+        bulkActions: { type: array, items: { $ref: "#/components/schemas/MrpMatchingBulkAction" } }
+    MrpMatchingWorkbench:
+      type: object
+      required: [runType, division, category, selectedCompetitors, products, filteredProducts, filter]
+      properties:
+        runType: { type: string, const: matching }
+        asOf: { type: string, format: date }
+        division: { type: [string, "null"] }
+        category: { type: [string, "null"] }
+        selectedCompetitors: { type: array, items: { type: string } }
+        driver:
+          oneOf:
+            - { type: string }
+            - { type: object, required: [mode], properties: { mode: { type: string, enum: [lowest, highest, named] }, name: { type: [string, "null"] } } }
+        driverSummary: { type: object, additionalProperties: true }
+        filter: { type: string, enum: [above, below, all] }
+        divisions:
+          type: array
+          items:
+            type: object
+            required: [division, count]
+            properties:
+              division: { type: string }
+              count: { type: integer }
+        categories:
+          type: array
+          items:
+            type: object
+            required: [category, label, count]
+            properties:
+              category: { type: [string, "null"] }
+              label: { type: string }
+              count: { type: integer }
+        categoryOptions:
+          type: array
+          items: { type: object, additionalProperties: true }
+        categoryPairs:
+          type: array
+          items: { type: object, additionalProperties: true }
+        competitors: { type: array, items: { type: string } }
+        products: { type: array, items: { type: object, additionalProperties: true } }
+        filteredProducts: { type: array, items: { type: object, additionalProperties: true } }
+        counts: { type: object, additionalProperties: { type: integer } }
+    MrpMatchingSessionResponse:
+      type: object
+      required: [runId, runType, modelKind, category, summary]
+      properties:
+        runId: { type: integer }
+        runType: { type: string, const: matching }
+        modelKind: { type: string, const: competitive }
+        asOf: { type: string, format: date }
+        division: { type: [string, "null"] }
+        category: { type: [string, "null"] }
+        scope: { type: object, additionalProperties: true }
+        actor: { type: string }
+        summary: { type: object, additionalProperties: true }
+        inputFingerprint: { type: string }
     MrpHistoricalEvidence:
       type: object
       properties:
@@ -2976,10 +3141,11 @@ components:
         reason: { type: [string, "null"] }
     MrpHistoricalRunResponse:
       type: object
-      required: [runId, modelKind, scenarioId, asOf, inputFingerprint, summary, sourceFreshness, series]
+      required: [runId, modelKind, runType, scenarioId, asOf, inputFingerprint, summary, sourceFreshness, series]
       properties:
         runId: { type: integer }
         modelKind: { type: string, const: historical }
+        runType: { type: string, const: historical }
         scenarioId: { type: [integer, "null"] }
         asOf: { type: string, format: date }
         policyVersion: { type: [integer, "null"] }
@@ -2999,23 +3165,46 @@ components:
         coverageSummary: { type: object, additionalProperties: true }
     MrpHistoricalInputSnapshot:
       type: object
-      required: [modelKind, asOf, products, history, seriesAnalyses, summary]
+      required: [modelKind, runType, asOf, products, history, seriesAnalyses, summary]
       properties:
         modelKind: { type: string, const: historical }
+        runType: { type: string, const: historical }
         asOf: { type: string, format: date }
         products: { type: array, items: { type: object, additionalProperties: true } }
         history: { type: array, items: { type: object, additionalProperties: true } }
         seriesAnalyses: { type: array, items: { $ref: "#/components/schemas/MrpHistoricalSeries" } }
         summary: { type: object, additionalProperties: true }
+    MrpMatchingInputSnapshot:
+      type: object
+      required: [modelKind, runType, asOf, division, category, selectedCompetitors, products, actions, compoundDivisionPolicy, matchingScope]
+      properties:
+        modelKind: { type: string, const: competitive }
+        runType: { type: string, const: matching }
+        asOf: { type: string, format: date }
+        division: { type: [string, "null"] }
+        category: { type: [string, "null"] }
+        matchingScope:
+          type: object
+          required: [division, category]
+          properties:
+            division: { type: [string, "null"] }
+            category: { type: [string, "null"] }
+        selectedCompetitors: { type: array, minItems: 1, items: { type: string } }
+        driver: { oneOf: [{ type: string }, { type: object, additionalProperties: true }] }
+        products: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorSnapshotProduct" } }
+        actions: { type: array, items: { type: object, additionalProperties: true } }
+        compoundDivisionPolicy: { type: string }
     MrpGeneratorInputSnapshot:
       oneOf:
         - $ref: "#/components/schemas/MrpCompetitiveInputSnapshot"
         - $ref: "#/components/schemas/MrpHistoricalInputSnapshot"
+        - $ref: "#/components/schemas/MrpMatchingInputSnapshot"
       discriminator:
-        propertyName: modelKind
+        propertyName: runType
         mapping:
-          competitive: "#/components/schemas/MrpCompetitiveInputSnapshot"
+          rule: "#/components/schemas/MrpCompetitiveInputSnapshot"
           historical: "#/components/schemas/MrpHistoricalInputSnapshot"
+          matching: "#/components/schemas/MrpMatchingInputSnapshot"
     MrpGeneratorRunInput:
       type: object
       properties:
@@ -3042,11 +3231,12 @@ components:
             canReset: { type: boolean }
     MrpGeneratorRun:
       type: object
-      required: [runId, scenarioId, modelKind, asOf, policyVersion, inputFingerprint, summary, sourceFreshness]
+      required: [runId, scenarioId, modelKind, runType, asOf, policyVersion, inputFingerprint, summary, sourceFreshness]
       properties:
         runId: { type: integer }
         scenarioId: { type: [integer, "null"] }
         modelKind: { type: string, enum: [competitive, historical] }
+        runType: { type: string, enum: [rule, historical, matching] }
         asOf: { type: string, format: date }
         policyVersion: { type: [integer, "null"], enum: [1, 2, 3, null] }
         inputFingerprint: { type: string }
@@ -3092,9 +3282,10 @@ components:
         margin: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorMarginEvidence" }, { type: "null" }] }
     MrpCompetitiveInputSnapshot:
       type: object
-      required: [modelKind, asOf, products, scope, rules, stage]
+      required: [modelKind, runType, asOf, products, scope, rules, stage]
       properties:
         modelKind: { type: string, const: competitive }
+        runType: { type: string, enum: [rule, matching] }
         asOf: { type: string, format: date }
         products: { type: array, items: { $ref: "#/components/schemas/MrpGeneratorSnapshotProduct" } }
         scope: { $ref: "#/components/schemas/MrpGeneratorScope" }
@@ -3120,6 +3311,7 @@ components:
         id: { type: integer }
         scenarioId: { type: [integer, "null"] }
         modelKind: { type: string, enum: [competitive, historical] }
+        runType: { type: string, enum: [rule, historical, matching] }
         asOf: { type: string, format: date }
         inputSnapshot: { $ref: "#/components/schemas/MrpGeneratorInputSnapshot" }
         inputFingerprint: { type: string }
@@ -3296,7 +3488,12 @@ components:
           items: { $ref: "#/components/schemas/MrpGeneratorFreshnessCompetitor" }
         sales: { $ref: "#/components/schemas/MrpGeneratorSalesApiStatus" }
         salesFetchedAt: { type: [string, "null"], format: date-time }
-        coverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
+        coverage:
+          oneOf:
+            - { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
+            - { type: object, additionalProperties: true }
+            - { type: "null" }
+        coverageUnavailableReason: { type: [string, "null"] }
         coverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
         dataSource: { type: [string, "null"] }
         knownLimits: { $ref: "#/components/schemas/MrpGeneratorKnownLimits" }
@@ -3563,7 +3760,7 @@ components:
       properties:
         batchId: { type: integer }
         status: { type: string, const: preview }
-        scenarioId: { type: integer }
+        scenarioId: { type: [integer, "null"] }
         runId: { type: integer }
         rowsChanged: { type: integer }
     PriceEditorProduct:

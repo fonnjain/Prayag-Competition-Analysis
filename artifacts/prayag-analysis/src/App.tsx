@@ -8,6 +8,7 @@ import DiscountSettings from "@/pages/discount-settings";
 import MrpGeneratorList from "@/pages/mrp-generator/index";
 import MrpGeneratorRun from "@/pages/mrp-generator/run";
 import MrpGeneratorCompare from "@/pages/mrp-generator/compare";
+import MrpMatchingWorkbench from "@/pages/mrp-generator/matching";
 import { useAuth, AuthProvider, PasswordChangeGate } from "@workspace/replit-auth-web";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -114,6 +115,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/mrp-generator" component={MrpGeneratorList} />
         <Route path="/mrp-generator/compare" component={MrpGeneratorCompare} />
+        <Route path="/mrp-generator/matching" component={MrpMatchingWorkbench} />
         <Route path="/mrp-generator/runs/:id" component={MrpGeneratorRun} />
         <Route path="/settings/discounts" component={DiscountSettings} />
         <Route component={NotFound} />

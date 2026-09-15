@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Play, Trash2, Edit, Activity, History, Zap, Info, ShieldAlert, Lock, Copy, RotateCcw } from "lucide-react";
+import { Plus, Play, Trash2, Edit, Activity, History, Zap, Info, ShieldAlert, Lock, Copy, RotateCcw, Target } from "lucide-react";
 import {
   useListMrpGeneratorScenarios,
   useDeleteMrpGeneratorScenario,
@@ -20,6 +20,11 @@ import { ScenarioDialog } from "./components/ScenarioDialog";
 import { MrpGeneratorScope, MrpGeneratorRule, MrpGeneratorPolicy, MrpGeneratorSimplePolicy } from "./types";
 import { useToast } from "@/hooks/use-toast";
 import { formatDisplayDate } from "@/lib/date-format";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useGetMrpGeneratorScopes } from "@workspace/api-client-react";
 
 function ScenarioPreviewSentence({ scenario }: { scenario: any }) {
   const previewMutation = usePreviewMrpGeneratorSimpleScenario();
@@ -70,6 +75,20 @@ export default function MrpGeneratorList() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<any>(null);
+
+  // Matching Setup Dialog State
+  const [matchingDialogOpen, setMatchingDialogOpen] = useState(false);
+  const [matchingDivision, setMatchingDivision] = useState<string>("");
+  const [matchingCategory, setMatchingCategory] = useState<string>("");
+  const [matchingCompetitors, setMatchingCompetitors] = useState<string[]>([]);
+  const [matchingDriver, setMatchingDriver] = useState<string>("lowest");
+
+  // Historical Setup Dialog State
+  const [historicalDialogOpen, setHistoricalDialogOpen] = useState(false);
+  const [historicalCategory, setHistoricalCategory] = useState<string>("");
+
+  const { data: scopesData } = useGetMrpGeneratorScopes();
+
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -81,6 +100,24 @@ export default function MrpGeneratorList() {
     }
     return err?.message || "Unknown error";
   };
+
+  const availableCategories = React.useMemo(() => {
+    if (!matchingDivision) return [];
+    const pairs = (scopesData as any)?.categoryPairs as Array<{ division: string; category: string | null }> | undefined;
+    if (pairs) {
+      return pairs
+        .filter(p => p.division === matchingDivision)
+        .map(p => p.category);
+    }
+    return [];
+  }, [scopesData, matchingDivision]);
+
+  React.useEffect(() => {
+    if (matchingDivision && matchingCategory && matchingCategory !== "all") {
+      const isValid = availableCategories.some(c => (c === null ? "__uncategorised__" : c) === matchingCategory);
+      if (!isValid) setMatchingCategory("");
+    }
+  }, [matchingDivision, availableCategories, matchingCategory]);
 
   const isForbidden = [scenariosError, runsError, metadataError, freshnessError].some(isError403);
 
@@ -176,16 +213,11 @@ export default function MrpGeneratorList() {
               Compare Runs
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => {
-            if (!confirm("Compute historical MRP baseline based on current catalog patterns?")) return;
-            computeHistoricalMutation.mutate({}, {
-              onSuccess: (res) => {
-                refetchRuns();
-                setLocation(`/mrp-generator/runs/${res.runId}`);
-              },
-              onError: (err: any) => toast({ title: "Historical Run Failed", description: getErrorMessage(err), variant: "destructive" })
-            });
-          }} disabled={computeHistoricalMutation.isPending}>
+          <Button variant="outline" onClick={() => setMatchingDialogOpen(true)}>
+            <Target className="w-4 h-4 mr-2" />
+            Matching MRP
+          </Button>
+          <Button variant="outline" onClick={() => setHistoricalDialogOpen(true)}>
             <History className="w-4 h-4 mr-2" />
             Compute Historical
           </Button>
@@ -353,9 +385,11 @@ export default function MrpGeneratorList() {
               {recentRuns.map((r) => (
                 <Link key={r.id} href={`/mrp-generator/runs/${r.id}`}>
                   <div className="p-3 border bg-card rounded-md hover:border-primary transition-colors cursor-pointer group">
-                    <div className="text-sm font-medium group-hover:text-primary transition-colors truncate">{r.scenarioName || `Run #${r.id}`}</div>
+                    <div className="text-sm font-medium group-hover:text-primary transition-colors truncate">
+                      {r.scenarioName || ((r as any).runType === "matching" ? `Matching Session #${r.id}` : (r as any).runType === "historical" ? `Historical Run #${r.id}` : `Run #${r.id}`)}
+                    </div>
                     <div className="text-xs text-muted-foreground flex justify-between mt-1">
-                      <span>Run #{r.id}</span>
+                      <span className="capitalize">{(r as any).runType || "Rule"} Run</span>
                       <span>{new Date(r.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                     </div>
                   </div>
@@ -373,6 +407,153 @@ export default function MrpGeneratorList() {
         onSave={handleSave}
         isSaving={isSaving}
       />
+
+      <Dialog open={historicalDialogOpen} onOpenChange={setHistoricalDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Compute Historical MRP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Compute historical MRP baseline based on current catalog patterns.</p>
+            <div className="space-y-2">
+              <Label>Category (Optional)</Label>
+              <Select value={historicalCategory || "all"} onValueChange={(v) => setHistoricalCategory(v === "all" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {scopesData?.categories?.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Exact catalogue category; compound divisions stay one stored compound value and products appear once.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHistoricalDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                computeHistoricalMutation.mutate({
+                  data: { category: historicalCategory || undefined }
+                }, {
+                  onSuccess: (res) => {
+                    refetchRuns();
+                    setHistoricalDialogOpen(false);
+                    setLocation(`/mrp-generator/runs/${res.runId}`);
+                  },
+                  onError: (err: any) => toast({ title: "Historical Run Failed", description: getErrorMessage(err), variant: "destructive" })
+                });
+              }}
+              disabled={computeHistoricalMutation.isPending}
+            >
+              {computeHistoricalMutation.isPending ? "Computing..." : "Compute Baseline"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={matchingDialogOpen} onOpenChange={setMatchingDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Matching MRP Workbench</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Select a scope and competitors to begin matching.</p>
+
+            <div className="space-y-2">
+              <Label>Division (Required)</Label>
+              <Select value={matchingDivision} onValueChange={(v) => { setMatchingDivision(v); setMatchingCategory(""); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a division" />
+                </SelectTrigger>
+                <SelectContent>
+                  {scopesData?.divisions?.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category (Optional)</Label>
+              <Select value={matchingCategory} onValueChange={setMatchingCategory} disabled={!matchingDivision || availableCategories.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All categories in division" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">-- All Categories --</SelectItem>
+                  {availableCategories.map((c, i) => {
+                    const val = c === null ? "__uncategorised__" : c;
+                    const label = c === null ? "Uncategorised" : c;
+                    return <SelectItem key={val || i} value={val}>{label}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                Warning: Exact category matching is strict. To match a compound like "CP Fittings / Faucets", you must use the Division dropdown instead.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Label>Competitors (Select at least one)</Label>
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md bg-muted/20">
+                {scopesData?.competitors?.map((c) => (
+                  <label key={c} className="flex items-center space-x-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={matchingCompetitors.includes(c)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setMatchingCompetitors(prev => [...prev, c]);
+                        } else {
+                          setMatchingCompetitors(prev => prev.filter(x => x !== c));
+                        }
+                      }}
+                    />
+                    <span className="truncate" title={c}>{c}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Label>Global Target Driver</Label>
+              <Select value={matchingDriver} onValueChange={setMatchingDriver}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select target driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lowest">Lowest Price</SelectItem>
+                  <SelectItem value="highest">Highest Price</SelectItem>
+                  {matchingCompetitors.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMatchingDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                const params = new URLSearchParams();
+                params.set("division", matchingDivision);
+                if (matchingCategory && matchingCategory !== "all") {
+                  params.set("category", matchingCategory);
+                }
+                matchingCompetitors.forEach(c => params.append("competitors", c));
+                params.set("driver", matchingDriver);
+                setLocation(`/mrp-generator/matching?${params.toString()}`);
+                setMatchingDialogOpen(false);
+              }}
+              disabled={!matchingDivision || matchingCompetitors.length === 0}
+            >
+              Open Workbench
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

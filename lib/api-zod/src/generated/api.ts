@@ -2440,8 +2440,166 @@ export const GetMrpGeneratorScopesResponse = zod.object({
   "divisions": zod.array(zod.string()),
   "series": zod.array(zod.string()),
   "categories": zod.array(zod.string()),
+  "categoryPairs": zod.array(zod.object({
+  "division": zod.string(),
+  "category": zod.string().nullable(),
+  "count": zod.number()
+})).describe('Active Price Finder browse division\/category combinations; null category denotes uncategorised products.'),
   "competitors": zod.array(zod.string())
 })
+
+
+/**
+ * @summary Read-only Price Finder hierarchy matching workbench
+ */
+
+export const getMrpMatchingWorkbenchQueryFilterDefault = `above`;
+
+export const GetMrpMatchingWorkbenchQueryParams = zod.object({
+  "division": zod.coerce.string().optional().describe('Required for new callers; exact Price Finder browse division value.'),
+  "category": zod.coerce.string().optional().describe('Optional exact catalog product category within division.'),
+  "competitors": zod.array(zod.coerce.string()).min(1),
+  "driver": zod.coerce.string().optional(),
+  "filter": zod.enum(['above', 'below', 'all']).default(getMrpMatchingWorkbenchQueryFilterDefault),
+  "asOf": zod.date().optional()
+})
+
+export const GetMrpMatchingWorkbenchResponse = zod.object({
+  "runType": zod.literal("matching"),
+  "asOf": zod.coerce.date().optional(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "selectedCompetitors": zod.array(zod.string()),
+  "driver": zod.union([zod.string(),zod.object({
+  "mode": zod.enum(['lowest', 'highest', 'named']),
+  "name": zod.string().nullish()
+})]).optional(),
+  "driverSummary": zod.record(zod.string(), zod.unknown()).optional(),
+  "filter": zod.enum(['above', 'below', 'all']),
+  "divisions": zod.array(zod.object({
+  "division": zod.string(),
+  "count": zod.number()
+})).optional(),
+  "categories": zod.array(zod.object({
+  "category": zod.string().nullable(),
+  "label": zod.string(),
+  "count": zod.number()
+})).optional(),
+  "categoryOptions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "categoryPairs": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "competitors": zod.array(zod.string()).optional(),
+  "products": zod.array(zod.record(zod.string(), zod.unknown())),
+  "filteredProducts": zod.array(zod.record(zod.string(), zod.unknown())),
+  "counts": zod.record(zod.string(), zod.number()).optional()
+})
+
+
+/**
+ * @summary Save immutable manual matching session; never writes MRP
+ */
+
+
+export const saveMrpMatchingSessionBodyOneActionsItemPercentMin = 0;
+export const saveMrpMatchingSessionBodyOneActionsItemPercentMax = 100;
+
+export const saveMrpMatchingSessionBodyOneActionsItemPriceExclusiveMin = 0;
+
+export const saveMrpMatchingSessionBodyOneActionsItemExactPriceExclusiveMin = 0;
+
+
+
+
+export const saveMrpMatchingSessionBodyOneBulkActionsItemPercentMin = 0;
+export const saveMrpMatchingSessionBodyOneBulkActionsItemPercentMax = 100;
+
+export const saveMrpMatchingSessionBodyOneBulkActionsItemPriceExclusiveMin = 0;
+
+
+
+
+export const saveMrpMatchingSessionBodyTwoActionsItemPercentMin = 0;
+export const saveMrpMatchingSessionBodyTwoActionsItemPercentMax = 100;
+
+export const saveMrpMatchingSessionBodyTwoActionsItemPriceExclusiveMin = 0;
+
+export const saveMrpMatchingSessionBodyTwoActionsItemExactPriceExclusiveMin = 0;
+
+
+
+
+export const saveMrpMatchingSessionBodyTwoBulkActionsItemPercentMin = 0;
+export const saveMrpMatchingSessionBodyTwoBulkActionsItemPercentMax = 100;
+
+export const saveMrpMatchingSessionBodyTwoBulkActionsItemPriceExclusiveMin = 0;
+
+
+
+
+export const SaveMrpMatchingSessionBody = zod.union([zod.object({
+  "division": zod.string().describe('Required for new matching callers; browse division value reused from Price Finder.'),
+  "category": zod.string().optional().describe('Optional exact catalog product category within division; category-only callers remain supported.'),
+  "selectedCompetitors": zod.array(zod.string()).min(1),
+  "competitors": zod.array(zod.string()).optional(),
+  "driver": zod.union([zod.string(),zod.object({
+  "named": zod.string().min(1)
+})]).optional(),
+  "asOf": zod.coerce.date().optional(),
+  "actions": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "action": zod.enum(['match', 'less_by_percent', 'leave', 'set', 'set_exact_price']),
+  "percent": zod.number().min(saveMrpMatchingSessionBodyOneActionsItemPercentMin).max(saveMrpMatchingSessionBodyOneActionsItemPercentMax).optional(),
+  "price": zod.number().gt(saveMrpMatchingSessionBodyOneActionsItemPriceExclusiveMin).optional(),
+  "exactPrice": zod.number().gt(saveMrpMatchingSessionBodyOneActionsItemExactPriceExclusiveMin).optional(),
+  "driver": zod.union([zod.string(),zod.object({
+  "named": zod.string().min(1)
+})]).optional()
+})).optional(),
+  "bulkActions": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "description": zod.string().optional(),
+  "visibleCodes": zod.array(zod.string()).min(1).describe('Canonical item codes currently visible in the UI; the server rejects codes outside the recomputed category\/competitor\/direction set.'),
+  "filteredCodes": zod.array(zod.string()).min(1).optional().describe('Deprecated compatibility alias for visibleCodes.'),
+  "action": zod.enum(['match', 'less_by_percent', 'leave', 'set', 'set_exact_price']),
+  "percent": zod.number().min(saveMrpMatchingSessionBodyOneBulkActionsItemPercentMin).max(saveMrpMatchingSessionBodyOneBulkActionsItemPercentMax).optional(),
+  "price": zod.number().gt(saveMrpMatchingSessionBodyOneBulkActionsItemPriceExclusiveMin).optional(),
+  "driver": zod.union([zod.string(),zod.object({
+  "named": zod.string().min(1)
+})]).optional(),
+  "filter": zod.enum(['above', 'below', 'all'])
+})).optional()
+}),zod.object({
+  "division": zod.string().optional().describe('Browse division value reused from Price Finder; optional for legacy category-only callers.'),
+  "category": zod.string().describe('Exact catalog product category.'),
+  "selectedCompetitors": zod.array(zod.string()).min(1),
+  "competitors": zod.array(zod.string()).optional(),
+  "driver": zod.union([zod.string(),zod.object({
+  "named": zod.string().min(1)
+})]).optional(),
+  "asOf": zod.coerce.date().optional(),
+  "actions": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "action": zod.enum(['match', 'less_by_percent', 'leave', 'set', 'set_exact_price']),
+  "percent": zod.number().min(saveMrpMatchingSessionBodyTwoActionsItemPercentMin).max(saveMrpMatchingSessionBodyTwoActionsItemPercentMax).optional(),
+  "price": zod.number().gt(saveMrpMatchingSessionBodyTwoActionsItemPriceExclusiveMin).optional(),
+  "exactPrice": zod.number().gt(saveMrpMatchingSessionBodyTwoActionsItemExactPriceExclusiveMin).optional(),
+  "driver": zod.union([zod.string(),zod.object({
+  "named": zod.string().min(1)
+})]).optional()
+})).optional(),
+  "bulkActions": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "description": zod.string().optional(),
+  "visibleCodes": zod.array(zod.string()).min(1).describe('Canonical item codes currently visible in the UI; the server rejects codes outside the recomputed category\/competitor\/direction set.'),
+  "filteredCodes": zod.array(zod.string()).min(1).optional().describe('Deprecated compatibility alias for visibleCodes.'),
+  "action": zod.enum(['match', 'less_by_percent', 'leave', 'set', 'set_exact_price']),
+  "percent": zod.number().min(saveMrpMatchingSessionBodyTwoBulkActionsItemPercentMin).max(saveMrpMatchingSessionBodyTwoBulkActionsItemPercentMax).optional(),
+  "price": zod.number().gt(saveMrpMatchingSessionBodyTwoBulkActionsItemPriceExclusiveMin).optional(),
+  "driver": zod.union([zod.string(),zod.object({
+  "named": zod.string().min(1)
+})]).optional(),
+  "filter": zod.enum(['above', 'below', 'all'])
+})).optional()
+})])
 
 
 export const GetMrpGeneratorFreshnessQueryParams = zod.object({
@@ -8048,14 +8206,17 @@ export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPoli
 
 
 
+
 export const ListMrpGeneratorRunsResponse = zod.object({
   "runs": zod.array(zod.object({
   "id": zod.number(),
   "scenarioId": zod.number().nullable(),
   "modelKind": zod.enum(['competitive', 'historical']),
+  "runType": zod.enum(['rule', 'historical', 'matching']).optional(),
   "asOf": zod.coerce.date(),
   "inputSnapshot": zod.union([zod.object({
-  "modelKind": zod.enum(['competitive']),
+  "modelKind": zod.literal("competitive"),
+  "runType": zod.enum(['matching', 'rule']),
   "asOf": zod.coerce.date(),
   "products": zod.array(zod.object({
   "itemCode": zod.string(),
@@ -8806,7 +8967,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "reason": zod.string().nullish()
 })).optional()
 }),zod.object({
-  "modelKind": zod.enum(['historical']),
+  "modelKind": zod.literal("historical"),
+  "runType": zod.enum(['historical']),
   "asOf": zod.coerce.date(),
   "products": zod.array(zod.record(zod.string(), zod.unknown())),
   "history": zod.array(zod.record(zod.string(), zod.unknown())),
@@ -8832,6 +8994,58 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "reason": zod.string().nullish()
 })),
   "summary": zod.record(zod.string(), zod.unknown())
+}),zod.object({
+  "modelKind": zod.literal("competitive"),
+  "runType": zod.enum(['matching']),
+  "asOf": zod.coerce.date(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "matchingScope": zod.object({
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable()
+}),
+  "selectedCompetitors": zod.array(zod.string()).min(1),
+  "driver": zod.union([zod.string(),zod.record(zod.string(), zod.unknown())]).optional(),
+  "products": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "seriesRange": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "currentMrp": zod.number().nullable(),
+  "currentDate": zod.coerce.date().nullable(),
+  "currentRowId": zod.number().nullable(),
+  "competitors": zod.array(zod.object({
+  "competitor": zod.string(),
+  "price": zod.number().nullable(),
+  "effectivePrice": zod.number().nullable(),
+  "effectiveDate": zod.coerce.date().nullable(),
+  "ageDays": zod.number().nullable(),
+  "stale": zod.boolean(),
+  "matched": zod.boolean()
+})),
+  "sales": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "margin": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional()
+})),
+  "actions": zod.array(zod.record(zod.string(), zod.unknown())),
+  "compoundDivisionPolicy": zod.string()
 })]),
   "inputFingerprint": zod.string(),
   "summary": zod.object({
@@ -9018,7 +9232,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "requestWindowSeconds": zod.number().optional()
 }),
   "salesFetchedAt": zod.coerce.date().nullish(),
-  "coverage": zod.object({
+  "coverage": zod.union([zod.object({
   "requested": zod.array(zod.string()),
   "returned": zod.array(zod.string()),
   "held": zod.array(zod.string()),
@@ -9028,7 +9242,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
   "dataSource": zod.string().nullable(),
   "last_modified": zod.coerce.date().nullable()
-}).optional(),
+}),zod.record(zod.string(), zod.unknown()),zod.null()]).optional(),
+  "coverageUnavailableReason": zod.string().nullish(),
   "coverageSummary": zod.object({
   "catalogTotal": zod.number(),
   "inScopeTotal": zod.number(),
@@ -9130,7 +9345,8 @@ export const ListMrpGeneratorRunsResponse = zod.object({
  * @summary Compute an immutable, read-only series-level historical MRP run
  */
 export const ComputeHistoricalMrpBody = zod.object({
-  "asOf": zod.coerce.date().optional()
+  "asOf": zod.coerce.date().optional(),
+  "category": zod.string().optional().describe('Exact catalog category; compound divisions remain one stored value.')
 })
 
 
@@ -9281,6 +9497,7 @@ export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRound
 
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneCategoryFloorsMinOne = 0;
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneCategoryFloorsExclusiveMaxOne = 100;
+
 
 export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsAMin = 0;
 export const getMrpGeneratorRunResponseScenarioOnePolicyOneBandsAMax = 1;
@@ -9459,9 +9676,11 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "id": zod.number(),
   "scenarioId": zod.number().nullable(),
   "modelKind": zod.enum(['competitive', 'historical']),
+  "runType": zod.enum(['rule', 'historical', 'matching']).optional(),
   "asOf": zod.coerce.date(),
   "inputSnapshot": zod.union([zod.object({
-  "modelKind": zod.enum(['competitive']),
+  "modelKind": zod.literal("competitive"),
+  "runType": zod.enum(['matching', 'rule']),
   "asOf": zod.coerce.date(),
   "products": zod.array(zod.object({
   "itemCode": zod.string(),
@@ -10212,7 +10431,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "reason": zod.string().nullish()
 })).optional()
 }),zod.object({
-  "modelKind": zod.enum(['historical']),
+  "modelKind": zod.literal("historical"),
+  "runType": zod.enum(['historical']),
   "asOf": zod.coerce.date(),
   "products": zod.array(zod.record(zod.string(), zod.unknown())),
   "history": zod.array(zod.record(zod.string(), zod.unknown())),
@@ -10238,6 +10458,58 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "reason": zod.string().nullish()
 })),
   "summary": zod.record(zod.string(), zod.unknown())
+}),zod.object({
+  "modelKind": zod.literal("competitive"),
+  "runType": zod.enum(['matching']),
+  "asOf": zod.coerce.date(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "matchingScope": zod.object({
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable()
+}),
+  "selectedCompetitors": zod.array(zod.string()).min(1),
+  "driver": zod.union([zod.string(),zod.record(zod.string(), zod.unknown())]).optional(),
+  "products": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "seriesRange": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "currentMrp": zod.number().nullable(),
+  "currentDate": zod.coerce.date().nullable(),
+  "currentRowId": zod.number().nullable(),
+  "competitors": zod.array(zod.object({
+  "competitor": zod.string(),
+  "price": zod.number().nullable(),
+  "effectivePrice": zod.number().nullable(),
+  "effectiveDate": zod.coerce.date().nullable(),
+  "ageDays": zod.number().nullable(),
+  "stale": zod.boolean(),
+  "matched": zod.boolean()
+})),
+  "sales": zod.union([zod.object({
+  "salesAmount": zod.number(),
+  "qty": zod.number().nullable(),
+  "qtyUnknown": zod.boolean(),
+  "fySalesExists": zod.boolean(),
+  "awaitingConfirmation": zod.boolean().optional(),
+  "tier": zod.union([zod.literal('A'),zod.literal('B'),zod.literal('C'),zod.literal(null)]).nullish()
+}),zod.null()]).optional(),
+  "margin": zod.union([zod.object({
+  "grossMarginPct": zod.number().nullable(),
+  "saleValue": zod.number().nullish(),
+  "bomValue": zod.number().nullish(),
+  "unitBomValue": zod.number().nullish(),
+  "qtyUnknown": zod.boolean().optional(),
+  "discountFrac": zod.number().nullish(),
+  "held": zod.boolean().optional(),
+  "latestMonth": zod.string().nullish(),
+  "warnings": zod.array(zod.string()).optional()
+}),zod.null()]).optional()
+})),
+  "actions": zod.array(zod.record(zod.string(), zod.unknown())),
+  "compoundDivisionPolicy": zod.string()
 })]),
   "inputFingerprint": zod.string(),
   "summary": zod.object({
@@ -10424,7 +10696,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "requestWindowSeconds": zod.number().optional()
 }),
   "salesFetchedAt": zod.coerce.date().nullish(),
-  "coverage": zod.object({
+  "coverage": zod.union([zod.object({
   "requested": zod.array(zod.string()),
   "returned": zod.array(zod.string()),
   "held": zod.array(zod.string()),
@@ -10434,7 +10706,8 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "reconciliation": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.null()])),
   "dataSource": zod.string().nullable(),
   "last_modified": zod.coerce.date().nullable()
-}).optional(),
+}),zod.record(zod.string(), zod.unknown()),zod.null()]).optional(),
+  "coverageUnavailableReason": zod.string().nullish(),
   "coverageSummary": zod.object({
   "catalogTotal": zod.number(),
   "inScopeTotal": zod.number(),

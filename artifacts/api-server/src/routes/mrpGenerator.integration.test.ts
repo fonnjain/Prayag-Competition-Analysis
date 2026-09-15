@@ -22,6 +22,7 @@ import { DEFAULT_P012_SCENARIO, promoteP012ToAdvanced } from "../lib/mrpGenerato
 
 const RUN = Date.now();
 const CODE = `__MRP_GENERATOR_${RUN}__`;
+const UNCATEGORISED_CODE = `__MRP_GENERATOR_UNCATEGORISED_${RUN}__`;
 const EXCLUDED_CODE = `__MRP_GENERATOR_EXCLUDED_${RUN}__`;
 const NO_CHANGE_CODE = `__MRP_GENERATOR_NO_CHANGE_${RUN}__`;
 const RIGHT_ONLY_CODE = `__MRP_GENERATOR_RIGHT_ONLY_${RUN}__`;
@@ -137,6 +138,7 @@ beforeAll(async () => {
   fixtureBatchId = await createMrpFixtureBatch("mrp-generator", RUN);
   await db.insert(catalogProductsTable).values([
     { itemCode: CODE, productName: "Generator change", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
+    { itemCode: UNCATEGORISED_CODE, productName: "Generator uncategorised", division: "PTMT", category: null, seriesRange: "Fixture" },
     { itemCode: EXCLUDED_CODE, productName: "Generator excluded", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
     { itemCode: NO_CHANGE_CODE, productName: "Generator no change", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
     { itemCode: RIGHT_ONLY_CODE, productName: "Generator right only", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
@@ -151,6 +153,7 @@ beforeAll(async () => {
   ]);
   await db.insert(mrpPriceHistoryTable).values([
     { itemCode: CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
+    { itemCode: UNCATEGORISED_CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     { itemCode: EXCLUDED_CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     { itemCode: NO_CHANGE_CODE, mrp: 150, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     { itemCode: RIGHT_ONLY_CODE, mrp: 120, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
@@ -169,6 +172,15 @@ beforeAll(async () => {
       priceBasis: "MRP",
       effectiveDate: DATE,
       matchedPrayagCode: CODE,
+      matchStatus: "matched",
+    },
+    {
+      competitor: COMPETITOR,
+      competitorCode: `GEN-UNCATEGORISED-${RUN}`,
+      price: 200,
+      priceBasis: "MRP",
+      effectiveDate: DATE,
+      matchedPrayagCode: UNCATEGORISED_CODE,
       matchStatus: "matched",
     },
     ...P012_CODES.map((matchedPrayagCode, index) => ({
@@ -958,6 +970,14 @@ describe("MRP Generator HTTP contract and safety", () => {
       seriesAnalyses: expect.any(Array),
       summary: expect.any(Object),
     }));
+    expect(detail.body.run.inputSnapshot.products[0]).toEqual(expect.objectContaining({
+      sales: null,
+      margin: null,
+    }));
+    expect(detail.body.run.sourceFreshness).toEqual(expect.objectContaining({
+      coverage: null,
+      coverageUnavailableReason: expect.stringContaining("No cached paired Sales snapshot"),
+    }));
     expect(detail.body.results.find((row: any) => row.itemCode === HISTORICAL_CODES[0])).toEqual(expect.objectContaining({
       modelKind: "historical",
       status: "suggested",
@@ -969,6 +989,80 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(handoff.status).toBe(409);
     expect(handoff.body.error).toContain("read-only");
     expect(await historicalHistoryDigest()).toEqual(before);
+  });
+
+  it("uses Price Finder division scope with optional category and validates below/all visible bulk targets", async () => {
+    const scopes = await admin.get("/api/mrp-generator/scopes");
+    expect(scopes.status).toBe(200);
+    expect(scopes.body.categoryPairs).toEqual(expect.arrayContaining([
+      { division: "PTMT", category: "Generator test", count: expect.any(Number) },
+      { division: "PTMT", category: null, count: expect.any(Number) },
+    ]));
+    const uncategorised = await admin.get("/api/mrp-generator/matching")
+      .query({ division: "PTMT", category: "__uncategorised__", competitors: [COMPETITOR], filter: "all" });
+    expect(uncategorised.status).toBe(200);
+    expect(uncategorised.body.category).toBeNull();
+    expect(uncategorised.body.products).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemCode: UNCATEGORISED_CODE, category: null }),
+    ]));
+    const uncategorisedSaved = await admin.post("/api/mrp-generator/matching").send({
+      division: "PTMT", category: "__uncategorised__", selectedCompetitors: [COMPETITOR],
+      bulkActions: [{ filter: "all", visibleCodes: [UNCATEGORISED_CODE], action: "leave" }],
+    });
+    expect(uncategorisedSaved.status).toBe(201);
+    runIds.push(uncategorisedSaved.body.runId);
+    expect(uncategorisedSaved.body.scope).toEqual({ division: "PTMT", category: null });
+
+    const fullScope = await admin.get("/api/mrp-generator/matching")
+      .query({ division: "PTMT", competitors: [COMPETITOR], filter: "all" });
+    expect(fullScope.status).toBe(200);
+    expect(fullScope.body.division).toBe("PTMT");
+    expect(fullScope.body.category).toBeNull();
+    expect(fullScope.body.products).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemCode: CODE, category: "Generator test" }),
+    ]));
+    expect(fullScope.body.divisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ division: "PTMT", count: expect.any(Number) }),
+    ]));
+    expect(fullScope.body.categoryOptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "Generator test", count: expect.any(Number) }),
+    ]));
+    expect(fullScope.body.categoryPairs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ division: "PTMT", category: "Generator test", count: expect.any(Number) }),
+    ]));
+    const missingScope = await admin.post("/api/mrp-generator/matching").send({
+      selectedCompetitors: [COMPETITOR],
+    });
+    expect(missingScope.status).toBe(400);
+    const missingFilter = await admin.post("/api/mrp-generator/matching").send({
+      division: "PTMT", category: "Generator test", selectedCompetitors: [COMPETITOR],
+      bulkActions: [{ visibleCodes: [CODE], action: "leave" }],
+    });
+    expect(missingFilter.status).toBe(400);
+    const missingVisibleCodes = await admin.post("/api/mrp-generator/matching").send({
+      division: "PTMT", category: "Generator test", selectedCompetitors: [COMPETITOR],
+      bulkActions: [{ filter: "all", action: "leave" }],
+    });
+    expect(missingVisibleCodes.status).toBe(400);
+
+    const saved = await admin.post("/api/mrp-generator/matching").send({
+      division: "PTMT", category: "Generator test", selectedCompetitors: [COMPETITOR],
+      bulkActions: [
+        { filter: "below", visibleCodes: [CODE], action: "leave", id: "below-first" },
+        { filter: "all", visibleCodes: [CODE], action: "match", id: "all-last" },
+      ],
+    });
+    expect(saved.status).toBe(201);
+    runIds.push(saved.body.runId);
+    expect(saved.body.scope).toEqual({ division: "PTMT", category: "Generator test" });
+    const detail = await admin.get(`/api/mrp-generator/runs/${saved.body.runId}`);
+    expect(detail.body.run.inputSnapshot).toEqual(expect.objectContaining({
+      division: "PTMT", category: "Generator test",
+    }));
+    expect(detail.body.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemCode: CODE, status: "suggested" }),
+    ]));
+    expect(detail.body.results.find((row: any) => row.itemCode === CODE).salesEvidence).toBeNull();
   });
 
   it("compares three runs across all selected values without a merge or apply action", async () => {

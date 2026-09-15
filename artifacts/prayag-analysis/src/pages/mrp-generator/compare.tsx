@@ -152,7 +152,7 @@ export default function MrpGeneratorCompare() {
                     }
                   }}
                 >
-                  #{r.id} ({r.scenarioName || "Run"})
+                  #{r.id} ({r.runType === "matching" ? "Matching" : r.scenarioName || "Run"})
                 </button>
               ))}
             </div>
@@ -165,7 +165,7 @@ export default function MrpGeneratorCompare() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {comparisonData?.runs?.map((r: any) => (
                 <div key={r.runId} className="bg-card border rounded-lg p-4 shadow-sm text-sm">
-                  <h3 className="font-semibold text-foreground border-b pb-2 mb-2">Run #{r.runId} <span className="font-normal text-muted-foreground ml-1">({r.modelKind})</span></h3>
+                  <h3 className="font-semibold text-foreground border-b pb-2 mb-2">Run #{r.runId} <span className="font-normal text-muted-foreground ml-1 capitalize">({r.runType || r.modelKind})</span></h3>
                   <div className="flex flex-col gap-1 text-muted-foreground">
                     <div className="flex justify-between">
                       <span>Evaluated:</span>
@@ -205,6 +205,55 @@ export default function MrpGeneratorCompare() {
                 </div>
               )}
             </div>
+
+            {/* Collective Margin Metrics */}
+            {(comparisonData?.runs)?.some((r: any) => r.collectiveMargin) && (
+              <div className="bg-card border rounded-lg p-4 shadow-sm space-y-4">
+                <h3 className="font-semibold text-foreground border-b pb-2">Collective Margin Projections</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(comparisonData.runs).map((r: any) => {
+                    if (!r.collectiveMargin) return null;
+                    const cm = r.collectiveMargin;
+                    return (
+                      <div key={r.runId} className="space-y-3 bg-muted/20 p-3 border rounded-md text-sm">
+                        <div className="flex items-center justify-between border-b pb-2">
+                          <h4 className="font-medium">
+                            Run #{r.runId}
+                            <span className="ml-2 text-xs text-muted-foreground bg-background px-1.5 py-0.5 rounded border capitalize">{r.runType || r.modelKind}</span>
+                          </h4>
+                          {cm.assumptions && cm.assumptions.length > 0 && (
+                            <div className="text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border">
+                              {cm.assumptions.join(" • ")}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                          <span className="text-muted-foreground">Current Margin:</span>
+                          <span className="text-right font-medium">{cm.current != null ? (cm.current * 100).toFixed(1) + '%' : "N/A"}</span>
+
+                          <span className="text-muted-foreground">Projected Margin:</span>
+                          <span className="text-right font-medium text-emerald-700">{cm.projected != null ? (cm.projected * 100).toFixed(1) + '%' : "N/A"}</span>
+
+                          <span className="text-muted-foreground">Delta:</span>
+                          <span className="text-right font-bold">{cm.deltaPoints != null ? (cm.deltaPoints > 0 ? "+" : "") + cm.deltaPoints.toFixed(1) + " pts" : "-"}</span>
+
+                          <span className="text-muted-foreground">Coverage:</span>
+                          <span className="text-right">{cm.coverage?.share != null ? (cm.coverage.share * 100).toFixed(1) + '%' : "0%"} ({cm.includedCount} items)</span>
+
+                          <span className="text-muted-foreground">Value at Risk:</span>
+                          <span className="text-right text-amber-700">₹{(cm.valueAtRisk?.value / 1e5 || 0).toFixed(1)}L</span>
+
+                          <span className="text-muted-foreground">Missing Data:</span>
+                          <span className="text-right text-destructive">{cm.excludedCount} items</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Filters */}
             <div className="bg-card border p-3 rounded-lg shadow-sm flex flex-wrap items-center gap-4 text-sm">

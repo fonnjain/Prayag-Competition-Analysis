@@ -57,6 +57,17 @@ import {
   SALES_REQUEST_WINDOW_SECONDS,
   SALES_TARGET_REQUEST_INTERVAL_MS,
 } from "../lib/salesApi";
+import {
+  calculateCollectiveMargin,
+  matchingPosition,
+  materializeMatchingDecision,
+  normalizeMatchingCompetitorName,
+  selectMatchingCompetitor,
+  type MatchingAction,
+  type MatchingActionType,
+  type MatchingDriver,
+  type CollectiveMarginInput,
+} from "../lib/p015";
 
 const router: IRouter = Router();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -118,6 +129,9 @@ const snapshotPolicyVersion = (snapshot: {
       : snapshot.p011Results != null || snapshot.policy != null ? 2 : 1;
 const snapshotModelKind = (snapshot: { modelKind?: unknown }): "competitive" | "historical" =>
   snapshot.modelKind === "historical" ? "historical" : "competitive";
+const snapshotRunType = (snapshot: { runType?: unknown; modelKind?: unknown }): "rule" | "historical" | "matching" =>
+  snapshot.runType === "historical" || snapshot.modelKind === "historical" ? "historical"
+    : snapshot.runType === "matching" ? "matching" : "rule";
 export function classifyBinaryHistoricalCompetitiveCategory(
   historicalValue: number | null,
   competitiveValue: number | null,
@@ -219,9 +233,9 @@ async function productsFor(asOf: string): Promise<GeneratorProduct[]> {
     return {
       itemCode: product.itemCode,
       productName: product.productName,
-      division: product.division,
+      division: product.division?.trim() || null,
       seriesRange: product.seriesRange,
-      category: product.category,
+      category: product.category?.trim() || null,
       currentMrp: map?.mrp ?? row?.mrp ?? null,
       currentDate: map?.effectiveDate ?? row?.effective_date ?? null,
       currentRowId: row?.id ?? null,
@@ -542,16 +556,401 @@ router.get("/mrp-generator/metadata", requireAdmin, async (_req, res) => {
 
 router.get("/mrp-generator/scopes", requireAdmin, async (_req, res) => {
   const [products, competitors] = await Promise.all([
-    db.select({ division: catalogProductsTable.division, series: catalogProductsTable.seriesRange, category: catalogProductsTable.category })
-      .from(catalogProductsTable).where(eq(catalogProductsTable.isActive, true)),
+    db.execute<{
+      division: string;
+      series: string | null;
+      category: string | null;
+    }>(sql`
+      SELECT
+        coalesce(nullif(trim(p.division), ''), 'Uncategorised') AS division,
+        p.series_range AS series,
+        nullif(trim(p.category), '') AS category
+      FROM catalog_products p
+      WHERE p.is_active IS TRUE
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+        AND EXISTS (
+          SELECT 1
+          FROM mrp_price_history h
+          WHERE h.item_code = p.item_code
+            AND h.effective_date <= CURRENT_DATE
+            AND h.mrp IS NOT NULL
+            AND h.review_status = 'approved'
+        )
+    `),
     db.selectDistinct({ competitor: competitorPricesTable.competitor }).from(competitorPricesTable),
   ]);
+  const productRows = products.rows;
+  const categoryPairs = [...new Map(productRows.map((product) => [
+    `${product.division}\u0000${product.category ?? "__uncategorised__"}`,
+    { division: product.division, category: product.category, count: 0 },
+  ])).values()];
+  for (const pair of categoryPairs) {
+    pair.count = productRows.filter((product) =>
+      product.division === pair.division && product.category === pair.category,
+    ).length;
+  }
   res.json({
-    divisions: [...new Set(products.map((p) => p.division).filter((v): v is string => !!v))].sort(),
-    series: [...new Set(products.map((p) => p.series).filter((v): v is string => !!v))].sort(),
-    categories: [...new Set(products.map((p) => p.category).filter((v): v is string => !!v))].sort(),
+    divisions: [...new Set(productRows.map((p) => p.division))].sort(),
+    series: [...new Set(productRows.map((p) => p.series).filter((v): v is string => !!v))].sort(),
+    categories: [...new Set(productRows.map((p) => p.category).filter((v): v is string => !!v))].sort(),
+    categoryPairs,
     competitors: competitors.map((c) => c.competitor).sort(),
   });
+});
+
+function queryList(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : value == null ? [] : String(value).split(",");
+  return [...new Set(values.flatMap((item) => String(item).split(",")).map((item) => item.trim()).filter(Boolean))];
+}
+
+function matchingFilter(value: unknown): "above" | "below" | "all" {
+  const filter = String(value ?? "above").toLowerCase();
+  return filter === "all" ? "all" : filter === "below" || filter === "below_only" ? "below" : "above";
+}
+
+function optionalScopeValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+const UNCATEGORISED_CATEGORY = "__uncategorised__";
+
+function browseDivision(product: GeneratorProduct): string {
+  return product.division?.trim() || "Uncategorised";
+}
+
+function matchingScopeProducts(
+  products: GeneratorProduct[],
+  division: string | null,
+  category: string | null,
+): GeneratorProduct[] {
+  return products.filter((product) =>
+    (division == null || browseDivision(product) === division) &&
+    (category == null ||
+      (category === UNCATEGORISED_CATEGORY
+        ? !product.category?.trim()
+        : product.category?.trim() === category)),
+  );
+}
+
+function matchingDriver(value: unknown): MatchingDriver {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const object = value as { mode?: unknown; name?: unknown; named?: unknown };
+    if (object.mode === "lowest" || object.mode === "highest") return object.mode;
+    const named = object.named ?? object.name;
+    if (typeof named === "string" && named.trim()) return { named: named.trim() };
+  }
+  const text = String(value ?? "lowest").trim();
+  if (text === "highest") return "highest";
+  if (text === "lowest" || !text) return "lowest";
+  return { named: text };
+}
+
+function matchingRows(products: GeneratorProduct[], competitors: string[], driver: MatchingDriver) {
+  return products.map((product) => {
+    const competitorValues = competitors.map((name) => {
+      const candidates = product.competitors.filter((candidate) =>
+        normalizeMatchingCompetitorName(candidate.competitor) === normalizeMatchingCompetitorName(name) &&
+        candidate.matched && candidate.effectivePrice != null,
+      );
+      const value = [...candidates].sort((a, b) =>
+        (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? "") || b.effectivePrice! - a.effectivePrice!,
+      )[0] ?? null;
+      return value ? {
+        competitor: value.competitor, price: value.price, normalizedPrice: value.effectivePrice,
+        effectiveDate: value.effectiveDate, stale: value.stale, matched: value.matched,
+      } : { competitor: name, price: null, normalizedPrice: null, effectiveDate: null, stale: false, matched: false };
+    });
+    const selected = selectMatchingCompetitor({ ...product, competitors: competitorValues.map((value) => ({
+      competitor: value.competitor, price: value.price, effectivePrice: value.normalizedPrice,
+      effectiveDate: value.effectiveDate, ageDays: null, stale: value.stale, matched: value.matched,
+    })) }, competitors, driver);
+    const position = matchingPosition(product.currentMrp, selected?.effectivePrice ?? null);
+    return {
+      itemCode: product.itemCode, productName: product.productName, division: product.division,
+      category: product.category, currentMrp: product.currentMrp, currentDate: product.currentDate,
+      currentRowId: product.currentRowId, competitors: competitorValues,
+      competitorValues,
+      driver: selected?.competitor ?? null, driverPrice: selected?.effectivePrice ?? null,
+      signedPositionPercent: position.signedPercent, position: position.direction,
+    };
+  }).sort((a, b) =>
+    (b.signedPositionPercent ?? Number.NEGATIVE_INFINITY) - (a.signedPositionPercent ?? Number.NEGATIVE_INFINITY) ||
+    a.itemCode.localeCompare(b.itemCode),
+  );
+}
+
+/**
+ * P015 workbench data is deliberately read-only. Category uses exact catalog
+ * equality; compound division text is never split, so each product appears
+ * once under its stored category/division.
+ */
+router.get("/mrp-generator/matching", requireAdmin, async (req, res) => {
+  const division = optionalScopeValue(req.query.division);
+  const requestedCategory = optionalScopeValue(req.query.category);
+  const category = requestedCategory === UNCATEGORISED_CATEGORY ? null : requestedCategory;
+  if (!division && !requestedCategory) { res.status(400).json({ error: "division is required (category-only matching is retained for compatibility)." }); return; }
+  const competitors = queryList(req.query.competitors ?? req.query.competitor);
+  if (!competitors.length) { res.status(400).json({ error: "At least one competitor is required." }); return; }
+  const asOf = validDate(req.query.asOf) ? req.query.asOf : today();
+  const allProducts = await productsFor(asOf);
+  const products = matchingScopeProducts(allProducts, division, requestedCategory);
+  const options = [...new Set(allProducts.flatMap((product) => product.competitors.map((value) => value.competitor)))].sort();
+  const unknown = competitors.filter((name) => !options.some((option) => normalizeMatchingCompetitorName(option) === normalizeMatchingCompetitorName(name)));
+  if (unknown.length) { res.status(400).json({ error: `Unknown competitor(s): ${unknown.join(", ")}.` }); return; }
+  const driver = matchingDriver(req.query.driver);
+  const allRows = matchingRows(products, competitors, driver);
+  const filter = matchingFilter(req.query.filter);
+  const filteredProducts = filter === "all" ? allRows : allRows.filter((row) => filter === row.position);
+  const divisionOptions = [...new Set(allProducts.map(browseDivision))].sort().map((value) => ({
+    division: value, count: allProducts.filter((product) => browseDivision(product) === value).length,
+  }));
+  const categoryOptions = [...new Set(allProducts
+    .filter((product) => division == null || browseDivision(product) === division)
+    .map((product) => product.category))]
+    .sort((a, b) => (a ?? "").localeCompare(b ?? ""))
+    .map((value) => ({
+      category: value, label: value ?? "Uncategorised",
+      count: allProducts.filter((product) =>
+        (division == null || browseDivision(product) === division) && product.category === value,
+      ).length,
+    }));
+  const categoryPairs = [...new Map(allProducts.map((product) => [
+    `${browseDivision(product)}\u0000${product.category ?? "__uncategorised__"}`,
+    { division: browseDivision(product), category: product.category, label: product.category ?? "Uncategorised", count: 0 },
+  ])).values()];
+  for (const pair of categoryPairs) {
+    pair.count = allProducts.filter((product) =>
+      browseDivision(product) === pair.division && product.category === pair.category,
+    ).length;
+  }
+  res.json({
+    runType: "matching", asOf, division, category, selectedCompetitors: competitors,
+    driver: typeof driver === "object" ? { mode: "named", name: driver.named } : { mode: driver },
+    driverSummary: {
+      mode: typeof driver === "object" ? "named" : driver,
+      name: typeof driver === "object" ? driver.named : null,
+      description: typeof driver === "object" ? `Named competitor: ${driver.named}` : `Selected ${driver} competitor price`,
+    },
+    filter,
+    divisions: divisionOptions,
+    categories: categoryOptions,
+    categoryOptions,
+    categoryPairs,
+    competitors: options, products: allRows, filteredProducts,
+    counts: {
+      all: allRows.length, above: allRows.filter((row) => row.position === "above").length,
+      below: allRows.filter((row) => row.position === "below").length,
+    },
+  });
+});
+
+router.post("/mrp-generator/matching", requireAdmin, async (req, res) => {
+  const body = req.body as Record<string, unknown> | null;
+  const division = optionalScopeValue(body?.division);
+  const requestedCategory = optionalScopeValue(body?.category);
+  const category = requestedCategory === UNCATEGORISED_CATEGORY ? null : requestedCategory;
+  const competitors = queryList(body?.selectedCompetitors ?? body?.competitors);
+  if (!division && !requestedCategory || !competitors.length) {
+    res.status(400).json({ error: "division and selected competitors are required (category-only matching is retained for compatibility)." }); return;
+  }
+  const asOf = validDate(body?.asOf) ? body!.asOf as string : today();
+  const allProducts = await productsFor(asOf);
+  const products = matchingScopeProducts(allProducts, division, requestedCategory);
+  if (!products.length) { res.status(400).json({ error: "Matching division/category scope has no active products." }); return; }
+  const available = [...new Set(allProducts.flatMap((product) => product.competitors.map((value) => value.competitor)))];
+  const unknown = competitors.filter((name) => !available.some((option) => normalizeMatchingCompetitorName(option) === normalizeMatchingCompetitorName(name)));
+  if (unknown.length) { res.status(400).json({ error: `Unknown competitor(s): ${unknown.join(", ")}.` }); return; }
+  const globalDriver = matchingDriver(body?.driver);
+  const rows = matchingRows(products, competitors, globalDriver);
+  const effectiveProducts = products.map((product) => {
+    const row = rows.find((candidate) => canonicalItemCode(candidate.itemCode) === canonicalItemCode(product.itemCode));
+    return row ? {
+      ...product,
+      competitors: row.competitors.map((value) => ({
+        competitor: value.competitor, price: value.price, effectivePrice: value.normalizedPrice,
+        effectiveDate: value.effectiveDate, ageDays: null, stale: value.stale, matched: value.matched,
+      })),
+    } : product;
+  });
+  const byCode = new Map(effectiveProducts.map((product) => [canonicalItemCode(product.itemCode), product]));
+  const rowByCode = new Map(rows.map((row) => [canonicalItemCode(row.itemCode), row]));
+  const decisions = new Map<string, MatchingAction>();
+  const rawBulk = [...(Array.isArray(body?.bulkActions) ? body!.bulkActions : []),
+    ...(body?.bulkAction && typeof body.bulkAction === "object" ? [body.bulkAction] : [])];
+  for (const [index, raw] of rawBulk.entries()) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) { res.status(400).json({ error: `bulkActions[${index}] must be an object.` }); return; }
+    const bulk = raw as Record<string, unknown>;
+    if (typeof bulk.filter !== "string" || !["above", "below", "all"].includes(bulk.filter)) {
+      res.status(400).json({ error: `bulkActions[${index}].filter must be above, below, or all.` }); return;
+    }
+    const filter = matchingFilter(bulk.filter);
+    const bulkAction = String(bulk.action ?? "").toLowerCase().replace(/[\s-]+/g, "_");
+    if (!["match", "less_by_percent", "leave", "set", "set_exact_price"].includes(bulkAction)) {
+      res.status(400).json({ error: `bulkActions[${index}] has an invalid action.` }); return;
+    }
+    // Bulk actions are scoped to exactly what the user could see. Recompute
+    // eligibility on the server, reject stale/out-of-scope codes, and never
+    // expand an omitted or partial visibleCodes list. When bulk rules overlap,
+    // this stable input order is authoritative: the later rule wins. Manual
+    // individual actions are applied afterward and always win over bulk.
+    const suppliedVisibleCodes = bulk.visibleCodes ?? bulk.filteredCodes;
+    if (!Array.isArray(suppliedVisibleCodes) || suppliedVisibleCodes.length < 1 ||
+      suppliedVisibleCodes.some((code) => typeof code !== "string" || !code.trim())) {
+      res.status(400).json({ error: `bulkActions[${index}].visibleCodes must be a non-empty array of item codes.` }); return;
+    }
+    const eligible = new Set(rows
+      .filter((row) => filter === "all" || row.position === filter)
+      .map((row) => canonicalItemCode(row.itemCode)));
+    const submitted = [...new Set((suppliedVisibleCodes as string[]).map((code) => canonicalItemCode(code)))];
+    const invalid = submitted.filter((code) => !eligible.has(code));
+    if (invalid.length) {
+      res.status(400).json({
+        error: `bulkActions[${index}] visibleCodes outside the freshly eligible workbench set: ${invalid.join(", ")}.`,
+      }); return;
+    }
+    for (const code of submitted) {
+      const row = rowByCode.get(code)!;
+      decisions.set(code, {
+        itemCode: row.itemCode, action: (bulkAction === "set_exact_price" ? "set" : bulkAction) as MatchingActionType,
+        percent: typeof bulk.percent === "number" ? bulk.percent : Number(bulk.percent),
+        price: typeof bulk.price === "number" ? bulk.price : Number(bulk.price),
+        driver: bulk.driver == null ? undefined : matchingDriver(bulk.driver),
+         filter,
+        source: "bulk", bulkId: String(bulk.id ?? `bulk-${index + 1}`),
+        bulkDescription: typeof bulk.description === "string" ? bulk.description : undefined,
+      });
+    }
+  }
+  const rawActions = Array.isArray(body?.actions) ? body.actions : [];
+  for (const [index, raw] of rawActions.entries()) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) { res.status(400).json({ error: `actions[${index}] must be an object.` }); return; }
+    const input = raw as Record<string, unknown>;
+    const itemCode = typeof input.itemCode === "string" ? input.itemCode : "";
+    const product = byCode.get(canonicalItemCode(itemCode));
+    if (!product) { res.status(400).json({ error: `actions[${index}] references a product outside the exact category.` }); return; }
+    const actionText = String(input.action ?? "").toLowerCase().replace(/[\s-]+/g, "_");
+    if (!["match", "less_by_percent", "leave", "set", "set_exact_price"].includes(actionText)) {
+      res.status(400).json({ error: `actions[${index}] has an invalid action.` }); return;
+    }
+    const action = actionText as MatchingActionType | "set_exact_price";
+    decisions.set(canonicalItemCode(itemCode), {
+      itemCode: product.itemCode, action: action === "set_exact_price" ? "set" : action,
+      percent: typeof input.percent === "number" ? input.percent : Number(input.percent),
+      price: typeof input.price === "number" ? input.price : Number(input.price ?? input.exactPrice),
+      driver: input.driver == null ? undefined : matchingDriver(input.driver),
+      source: "manual",
+    });
+  }
+  if (typeof globalDriver === "object" &&
+    !competitors.some((name) => normalizeMatchingCompetitorName(name) === normalizeMatchingCompetitorName(globalDriver.named))) {
+    res.status(400).json({ error: `Named driver "${globalDriver.named}" is not selected.` }); return;
+  }
+  for (const [code, action] of decisions) {
+    const product = byCode.get(code)!;
+    if (action.action === "set" && (!(typeof action.price === "number") || !Number.isFinite(action.price) || action.price <= 0)) {
+      res.status(400).json({ error: `A positive exact price is required for ${action.itemCode}.` }); return;
+    }
+    if (action.action === "less_by_percent" &&
+      (!(typeof action.percent === "number") || !Number.isFinite(action.percent) || action.percent < 0 || action.percent > 100)) {
+      res.status(400).json({ error: `less_by_percent for ${action.itemCode} requires a percent from 0 to 100.` }); return;
+    }
+    if (action.action === "match" || action.action === "less_by_percent") {
+      const driver = action.driver ?? globalDriver;
+      if (typeof driver === "object" &&
+        !competitors.some((name) => normalizeMatchingCompetitorName(name) === normalizeMatchingCompetitorName(driver.named))) {
+        res.status(400).json({ error: `Named driver "${driver.named}" is not selected.` }); return;
+      }
+      if (!selectMatchingCompetitor(product, competitors, driver)) {
+        res.status(400).json({ error: `No usable competitor evidence for ${action.itemCode} and its selected driver.` }); return;
+      }
+    }
+  }
+  if (!decisions.size) { res.status(400).json({ error: "At least one explicit manual or bulk action is required." }); return; }
+  const actorEmail = actor(req);
+  if (!actorEmail) { res.status(403).json({ error: "Authenticated actor is required for manual matching actions." }); return; }
+  // A matching run freezes the one cached paired snapshot that was available
+  // at creation. It never refreshes a source as a side effect of saving.
+  const cachedSales = getCachedSalesSnapshot();
+  const frozenProducts = cachedSales
+    ? enrichProducts(effectiveProducts, cachedSales)
+    : effectiveProducts.map((product) => ({
+      ...product,
+        sales: null,
+        margin: null,
+    }));
+  const frozenByCode = new Map(frozenProducts.map((product) => [canonicalItemCode(product.itemCode), product]));
+  const results = effectiveProducts.filter((product) => decisions.has(canonicalItemCode(product.itemCode))).map((product) => {
+    const action = decisions.get(canonicalItemCode(product.itemCode))!;
+    const decision = materializeMatchingDecision(product, action, competitors, globalDriver);
+    decision.trace[0] = {
+      ...decision.trace[0],
+      actor: actorEmail,
+      source: action.source ?? "manual",
+      bulkId: action.bulkId ?? null,
+      bulkDescription: action.bulkDescription ?? null,
+    };
+    return { product: frozenByCode.get(canonicalItemCode(product.itemCode)) ?? product, action, decision };
+  });
+  const snapshot = {
+    runType: "matching", modelKind: "competitive", asOf, division, category,
+    matchingScope: { division, category },
+    selectedCompetitors: competitors, driver: globalDriver, actor: actorEmail,
+    products: frozenProducts.map((product) => ({ ...product, competitors: product.competitors })),
+    actions: results.map(({ action, decision }) => ({ ...action, ...decision })),
+    compoundDivisionPolicy: "stored compound division is one value; products appear once",
+  };
+  const freshness = {
+    asOf,
+    mrpDates: [...new Set(products.map((product) => product.currentDate).filter((value): value is string => Boolean(value)))].sort(),
+    competitors: [...new Map(products.flatMap((product) => product.competitors
+      .filter((value) => competitors.some((name) => normalizeMatchingCompetitorName(name) === normalizeMatchingCompetitorName(value.competitor)))
+      .map((value) => [`${value.competitor}:${value.effectiveDate ?? "undated"}`, {
+        competitor: value.competitor, effectiveDate: value.effectiveDate, ageDays: value.ageDays, stale: value.stale,
+      }]))).values()],
+    sales: cachedSales ? {
+      ...cachedSales.availability, fetchedAt: cachedSales.fetchedAt,
+    } : { ...getSalesApiStatus(), dataSource: null },
+    ...(cachedSales ? { coverage: cachedSales.coverage, dataSource: cachedSales.availability.dataSource } : {}),
+    ...(!cachedSales ? { coverage: null, dataSource: null } : {}),
+    ...(!cachedSales ? { coverageUnavailableReason: "No cached paired Sales snapshot was available at matching run creation." } : {}),
+    source: "approved Standard Prayag MRP and matched competitor prices",
+  };
+  const summary = {
+    total: results.length, suggested: results.filter(({ decision }) => decision.suggestedMrp != null).length,
+    noChange: results.filter(({ decision }) => decision.suggestedMrp == null).length,
+    manual: results.length, actor: actorEmail, runType: "matching",
+    scope: { division, category },
+  };
+  const fingerprint = inputFingerprint({ snapshot, freshness });
+  const runId = await db.transaction(async (tx) => {
+    const inserted = await tx.insert(mrpGeneratorRunsTable).values({
+      scenarioId: null, modelKind: "competitive", asOf, inputSnapshot: stableJson(snapshot),
+      inputFingerprint: fingerprint, summary: json(summary), sourceFreshness: json(freshness), createdBy: actorEmail,
+    }).returning({ id: mrpGeneratorRunsTable.id });
+    const id = inserted[0]!.id;
+    if (results.length) await tx.insert(mrpGeneratorResultsTable).values(results.map(({ product, action, decision }) => ({
+      runId: id, itemCode: product.itemCode, productName: product.productName, division: product.division,
+      category: product.category, currentMrp: product.currentMrp, currentDate: product.currentDate,
+      currentRowId: product.currentRowId ?? null, suggestedMrp: decision.suggestedMrp, status: decision.status,
+      exclusions: json(decision.suggestedMrp == null ? ["reviewed_no_change"] : []),
+      competitorValues: json(product.competitors), trace: json(decision.trace),
+      competitiveTarget: decision.suggestedMrp, bindingConstraint: null,
+      changePercent: decision.suggestedMrp != null && product.currentMrp
+        ? ((decision.suggestedMrp - product.currentMrp) / product.currentMrp) * 100 : null,
+      modelKind: "competitive", reason: decision.action === "leave" ? "Reviewed; no change." : "P015 manual matching action.",
+      evidence: json({
+        action: decision.action, driver: decision.driver, actor: actorEmail,
+        source: action.source ?? "manual", bulkId: action.bulkId ?? null,
+        bulkDescription: action.bulkDescription ?? null,
+        filter: action.filter ?? null,
+        salesEvidence: product.sales ?? null,
+        marginEvidence: product.margin ?? null,
+      }),
+    })));
+    return id;
+  });
+  res.status(201).json({ runId, runType: "matching", modelKind: "competitive", asOf, division, category,
+    scope: { division, category }, actor: actorEmail, summary, inputFingerprint: fingerprint });
 });
 
 router.get("/mrp-generator/freshness", requireAdmin, async (req, res) => {
@@ -589,8 +988,21 @@ router.get("/mrp-generator/freshness", requireAdmin, async (req, res) => {
  */
 router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
   const asOf = validDate(req.body?.asOf) ? req.body.asOf : today();
+  const requestedCategory = typeof req.body?.category === "string" ? req.body.category : null;
   try {
-    const products = await productsFor(asOf);
+    const allProducts = await productsFor(asOf);
+    const products = requestedCategory == null
+      ? allProducts
+      : allProducts.filter((product) => product.category === requestedCategory);
+    const cachedSales = getCachedSalesSnapshot();
+    const frozenProducts = cachedSales
+      ? enrichProducts(products, cachedSales)
+      : products.map((product) => ({
+        ...product,
+        sales: null,
+        margin: null,
+      }));
+    const frozenByCode = new Map(frozenProducts.map((product) => [canonicalItemCode(product.itemCode), product]));
     const historyRows = await db.execute<{
       id: number; item_code: string; mrp: number | null; effective_date: string;
       review_status: string | null; variant: string | null;
@@ -607,15 +1019,18 @@ router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
       effectiveDate: row.effective_date, reviewStatus: row.review_status,
       variant: row.variant,
     }));
-    const evaluation = evaluateHistoricalMrp(products, history, asOf);
+    const evaluation = evaluateHistoricalMrp(frozenProducts, history, asOf);
     const snapshot = {
       modelKind: "historical",
+      runType: "historical",
       asOf,
-      products: products.map((product) => ({
+      ...(requestedCategory != null ? { category: requestedCategory } : {}),
+      products: frozenProducts.map((product) => ({
         itemCode: product.itemCode, productName: product.productName,
         division: product.division, category: product.category,
         seriesRange: product.seriesRange, currentMrp: product.currentMrp,
         currentDate: product.currentDate, currentRowId: product.currentRowId,
+        sales: product.sales, margin: product.margin,
       })),
       history,
       seriesAnalyses: evaluation.series,
@@ -626,12 +1041,17 @@ router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
       modelKind: "historical",
       mrpDates: [...new Set(products.map((product) => product.currentDate).filter(Boolean))].sort(),
       competitors: [],
-      sales: getSalesApiStatus(),
+      sales: cachedSales ? {
+        ...cachedSales.availability, fetchedAt: cachedSales.fetchedAt,
+      } : { ...getSalesApiStatus(), dataSource: null },
+      ...(cachedSales ? { coverage: cachedSales.coverage, dataSource: cachedSales.availability.dataSource } : {}),
+      ...(!cachedSales ? { coverage: null, dataSource: null } : {}),
+      ...(!cachedSales ? { coverageUnavailableReason: "No cached paired Sales snapshot was available at historical run creation." } : {}),
       source: "approved Standard Prayag MRP history",
       historyRows: history.length,
       latestDate: history.map((row) => row.effectiveDate).sort().at(-1) ?? null,
     };
-    const summary = { ...evaluation.summary, modelKind: "historical" };
+    const summary = { ...evaluation.summary, modelKind: "historical", runType: "historical" };
     const fingerprint = inputFingerprint({ modelKind: "historical", asOf, snapshot, freshness });
     const runId = await db.transaction(async (tx) => {
       const inserted = await tx.insert(mrpGeneratorRunsTable).values({
@@ -667,7 +1087,11 @@ router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
           modelKind: "historical",
           series: result.series,
           reason: result.reason,
-          evidence: json(result.evidence),
+          evidence: json({
+            ...result.evidence,
+            salesEvidence: frozenByCode.get(canonicalItemCode(result.itemCode))?.sales ?? null,
+            marginEvidence: frozenByCode.get(canonicalItemCode(result.itemCode))?.margin ?? null,
+          }),
         }));
         // Historical runs cover the complete catalog. Keep each insert below
         // PostgreSQL's 16-bit bind-parameter limit.
@@ -678,7 +1102,7 @@ router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
       return id;
     });
     res.status(201).json({
-      runId, scenarioId: null, modelKind: "historical", asOf,
+      runId, scenarioId: null, modelKind: "historical", runType: "historical", asOf,
       policyVersion: null, inputFingerprint: fingerprint, summary,
       sourceFreshness: freshness, series: evaluation.series,
     });
@@ -1046,6 +1470,7 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
       : null;
     const snapshot = {
       modelKind: "competitive" as const,
+      runType: "rule" as const,
       asOf,
       ...(snapshotSales ? {
         salesFetchedAt: snapshotSales.fetchedAt,
@@ -1145,10 +1570,14 @@ router.post("/mrp-generator/scenarios/:scenarioId/run", requireAdmin, async (req
         bindingConstraint: r.bindingConstraint,
         changePercent: r.changePercent,
         modelKind: "competitive",
+        evidence: json({
+          salesEvidence: r.salesEvidence ?? null,
+          marginEvidence: r.marginEvidence ?? null,
+        }),
       })));
       return runId;
     });
-    res.status(201).json({ runId: run, scenarioId, modelKind: "competitive", asOf, policyVersion: p011 ? 2 : p012 ? 3 : 1, inputFingerprint: fingerprint, summary, sourceFreshness: freshness });
+    res.status(201).json({ runId: run, scenarioId, modelKind: "competitive", runType: "rule", asOf, policyVersion: p011 ? 2 : p012 ? 3 : 1, inputFingerprint: fingerprint, summary, sourceFreshness: freshness });
   } catch (error) {
     const status = (error as { httpStatus?: number }).httpStatus ?? 400;
     const option = (error as { option?: string }).option;
@@ -1181,12 +1610,13 @@ router.get("/mrp-generator/runs", requireAdmin, async (req, res) => {
   res.json({
     runs: rows.map(({ run, scenarioName }) => ({
       ...run,
-      scenarioName: scenarioName ?? null,
+      scenarioName: scenarioName ?? (snapshotRunType(parsed(run.inputSnapshot, { modelKind: run.modelKind })) === "matching" ? "Matching Scenario" : null),
       inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
       summary: parsed(run.summary, {}),
       sourceFreshness: parsed(run.sourceFreshness, {}),
       policyVersion: run.modelKind === "historical" ? null : snapshotPolicyVersion(parsed(run.inputSnapshot, {})),
       modelKind: run.modelKind ?? snapshotModelKind(parsed(run.inputSnapshot, {})),
+      runType: snapshotRunType(parsed(run.inputSnapshot, { modelKind: run.modelKind })),
       simplePolicy: (parsed<{ simplePolicy?: P012SimplePolicy }>(run.inputSnapshot, {}).simplePolicy ?? null),
       advancedPolicy: (parsed<{ advancedPolicy?: unknown }>(run.inputSnapshot, {}).advancedPolicy ?? null),
     })),
@@ -1203,12 +1633,15 @@ function exposedInputSnapshot(
     ...snapshot,
     modelKind: persistedModelKind === "historical" || snapshot.modelKind === "historical"
       ? "historical" : "competitive",
+    runType: snapshotRunType({ ...snapshot, modelKind: persistedModelKind ?? snapshot.modelKind }),
   };
 }
 
 function exposedRun(run: typeof mrpGeneratorRunsTable.$inferSelect) {
   return {
     ...run,
+    scenarioName: snapshotRunType(parsed(run.inputSnapshot, { modelKind: run.modelKind })) === "matching"
+      ? "Matching Scenario" : null,
     summary: parsed(run.summary, {}),
     sourceFreshness: parsed(run.sourceFreshness, {}),
     inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
@@ -1219,6 +1652,7 @@ function exposedResult(
   evidence?: { sales?: unknown; margin?: unknown; warnings?: string[] },
   policyResult?: Record<string, unknown>,
 ): any {
+  const persistedEvidence = parsed<{ salesEvidence?: unknown; marginEvidence?: unknown }>(row.evidence ?? "{}", {});
   return {
     ...row,
     exclusions: parsed(row.exclusions, []),
@@ -1252,8 +1686,8 @@ function exposedResult(
         escalationReason: policyResult.escalationReason,
       }),
     } : {}),
-    salesEvidence: evidence?.sales ?? null,
-    marginEvidence: evidence?.margin ?? null,
+    salesEvidence: persistedEvidence.salesEvidence ?? evidence?.sales ?? null,
+    marginEvidence: persistedEvidence.marginEvidence ?? evidence?.margin ?? null,
     warnings: evidence?.warnings ?? [],
     ...(row.modelKind === "historical" || row.evidence || row.reason || row.series ? {
       modelKind: row.modelKind ?? "historical",
@@ -1306,6 +1740,7 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
   // scenario edit must not rewrite any run policy metadata. Old snapshots
   // infer P011 only from their own policy/result payload.
   const modelKind = run.modelKind ?? snapshotModelKind(snapshot);
+  const runType = snapshotRunType({ ...snapshot, modelKind });
   const policyVersion = modelKind === "historical" ? null : snapshotPolicyVersion(snapshot);
   const policy = snapshot.policy ?? null;
   const simplePolicy = snapshot.simplePolicy ?? null;
@@ -1317,6 +1752,7 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
     run: exposedRun(run),
     policyVersion,
     modelKind,
+    runType,
     policy,
     scenario: immutableScenario,
     simplePolicy,
@@ -1329,7 +1765,10 @@ router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) 
   const id = Number(req.params.runId);
   const rows = await db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)).orderBy(asc(mrpGeneratorResultsTable.itemCode));
   if (!rows.length && !(await db.select({ id: mrpGeneratorRunsTable.id }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0]) { res.status(404).json({ error: "Run not found." }); return; }
-  const run = (await db.select({ inputSnapshot: mrpGeneratorRunsTable.inputSnapshot }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0];
+  const run = (await db.select({
+    inputSnapshot: mrpGeneratorRunsTable.inputSnapshot,
+    modelKind: mrpGeneratorRunsTable.modelKind,
+  }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0];
   const snapshot = parsed<{ products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }>; p011Results?: Array<Record<string, unknown>>; p012Results?: Array<Record<string, unknown>> }>(run?.inputSnapshot ?? "{}", {});
   const evidence = new Map((snapshot.products ?? []).map((product) => [
     canonicalItemCode(product.itemCode ?? ""), {
@@ -1345,7 +1784,7 @@ router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) 
   const p012ByCode = new Map((snapshot.p012Results ?? []).map((result) => [
     canonicalItemCode(String(result.itemCode ?? "")), result,
   ]));
-  res.json({ runId: id, results: rows.map((row) => exposedResult(row, evidence.get(canonicalItemCode(row.itemCode)), p011ByCode.get(canonicalItemCode(row.itemCode)) ?? p012ByCode.get(canonicalItemCode(row.itemCode)))) });
+  res.json({ runId: id, runType: snapshotRunType({ ...snapshot, modelKind: run?.modelKind }), results: rows.map((row) => exposedResult(row, evidence.get(canonicalItemCode(row.itemCode)), p011ByCode.get(canonicalItemCode(row.itemCode)) ?? p012ByCode.get(canonicalItemCode(row.itemCode)))) });
 });
 
 router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
@@ -1448,9 +1887,48 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
     .sort((a, b) => b.absoluteDifference - a.absoluteDifference).slice(0, 25);
   const runSummaries = runIds.map((id) => ({
     runId: id, modelKind: runById.get(id)!.modelKind ?? "competitive",
+    runType: snapshotRunType({
+      ...parsed<{ runType?: unknown; modelKind?: unknown }>(runById.get(id)!.inputSnapshot, {}),
+      modelKind: runById.get(id)!.modelKind,
+    }),
     inputSnapshot: exposedInputSnapshot(runById.get(id)!.inputSnapshot, runById.get(id)!.modelKind),
     summary: parsed(runById.get(id)!.summary, {}),
     policyVersion: (runById.get(id)!.modelKind ?? "competitive") === "historical" ? null : snapshotPolicyVersion(parsed(runById.get(id)!.inputSnapshot, {})),
+    collectiveMargin: (() => {
+      const snapshot = parsed<{
+        products?: Array<CollectiveMarginInput & { itemCode?: string }>;
+        salesCoverage?: { sales?: { held?: string[] }; margin?: { held?: string[] } };
+      }>(runById.get(id)!.inputSnapshot, {});
+      const freshness = parsed<{ coverage?: { sales?: { held?: string[] }; margin?: { held?: string[] } } }>(
+        runById.get(id)!.sourceFreshness, {},
+      );
+      const evidence = new Map((snapshot.products ?? []).map((product) => [canonicalItemCode(product.itemCode ?? ""), product]));
+      const resultByCode = new Map((byRun.get(id) ?? []).map((row) => [canonicalItemCode(row.itemCode), row]));
+      const values = (snapshot.products ?? []).map((product) => {
+        const code = canonicalItemCode(product.itemCode ?? "");
+        const row = resultByCode.get(code);
+        const persisted = parsed<{ salesEvidence?: unknown; marginEvidence?: unknown }>(row?.evidence ?? "{}", {});
+        return {
+          ...product,
+          itemCode: row?.itemCode ?? product.itemCode,
+          currentMrp: row?.currentMrp ?? product.currentMrp,
+          suggestedMrp: row?.suggestedMrp ?? null,
+          sales: persisted.salesEvidence ?? product.sales ?? null,
+          margin: persisted.marginEvidence ?? product.margin ?? null,
+        };
+      });
+      const coverage = snapshot.salesCoverage ?? freshness.coverage;
+      return calculateCollectiveMargin(values, {
+        sourcePeriods: {
+          sales: coverage?.sales ? "2026-04..2026-08" : null,
+          margin: coverage?.margin ? "2026-04..2026-06" : null,
+        },
+        holds: [
+          ...(coverage?.sales?.held ?? []),
+          ...(coverage?.margin?.held ?? []),
+        ],
+      });
+    })(),
   }));
   const legacyLeftSnapshot = parsed<{ policy?: unknown; simplePolicy?: unknown; advancedPolicy?: unknown }>(runById.get(legacyLeft)!.inputSnapshot, {});
   const legacyRightSnapshot = parsed<{ policy?: unknown; simplePolicy?: unknown; advancedPolicy?: unknown }>(runById.get(legacyRight)!.inputSnapshot, {});
@@ -1463,6 +1941,10 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
     leftAdvancedPolicy: legacyLeftSnapshot.advancedPolicy ?? null, rightAdvancedPolicy: legacyRightSnapshot.advancedPolicy ?? null,
     products, differences, categories: categoryCounts, categoryCounts,
     disagreementCounts: categoryCounts, largestDisagreements,
+    comparisonMetrics: runSummaries.map(({ runId, runType, modelKind, collectiveMargin }) => ({
+      runId, runType, modelKind, collectiveMargin,
+    })),
+    readOnly: true,
   });
 });
 

@@ -47,9 +47,10 @@ export default function MrpGeneratorRun() {
   if (error || !data) return <div className="p-8 text-destructive">Error loading run details.</div>;
 
   const { run, scenario, results } = data;
-  const summary = run.summary;
+  const summary = run.summary as any;
   const freshness = run.sourceFreshness;
-  const isHistorical = run.modelKind === "historical";
+  const isHistorical = run.runType === "historical" || run.modelKind === "historical";
+  const isMatching = run.runType === "matching";
   const historicalSnapshot = isHistorical ? (run.inputSnapshot as any) : null;
   const historicalSeries = historicalSnapshot?.seriesAnalyses || [];
 
@@ -203,7 +204,26 @@ export default function MrpGeneratorRun() {
         {/* Summary Card */}
         <Card className="p-4 sm:p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Run Summary</h2>
-          {!isHistorical ? (
+          {isMatching ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{summary.manual || summary.total || 0}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Manual Actions</div>
+              </div>
+              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
+                <div className="text-2xl font-bold text-emerald-700">{summary.suggested || 0}</div>
+                <div className="text-xs text-emerald-600/80 uppercase tracking-wide">Draft Suggestions</div>
+              </div>
+              <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
+                <div className="text-2xl font-bold">{summary.noChange || 0}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Leaves (No Change)</div>
+              </div>
+              <div className="bg-muted/20 p-3 rounded-lg border border-border/50 text-center flex flex-col justify-center">
+                <div className="text-sm font-medium truncate" title={summary.actor as string}>{summary.actor as string || "Unknown"}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mt-1">Actor</div>
+              </div>
+            </div>
+          ) : !isHistorical ? (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
                 <div className="text-2xl font-bold">{summary.policyVersion === 3 ? (summary.evaluated ?? summary.total) : summary.total || 0}</div>
@@ -282,7 +302,9 @@ export default function MrpGeneratorRun() {
                     const nb = parseInt(b.replace(/\D/g, "")) || 0;
                     return na - nb;
                   })
-                  .map(([rowName, counts]) => (
+                  .map(([rowName, countsValue]) => {
+                    const counts = countsValue as any;
+                    return (
                     <div key={rowName} className="flex flex-wrap gap-x-4 gap-y-1 text-xs items-center p-1.5 bg-background rounded border">
                       <span className="font-medium text-sm text-foreground w-16">{rowName}</span>
                       <span>{counts.scopeMatched} matched scope</span>
@@ -301,13 +323,14 @@ export default function MrpGeneratorRun() {
                           <span>&middot;</span>
                           <div className="flex gap-2">
                             {Object.entries(counts.tierDistribution).map(([tier, tCount]) => (
-                              <span key={tier} className="text-muted-foreground">[{tier}: {tCount}]</span>
+                              <span key={tier} className="text-muted-foreground">[{tier}: {tCount as number}]</span>
                             ))}
                           </div>
                         </>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -466,7 +489,7 @@ export default function MrpGeneratorRun() {
                           </tr>
                         </thead>
                         <tbody>
-                          {summary.portfolio.headroom.map(h => (
+                          {summary.portfolio.headroom.map((h: any) => (
                             <tr key={h.itemCode} className="border-b last:border-0 border-border/50">
                               <td className="py-1 font-medium">{h.itemCode}</td>
                               <td className="py-1">{h.band}</td>
@@ -856,6 +879,32 @@ export default function MrpGeneratorRun() {
                                   </>
                                 )}
                               </div>
+
+                              {isMatching && (
+                                <div className="mt-3 space-y-1">
+                                  <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Matching Action</h5>
+                                  <div className="bg-muted/20 p-2 border rounded">
+                                    {r.trace?.filter((t: any) => t.ruleType === "matching_manual_action").map((t: any, i: number) => (
+                                      <div key={i} className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+                                        <span className="text-muted-foreground">Source:</span>
+                                        <span className="font-medium capitalize text-foreground">{t.source || "manual"}</span>
+                                        <span className="text-muted-foreground">Action:</span>
+                                        <span className="font-medium capitalize text-primary">{String(t.action).replace(/_/g, ' ')}</span>
+                                        <span className="text-muted-foreground">Driver/Reason:</span>
+                                        <span>{t.driver || "N/A"} - {t.reason}</span>
+                                        <span className="text-muted-foreground">Actor:</span>
+                                        <span>{t.actor || "System"}</span>
+                                        {t.evidence && (
+                                          <>
+                                            <span className="text-muted-foreground">Target Evidence:</span>
+                                            <span className="text-emerald-700 font-medium">₹{t.evidence.effectivePrice?.toFixed(2)} ({t.evidence.competitor})</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
                               {historicalEvidence && (
                                 <div className="mt-3 space-y-1">

@@ -168,10 +168,19 @@ export interface MrpGeneratorMetadata {
   sources: string[];
 }
 
+export type MrpGeneratorScopesCategoryPairsItem = {
+  division: string;
+  /** @nullable */
+  category: string | null;
+  count: number;
+};
+
 export interface MrpGeneratorScopes {
   divisions: string[];
   series: string[];
   categories: string[];
+  /** Active Price Finder browse division/category combinations; null category denotes uncategorised products. */
+  categoryPairs: MrpGeneratorScopesCategoryPairsItem[];
   competitors: string[];
 }
 
@@ -1070,6 +1079,209 @@ export interface MrpGeneratorDemotionResponse {
 
 export interface MrpHistoricalRunInput {
   asOf?: string;
+  /** Exact catalog category; compound divisions remain one stored value. */
+  category?: string;
+}
+
+export type MrpMatchingActionAction = typeof MrpMatchingActionAction[keyof typeof MrpMatchingActionAction];
+
+
+export const MrpMatchingActionAction = {
+  match: 'match',
+  less_by_percent: 'less_by_percent',
+  leave: 'leave',
+  set: 'set',
+  set_exact_price: 'set_exact_price',
+} as const;
+
+export type MrpMatchingActionDriver = string | {
+  /** @minLength 1 */
+  named: string;
+};
+
+export interface MrpMatchingAction {
+  itemCode: string;
+  action: MrpMatchingActionAction;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent?: number;
+  /** @exclusiveMinimum 0 */
+  price?: number;
+  /** @exclusiveMinimum 0 */
+  exactPrice?: number;
+  driver?: MrpMatchingActionDriver;
+}
+
+export type MrpMatchingBulkActionAction = typeof MrpMatchingBulkActionAction[keyof typeof MrpMatchingBulkActionAction];
+
+
+export const MrpMatchingBulkActionAction = {
+  match: 'match',
+  less_by_percent: 'less_by_percent',
+  leave: 'leave',
+  set: 'set',
+  set_exact_price: 'set_exact_price',
+} as const;
+
+export type MrpMatchingBulkActionDriver = string | {
+  /** @minLength 1 */
+  named: string;
+};
+
+export type MrpMatchingBulkActionFilter = typeof MrpMatchingBulkActionFilter[keyof typeof MrpMatchingBulkActionFilter];
+
+
+export const MrpMatchingBulkActionFilter = {
+  above: 'above',
+  below: 'below',
+  all: 'all',
+} as const;
+
+export interface MrpMatchingBulkAction {
+  id?: string;
+  description?: string;
+  /**
+     * Canonical item codes currently visible in the UI; the server rejects codes outside the recomputed category/competitor/direction set.
+     * @minItems 1
+     */
+  visibleCodes: string[];
+  /**
+     * Deprecated compatibility alias for visibleCodes.
+     * @deprecated
+     * @minItems 1
+     */
+  filteredCodes?: string[];
+  action: MrpMatchingBulkActionAction;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  percent?: number;
+  /** @exclusiveMinimum 0 */
+  price?: number;
+  driver?: MrpMatchingBulkActionDriver;
+  filter: MrpMatchingBulkActionFilter;
+}
+
+export type MrpMatchingSessionInputWithDivisionDriver = string | {
+  /** @minLength 1 */
+  named: string;
+};
+
+export interface MrpMatchingSessionInputWithDivision {
+  /** Required for new matching callers; browse division value reused from Price Finder. */
+  division: string;
+  /** Optional exact catalog product category within division; category-only callers remain supported. */
+  category?: string;
+  /** @minItems 1 */
+  selectedCompetitors: string[];
+  competitors?: string[];
+  driver?: MrpMatchingSessionInputWithDivisionDriver;
+  asOf?: string;
+  actions?: MrpMatchingAction[];
+  bulkActions?: MrpMatchingBulkAction[];
+}
+
+export type MrpMatchingSessionInputWithCategoryDriver = string | {
+  /** @minLength 1 */
+  named: string;
+};
+
+export interface MrpMatchingSessionInputWithCategory {
+  /** Browse division value reused from Price Finder; optional for legacy category-only callers. */
+  division?: string;
+  /** Exact catalog product category. */
+  category: string;
+  /** @minItems 1 */
+  selectedCompetitors: string[];
+  competitors?: string[];
+  driver?: MrpMatchingSessionInputWithCategoryDriver;
+  asOf?: string;
+  actions?: MrpMatchingAction[];
+  bulkActions?: MrpMatchingBulkAction[];
+}
+
+export type MrpMatchingSessionInput = MrpMatchingSessionInputWithDivision | MrpMatchingSessionInputWithCategory;
+
+export type MrpMatchingWorkbenchDriver = string | {
+  mode: 'lowest' | 'highest' | 'named';
+  /** @nullable */
+  name?: string | null;
+};
+
+export type MrpMatchingWorkbenchDriverSummary = { [key: string]: unknown };
+
+export type MrpMatchingWorkbenchFilter = typeof MrpMatchingWorkbenchFilter[keyof typeof MrpMatchingWorkbenchFilter];
+
+
+export const MrpMatchingWorkbenchFilter = {
+  above: 'above',
+  below: 'below',
+  all: 'all',
+} as const;
+
+export type MrpMatchingWorkbenchDivisionsItem = {
+  division: string;
+  count: number;
+};
+
+export type MrpMatchingWorkbenchCategoriesItem = {
+  /** @nullable */
+  category: string | null;
+  label: string;
+  count: number;
+};
+
+export type MrpMatchingWorkbenchCategoryOptionsItem = { [key: string]: unknown };
+
+export type MrpMatchingWorkbenchCategoryPairsItem = { [key: string]: unknown };
+
+export type MrpMatchingWorkbenchProductsItem = { [key: string]: unknown };
+
+export type MrpMatchingWorkbenchFilteredProductsItem = { [key: string]: unknown };
+
+export type MrpMatchingWorkbenchCounts = {[key: string]: number};
+
+export interface MrpMatchingWorkbench {
+  runType: 'matching';
+  asOf?: string;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  selectedCompetitors: string[];
+  driver?: MrpMatchingWorkbenchDriver;
+  driverSummary?: MrpMatchingWorkbenchDriverSummary;
+  filter: MrpMatchingWorkbenchFilter;
+  divisions?: MrpMatchingWorkbenchDivisionsItem[];
+  categories?: MrpMatchingWorkbenchCategoriesItem[];
+  categoryOptions?: MrpMatchingWorkbenchCategoryOptionsItem[];
+  categoryPairs?: MrpMatchingWorkbenchCategoryPairsItem[];
+  competitors?: string[];
+  products: MrpMatchingWorkbenchProductsItem[];
+  filteredProducts: MrpMatchingWorkbenchFilteredProductsItem[];
+  counts?: MrpMatchingWorkbenchCounts;
+}
+
+export type MrpMatchingSessionResponseScope = { [key: string]: unknown };
+
+export type MrpMatchingSessionResponseSummary = { [key: string]: unknown };
+
+export interface MrpMatchingSessionResponse {
+  runId: number;
+  runType: 'matching';
+  modelKind: 'competitive';
+  asOf?: string;
+  /** @nullable */
+  division?: string | null;
+  /** @nullable */
+  category: string | null;
+  scope?: MrpMatchingSessionResponseScope;
+  actor?: string;
+  summary: MrpMatchingSessionResponseSummary;
+  inputFingerprint?: string;
 }
 
 export type MrpHistoricalRunResponseSummary = { [key: string]: unknown };
@@ -1079,6 +1291,7 @@ export type MrpHistoricalRunResponseSourceFreshness = { [key: string]: unknown }
 export interface MrpHistoricalRunResponse {
   runId: number;
   modelKind: 'historical';
+  runType: 'historical';
   /** @nullable */
   scenarioId: number | null;
   asOf: string;
@@ -1102,10 +1315,10 @@ export interface MrpHistoricalSourceFreshness {
   coverageSummary?: MrpHistoricalSourceFreshnessCoverageSummary;
 }
 
-export type MrpHistoricalInputSnapshotModelKind = typeof MrpHistoricalInputSnapshotModelKind[keyof typeof MrpHistoricalInputSnapshotModelKind];
+export type MrpHistoricalInputSnapshotRunType = typeof MrpHistoricalInputSnapshotRunType[keyof typeof MrpHistoricalInputSnapshotRunType];
 
 
-export const MrpHistoricalInputSnapshotModelKind = {
+export const MrpHistoricalInputSnapshotRunType = {
   historical: 'historical',
 } as const;
 
@@ -1116,7 +1329,8 @@ export type MrpHistoricalInputSnapshotHistoryItem = { [key: string]: unknown };
 export type MrpHistoricalInputSnapshotSummary = { [key: string]: unknown };
 
 export interface MrpHistoricalInputSnapshot {
-  modelKind: MrpHistoricalInputSnapshotModelKind;
+  modelKind: 'historical';
+  runType: MrpHistoricalInputSnapshotRunType;
   asOf: string;
   products: MrpHistoricalInputSnapshotProductsItem[];
   history: MrpHistoricalInputSnapshotHistoryItem[];
@@ -1124,12 +1338,23 @@ export interface MrpHistoricalInputSnapshot {
   summary: MrpHistoricalInputSnapshotSummary;
 }
 
-export type MrpCompetitiveInputSnapshotModelKind = typeof MrpCompetitiveInputSnapshotModelKind[keyof typeof MrpCompetitiveInputSnapshotModelKind];
+export type MrpMatchingInputSnapshotRunType = typeof MrpMatchingInputSnapshotRunType[keyof typeof MrpMatchingInputSnapshotRunType];
 
 
-export const MrpCompetitiveInputSnapshotModelKind = {
-  competitive: 'competitive',
+export const MrpMatchingInputSnapshotRunType = {
+  matching: 'matching',
 } as const;
+
+export type MrpMatchingInputSnapshotMatchingScope = {
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+};
+
+export type MrpMatchingInputSnapshotDriver = string | { [key: string]: unknown };
+
+export type MrpMatchingInputSnapshotActionsItem = { [key: string]: unknown };
 
 export interface MrpGeneratorSnapshotProduct {
   itemCode: string;
@@ -1151,6 +1376,31 @@ export interface MrpGeneratorSnapshotProduct {
   sales?: MrpGeneratorSalesEvidence | null;
   margin?: MrpGeneratorMarginEvidence | null;
 }
+
+export interface MrpMatchingInputSnapshot {
+  modelKind: 'competitive';
+  runType: MrpMatchingInputSnapshotRunType;
+  asOf: string;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  matchingScope: MrpMatchingInputSnapshotMatchingScope;
+  /** @minItems 1 */
+  selectedCompetitors: string[];
+  driver?: MrpMatchingInputSnapshotDriver;
+  products: MrpGeneratorSnapshotProduct[];
+  actions: MrpMatchingInputSnapshotActionsItem[];
+  compoundDivisionPolicy: string;
+}
+
+export type MrpCompetitiveInputSnapshotRunType = typeof MrpCompetitiveInputSnapshotRunType[keyof typeof MrpCompetitiveInputSnapshotRunType];
+
+
+export const MrpCompetitiveInputSnapshotRunType = {
+  matching: 'matching',
+  rule: 'rule',
+} as const;
 
 export type MrpCompetitiveInputSnapshotStage = typeof MrpCompetitiveInputSnapshotStage[keyof typeof MrpCompetitiveInputSnapshotStage];
 
@@ -1325,7 +1575,8 @@ export type MrpCompetitiveInputSnapshotPortfolio = { [key: string]: unknown };
 export type MrpCompetitiveInputSnapshotHistoryItem = { [key: string]: unknown };
 
 export interface MrpCompetitiveInputSnapshot {
-  modelKind: MrpCompetitiveInputSnapshotModelKind;
+  modelKind: 'competitive';
+  runType: MrpCompetitiveInputSnapshotRunType;
   asOf: string;
   products: MrpGeneratorSnapshotProduct[];
   scope: MrpGeneratorScope;
@@ -1349,7 +1600,7 @@ export interface MrpCompetitiveInputSnapshot {
   seriesAnalyses?: MrpHistoricalSeries[];
 }
 
-export type MrpGeneratorInputSnapshot = MrpCompetitiveInputSnapshot | MrpHistoricalInputSnapshot;
+export type MrpGeneratorInputSnapshot = MrpCompetitiveInputSnapshot | MrpHistoricalInputSnapshot | MrpMatchingInputSnapshot;
 
 export interface MrpGeneratorRunInput {
   asOf?: string;
@@ -1388,6 +1639,15 @@ export type MrpGeneratorRunModelKind = typeof MrpGeneratorRunModelKind[keyof typ
 export const MrpGeneratorRunModelKind = {
   competitive: 'competitive',
   historical: 'historical',
+} as const;
+
+export type MrpGeneratorRunRunType = typeof MrpGeneratorRunRunType[keyof typeof MrpGeneratorRunRunType];
+
+
+export const MrpGeneratorRunRunType = {
+  rule: 'rule',
+  historical: 'historical',
+  matching: 'matching',
 } as const;
 
 /**
@@ -1556,6 +1816,8 @@ export interface MrpGeneratorSalesApiStatus {
   requestWindowSeconds?: number;
 }
 
+export type MrpGeneratorSourceFreshnessCoverage = MrpGeneratorNormalizedCoverage | { [key: string]: unknown } | null;
+
 export interface MrpGeneratorSourceFreshness {
   asOf: string;
   /** @nullable */
@@ -1571,7 +1833,9 @@ export interface MrpGeneratorSourceFreshness {
   sales: MrpGeneratorSalesApiStatus;
   /** @nullable */
   salesFetchedAt?: string | null;
-  coverage?: MrpGeneratorNormalizedCoverage;
+  coverage?: MrpGeneratorSourceFreshnessCoverage;
+  /** @nullable */
+  coverageUnavailableReason?: string | null;
   coverageSummary?: MrpGeneratorCoverageSummary;
   /** @nullable */
   dataSource?: string | null;
@@ -1583,6 +1847,7 @@ export interface MrpGeneratorRun {
   /** @nullable */
   scenarioId: number | null;
   modelKind: MrpGeneratorRunModelKind;
+  runType: MrpGeneratorRunRunType;
   asOf: string;
   /** @nullable */
   policyVersion: MrpGeneratorRunPolicyVersion;
@@ -1599,11 +1864,21 @@ export const MrpGeneratorPersistedRunModelKind = {
   historical: 'historical',
 } as const;
 
+export type MrpGeneratorPersistedRunRunType = typeof MrpGeneratorPersistedRunRunType[keyof typeof MrpGeneratorPersistedRunRunType];
+
+
+export const MrpGeneratorPersistedRunRunType = {
+  rule: 'rule',
+  historical: 'historical',
+  matching: 'matching',
+} as const;
+
 export interface MrpGeneratorPersistedRun {
   id: number;
   /** @nullable */
   scenarioId: number | null;
   modelKind: MrpGeneratorPersistedRunModelKind;
+  runType?: MrpGeneratorPersistedRunRunType;
   asOf: string;
   inputSnapshot: MrpGeneratorInputSnapshot;
   inputFingerprint: string;
@@ -1757,7 +2032,8 @@ export interface MrpGeneratorComparison {
 export interface MrpGeneratorHandoffResponse {
   batchId: number;
   status: 'preview';
-  scenarioId: number;
+  /** @nullable */
+  scenarioId: number | null;
   runId: number;
   rowsChanged: number;
 }
@@ -4357,6 +4633,33 @@ asOf?: string;
 export type GetPriceEditorEditsParams = {
 itemCode: string;
 };
+
+export type GetMrpMatchingWorkbenchParams = {
+/**
+ * Required for new callers; exact Price Finder browse division value.
+ */
+division?: string;
+/**
+ * Optional exact catalog product category within division.
+ */
+category?: string;
+/**
+ * @minItems 1
+ */
+competitors: string[];
+driver?: string;
+filter?: GetMrpMatchingWorkbenchFilter;
+asOf?: string;
+};
+
+export type GetMrpMatchingWorkbenchFilter = typeof GetMrpMatchingWorkbenchFilter[keyof typeof GetMrpMatchingWorkbenchFilter];
+
+
+export const GetMrpMatchingWorkbenchFilter = {
+  above: 'above',
+  below: 'below',
+  all: 'all',
+} as const;
 
 export type GetMrpGeneratorFreshnessParams = {
 asOf?: string;
