@@ -51,12 +51,20 @@ import {
   type SalesSnapshot,
   type SalesCoverage,
   SUPPORTED_SALES_PERIOD,
+  SALES_PAGE_SIZE,
+  SALES_REQUEST_LIMIT,
+  SALES_REQUEST_WINDOW_SECONDS,
+  SALES_TARGET_REQUEST_INTERVAL_MS,
 } from "../lib/salesApi";
 
 const router: IRouter = Router();
 const today = () => new Date().toISOString().slice(0, 10);
 const KNOWN_LIMITS = {
-  pageLimit: 500,
+  pageLimit: SALES_PAGE_SIZE,
+  pageSize: SALES_PAGE_SIZE,
+  requestLimit: SALES_REQUEST_LIMIT,
+  requestWindowSeconds: SALES_REQUEST_WINDOW_SECONDS,
+  targetRequestIntervalMs: SALES_TARGET_REQUEST_INTERVAL_MS,
   maxRestarts: 2,
   salesPeriod: ["2026-04..2026-08"],
   marginPeriod: ["2026-04..2026-06"],
@@ -219,6 +227,7 @@ const salesPeriod = (rules: GeneratorRule[]): string =>
 
 function salesErrorStatus(error: unknown): number {
   if (error instanceof SalesApiError && error.kind === "auth") return 502;
+  if (error instanceof SalesApiError && error.kind === "rate_limited") return 429;
   if (error instanceof SalesApiError && error.kind === "missing_credential") return 503;
   return 503;
 }

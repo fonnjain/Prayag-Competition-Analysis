@@ -19,7 +19,25 @@ export const MrpGeneratorOptionStatusStatus = {
   missing_credential: 'missing_credential',
   auth_failed: 'auth_failed',
   unavailable: 'unavailable',
+  rate_limited: 'rate_limited',
 } as const;
+
+export type MrpGeneratorRequestMetricsCountLabel = typeof MrpGeneratorRequestMetricsCountLabel[keyof typeof MrpGeneratorRequestMetricsCountLabel];
+
+
+export const MrpGeneratorRequestMetricsCountLabel = {
+  actual: 'actual',
+} as const;
+
+export interface MrpGeneratorRequestMetrics {
+  pageSize: number;
+  requestsMade: number;
+  completedPages: number;
+  requestLimit: number;
+  requestWindowSeconds: number;
+  expectedPages?: number;
+  countLabel: MrpGeneratorRequestMetricsCountLabel;
+}
 
 /**
  * @nullable
@@ -41,6 +59,16 @@ export interface MrpGeneratorOptionStatus {
   upstreamStatus?: number | null;
   /** @nullable */
   lastAttemptAt?: string | null;
+  requestMetrics?: MrpGeneratorRequestMetrics;
+  /** @nullable */
+  retryAt?: string | null;
+  /** @nullable */
+  retryAfterSeconds?: number | null;
+  pageSize?: number;
+  requestsMade?: number;
+  completedPages?: number;
+  requestLimit?: number;
+  requestWindowSeconds?: number;
 }
 
 export type MrpGeneratorMetadataOptions = {
@@ -57,6 +85,7 @@ export const MrpGeneratorSalesApiStatusProperty = {
   missing_credential: 'missing_credential',
   auth_failed: 'auth_failed',
   unavailable: 'unavailable',
+  rate_limited: 'rate_limited',
 } as const;
 
 export type MrpGeneratorSalesApiComponents = {
@@ -77,6 +106,16 @@ export interface MrpGeneratorSalesApi {
   upstreamStatus?: number | null;
   /** @nullable */
   lastAttemptAt?: string | null;
+  requestMetrics?: MrpGeneratorRequestMetrics;
+  /** @nullable */
+  retryAt?: string | null;
+  /** @nullable */
+  retryAfterSeconds?: number | null;
+  pageSize?: number;
+  requestsMade?: number;
+  completedPages?: number;
+  requestLimit?: number;
+  requestWindowSeconds?: number;
   components?: MrpGeneratorSalesApiComponents;
 }
 
@@ -1014,6 +1053,7 @@ export const MrpGeneratorSalesApiStatusStatus = {
   missing_credential: 'missing_credential',
   auth_failed: 'auth_failed',
   unavailable: 'unavailable',
+  rate_limited: 'rate_limited',
 } as const;
 
 export type MrpGeneratorNormalizedCoverageReconciliation = {[key: string]: string | number | null};
@@ -1158,6 +1198,16 @@ export interface MrpGeneratorSalesApiStatus {
   fetchedAt?: string | null;
   coverage?: MrpGeneratorNormalizedCoverage;
   coverageSummary?: MrpGeneratorCoverageSummary;
+  requestMetrics?: MrpGeneratorRequestMetrics;
+  /** @nullable */
+  retryAt?: string | null;
+  /** @nullable */
+  retryAfterSeconds?: number | null;
+  pageSize?: number;
+  requestsMade?: number;
+  completedPages?: number;
+  requestLimit?: number;
+  requestWindowSeconds?: number;
 }
 
 export type MrpGeneratorKnownLimitsSalesPeriodItem = typeof MrpGeneratorKnownLimitsSalesPeriodItem[keyof typeof MrpGeneratorKnownLimitsSalesPeriodItem];
@@ -1176,6 +1226,12 @@ export const MrpGeneratorKnownLimitsMarginPeriodItem = {
 
 export interface MrpGeneratorKnownLimits {
   pageLimit: number;
+  /** Upstream page size used for each Sales request. */
+  pageSize: number;
+  /** Configured upstream request budget per rolling window. */
+  requestLimit: number;
+  requestWindowSeconds: number;
+  targetRequestIntervalMs: number;
   maxRestarts: number;
   /** Current FY2026-27 Sales query period. */
   salesPeriod: MrpGeneratorKnownLimitsSalesPeriodItem[];

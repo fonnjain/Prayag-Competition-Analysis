@@ -16,7 +16,7 @@ import {
 } from "@workspace/db";
 import routes from "./index";
 import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
-import { SalesApiClient, resetSalesApiClient, setSalesApiClientForTests } from "../lib/salesApi";
+import { SalesApiClient, resetSalesApiClient, setSalesApiClientForTests, type SalesApiClientOptions } from "../lib/salesApi";
 import { DEFAULT_P012_SCENARIO, promoteP012ToAdvanced } from "../lib/mrpGenerator";
 
 const RUN = Date.now();
@@ -35,13 +35,20 @@ const P012_CODES = [
 const DATE = "2020-01-01";
 const AS_OF = new Date().toISOString().slice(0, 10);
 
+const testSalesClient = (options: SalesApiClientOptions = {}): SalesApiClient =>
+  new SalesApiClient({
+    ...options,
+    sleep: options.sleep ?? (async () => undefined),
+    now: options.now ?? (() => Date.now()),
+  });
+
 function authenticatedSalesFixture(): SalesApiClient {
   const coverage = {
     requested: ["2026-04..2026-08"], returned: ["2026-04..2026-08"],
     read_at: "2026-08-01", dataSource: "fixture-before-each",
     held: [], unavailable: [], provisional: [],
   };
-  return new SalesApiClient({
+  return testSalesClient({
     apiKey: "fixture-authenticated",
     fetch: async (url) => url.includes("sales-by-item")
       ? new Response(JSON.stringify({ coverage, rows: [{
@@ -57,7 +64,7 @@ function authenticatedSalesFixture(): SalesApiClient {
 }
 
 function unavailableSalesFixture(): SalesApiClient {
-  return new SalesApiClient({
+  return testSalesClient({
     fetch: async () => {
       throw new Error("Sales fixture intentionally unavailable.");
     },
@@ -380,7 +387,7 @@ describe("MRP Generator HTTP contract and safety", () => {
   });
 
   it("bootstraps authenticated Stage 2 metadata/save/run and invalidates rejected credentials", async () => {
-    const unauthorized = new SalesApiClient({
+    const unauthorized = testSalesClient({
       apiKey: "revoked",
       fetch: async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 }),
     });
@@ -395,7 +402,7 @@ describe("MRP Generator HTTP contract and safety", () => {
       read_at: "2026-08-01", dataSource: "fixture-sales",
       held: null, unavailable: [], provisional: false,
     };
-    const fixtureSales = new SalesApiClient({
+    const fixtureSales = testSalesClient({
       apiKey: "valid",
       fetch: async (url) => url.includes("sales-by-item")
         ? new Response(JSON.stringify({ coverage, rows: [{
@@ -444,7 +451,7 @@ describe("MRP Generator HTTP contract and safety", () => {
       read_at: "2026-08-01", dataSource: "fixture-p011",
       held: [], unavailable: [], provisional: [],
     };
-    setSalesApiClientForTests(new SalesApiClient({
+    setSalesApiClientForTests(testSalesClient({
       apiKey: "valid-p011",
       fetch: async (url) => url.includes("sales-by-item")
         ? new Response(JSON.stringify({ coverage, rows: [{
@@ -708,7 +715,7 @@ describe("MRP Generator HTTP contract and safety", () => {
       requested: ["2026-04..2026-08"], returned: ["2026-04..2026-08"],
       read_at: "2026-08-01", dataSource: "independent-fixture", held: [], unavailable: [], provisional: [],
     };
-    setSalesApiClientForTests(new SalesApiClient({
+    setSalesApiClientForTests(testSalesClient({
       apiKey: "independent-fixture",
       fetch: async (url) => {
         if (url.includes("sales-by-item")) throw new Error("sales endpoint down");
@@ -732,7 +739,7 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(marginRun.status).toBe(201);
     runIds.push(marginRun.body.runId);
 
-    setSalesApiClientForTests(new SalesApiClient({
+    setSalesApiClientForTests(testSalesClient({
       apiKey: "independent-fixture",
       fetch: async (url) => {
         if (url.includes("margin-by-item")) throw new Error("margin endpoint down");

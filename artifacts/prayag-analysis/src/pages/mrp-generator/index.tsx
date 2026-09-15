@@ -198,12 +198,16 @@ export default function MrpGeneratorList() {
                   </div>
 
                   {metadata.salesApi?.components?.sales && (
-                    <div className={`flex items-start gap-1.5 mt-2 p-1.5 rounded border ${metadata.salesApi.components.sales.available ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                    <div className={`flex items-start gap-1.5 mt-2 p-1.5 rounded border ${metadata.salesApi.components.sales.available ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : metadata.salesApi.components.sales.status === 'rate_limited' ? 'text-orange-700 bg-orange-50 border-orange-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
                       <Zap className="w-4 h-4 shrink-0" />
                       <div className="flex flex-col">
-                        <span>Sales API (Volume): {metadata.salesApi.components.sales.available ? 'Available' : 'Unavailable'}</span>
+                        <span>Sales API (Volume): {metadata.salesApi.components.sales.available ? 'Available' : metadata.salesApi.components.sales.status === 'rate_limited' ? 'RATE LIMITED' : 'Unavailable'}</span>
+                        <span className="text-xs mt-0.5">Page size: {metadata.salesApi.components.sales.pageSize ?? 500} · Requests per refresh: {metadata.salesApi.components.sales.requestsMade ?? metadata.salesApi.components.sales.requestMetrics?.requestsMade ?? "latest refresh pending"}</span>
                         {!metadata.salesApi.components.sales.available && metadata.salesApi.components.sales.reason && (
                           <span className="text-xs mt-0.5">{metadata.salesApi.components.sales.reason}</span>
+                        )}
+                        {metadata.salesApi.components.sales.status === 'rate_limited' && metadata.salesApi.components.sales.retryAt && (
+                          <span className="text-xs mt-0.5">Retry after: {new Date(metadata.salesApi.components.sales.retryAt).toLocaleString()}</span>
                         )}
                         {!metadata.salesApi.components.sales.available && metadata.salesApi.components.sales.upstreamStatus && (
                           <span className="text-xs mt-0.5">Upstream Status: {metadata.salesApi.components.sales.upstreamStatus}</span>
@@ -213,12 +217,16 @@ export default function MrpGeneratorList() {
                   )}
 
                   {metadata.salesApi?.components?.margin && (
-                    <div className={`flex items-start gap-1.5 mt-2 p-1.5 rounded border ${metadata.salesApi.components.margin.available ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                    <div className={`flex items-start gap-1.5 mt-2 p-1.5 rounded border ${metadata.salesApi.components.margin.available ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : metadata.salesApi.components.margin.status === 'rate_limited' ? 'text-orange-700 bg-orange-50 border-orange-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
                       <Zap className="w-4 h-4 shrink-0" />
                       <div className="flex flex-col">
-                        <span>Margin API: {metadata.salesApi.components.margin.available ? 'Available' : 'Unavailable'}</span>
+                        <span>Margin API: {metadata.salesApi.components.margin.available ? 'Available' : metadata.salesApi.components.margin.status === 'rate_limited' ? 'RATE LIMITED' : 'Unavailable'}</span>
+                        <span className="text-xs mt-0.5">Page size: {metadata.salesApi.components.margin.pageSize ?? 500} · Requests per refresh: {metadata.salesApi.components.margin.requestsMade ?? metadata.salesApi.components.margin.requestMetrics?.requestsMade ?? "latest refresh pending"}</span>
                         {!metadata.salesApi.components.margin.available && metadata.salesApi.components.margin.reason && (
                           <span className="text-xs mt-0.5">{metadata.salesApi.components.margin.reason}</span>
+                        )}
+                        {metadata.salesApi.components.margin.status === 'rate_limited' && metadata.salesApi.components.margin.retryAt && (
+                          <span className="text-xs mt-0.5">Retry after: {new Date(metadata.salesApi.components.margin.retryAt).toLocaleString()}</span>
                         )}
                         {!metadata.salesApi.components.margin.available && metadata.salesApi.components.margin.upstreamStatus && (
                           <span className="text-xs mt-0.5">Upstream Status: {metadata.salesApi.components.margin.upstreamStatus}</span>

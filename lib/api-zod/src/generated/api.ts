@@ -2283,32 +2283,80 @@ export const GetMrpGeneratorMetadataResponse = zod.object({
   "deterministic": zod.boolean(),
   "salesApi": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "dataSource": zod.string().nullish(),
   "endpoint": zod.string().nullish(),
   "upstreamStatus": zod.number().nullish(),
   "lastAttemptAt": zod.coerce.date().nullish(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional(),
   "components": zod.object({
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "coverage": zod.string().nullish(),
   "coverageDetail": zod.record(zod.string(), zod.unknown()).nullish(),
   "endpoint": zod.string().nullish(),
   "upstreamStatus": zod.number().nullish(),
-  "lastAttemptAt": zod.coerce.date().nullish()
+  "lastAttemptAt": zod.coerce.date().nullish(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 }).optional(),
   "margin": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "coverage": zod.string().nullish(),
   "coverageDetail": zod.record(zod.string(), zod.unknown()).nullish(),
   "endpoint": zod.string().nullish(),
   "upstreamStatus": zod.number().nullish(),
-  "lastAttemptAt": zod.coerce.date().nullish()
+  "lastAttemptAt": zod.coerce.date().nullish(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 }).optional()
 }).optional()
 }),
@@ -2326,23 +2374,55 @@ export const GetMrpGeneratorMetadataResponse = zod.object({
   "competitiveOnly": zod.record(zod.string(), zod.unknown()),
   "margin": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "coverage": zod.string().nullish(),
   "coverageDetail": zod.record(zod.string(), zod.unknown()).nullish(),
   "endpoint": zod.string().nullish(),
   "upstreamStatus": zod.number().nullish(),
-  "lastAttemptAt": zod.coerce.date().nullish()
+  "lastAttemptAt": zod.coerce.date().nullish(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 }),
   "volume": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "coverage": zod.string().nullish(),
   "coverageDetail": zod.record(zod.string(), zod.unknown()).nullish(),
   "endpoint": zod.string().nullish(),
   "upstreamStatus": zod.number().nullish(),
-  "lastAttemptAt": zod.coerce.date().nullish()
+  "lastAttemptAt": zod.coerce.date().nullish(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 })
 }).optional(),
   "sources": zod.array(zod.string())
@@ -2379,7 +2459,7 @@ export const GetMrpGeneratorFreshnessResponse = zod.object({
 })),
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "dataSource": zod.string().nullish(),
   "fetchedAt": zod.coerce.date().nullish(),
@@ -2468,7 +2548,23 @@ export const GetMrpGeneratorFreshnessResponse = zod.object({
 })
 }),
   "dataSource": zod.string().nullable()
-}).optional()
+}).optional(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 }),
   "salesFetchedAt": zod.coerce.date().nullish(),
   "coverage": zod.object({
@@ -2560,6 +2656,10 @@ export const GetMrpGeneratorFreshnessResponse = zod.object({
   "dataSource": zod.string().nullish(),
   "knownLimits": zod.object({
   "pageLimit": zod.number(),
+  "pageSize": zod.number().describe('Upstream page size used for each Sales request.'),
+  "requestLimit": zod.number().describe('Configured upstream request budget per rolling window.'),
+  "requestWindowSeconds": zod.number(),
+  "targetRequestIntervalMs": zod.number(),
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
@@ -8557,6 +8657,10 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 }).optional(),
   "knownLimits": zod.object({
   "pageLimit": zod.number(),
+  "pageSize": zod.number().describe('Upstream page size used for each Sales request.'),
+  "requestLimit": zod.number().describe('Configured upstream request budget per rolling window.'),
+  "requestWindowSeconds": zod.number(),
+  "targetRequestIntervalMs": zod.number(),
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
@@ -8635,7 +8739,7 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 })),
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "dataSource": zod.string().nullish(),
   "fetchedAt": zod.coerce.date().nullish(),
@@ -8724,7 +8828,23 @@ export const ListMrpGeneratorRunsResponse = zod.object({
 })
 }),
   "dataSource": zod.string().nullable()
-}).optional()
+}).optional(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 }),
   "salesFetchedAt": zod.coerce.date().nullish(),
   "coverage": zod.object({
@@ -8816,6 +8936,10 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "dataSource": zod.string().nullish(),
   "knownLimits": zod.object({
   "pageLimit": zod.number(),
+  "pageSize": zod.number().describe('Upstream page size used for each Sales request.'),
+  "requestLimit": zod.number().describe('Configured upstream request budget per rolling window.'),
+  "requestWindowSeconds": zod.number(),
+  "targetRequestIntervalMs": zod.number(),
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
@@ -9819,6 +9943,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
 }).optional(),
   "knownLimits": zod.object({
   "pageLimit": zod.number(),
+  "pageSize": zod.number().describe('Upstream page size used for each Sales request.'),
+  "requestLimit": zod.number().describe('Configured upstream request budget per rolling window.'),
+  "requestWindowSeconds": zod.number(),
+  "targetRequestIntervalMs": zod.number(),
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')
@@ -9897,7 +10025,7 @@ export const GetMrpGeneratorRunResponse = zod.object({
 })),
   "sales": zod.object({
   "available": zod.boolean(),
-  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable']),
+  "status": zod.enum(['authenticated', 'missing_credential', 'auth_failed', 'unavailable', 'rate_limited']),
   "reason": zod.string().nullish(),
   "dataSource": zod.string().nullish(),
   "fetchedAt": zod.coerce.date().nullish(),
@@ -9986,7 +10114,23 @@ export const GetMrpGeneratorRunResponse = zod.object({
 })
 }),
   "dataSource": zod.string().nullable()
-}).optional()
+}).optional(),
+  "requestMetrics": zod.object({
+  "pageSize": zod.number(),
+  "requestsMade": zod.number(),
+  "completedPages": zod.number(),
+  "requestLimit": zod.number(),
+  "requestWindowSeconds": zod.number(),
+  "expectedPages": zod.number().optional(),
+  "countLabel": zod.enum(['actual'])
+}).optional(),
+  "retryAt": zod.coerce.date().nullish(),
+  "retryAfterSeconds": zod.number().nullish(),
+  "pageSize": zod.number().optional(),
+  "requestsMade": zod.number().optional(),
+  "completedPages": zod.number().optional(),
+  "requestLimit": zod.number().optional(),
+  "requestWindowSeconds": zod.number().optional()
 }),
   "salesFetchedAt": zod.coerce.date().nullish(),
   "coverage": zod.object({
@@ -10078,6 +10222,10 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "dataSource": zod.string().nullish(),
   "knownLimits": zod.object({
   "pageLimit": zod.number(),
+  "pageSize": zod.number().describe('Upstream page size used for each Sales request.'),
+  "requestLimit": zod.number().describe('Configured upstream request budget per rolling window.'),
+  "requestWindowSeconds": zod.number(),
+  "targetRequestIntervalMs": zod.number(),
   "maxRestarts": zod.number(),
   "salesPeriod": zod.array(zod.enum(['2026-04..2026-08'])).describe('Current FY2026-27 Sales query period.'),
   "marginPeriod": zod.array(zod.enum(['2026-04..2026-06'])).describe('Current FY2026-27 margin query period.')

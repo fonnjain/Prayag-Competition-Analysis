@@ -87,6 +87,8 @@ export type SalesSnapshot = {
     status: "authenticated";
     dataSource: string;
   };
+  /** Safe upstream request accounting for the completed paired refresh. */
+  requestMetrics: SalesRequestMetrics;
   awaitingConfirmationByCode: Record<string, SalesAggregate>;
   /** Compatibility alias for the temporary server probe. */
   awaitingByCode: Record<string, SalesAggregate>;
@@ -102,21 +104,55 @@ export type SalesApiStatus =
   | { available: false; status: "missing_credential"; reason: string }
   | { available: false; status: "auth_failed"; reason: string }
   | { available: false; status: "unavailable"; reason: string }
-  | { available: true; status: "authenticated"; dataSource: string };
+  | ({ available: false; status: "rate_limited"; reason: string } & SalesRateLimitMetadata)
+  | {
+    available: true; status: "authenticated"; dataSource: string; requestMetrics?: SalesRequestMetrics;
+    pageSize?: number; requestsMade?: number; completedPages?: number;
+    requestLimit?: number; requestWindowSeconds?: number;
+  };
+
+export type SalesRequestMetrics = {
+  pageSize: number;
+  requestsMade: number;
+  completedPages: number;
+  requestLimit: number;
+  requestWindowSeconds: number;
+  /** Only present when the source explicitly supplied a safe page count. */
+  expectedPages?: number;
+  countLabel: "actual";
+};
+
+export type SalesRateLimitMetadata = {
+  retryAt: string;
+  retryAfterSeconds: number;
+  pageSize: number;
+  requestsMade: number;
+  completedPages: number;
+  requestLimit: number;
+  requestWindowSeconds: number;
+};
 
 export type SalesComponentStatus = {
   available: boolean;
-  status: "missing_credential" | "auth_failed" | "unavailable" | "authenticated";
+  status: "missing_credential" | "auth_failed" | "unavailable" | "rate_limited" | "authenticated";
   reason?: string;
   dataSource?: string;
   endpoint?: string;
   upstreamStatus?: number;
   lastAttemptAt?: string | null;
   coverage?: SalesCoverage | null;
+  requestMetrics?: SalesRequestMetrics;
+  retryAt?: string;
+  retryAfterSeconds?: number;
+  pageSize?: number;
+  requestsMade?: number;
+  completedPages?: number;
+  requestLimit?: number;
+  requestWindowSeconds?: number;
 };
 
 export class SalesApiError extends Error {
-  readonly kind: "missing_credential" | "auth" | "network" | "schema" | "source_changed";
+  readonly kind: "missing_credential" | "auth" | "network" | "schema" | "source_changed" | "rate_limited";
   readonly statusCode?: number;
   readonly httpStatus?: number;
   constructor(
@@ -134,6 +170,13 @@ export class SalesApiError extends Error {
 
 const DEFAULT_BASE_URL = "https://prayag-sales.com";
 const PAGE_LIMIT = 500;
+export const SALES_PAGE_SIZE = PAGE_LIMIT;
+export const SALES_REQUEST_LIMIT = 60;
+export const SALES_REQUEST_WINDOW_SECONDS = 60;
+export const SALES_TARGET_REQUEST_INTERVAL_MS = 1_100;
+const REQUEST_INTERVAL_MS = SALES_TARGET_REQUEST_INTERVAL_MS;
+const RESTART_COOLDOWN_MS = 1_500;
+const MAX_RATE_LIMIT_WAIT_MS = 15 * 60_000;
 const MAX_RESTARTS = 2;
 export const SUPPORTED_SALES_PERIOD = "2026-27";
 const AWAITING_CONFIRMATION = new Set([
@@ -141,6 +184,61 @@ const AWAITING_CONFIRMATION = new Set([
   "824XD", "924XD", "824SD", "HD140B", "HD160B", "HD200B",
 ]);
 export const awaitingConfirmationCodes = [...AWAITING_CONFIRMATION].sort();
+
+type MetricsAccumulator = {
+  requestsMade: number;
+  completedPages: number;
+  byComponent: Record<"sales" | "margin", { requestsMade: number; completedPages: number }>;
+};
+
+const newMetricsAccumulator = (): MetricsAccumulator => ({
+  requestsMade: 0,
+  completedPages: 0,
+  byComponent: {
+    sales: { requestsMade: 0, completedPages: 0 },
+    margin: { requestsMade: 0, completedPages: 0 },
+  },
+});
+
+const metricsSnapshot = (
+  metrics: MetricsAccumulator,
+  component?: "sales" | "margin",
+): SalesRequestMetrics => {
+  const values = component ? metrics.byComponent[component] : metrics;
+  return {
+  pageSize: PAGE_LIMIT,
+  requestsMade: values.requestsMade,
+  completedPages: values.completedPages,
+  requestLimit: SALES_REQUEST_LIMIT,
+  requestWindowSeconds: SALES_REQUEST_WINDOW_SECONDS,
+  countLabel: "actual",
+  };
+};
+
+function combineMetrics(
+  first: SalesRequestMetrics | undefined,
+  second: SalesRequestMetrics | undefined,
+): SalesRequestMetrics {
+  const metrics = first ?? second;
+  return {
+    pageSize: PAGE_LIMIT,
+    requestsMade: (first?.requestsMade ?? 0) + (second?.requestsMade ?? 0),
+    completedPages: (first?.completedPages ?? 0) + (second?.completedPages ?? 0),
+    requestLimit: SALES_REQUEST_LIMIT,
+    requestWindowSeconds: SALES_REQUEST_WINDOW_SECONDS,
+    ...(first?.expectedPages != null && second?.expectedPages != null
+      ? { expectedPages: first.expectedPages + second.expectedPages }
+      : metrics?.expectedPages != null ? { expectedPages: metrics.expectedPages } : {}),
+    countLabel: "actual",
+  };
+}
+
+function pageCount(payload: unknown): number | undefined {
+  const body = object(payload);
+  const pagination = object(body?.pagination) ?? object(body?.meta);
+  const value = pagination?.total_pages ?? pagination?.totalPages ?? body?.total_pages ?? body?.totalPages;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 ? value : undefined;
+}
 
 const object = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -365,28 +463,56 @@ function aggregateMargin(rows: MarginRow[], coverage: SalesCoverage): Record<str
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+export type SalesApiClientOptions = {
+  fetch?: FetchLike;
+  apiKey?: string;
+  baseUrl?: string;
+  sleep?: (milliseconds: number) => Promise<void>;
+  now?: () => number;
+};
 
 export class SalesApiClient {
   private readonly fetcher: FetchLike;
   private readonly baseUrl: string;
   private readonly key: string | undefined;
+  private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly now: () => number;
   private cached: SalesSnapshot | null = null;
   private lastFailure: SalesApiError | null = null;
-  private salesCache: { rows: SalesRow[]; coverage: SalesCoverage; fetchedAt: string } | null = null;
-  private marginCache: { rows: MarginRow[]; coverage: SalesCoverage; fetchedAt: string } | null = null;
+  private salesCache: { rows: SalesRow[]; coverage: SalesCoverage; fetchedAt: string; requestMetrics: SalesRequestMetrics } | null = null;
+  private marginCache: { rows: MarginRow[]; coverage: SalesCoverage; fetchedAt: string; requestMetrics: SalesRequestMetrics } | null = null;
   private salesFailure: SalesApiError | null = null;
   private marginFailure: SalesApiError | null = null;
   private salesLastAttemptAt: string | null = null;
   private marginLastAttemptAt: string | null = null;
+  private salesMetrics: SalesRequestMetrics | undefined;
+  private marginMetrics: SalesRequestMetrics | undefined;
+  private rateLimit: (SalesRateLimitMetadata & { component: "sales" | "margin" }) | null = null;
+  private rateLimitWaitMs = 0;
+  private requestStarts: number[] = [];
+  private queue: Promise<unknown> = Promise.resolve();
+  private fullInFlight: Promise<SalesSnapshot> | null = null;
+  private optionInFlight = new Map<string, Promise<SalesSnapshot>>();
 
-  constructor(options: { fetch?: FetchLike; apiKey?: string; baseUrl?: string } = {}) {
+  constructor(options: SalesApiClientOptions = {}) {
     this.fetcher = options.fetch ?? ((input, init) => fetch(input, init));
     this.key = options.apiKey ?? process.env.SALES_API_KEY;
     this.baseUrl = (options.baseUrl ?? process.env.SALES_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.now = options.now ?? (() => Date.now());
   }
 
   status(): SalesApiStatus {
     if (!this.key?.trim()) return { available: false, status: "missing_credential", reason: "Sales API credential is not configured." };
+    if (this.rateLimit) {
+      const { component: _component, ...metadata } = this.rateLimit;
+      return {
+        available: false,
+        status: "rate_limited",
+        reason: "Sales API request budget is temporarily rate limited; the last refresh is being retained.",
+        ...metadata,
+      };
+    }
     if (this.lastFailure?.kind === "auth") {
       const reason = this.lastFailure.statusCode === 403
         ? "Sales API denied access to the endpoint (HTTP 403)."
@@ -394,13 +520,22 @@ export class SalesApiClient {
       return { available: false, status: "auth_failed", reason };
     }
     if (this.lastFailure) return { available: false, status: "unavailable", reason: "Sales API snapshot is unavailable." };
-    if (this.cached) return this.cached.availability;
+    if (this.cached) return {
+      ...this.cached.availability,
+      requestMetrics: this.cached.requestMetrics,
+      pageSize: this.cached.requestMetrics.pageSize,
+      requestsMade: this.cached.requestMetrics.requestsMade,
+      completedPages: this.cached.requestMetrics.completedPages,
+      requestLimit: this.cached.requestMetrics.requestLimit,
+      requestWindowSeconds: this.cached.requestMetrics.requestWindowSeconds,
+    };
     return { available: false, status: "unavailable", reason: "Sales API snapshot has not been authenticated." };
   }
 
   clearCache(): void {
     this.cached = null; this.lastFailure = null; this.salesCache = null; this.marginCache = null;
     this.salesFailure = null; this.marginFailure = null;
+    this.salesMetrics = undefined; this.marginMetrics = undefined; this.rateLimit = null; this.rateLimitWaitMs = 0;
   }
   cachedSnapshot(): SalesSnapshot | null { return this.cached; }
 
@@ -409,14 +544,27 @@ export class SalesApiClient {
     const lastAttemptAt = component === "sales" ? this.salesLastAttemptAt : this.marginLastAttemptAt;
     const cache = component === "sales" ? this.salesCache : this.marginCache;
     const failure = component === "sales" ? this.salesFailure : this.marginFailure;
+    const metrics = component === "sales" ? this.salesMetrics : this.marginMetrics;
     if (!this.key?.trim()) return { available: false, status: "missing_credential", reason: "Sales API credential is not configured.", endpoint, lastAttemptAt };
+    if (this.rateLimit?.component === component) {
+      const { component: _component, ...metadata } = this.rateLimit;
+      return {
+        available: false,
+        status: "rate_limited",
+        reason: "Sales API request budget is temporarily rate limited; the cached component is retained.",
+        endpoint, lastAttemptAt, requestMetrics: metrics, ...metadata,
+      };
+    }
     if (failure?.kind === "auth") return { available: false, status: "auth_failed", reason: failure.message, endpoint, upstreamStatus: failure.statusCode, lastAttemptAt };
     if (failure) return { available: false, status: "unavailable", reason: failure.message, endpoint, upstreamStatus: failure.statusCode, lastAttemptAt };
     if (cache) return {
       available: true, status: "authenticated", dataSource: cache.coverage.dataSource ?? this.baseUrl,
-      endpoint, lastAttemptAt, coverage: cache.coverage,
+      endpoint, lastAttemptAt, coverage: cache.coverage, requestMetrics: cache.requestMetrics,
+      pageSize: cache.requestMetrics.pageSize, requestsMade: cache.requestMetrics.requestsMade,
+      completedPages: cache.requestMetrics.completedPages, requestLimit: cache.requestMetrics.requestLimit,
+      requestWindowSeconds: cache.requestMetrics.requestWindowSeconds,
     };
-    return { available: false, status: "unavailable", reason: "Sales API endpoint has not been authenticated.", endpoint, lastAttemptAt };
+    return { available: false, status: "unavailable", reason: "Sales API endpoint has not been authenticated.", endpoint, lastAttemptAt, requestMetrics: metrics };
   }
 
   private snapshotFromParts(
@@ -425,7 +573,8 @@ export class SalesApiClient {
     salesCoverage: SalesCoverage,
     marginRows: MarginRow[],
     marginCoverage: SalesCoverage,
-    fetchedAt = new Date().toISOString(),
+    requestMetrics: SalesRequestMetrics,
+    fetchedAt = new Date(this.now()).toISOString(),
   ): SalesSnapshot {
     const dataSource = salesCoverage.dataSource ?? marginCoverage.dataSource ?? this.baseUrl;
     return {
@@ -435,6 +584,7 @@ export class SalesApiClient {
       awaitingByCode: aggregateSales(salesRows.filter((row) => AWAITING_CONFIRMATION.has(row.code)), true),
       marginByCode: aggregateMargin(marginRows, marginCoverage),
       coverage: { sales: salesCoverage, margin: marginCoverage },
+      requestMetrics,
       availability: { available: true, status: "authenticated", dataSource },
     };
   }
@@ -444,29 +594,55 @@ export class SalesApiClient {
     if (period !== SUPPORTED_SALES_PERIOD) throw new SalesApiError("schema", `Sales period ${period} is not supported; only ${SUPPORTED_SALES_PERIOD} is available.`);
     if (!options.sales && !options.margin) return this.getSnapshot({ refresh: options.refresh, period });
     if (!this.key?.trim()) throw new SalesApiError("missing_credential", "Sales API credential is not configured.");
+    const key = JSON.stringify({ sales: Boolean(options.sales), margin: Boolean(options.margin), refresh: Boolean(options.refresh), period });
+    const existing = this.optionInFlight.get(key);
+    if (existing) return existing;
+    const promise = this.enqueue(() => this.loadOptionSnapshot(options, period));
+    this.optionInFlight.set(key, promise);
+    // Do not use finally here: its derived promise would reject when the
+    // traversal rejects and become an unhandled rejection.  Both branches of
+    // then return void, so the cleanup promise is always observed.
+    void promise.then(
+      () => { this.optionInFlight.delete(key); },
+      () => { this.optionInFlight.delete(key); },
+    );
+    return promise;
+  }
+
+  private async loadOptionSnapshot(
+    options: { sales?: boolean; margin?: boolean; refresh?: boolean; period?: string },
+    period: string,
+  ): Promise<SalesSnapshot> {
     const emptyCoverage = (): SalesCoverage => ({
       requested: [], returned: [], held: [], unavailable: [], provisional: [], read_at: null,
       reconciliation: {}, dataSource: this.baseUrl, last_modified: null,
     });
     let salesPart = options.sales ? this.salesCache : null;
     let marginPart = options.margin ? this.marginCache : null;
+    const metrics = newMetricsAccumulator();
     if (options.sales && (!salesPart || options.refresh)) {
-      this.salesLastAttemptAt = new Date().toISOString();
+      this.salesLastAttemptAt = new Date(this.now()).toISOString();
       try {
-        const source = await this.traverse("/api/external/sales-by-item?fy=2026-27&from=2026-04&to=2026-08");
-        salesPart = { rows: source.rows.map(parseSalesRow), coverage: source.coverage, fetchedAt: new Date().toISOString() };
-        this.salesCache = salesPart; this.salesFailure = null;
+        const source = await this.traverseWithRestarts(
+          "/api/external/sales-by-item?fy=2026-27&from=2026-04&to=2026-08", "sales", metrics,
+        );
+        salesPart = { rows: source.rows.map(parseSalesRow), coverage: source.coverage, fetchedAt: new Date(this.now()).toISOString(), requestMetrics: source.requestMetrics };
+        this.salesCache = { ...salesPart, requestMetrics: source.requestMetrics }; this.salesMetrics = source.requestMetrics; this.salesFailure = null;
+        this.rateLimit = null; this.rateLimitWaitMs = 0;
       } catch (error) {
         this.salesFailure = error instanceof SalesApiError ? error : new SalesApiError("network", "Sales API network request failed.");
         throw this.salesFailure;
       }
     }
     if (options.margin && (!marginPart || options.refresh)) {
-      this.marginLastAttemptAt = new Date().toISOString();
+      this.marginLastAttemptAt = new Date(this.now()).toISOString();
       try {
-        const source = await this.traverse("/api/external/margin-by-item?fy=2026-27&from=2026-04&to=2026-06");
-        marginPart = { rows: source.rows.map(parseMarginRow), coverage: source.coverage, fetchedAt: new Date().toISOString() };
-        this.marginCache = marginPart; this.marginFailure = null;
+        const source = await this.traverseWithRestarts(
+          "/api/external/margin-by-item?fy=2026-27&from=2026-04&to=2026-06", "margin", metrics,
+        );
+        marginPart = { rows: source.rows.map(parseMarginRow), coverage: source.coverage, fetchedAt: new Date(this.now()).toISOString(), requestMetrics: source.requestMetrics };
+        this.marginCache = { ...marginPart, requestMetrics: source.requestMetrics }; this.marginMetrics = source.requestMetrics; this.marginFailure = null;
+        this.rateLimit = null; this.rateLimitWaitMs = 0;
       } catch (error) {
         this.marginFailure = error instanceof SalesApiError ? error : new SalesApiError("network", "Sales API network request failed.");
         throw this.marginFailure;
@@ -476,6 +652,10 @@ export class SalesApiClient {
       period,
       salesPart?.rows ?? [], salesPart?.coverage ?? emptyCoverage(),
       marginPart?.rows ?? [], marginPart?.coverage ?? emptyCoverage(),
+      combineMetrics(
+        options.sales ? (metrics.byComponent.sales.requestsMade ? metricsSnapshot(metrics, "sales") : salesPart?.requestMetrics) : undefined,
+        options.margin ? (metrics.byComponent.margin.requestsMade ? metricsSnapshot(metrics, "margin") : marginPart?.requestMetrics) : undefined,
+      ),
       salesPart?.fetchedAt ?? marginPart?.fetchedAt,
     );
     if (options.sales && options.margin) this.cached = snapshot;
@@ -489,16 +669,35 @@ export class SalesApiClient {
     }
     const state = this.status();
     if (state.status === "missing_credential") throw new SalesApiError("missing_credential", state.reason);
+    if (this.cached && state.status === "rate_limited" && !options.refresh) return this.cached;
     if (this.cached && !this.lastFailure && this.cached.period === period && !options.refresh) return this.cached;
-    for (let restart = 0; restart <= MAX_RESTARTS; restart++) {
-      try {
+    if (this.fullInFlight) return this.fullInFlight;
+    const promise = this.enqueue(() => this.loadSnapshot(options, period));
+    this.fullInFlight = promise;
+    void promise.then(
+      () => { this.fullInFlight = null; },
+      () => { this.fullInFlight = null; },
+    );
+    return promise;
+  }
+
+  private async loadSnapshot(options: { refresh?: boolean; period?: string }, period: string): Promise<SalesSnapshot> {
+    const metrics = newMetricsAccumulator();
+    try {
         // Coverage is parsed and validated before any row is accepted.
-        const sales = await this.traverse("/api/external/sales-by-item?fy=2026-27&from=2026-04&to=2026-08");
-        const margin = await this.traverse("/api/external/margin-by-item?fy=2026-27&from=2026-04&to=2026-06");
+        // A source_changed restart is part of this same logical refresh:
+        // retain the accumulator and limiter history rather than spending a
+        // new unaccounted burst.
+        const sales = await this.traverseWithRestarts(
+          "/api/external/sales-by-item?fy=2026-27&from=2026-04&to=2026-08", "sales", metrics,
+        );
+        const margin = await this.traverseWithRestarts(
+          "/api/external/margin-by-item?fy=2026-27&from=2026-04&to=2026-06", "margin", metrics,
+        );
            const parsedSalesRows = sales.rows.map(parseSalesRow);
            const parsedMarginRows = margin.rows.map(parseMarginRow);
            const snapshot: SalesSnapshot = {
-           fetchedAt: new Date().toISOString(),
+            fetchedAt: new Date(this.now()).toISOString(),
            period,
            dataSource: typeof sales.coverage.dataSource === "string" ? sales.coverage.dataSource :
              typeof margin.coverage.dataSource === "string" ? margin.coverage.dataSource : this.baseUrl,
@@ -509,6 +708,7 @@ export class SalesApiClient {
            awaitingByCode: aggregateSales(parsedSalesRows.filter((row) => AWAITING_CONFIRMATION.has(row.code)), true),
            marginByCode: aggregateMargin(parsedMarginRows, margin.coverage),
           coverage: { sales: sales.coverage, margin: margin.coverage },
+             requestMetrics: metricsSnapshot(metrics),
           availability: {
             available: true,
             status: "authenticated",
@@ -517,40 +717,73 @@ export class SalesApiClient {
           },
         };
          this.cached = snapshot;
-        this.salesCache = { rows: parsedSalesRows, coverage: sales.coverage, fetchedAt: snapshot.fetchedAt };
-        this.marginCache = { rows: parsedMarginRows, coverage: margin.coverage, fetchedAt: snapshot.fetchedAt };
+          this.salesCache = { rows: parsedSalesRows, coverage: sales.coverage, fetchedAt: snapshot.fetchedAt, requestMetrics: metricsSnapshot(metrics, "sales") };
+          this.marginCache = { rows: parsedMarginRows, coverage: margin.coverage, fetchedAt: snapshot.fetchedAt, requestMetrics: metricsSnapshot(metrics, "margin") };
+          this.salesMetrics = metricsSnapshot(metrics, "sales");
+          this.marginMetrics = metricsSnapshot(metrics, "margin");
         this.salesFailure = null;
         this.marginFailure = null;
         this.lastFailure = null;
+         this.rateLimit = null;
+         this.rateLimitWaitMs = 0;
         return snapshot;
+    } catch (error) {
+      this.lastFailure = error instanceof SalesApiError ? error : new SalesApiError("network", "Sales API snapshot is unavailable.");
+      if (this.lastFailure.kind === "auth") this.cached = null;
+      throw error;
+    }
+  }
+
+  /**
+   * A source_changed response restarts only this traversal.  This is safe for
+   * independent components and avoids discarding completed rows, while the
+   * caller's accumulator and this client's rolling limiter remain shared.
+   */
+  private async traverseWithRestarts(
+    path: string,
+    component: "sales" | "margin",
+    metrics: MetricsAccumulator,
+  ): Promise<{ rows: unknown[]; coverage: SalesCoverage; requestMetrics: SalesRequestMetrics }> {
+    for (let restart = 0; restart <= MAX_RESTARTS; restart++) {
+      try {
+        return await this.traverse(path, component, metrics);
       } catch (error) {
         if (!(error instanceof SalesApiError) || error.kind !== "source_changed" || restart >= MAX_RESTARTS) {
-           this.lastFailure = error instanceof SalesApiError ? error : new SalesApiError("network", "Sales API snapshot is unavailable.");
-           if (this.lastFailure.kind === "auth") this.cached = null;
           throw error;
         }
+        await this.sleep(RESTART_COOLDOWN_MS * (restart + 1));
       }
     }
     throw new SalesApiError("source_changed", "Sales source changed while reading; retry limit exceeded.");
   }
 
-  private async traverse(path: string): Promise<{ rows: unknown[]; coverage: SalesCoverage }> {
+  private async traverse(
+    path: string,
+    component: "sales" | "margin",
+    metrics: MetricsAccumulator,
+  ): Promise<{ rows: unknown[]; coverage: SalesCoverage; requestMetrics: SalesRequestMetrics }> {
     const rows: unknown[] = [];
     let cursor: string | null = null;
     let coverage: SalesCoverage | null = null;
-    do {
+    let completedPages = 0;
+    let expectedPages: number | undefined;
+    while (true) {
       const separator = path.includes("?") ? "&" : "?";
       const url = `${this.baseUrl}${path}${separator}limit=${PAGE_LIMIT}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
       let response: Response;
       try {
-        response = await this.fetcher(url, { method: "GET", headers: { "X-API-Key": this.key! } });
+        response = await this.request(url, { method: "GET", headers: { "X-API-Key": this.key! } }, component);
+        metrics.requestsMade++;
+        metrics.byComponent[component].requestsMade++;
         if (response.status === 401 || response.status === 403) {
           // The upstream contract accepts either header style.  Keep the API
           // key attempt first, and only spend one bounded retry on Bearer.
-          response = await this.fetcher(url, {
+          response = await this.request(url, {
             method: "GET",
             headers: { Authorization: `Bearer ${this.key!}` },
-          });
+          }, component);
+          metrics.requestsMade++;
+          metrics.byComponent[component].requestsMade++;
         }
       } catch {
         throw new SalesApiError("network", "Sales API network request failed.");
@@ -570,15 +803,106 @@ export class SalesApiClient {
         } catch { /* status alone is not enough */ }
         if (sourceChanged) throw new SalesApiError("source_changed", "Sales source changed during traversal.", 409);
       }
+      if (response.status === 429) {
+        const retryAfter = this.retryAfter(response);
+        const delay = retryAfter.delayMs;
+        // Never shorten an upstream Retry-After.  If it cannot fit inside our
+        // generous cumulative wait budget, report the upstream retryAt and
+        // stop instead of making an early request.
+        if (delay > MAX_RATE_LIMIT_WAIT_MS || this.rateLimitWaitMs + delay > MAX_RATE_LIMIT_WAIT_MS) {
+          throw this.rateLimitedError(component, retryAfter.retryAt, metrics);
+        }
+        this.rateLimitWaitMs += delay;
+        const retryAt = retryAfter.retryAt;
+        this.rateLimit = {
+          component, retryAt, retryAfterSeconds: Math.ceil(delay / 1000),
+          pageSize: PAGE_LIMIT, requestsMade: metrics.requestsMade, completedPages: metrics.completedPages,
+          requestLimit: SALES_REQUEST_LIMIT, requestWindowSeconds: SALES_REQUEST_WINDOW_SECONDS,
+        };
+        await this.sleep(delay);
+        continue;
+      }
       if (!response.ok) throw new SalesApiError("network", `Sales API returned HTTP ${response.status}.`, response.status);
       let payload: unknown;
       try { payload = await response.json(); } catch { throw new SalesApiError("schema", "Sales API returned invalid JSON."); }
       if (!coverage) coverage = extractCoverage(payload);
       rows.push(...extractRows(payload));
+      completedPages++;
+      metrics.completedPages++;
+      metrics.byComponent[component].completedPages++;
+      expectedPages = expectedPages ?? pageCount(payload);
       cursor = nextCursor(payload);
-    } while (cursor);
+      if (!cursor) break;
+    }
     if (!coverage) throw new SalesApiError("schema", "Sales API coverage was not returned.");
-    return { rows, coverage };
+    const requestMetrics: SalesRequestMetrics = {
+      pageSize: PAGE_LIMIT, requestsMade: metrics.byComponent[component].requestsMade,
+      completedPages: metrics.byComponent[component].completedPages,
+      requestLimit: SALES_REQUEST_LIMIT, requestWindowSeconds: SALES_REQUEST_WINDOW_SECONDS,
+      ...(expectedPages != null ? { expectedPages } : {}),
+      countLabel: "actual",
+    };
+    return { rows, coverage, requestMetrics };
+  }
+
+  private async request(url: string, init: RequestInit, component: "sales" | "margin"): Promise<Response> {
+    const now = this.now();
+    const recent = this.requestStarts.filter((started) => now - started < SALES_REQUEST_WINDOW_SECONDS * 1000);
+    this.requestStarts = recent;
+    const previous = this.requestStarts.at(-1);
+    const windowDelay = recent.length >= SALES_REQUEST_LIMIT
+      ? Math.max(0, SALES_REQUEST_WINDOW_SECONDS * 1000 - (now - recent[0]!))
+      : 0;
+    const pacingDelay = previous == null ? 0 : Math.max(0, REQUEST_INTERVAL_MS - (now - previous));
+    const delay = Math.max(windowDelay, pacingDelay);
+    if (delay > 0) await this.sleep(delay);
+    this.requestStarts.push(this.now());
+    try {
+      return await this.fetcher(url, init);
+    } catch {
+      throw new SalesApiError("network", "Sales API network request failed.");
+    }
+  }
+
+  private retryAfter(response: Response): { delayMs: number; retryAt: string } {
+    const value = response.headers.get("retry-after");
+    if (value) {
+      const trimmed = value.trim();
+      const seconds = Number(trimmed);
+      if (Number.isFinite(seconds) && seconds > 0) {
+        const delayMs = seconds * 1000;
+        return { delayMs, retryAt: new Date(this.now() + delayMs).toISOString() };
+      }
+      // Numeric zero/negative values are invalid Retry-After values; do not
+      // feed them to Date.parse (some runtimes interpret "0" as year 2000).
+      const date = Number.isFinite(seconds) ? NaN : Date.parse(value);
+      if (Number.isFinite(date) && date > this.now()) {
+        return { delayMs: date - this.now(), retryAt: new Date(date).toISOString() };
+      }
+    }
+    const prior = this.rateLimit?.retryAfterSeconds ?? 0;
+    const delayMs = Math.max(1_000, prior * 2_000 || 1_000);
+    return { delayMs, retryAt: new Date(this.now() + delayMs).toISOString() };
+  }
+
+  private rateLimitedError(
+    component: "sales" | "margin",
+    retryAt: string,
+    metrics: MetricsAccumulator,
+  ): SalesApiError {
+    const retryAfterSeconds = Math.max(1, Math.ceil((Date.parse(retryAt) - this.now()) / 1000));
+    this.rateLimit = {
+      component, retryAt, retryAfterSeconds,
+      pageSize: PAGE_LIMIT, requestsMade: metrics.requestsMade, completedPages: metrics.completedPages,
+      requestLimit: SALES_REQUEST_LIMIT, requestWindowSeconds: SALES_REQUEST_WINDOW_SECONDS,
+    };
+    return new SalesApiError("rate_limited", "Sales API remains rate limited after a bounded wait.", 429);
+  }
+
+  private enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(work, work);
+    this.queue = result.then(() => undefined, () => undefined);
+    return result;
   }
 }
 

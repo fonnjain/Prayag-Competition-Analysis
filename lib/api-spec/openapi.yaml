@@ -2487,12 +2487,20 @@ components:
       required: [available, status]
       properties:
         available: { type: boolean }
-        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable] }
+        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable, rate_limited] }
         reason: { type: [string, "null"] }
         dataSource: { type: [string, "null"] }
         endpoint: { type: [string, "null"] }
         upstreamStatus: { type: [integer, "null"] }
         lastAttemptAt: { type: [string, "null"], format: date-time }
+        requestMetrics: { $ref: "#/components/schemas/MrpGeneratorRequestMetrics" }
+        retryAt: { type: [string, "null"], format: date-time }
+        retryAfterSeconds: { type: [integer, "null"] }
+        pageSize: { type: integer }
+        requestsMade: { type: integer }
+        completedPages: { type: integer }
+        requestLimit: { type: integer }
+        requestWindowSeconds: { type: integer }
         components:
           type: object
           properties:
@@ -2503,13 +2511,21 @@ components:
       required: [available, status]
       properties:
         available: { type: boolean }
-        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable] }
+        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable, rate_limited] }
         reason: { type: [string, "null"] }
         coverage: { type: [string, "null"] }
         coverageDetail: { type: [object, "null"], additionalProperties: true }
         endpoint: { type: [string, "null"] }
         upstreamStatus: { type: [integer, "null"] }
         lastAttemptAt: { type: [string, "null"], format: date-time }
+        requestMetrics: { $ref: "#/components/schemas/MrpGeneratorRequestMetrics" }
+        retryAt: { type: [string, "null"], format: date-time }
+        retryAfterSeconds: { type: [integer, "null"] }
+        pageSize: { type: integer }
+        requestsMade: { type: integer }
+        completedPages: { type: integer }
+        requestLimit: { type: integer }
+        requestWindowSeconds: { type: integer }
     MrpGeneratorDisabledRule:
       type: object
       required: [type, reason, configurationSummary]
@@ -3118,9 +3134,13 @@ components:
         to: { type: string }
     MrpGeneratorKnownLimits:
       type: object
-      required: [pageLimit, maxRestarts, salesPeriod, marginPeriod]
+      required: [pageLimit, pageSize, requestLimit, requestWindowSeconds, targetRequestIntervalMs, maxRestarts, salesPeriod, marginPeriod]
       properties:
         pageLimit: { type: integer }
+        pageSize: { type: integer, description: Upstream page size used for each Sales request. }
+        requestLimit: { type: integer, description: Configured upstream request budget per rolling window. }
+        requestWindowSeconds: { type: integer }
+        targetRequestIntervalMs: { type: integer }
         maxRestarts: { type: integer }
         salesPeriod: { type: array, items: { type: string, enum: ["2026-04..2026-08"] }, description: Current FY2026-27 Sales query period. }
         marginPeriod: { type: array, items: { type: string, enum: ["2026-04..2026-06"] }, description: Current FY2026-27 margin query period. }
@@ -3144,12 +3164,31 @@ components:
       required: [available, status]
       properties:
         available: { type: boolean }
-        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable] }
+        status: { type: string, enum: [authenticated, missing_credential, auth_failed, unavailable, rate_limited] }
         reason: { type: [string, "null"] }
         dataSource: { type: [string, "null"] }
         fetchedAt: { type: [string, "null"], format: date-time }
         coverage: { $ref: "#/components/schemas/MrpGeneratorNormalizedCoverage" }
         coverageSummary: { $ref: "#/components/schemas/MrpGeneratorCoverageSummary" }
+        requestMetrics: { $ref: "#/components/schemas/MrpGeneratorRequestMetrics" }
+        retryAt: { type: [string, "null"], format: date-time }
+        retryAfterSeconds: { type: [integer, "null"] }
+        pageSize: { type: integer }
+        requestsMade: { type: integer }
+        completedPages: { type: integer }
+        requestLimit: { type: integer }
+        requestWindowSeconds: { type: integer }
+    MrpGeneratorRequestMetrics:
+      type: object
+      required: [pageSize, requestsMade, completedPages, requestLimit, requestWindowSeconds, countLabel]
+      properties:
+        pageSize: { type: integer }
+        requestsMade: { type: integer }
+        completedPages: { type: integer }
+        requestLimit: { type: integer }
+        requestWindowSeconds: { type: integer }
+        expectedPages: { type: integer }
+        countLabel: { type: string, enum: [actual] }
     MrpGeneratorFreshnessMrp:
       type: object
       required: [effectiveDate, ageDays, stale]

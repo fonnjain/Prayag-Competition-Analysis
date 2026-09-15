@@ -40,3 +40,9 @@ P012 Simple scenarios are competitive-only by default. Ordered rows use first-ma
 **Why:** The table order is part of the administrator's pricing intent. Falling through after a named competitor is missing would silently apply a broader rule the user did not choose for that product.
 
 **How to apply:** Keep margin floors and volume weighting independently opt-in. Margin may constrain a target; volume adds deterministic A/B/C/F sales-value weighting and evidence but does not silently rewrite the row's competitive target.
+
+The Sales source permits 60 requests per minute. Request pages of 500, serialize Sales then margin, and pace all attempts—including authentication retries—through one shared rolling limiter. Treat HTTP 429 as rate limiting, not unavailability.
+
+**Why:** A complete paired refresh is roughly 37 pages. Failing on 429 or immediately restarting after a source-changed 409 discards useful progress and can repeatedly exhaust the same request budget.
+
+**How to apply:** Honor `Retry-After`, resume the same cursor, preserve cached snapshots while waiting, and retain request history across paced 409 traversal restarts. Report exact logical-refresh request/page totals and the next retry time.
