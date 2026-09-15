@@ -2461,11 +2461,15 @@ export const GetMrpMatchingWorkbenchQueryParams = zod.object({
   "competitors": zod.array(zod.coerce.string()).min(1),
   "driver": zod.coerce.string().optional(),
   "filter": zod.enum(['above', 'below', 'all']).default(getMrpMatchingWorkbenchQueryFilterDefault),
-  "asOf": zod.date().optional()
+  "asOf": zod.date().optional(),
+  "view": zod.enum(['prince_exposure']).optional().describe('Fixed read-only view; prince_exposure shows mapped Prince products cheaper than Prayag.')
 })
 
 export const GetMrpMatchingWorkbenchResponse = zod.object({
   "runType": zod.literal("matching"),
+  "view": zod.enum(['prince_exposure']).optional(),
+  "readOnly": zod.boolean().optional(),
+  "suggestions": zod.boolean().optional(),
   "asOf": zod.coerce.date().optional(),
   "division": zod.string().nullable(),
   "category": zod.string().nullable(),
@@ -2490,7 +2494,8 @@ export const GetMrpMatchingWorkbenchResponse = zod.object({
   "competitors": zod.array(zod.string()).optional(),
   "products": zod.array(zod.record(zod.string(), zod.unknown())),
   "filteredProducts": zod.array(zod.record(zod.string(), zod.unknown())),
-  "counts": zod.record(zod.string(), zod.number()).optional()
+  "counts": zod.record(zod.string(), zod.number()).optional(),
+  "exposure": zod.record(zod.string(), zod.unknown()).optional()
 })
 
 
@@ -2921,11 +2926,17 @@ export const listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMaxIncrease
 
 export const listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMinBelowPercentMin = 0;
+export const listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const listMrpGeneratorScenariosResponseOneAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const listMrpGeneratorScenariosResponseOneAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -3219,11 +3230,12 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMinBelowPercentMin).max(listMrpGeneratorScenariosResponseOneSimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -3244,11 +3256,12 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(listMrpGeneratorScenariosResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -3437,7 +3450,11 @@ export const ListMrpGeneratorScenariosResponseItem = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "isDefault": zod.boolean().optional(),
-  "canReset": zod.boolean().optional()
+  "canReset": zod.boolean().optional(),
+  "canonicalProvenance": zod.union([zod.object({
+  "key": zod.literal("p017-canonical-default"),
+  "version": zod.number()
+}),zod.null()]).optional()
 }))
 export const ListMrpGeneratorScenariosResponse = zod.array(ListMrpGeneratorScenariosResponseItem)
 
@@ -3534,11 +3551,17 @@ export const createMrpGeneratorScenarioBodySimplePolicyRowsItemMaxIncreaseMin = 
 
 export const createMrpGeneratorScenarioBodySimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const createMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMin = 0;
+export const createMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const createMrpGeneratorScenarioBodyAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const createMrpGeneratorScenarioBodyAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -3832,11 +3855,12 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(createMrpGeneratorScenarioBodySimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(createMrpGeneratorScenarioBodySimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(createMrpGeneratorScenarioBodySimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(createMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMin).max(createMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -3857,11 +3881,12 @@ export const CreateMrpGeneratorScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(createMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -4061,6 +4086,9 @@ export const previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxIncreas
 
 export const previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMin = 0;
+export const previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const previewMrpGeneratorSimpleScenarioBodyLimitMax = 100;
 
 
@@ -4090,11 +4118,12 @@ export const PreviewMrpGeneratorSimpleScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMin).max(previewMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }),
@@ -4126,6 +4155,7 @@ export const PreviewMrpGeneratorSimpleScenarioResponse = zod.object({
   "excluded": zod.number(),
   "increases": zod.number(),
   "decreases": zod.number(),
+  "medianChangePercent": zod.number().nullable(),
   "rowCounts": zod.record(zod.string(), zod.object({
   "scopeMatched": zod.number(),
   "withCompetitorPrice": zod.number(),
@@ -4380,11 +4410,17 @@ export const getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxIncreaseMi
 
 export const getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const getMrpGeneratorScenarioResponseOneAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const getMrpGeneratorScenarioResponseOneAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -4678,11 +4714,12 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMin).max(getMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -4703,11 +4740,12 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(getMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -4896,7 +4934,11 @@ export const GetMrpGeneratorScenarioResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "isDefault": zod.boolean().optional(),
-  "canReset": zod.boolean().optional()
+  "canReset": zod.boolean().optional(),
+  "canonicalProvenance": zod.union([zod.object({
+  "key": zod.literal("p017-canonical-default"),
+  "version": zod.number()
+}),zod.null()]).optional()
 }))
 
 
@@ -4996,11 +5038,17 @@ export const updateMrpGeneratorScenarioBodySimplePolicyRowsItemMaxIncreaseMin = 
 
 export const updateMrpGeneratorScenarioBodySimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const updateMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMin = 0;
+export const updateMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const updateMrpGeneratorScenarioBodyAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const updateMrpGeneratorScenarioBodyAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -5294,11 +5342,12 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(updateMrpGeneratorScenarioBodySimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(updateMrpGeneratorScenarioBodySimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(updateMrpGeneratorScenarioBodySimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(updateMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMin).max(updateMrpGeneratorScenarioBodySimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -5319,11 +5368,12 @@ export const UpdateMrpGeneratorScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(updateMrpGeneratorScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -5598,11 +5648,17 @@ export const updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxIncreas
 
 export const updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMin = 0;
+export const updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const updateMrpGeneratorScenarioResponseOneAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const updateMrpGeneratorScenarioResponseOneAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -5896,11 +5952,12 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMin).max(updateMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -5921,11 +5978,12 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(updateMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -6114,7 +6172,11 @@ export const UpdateMrpGeneratorScenarioResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "isDefault": zod.boolean().optional(),
-  "canReset": zod.boolean().optional()
+  "canReset": zod.boolean().optional(),
+  "canonicalProvenance": zod.union([zod.object({
+  "key": zod.literal("p017-canonical-default"),
+  "version": zod.number()
+}),zod.null()]).optional()
 }))
 
 
@@ -6219,11 +6281,17 @@ export const resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxIncrease
 
 export const resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMin = 0;
+export const resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const resetMrpGeneratorScenarioResponseOneAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const resetMrpGeneratorScenarioResponseOneAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -6517,11 +6585,12 @@ export const ResetMrpGeneratorScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMin).max(resetMrpGeneratorScenarioResponseOneSimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -6542,11 +6611,12 @@ export const ResetMrpGeneratorScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(resetMrpGeneratorScenarioResponseOneAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -6735,7 +6805,11 @@ export const ResetMrpGeneratorScenarioResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "isDefault": zod.boolean().optional(),
-  "canReset": zod.boolean().optional()
+  "canReset": zod.boolean().optional(),
+  "canonicalProvenance": zod.union([zod.object({
+  "key": zod.literal("p017-canonical-default"),
+  "version": zod.number()
+}),zod.null()]).optional()
 }))
 
 
@@ -6765,6 +6839,9 @@ export const promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxIncreas
 
 export const promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMin = 0;
+export const promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const promoteMrpGeneratorSimpleScenarioBodyPolicyHoldBelowMin = 0;
 
 export const promoteMrpGeneratorSimpleScenarioBodyPolicyRoundingUnitMin = 0;
@@ -6777,6 +6854,9 @@ export const promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemTargetPercentMin
 export const promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMaxIncreaseMin = 0;
 
 export const promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMaxDecreaseMin = 0;
+
+export const promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMinBelowPercentMin = 0;
+export const promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMinBelowPercentMax = 100;
 
 
 
@@ -6805,11 +6885,12 @@ export const PromoteMrpGeneratorSimpleScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMin).max(promoteMrpGeneratorSimpleScenarioBodySimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -6837,11 +6918,12 @@ export const PromoteMrpGeneratorSimpleScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMinBelowPercentMin).max(promoteMrpGeneratorSimpleScenarioBodyPolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional()
@@ -6939,11 +7021,17 @@ export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRow
 
 export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMinBelowPercentMin = 0;
+export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMinBelowPercentMax = 100;
+
 export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemTargetPercentMin = 0;
 
 export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMaxIncreaseMin = 0;
 
 export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
+
+export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
 
 export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
@@ -6997,6 +7085,9 @@ export const promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemTarg
 export const promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMaxIncreaseMin = 0;
 
 export const promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMaxDecreaseMin = 0;
+
+export const promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMinBelowPercentMin = 0;
+export const promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMinBelowPercentMax = 100;
 
 export const promoteMrpGeneratorSimpleScenarioResponseAdvancedRulesItemTwoTwoPercentMin = 0;
 export const promoteMrpGeneratorSimpleScenarioResponseAdvancedRulesItemTwoTwoPercentMax = 100;
@@ -7291,11 +7382,12 @@ export const PromoteMrpGeneratorSimpleScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMinBelowPercentMin).max(promoteMrpGeneratorSimpleScenarioResponseScenarioOneSimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }).optional(),
@@ -7316,11 +7408,12 @@ export const PromoteMrpGeneratorSimpleScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(promoteMrpGeneratorSimpleScenarioResponseScenarioOneAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -7509,7 +7602,11 @@ export const PromoteMrpGeneratorSimpleScenarioResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "isDefault": zod.boolean().optional(),
-  "canReset": zod.boolean().optional()
+  "canReset": zod.boolean().optional(),
+  "canonicalProvenance": zod.union([zod.object({
+  "key": zod.literal("p017-canonical-default"),
+  "version": zod.number()
+}),zod.null()]).optional()
 })).optional(),
   "advanced": zod.object({
   "policyVersion": zod.number(),
@@ -7528,11 +7625,12 @@ export const PromoteMrpGeneratorSimpleScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMinBelowPercentMin).max(promoteMrpGeneratorSimpleScenarioResponseAdvancedSimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -7727,6 +7825,9 @@ export const demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemM
 
 export const demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMaxDecreaseMin = 0;
 
+export const demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMin = 0;
+export const demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMax = 100;
+
 export const demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicyRulesItemTwoTwoPercentMin = 0;
 export const demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicyRulesItemTwoTwoPercentMax = 100;
 
@@ -7794,11 +7895,12 @@ export const DemoteMrpGeneratorAdvancedScenarioBody = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMin).max(demoteMrpGeneratorAdvancedScenarioBodyAdvancedPolicySimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -7994,6 +8096,9 @@ export const demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMaxIn
 
 export const demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMaxDecreaseMin = 0;
 
+export const demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMinBelowPercentMin = 0;
+export const demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMinBelowPercentMax = 100;
+
 
 
 export const DemoteMrpGeneratorAdvancedScenarioResponse = zod.object({
@@ -8021,11 +8126,12 @@ export const DemoteMrpGeneratorAdvancedScenarioResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMinBelowPercentMin).max(demoteMrpGeneratorAdvancedScenarioResponseSimplePolicyRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }),
@@ -8151,11 +8257,17 @@ export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicy
 
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMax = 100;
+
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
 
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
 
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
+
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMin = 0;
+export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMax = 100;
 
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
 export const listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
@@ -8496,11 +8608,12 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -8521,11 +8634,12 @@ export const ListMrpGeneratorRunsResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMin).max(listMrpGeneratorRunsResponseRunsItemOneInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -9445,11 +9559,17 @@ export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsIte
 
 export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMax = 100;
+
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
 
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
 
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
+
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMax = 100;
 
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
 export const getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
@@ -9550,11 +9670,17 @@ export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxIncr
 
 export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMinBelowPercentMax = 100;
+
 export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemTargetPercentMin = 0;
 
 export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxIncreaseMin = 0;
 
 export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxDecreaseMin = 0;
+
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMinBelowPercentMax = 100;
 
 export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemTwoTwoPercentMin = 0;
 export const getMrpGeneratorRunResponseScenarioOneAdvancedOneRulesItemTwoTwoPercentMax = 100;
@@ -9616,11 +9742,17 @@ export const getMrpGeneratorRunResponseSimplePolicyOneRowsItemMaxIncreaseMin = 0
 
 export const getMrpGeneratorRunResponseSimplePolicyOneRowsItemMaxDecreaseMin = 0;
 
+export const getMrpGeneratorRunResponseSimplePolicyOneRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorRunResponseSimplePolicyOneRowsItemMinBelowPercentMax = 100;
+
 export const getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemTargetPercentMin = 0;
 
 export const getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin = 0;
 
 export const getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin = 0;
+
+export const getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMinBelowPercentMin = 0;
+export const getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMinBelowPercentMax = 100;
 
 export const getMrpGeneratorRunResponseAdvancedPolicyOneRulesItemTwoTwoPercentMin = 0;
 export const getMrpGeneratorRunResponseAdvancedPolicyOneRulesItemTwoTwoPercentMax = 100;
@@ -9960,11 +10092,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneSimplePolicyOneRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -9985,11 +10118,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMin).max(getMrpGeneratorRunResponseRunInputSnapshotOneAdvancedPolicyOneSimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -10863,11 +10997,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMinBelowPercentMin).max(getMrpGeneratorRunResponseScenarioOneSimplePolicyOneRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -10888,11 +11023,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMinBelowPercentMin).max(getMrpGeneratorRunResponseScenarioOneAdvancedOneSimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({
@@ -11074,7 +11210,11 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "categoryFloors": zod.record(zod.string(), zod.number().min(getMrpGeneratorRunResponseScenarioOneAdvancedOneCategoryFloorsMinOne).lt(getMrpGeneratorRunResponseScenarioOneAdvancedOneCategoryFloorsExclusiveMaxOne)).optional()
 }),zod.null()]).optional(),
   "isDefault": zod.boolean().optional(),
-  "canReset": zod.boolean().optional()
+  "canReset": zod.boolean().optional(),
+  "canonicalProvenance": zod.union([zod.object({
+  "key": zod.literal("p017-canonical-default"),
+  "version": zod.number()
+}),zod.null()]).optional()
 }),zod.null()]),
   "simplePolicy": zod.union([zod.object({
   "policyVersion": zod.number(),
@@ -11100,11 +11240,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorRunResponseSimplePolicyOneRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorRunResponseSimplePolicyOneRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorRunResponseSimplePolicyOneRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorRunResponseSimplePolicyOneRowsItemMinBelowPercentMin).max(getMrpGeneratorRunResponseSimplePolicyOneRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 }))
 }),zod.null()]).optional(),
@@ -11125,11 +11266,12 @@ export const GetMrpGeneratorRunResponse = zod.object({
   "value": zod.union([zod.string(),zod.array(zod.string()),zod.null()]).optional()
 }),
   "target": zod.object({
-  "mode": zod.enum(['below', 'match', 'above', 'close_gap']),
+  "mode": zod.enum(['below', 'match', 'above', 'close_gap', 'hold']),
   "percent": zod.number().min(getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemTargetPercentMin).nullish()
 }),
   "maxIncrease": zod.number().min(getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMaxIncreaseMin).nullish(),
   "maxDecrease": zod.number().min(getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMaxDecreaseMin).nullish(),
+  "minBelowPercent": zod.number().min(getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMinBelowPercentMin).max(getMrpGeneratorRunResponseAdvancedPolicyOneSimpleRowsItemMinBelowPercentMax).nullish().describe('Match only when the nearest competitor is more than this percentage above current MRP.'),
   "catchAll": zod.boolean().optional()
 })),
   "rules": zod.array(zod.union([zod.object({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_P012_SCENARIO,
+  DEFAULT_P017_SCENARIO,
   evaluateP012Product,
   evaluateP012Scenario,
   promoteP012ToAdvanced,
@@ -128,5 +129,30 @@ describe("P012 Simple table", () => {
     expect(convertAdvancedToP012({ rules: [{ type: "portfolio_constraint" }] })).toEqual({
       reasons: ["Advanced policy contains rules that cannot be represented by an ordered simple table."],
     });
+  });
+});
+
+describe("P017 shipped default", () => {
+  it("only captures a strictly greater-than-8% gap, never decreases, and explicitly holds the rest", () => {
+    expect(DEFAULT_P017_SCENARIO.name).toBe("Capture where we are clearly below");
+    const policy = DEFAULT_P017_SCENARIO.policy;
+    const twelve = evaluateP012Product(product("P017-12", 100, "PTMT", [["Prince", 112]]), policy);
+    expect(twelve.status).toBe("suggested");
+    expect(twelve.suggestedMrp).toBe(104);
+    expect(twelve.changePercent).toBeGreaterThan(0);
+    for (const [code, current, competitor] of [["P017-3", 100, 103], ["P017-parity", 100, 100], ["P017-above", 110, 100]] as const) {
+      const result = evaluateP012Product(product(code, current, "PTMT", [["Prince", competitor]]), policy);
+      expect(result.status).toBe("no_change");
+      expect(result.suggestedMrp).toBe(current);
+      expect(result.matchedRowId).toBe("p017-explicit-hold");
+      expect(result.decisionSentence).toMatch(/reviewed.*no change/i);
+    }
+  });
+
+  it("caps capture at 15%, holds no competitor, and keeps sub-₹50 prices unchanged", () => {
+    const policy = DEFAULT_P017_SCENARIO.policy;
+    expect(evaluateP012Product(product("P017-cap", 100, "PTMT", [["Prince", 200]]), policy).suggestedMrp).toBe(115);
+    expect(evaluateP012Product(product("P017-none", 100, "PTMT", []), policy).matchedRowId).toBe("p017-explicit-hold");
+    expect(evaluateP012Product(product("P017-floor", 40, "PTMT", [["Prince", 100]]), policy).suggestedMrp).toBe(40);
   });
 });

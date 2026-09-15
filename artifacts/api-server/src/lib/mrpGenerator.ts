@@ -118,7 +118,7 @@ export type P011Position = "well_below" | "parity" | "above";
 export type P011CompetitorMode = "nearest" | "lowest" | "named";
 export type P011Action = "CAPTURE" | "DEFEND" | "HOLD" | "REVIEW" | "LEAVE_ALONE" | "MARGIN_ONLY" | "EXCLUDED";
 
-export type P012TargetMode = "below" | "match" | "above" | "close_gap";
+export type P012TargetMode = "below" | "match" | "above" | "close_gap" | "hold";
 export type P012AppliesTo = "division" | "series" | "category" | "explicit_codes" | "all";
 export type P012CompetitorMode = "named" | "nearest" | "lowest";
 export type P012Competitor = { mode: P012CompetitorMode; name?: string | null };
@@ -131,6 +131,10 @@ export type P012Rule = {
   target: { mode: P012TargetMode; percent?: number | null };
   maxIncrease?: number | null;
   maxDecrease?: number | null;
+  /** Only match this row when the nearest available competitor is more than
+   * this many percent above the current MRP. This is additive so old P012
+   * rows retain their exact matching semantics. */
+  minBelowPercent?: number | null;
   catchAll?: boolean;
 };
 export type P012SimplePolicy = {
@@ -149,6 +153,47 @@ export type P012Scenario = {
   scope: GeneratorScope;
   policy: P012SimplePolicy;
 };
+
+/** P017 is the shipped competitive default. The legacy P012 constant remains
+ * exported for old callers and immutable historical snapshots. */
+export const DEFAULT_P017_SCENARIO: P012Scenario = {
+  name: "Capture where we are clearly below",
+  description: "Raises prices only where we sit well under the competition. Holds everywhere else. Edit freely.",
+  scope: { competitorMapped: true },
+  policy: {
+    policyVersion: 3,
+    mode: "simple",
+    holdBelow: 50,
+    rounding: { unit: 1, direction: "nearest" },
+    marginEnabled: false,
+    volumeEnabled: false,
+    categoryFloors: { PTMT: 65, "C P": 38, PLUMBING: 30, SANITARYWARE: 38, SINK: 40, HARDWARE: 38 },
+    rows: [
+      {
+        id: "p017-capture-gap",
+        order: 1,
+        label: "More than 8% below nearest competitor: close 30% of gap (max +15%)",
+        competitor: { mode: "nearest", name: null },
+        appliesTo: { type: "all" },
+        target: { mode: "close_gap", percent: 30 },
+        maxIncrease: 15,
+        maxDecrease: 0,
+        minBelowPercent: 8,
+      },
+      {
+        id: "p017-explicit-hold",
+        order: 2,
+        label: "Everything else: reviewed — no change",
+        competitor: { mode: "nearest", name: null },
+        appliesTo: { type: "all" },
+        target: { mode: "hold" },
+        catchAll: true,
+      },
+    ],
+  },
+};
+
+export const DEFAULT_P017_POLICY = DEFAULT_P017_SCENARIO.policy;
 
 export const DEFAULT_P012_SCENARIO: P012Scenario = {
   name: "Match competition, stay below",
@@ -206,7 +251,7 @@ function normalizeP012Rule(value: unknown, index: number): P012Rule {
   const targetRaw = targetObject.mode ?? (typeof targetValue === "string" ? targetValue : "match");
   const targetModeRaw = String(targetRaw).toLowerCase().replace(/[\s-]+/g, "_");
   const targetMode: P012TargetMode =
-    targetModeRaw === "below" || targetModeRaw === "above" || targetModeRaw === "close_gap"
+    targetModeRaw === "below" || targetModeRaw === "above" || targetModeRaw === "close_gap" || targetModeRaw === "hold"
       ? targetModeRaw : "match";
   const scopeValue = appliesObject.value ?? appliesObject.name ?? row.value ?? row.scopeValue;
   return {
@@ -222,6 +267,9 @@ function normalizeP012Rule(value: unknown, index: number): P012Rule {
     target: { mode: targetMode, percent: p012Number(targetObject.percent ?? row.percent ?? row.percentage, targetMode === "match" ? null : 0) },
     maxIncrease: p012Number(row.maxIncrease ?? row.maxIncreasePercent),
     maxDecrease: p012Number(row.maxDecrease ?? row.maxDecreasePercent),
+    minBelowPercent: p012Number(
+      row.minBelowPercent ?? row.minimumBelowPercent ?? row.thresholdPercent ?? row.onlyWhenBelowPercent,
+    ),
     catchAll: row.catchAll === true || applies === "all",
   };
 }
@@ -267,8 +315,13 @@ export function validateP012Policy(value: unknown): P012SimplePolicy {
     ids.add(row.id);
     orders.add(row.order);
     if (row.competitor.mode === "named" && !row.competitor.name) throw new Error(`P012 rows[${index}] named competitor requires a name.`);
-    if (row.target.mode !== "match" && (row.target.percent == null || row.target.percent < 0 || row.target.percent > 100)) {
+    if (row.target.mode !== "match" && row.target.mode !== "hold" &&
+      (row.target.percent == null || row.target.percent < 0 || row.target.percent > 100)) {
       throw new Error(`P012 rows[${index}] target percent must be between 0 and 100.`);
+    }
+    if (row.minBelowPercent != null &&
+      (!Number.isFinite(row.minBelowPercent) || row.minBelowPercent < 0 || row.minBelowPercent > 100)) {
+      throw new Error(`P012 rows[${index}] minBelowPercent must be between 0 and 100.`);
     }
     for (const [field, raw] of [["maxIncrease", row.maxIncrease], ["maxDecrease", row.maxDecrease] ] as const) {
       if (raw != null && (!Number.isFinite(raw) || raw < 0 || raw > 100)) throw new Error(`P012 rows[${index}] ${field} must be between 0 and 100.`);
@@ -1014,13 +1067,29 @@ export function matchesScope(product: GeneratorProduct, scope: GeneratorScope): 
 
 function p012RowMatches(product: GeneratorProduct, row: P012Rule): boolean {
   const type = row.appliesTo.type;
-  if (row.catchAll || type === "all") return true;
-  const configured = Array.isArray(row.appliesTo.value) ? row.appliesTo.value : row.appliesTo.value == null ? [] : [row.appliesTo.value];
-  if (!configured.length) return false;
-  const wanted = configured.map(norm);
-  if (type === "explicit_codes") return wanted.includes(canonicalItemCode(product.itemCode).toLowerCase());
-  const actual = type === "division" ? product.division : type === "series" ? product.seriesRange : product.category;
-  return actual != null && wanted.includes(norm(actual));
+  if (!row.catchAll && type !== "all") {
+    const configured = Array.isArray(row.appliesTo.value) ? row.appliesTo.value : row.appliesTo.value == null ? [] : [row.appliesTo.value];
+    if (!configured.length) return false;
+    const wanted = configured.map(norm);
+    if (type === "explicit_codes" && !wanted.includes(canonicalItemCode(product.itemCode).toLowerCase())) return false;
+    const actual = type === "division" ? product.division : type === "series" ? product.seriesRange : product.category;
+    if (type !== "explicit_codes" && actual != null && !wanted.includes(norm(actual))) return false;
+    if (type !== "explicit_codes" && actual == null) return false;
+  }
+  if (row.minBelowPercent != null) {
+    const current = product.currentMrp;
+    if (current == null || !Number.isFinite(current) || current <= 0) return false;
+    const nearest = product.competitors
+      .filter((candidate) => candidate.matched && candidate.effectivePrice != null &&
+        Number.isFinite(candidate.effectivePrice) && candidate.effectivePrice > 0)
+      .sort((a, b) =>
+        Math.abs(a.effectivePrice! - current) - Math.abs(b.effectivePrice! - current) ||
+        a.effectivePrice! - b.effectivePrice! || a.competitor.localeCompare(b.competitor),
+      )[0];
+    // "More than 8% below" is intentionally strict: exactly 8% is held.
+    if (!nearest || ((nearest.effectivePrice! - current) / current) * 100 <= row.minBelowPercent) return false;
+  }
+  return true;
 }
 
 function p012Competitor(product: GeneratorProduct, row: P012Rule): GeneratorCompetitor | null {
@@ -1105,6 +1174,7 @@ export type P012Summary = {
   excluded: number;
   increases: number;
   decreases: number;
+  medianChangePercent: number | null;
   rowCounts: Record<string, {
     scopeMatched: number;
     withCompetitorPrice: number;
@@ -1167,6 +1237,9 @@ export function evaluateP012Product(
   if (current == null || !Number.isFinite(current)) return untouched("No current MRP; untouched.");
   if (!matched) return untouched("No simple policy row matched; fallthrough untouched.");
   if (current < policy.holdBelow) return untouched(`Current MRP ₹${current} is below the ₹${policy.holdBelow} hold threshold; untouched.`);
+  if (matched.target.mode === "hold") {
+    return untouched(`Row ${rowNumber}: ${matched.label}; reviewed — no change.`, [], "explicit hold");
+  }
   if (policy.marginEnabled && (!product.margin || product.margin.grossMarginPct == null)) {
     return untouched(`Row ${rowNumber}: margin option requires usable margin evidence; untouched.`, ["Margin option: usable margin evidence is unavailable."]);
   }
@@ -1243,6 +1316,13 @@ export function evaluateP012Scenario(
   const noCompetitorUntouched = results.filter((result) => result.matchedRowId != null && result.selectedCompetitorPrice == null).length;
   const wouldChange = results.filter((result) => result.status === "suggested").length;
   const noChange = results.filter((result) => result.status === "no_change").length;
+  const changes = results
+    .map((result) => result.changePercent)
+    .filter((value): value is number => value != null && Number.isFinite(value) && value !== 0)
+    .sort((a, b) => a - b);
+  const medianChangePercent = changes.length
+    ? (changes.length % 2 ? changes[(changes.length - 1) / 2]! : (changes[changes.length / 2 - 1]! + changes[changes.length / 2]!) / 2)
+    : null;
   const warnings = policy.rows.some((row) => row.catchAll || row.appliesTo.type === "all")
     ? [] : [`No catch-all row; ${fallthroughUntouched} product(s) fall through untouched.`];
   const summary: P012Summary = {
@@ -1250,6 +1330,7 @@ export function evaluateP012Scenario(
     noCompetitorUntouched, fallthroughUntouched, suggested: wouldChange, excluded: 0,
     increases: results.filter((r) => (r.changePercent ?? 0) > 0).length,
     decreases: results.filter((r) => (r.changePercent ?? 0) < 0).length,
+    medianChangePercent,
     rowCounts, tierDistribution,
   };
   return { results, summary, reach: rowCounts, warnings };
@@ -1295,6 +1376,7 @@ export function promoteP012ToAdvanced(policyInput: P012SimplePolicy): P012Advanc
       target: row.target,
       maxIncrease: row.maxIncrease ?? null,
       maxDecrease: row.maxDecrease ?? null,
+      minBelowPercent: row.minBelowPercent ?? null,
       catchAll: row.catchAll === true,
     })),
   };

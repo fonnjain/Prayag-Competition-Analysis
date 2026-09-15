@@ -15,10 +15,10 @@ import {
   mrpRevisionRowsTable,
 } from "@workspace/db";
 import routes from "./index";
-import { classifyBinaryHistoricalCompetitiveCategory } from "./mrpGenerator";
+import { classifyBinaryHistoricalCompetitiveCategory, ensureDefaultP012Scenario } from "./mrpGenerator";
 import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.js";
 import { SalesApiClient, resetSalesApiClient, setSalesApiClientForTests, type SalesApiClientOptions } from "../lib/salesApi";
-import { DEFAULT_P012_SCENARIO, promoteP012ToAdvanced } from "../lib/mrpGenerator";
+import { DEFAULT_P011_POLICY, DEFAULT_P012_SCENARIO, promoteP012ToAdvanced } from "../lib/mrpGenerator";
 
 const RUN = Date.now();
 const CODE = `__MRP_GENERATOR_${RUN}__`;
@@ -26,6 +26,10 @@ const UNCATEGORISED_CODE = `__MRP_GENERATOR_UNCATEGORISED_${RUN}__`;
 const EXCLUDED_CODE = `__MRP_GENERATOR_EXCLUDED_${RUN}__`;
 const NO_CHANGE_CODE = `__MRP_GENERATOR_NO_CHANGE_${RUN}__`;
 const RIGHT_ONLY_CODE = `__MRP_GENERATOR_RIGHT_ONLY_${RUN}__`;
+const PRINCE_BELOW_CODE = `__MRP_PRINCE_BELOW_${RUN}__`;
+const PRINCE_ABOVE_CODE = `__MRP_PRINCE_ABOVE_${RUN}__`;
+const PRINCE_MISSING_CODE = `__MRP_PRINCE_MISSING_${RUN}__`;
+const PRINCE_COMPETITOR = "Prince";
 const COMPETITOR = `Generator Competitor ${RUN}`;
 const COMPETITOR_B = `Generator Competitor B ${RUN}`;
 const P012_COMPETITOR = `P012 Competitor ${RUN}`;
@@ -142,6 +146,9 @@ beforeAll(async () => {
     { itemCode: EXCLUDED_CODE, productName: "Generator excluded", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
     { itemCode: NO_CHANGE_CODE, productName: "Generator no change", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
     { itemCode: RIGHT_ONLY_CODE, productName: "Generator right only", division: "PTMT", category: "Generator test", seriesRange: "Fixture" },
+    { itemCode: PRINCE_BELOW_CODE, productName: "Prince below", division: "UPVC Pipe", category: "UPVC Pipe", seriesRange: "P017 Fixture" },
+    { itemCode: PRINCE_ABOVE_CODE, productName: "Prince above", division: "UPVC Pipe", category: "UPVC Pipe", seriesRange: "P017 Fixture" },
+    { itemCode: PRINCE_MISSING_CODE, productName: "Prince missing", division: "AGRI Pipe", category: "AGRI Pipe", seriesRange: "P017 Fixture" },
     { itemCode: P012_CODES[0], productName: "P012 division", division: "P012-DIVISION", category: "P012", seriesRange: "P012-1" },
     { itemCode: P012_CODES[1], productName: "P012 series", division: "P012-OTHER", category: "P012", seriesRange: "P012-SERIES" },
     { itemCode: P012_CODES[2], productName: "P012 category", division: "P012-OTHER", category: "P012-CATEGORY", seriesRange: "P012-3" },
@@ -157,6 +164,7 @@ beforeAll(async () => {
     { itemCode: EXCLUDED_CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     { itemCode: NO_CHANGE_CODE, mrp: 150, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
     { itemCode: RIGHT_ONLY_CODE, mrp: 120, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
+    ...[PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE].map((itemCode) => ({ itemCode, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId })),
     ...P012_CODES.map((itemCode) => ({ itemCode, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId })),
     ...HISTORICAL_CODES.flatMap((itemCode, index) => [
       { itemCode, mrp: 858.25, priceBasis: "MRP", effectiveDate: "2025-09-01", loadDate: DATE, variant: "Standard", loadBatchId: fixtureBatchId },
@@ -165,6 +173,8 @@ beforeAll(async () => {
     ]),
   ]);
   await db.insert(competitorPricesTable).values([
+    { competitor: PRINCE_COMPETITOR, competitorCode: `PRINCE-BELOW-${RUN}`, price: 90, priceBasis: "MRP", effectiveDate: DATE, matchedPrayagCode: PRINCE_BELOW_CODE, matchStatus: "matched" },
+    { competitor: PRINCE_COMPETITOR, competitorCode: `PRINCE-ABOVE-${RUN}`, price: 110, priceBasis: "MRP", effectiveDate: DATE, matchedPrayagCode: PRINCE_ABOVE_CODE, matchStatus: "matched" },
     {
       competitor: COMPETITOR,
       competitorCode: `GEN-${RUN}`,
@@ -245,11 +255,11 @@ afterAll(async () => {
   if (historicalCompareScenarioBId) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, historicalCompareScenarioBId)));
   if (p012ScenarioIds.length) await cleanup(() => db.delete(mrpGeneratorScenariosTable).where(inArray(mrpGeneratorScenariosTable.id, p012ScenarioIds)));
   resetSalesApiClient();
-  await cleanup(() => db.delete(competitorPricesTable).where(sql`${competitorPricesTable.competitor} IN (${COMPETITOR}, ${COMPETITOR_B}, ${P012_COMPETITOR})`));
-  await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
-  await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
+  await cleanup(() => db.delete(competitorPricesTable).where(sql`${competitorPricesTable.competitor} IN (${COMPETITOR}, ${COMPETITOR_B}, ${P012_COMPETITOR}) OR ${competitorPricesTable.competitorCode} IN (${`PRINCE-BELOW-${RUN}`}, ${`PRINCE-ABOVE-${RUN}`})`));
+  await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
+  await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
   await cleanup(() => deleteMrpFixtureBatch(fixtureBatchId));
-  await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
+  await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
 });
 
 beforeEach(({ task }) => {
@@ -647,24 +657,61 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(await historyDigest()).toEqual(before);
   });
 
-  it("P012 supplies one idempotent default, edits in place, duplicates, and resets exactly", async () => {
+  it("P017 supplies one idempotent default, edits in place, duplicates, and resets exactly", async () => {
     const first = await admin.get("/api/mrp-generator/scenarios");
+    const existingCanonical = first.body.find((row: any) => row.isDefault);
+    if (existingCanonical && existingCanonical.name !== "Capture where we are clearly below") {
+      expect((await admin.post(`/api/mrp-generator/scenarios/${existingCanonical.id}/reset`)).status).toBe(200);
+    }
     const second = await admin.get("/api/mrp-generator/scenarios");
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    const defaults = second.body.filter((row: any) => row.name === "Match competition, stay below");
+    const defaults = second.body.filter((row: any) => row.name === "Capture where we are clearly below");
     expect(defaults).toHaveLength(1);
     expect(defaults[0]).toEqual(expect.objectContaining({
       policyVersion: 3,
-      description: "Starting point. Edit freely -- it explains itself as you change it.",
+      description: "Raises prices only where we sit well under the competition. Holds everywhere else. Edit freely.",
       scope: { competitorMapped: true },
       simplePolicy: expect.objectContaining({
         holdBelow: 50, marginEnabled: false, volumeEnabled: false,
-        rows: [expect.objectContaining({ order: 1, catchAll: true })],
+        rows: [
+          expect.objectContaining({ order: 1, minBelowPercent: 8, maxIncrease: 15, maxDecrease: 0 }),
+          expect.objectContaining({ order: 2, target: expect.objectContaining({ mode: "hold" }), catchAll: true }),
+        ],
       }),
     }));
+    const simpleEdit = await admin.patch(`/api/mrp-generator/scenarios/${defaults[0].id}`).send({
+      simplePolicy: defaults[0].simplePolicy,
+      policyVersion: 3,
+    });
+    expect(simpleEdit.status).toBe(200);
+    expect(simpleEdit.body.canonicalProvenance).toEqual({ key: "p017-canonical-default", version: 1 });
+    const promoted = await admin.post(`/api/mrp-generator/scenarios/${defaults[0].id}/promote`).send();
+    expect(promoted.status).toBe(200);
+    expect(promoted.body.scenario.canonicalProvenance).toEqual({ key: "p017-canonical-default", version: 1 });
+    const demoted = await admin.post(`/api/mrp-generator/scenarios/${defaults[0].id}/demote`)
+      .send({ advancedPolicy: promoted.body.advanced });
+    expect(demoted.status).toBe(200);
+    const restored = await admin.patch(`/api/mrp-generator/scenarios/${defaults[0].id}`).send({
+      simplePolicy: demoted.body.simplePolicy,
+      policyVersion: 3,
+    });
+    expect(restored.status).toBe(200);
+    expect(restored.body.canonicalProvenance).toEqual({ key: "p017-canonical-default", version: 1 });
+    const p011Conversion = await admin.patch(`/api/mrp-generator/scenarios/${defaults[0].id}`).send({
+      policyVersion: 2,
+      policy: DEFAULT_P011_POLICY,
+    });
+    expect(p011Conversion.status).toBe(200);
+    expect(p011Conversion.body.canonicalProvenance).toEqual({ key: "p017-canonical-default", version: 1 });
+    const restoredAfterP011 = await admin.patch(`/api/mrp-generator/scenarios/${defaults[0].id}`).send({
+      simplePolicy: defaults[0].simplePolicy,
+      policyVersion: 3,
+    });
+    expect(restoredAfterP011.status).toBe(200);
+    expect(restoredAfterP011.body.canonicalProvenance).toEqual({ key: "p017-canonical-default", version: 1 });
     const forged = await admin.post("/api/mrp-generator/scenarios").send({
-      name: "Match competition, stay below", policyVersion: 3,
+      name: "Capture where we are clearly below", policyVersion: 3,
       simplePolicy: defaults[0].simplePolicy,
     });
     expect(forged.status).toBe(409);
@@ -678,9 +725,10 @@ describe("MRP Generator HTTP contract and safety", () => {
       policyVersion: 3,
     });
     expect(edited.status).toBe(200);
+    expect(edited.body.name).toBe(`P012 edited ${RUN}`);
     const afterEdit = await admin.get("/api/mrp-generator/scenarios");
     expect(afterEdit.body.filter((row: any) => row.name === `P012 edited ${RUN}`)).toHaveLength(1);
-    expect(afterEdit.body.filter((row: any) => row.name === "Match competition, stay below")).toHaveLength(0);
+    expect(afterEdit.body.filter((row: any) => row.name === "Capture where we are clearly below")).toHaveLength(0);
     const copy = await admin.post(`/api/mrp-generator/scenarios/${id}/duplicate`).send();
     expect(copy.status).toBe(201);
     expect(copy.body.name).toBe(`P012 edited ${RUN} copy`);
@@ -690,8 +738,8 @@ describe("MRP Generator HTTP contract and safety", () => {
     const reset = await admin.post(`/api/mrp-generator/scenarios/${id}/reset`).send();
     expect(reset.status).toBe(200);
     expect(reset.body).toEqual(expect.objectContaining({
-      name: "Match competition, stay below",
-      description: "Starting point. Edit freely -- it explains itself as you change it.",
+      name: "Capture where we are clearly below",
+      description: "Raises prices only where we sit well under the competition. Holds everywhere else. Edit freely.",
       policyVersion: 3,
       simplePolicy: expect.objectContaining({ holdBelow: 50, marginEnabled: false, volumeEnabled: false }),
     }));
@@ -699,6 +747,100 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(runnable.status).toBe(201);
     runIds.push(runnable.body.runId);
     p012ScenarioIds.push(id);
+  });
+
+  it("migrates verified legacy scenarios and preserves immutable run bytes in a rolled-back DB transaction", async () => {
+    const existing = await db.select().from(mrpGeneratorScenariosTable);
+    const canonical = existing.find((row) => String(row.rules).includes("p017-canonical-default")) ??
+      await ensureDefaultP012Scenario(`p017-fixture-${RUN}`);
+    expect(canonical).toBeTruthy();
+    const rollback = Symbol("rollback-p017-migration-fixture");
+    let observed: Record<string, unknown> | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        const canonicalRules = JSON.parse(String(canonical!.rules));
+        const backupRules = { ...canonicalRules };
+        delete backupRules.p017Migration;
+        delete backupRules.p012DefaultKey;
+        await tx.update(mrpGeneratorScenariosTable).set({
+          name: `P017 canonical backup ${RUN}`,
+          rules: JSON.stringify(backupRules),
+        }).where(eq(mrpGeneratorScenariosTable.id, canonical!.id));
+        const legacyRules = JSON.stringify({
+          policyVersion: 3,
+          p012DefaultKey: "canonical",
+          policy: DEFAULT_P012_SCENARIO.policy,
+        });
+        const legacyRows = await tx.insert(mrpGeneratorScenariosTable).values([
+          {
+            name: `5% below nearest legacy fixture ${RUN}`,
+            description: DEFAULT_P012_SCENARIO.description,
+            scope: JSON.stringify(DEFAULT_P012_SCENARIO.scope),
+            rules: legacyRules, version: 3, createdBy: `p017-fixture-${RUN}`,
+          },
+          {
+            name: "Capture where we are clearly below",
+            description: DEFAULT_P012_SCENARIO.description,
+            scope: JSON.stringify(DEFAULT_P012_SCENARIO.scope),
+            rules: legacyRules, version: 3, createdBy: `p017-fixture-${RUN}`,
+          },
+        ]).returning();
+        const legacy = legacyRows[0]!;
+        const snapshot = JSON.stringify({
+          modelKind: "competitive", runType: "rule", asOf: AS_OF,
+          scope: DEFAULT_P012_SCENARIO.scope, rules: DEFAULT_P012_SCENARIO.policy,
+        });
+        const run = (await tx.insert(mrpGeneratorRunsTable).values({
+          scenarioId: legacy.id, modelKind: "competitive", asOf: AS_OF,
+          inputSnapshot: snapshot, inputFingerprint: `p017-fingerprint-${RUN}`,
+          summary: "p017 fixture", sourceFreshness: JSON.stringify({ fixture: true }),
+          createdBy: `p017-fixture-${RUN}`,
+        }).returning())[0]!;
+        const result = (await tx.insert(mrpGeneratorResultsTable).values({
+          runId: run.id, itemCode: `P017-MIGRATION-${RUN}`, productName: "P017 migration fixture",
+          status: "no_change", exclusions: "[]", competitorValues: "[]", trace: "[]",
+        }).returning())[0]!;
+        const beforeBytes = {
+          snapshot: run.inputSnapshot,
+          result: JSON.stringify(result),
+        };
+        const first = await ensureDefaultP012Scenario(`p017-fixture-${RUN}`, tx as any);
+        const migratedRows = await tx.select().from(mrpGeneratorScenariosTable);
+        const migratedLegacy = migratedRows.find((row) => row.id === legacy.id)!;
+        const migratedNewNameLegacy = migratedRows.find((row) => row.id === legacyRows[1]!.id)!;
+        const second = await ensureDefaultP012Scenario(`p017-fixture-${RUN}`, tx as any);
+        const rerunRows = await tx.select().from(mrpGeneratorScenariosTable);
+        const rerunLegacy = rerunRows.find((row) => row.id === legacy.id)!;
+        const rerunRun = (await tx.select().from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, run.id)))[0]!;
+        const rerunResult = (await tx.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.id, result.id)))[0]!;
+        observed = {
+          oldIdPreserved: migratedLegacy.id === legacy.id,
+          oldName: migratedLegacy.name,
+          secondLegacyName: migratedNewNameLegacy.name,
+          rulesPreserved: migratedLegacy.rules === JSON.stringify({ policyVersion: 3, policy: DEFAULT_P012_SCENARIO.policy }),
+          scopePreserved: migratedLegacy.scope === JSON.stringify(DEFAULT_P012_SCENARIO.scope),
+          snapshotSame: rerunRun.inputSnapshot === beforeBytes.snapshot,
+          resultSame: JSON.stringify(rerunResult) === beforeBytes.result,
+          canonicalId: first.id,
+          idempotentId: second.id,
+          canonicalCount: rerunRows.filter((row) => String(row.rules).includes("p017-canonical-default")).length,
+        };
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+    expect(observed).toEqual(expect.objectContaining({
+      oldIdPreserved: true,
+      oldName: expect.stringMatching(/^5% below nearest \(superseded\)/),
+      secondLegacyName: expect.stringMatching(/^5% below nearest \(superseded\)/),
+      rulesPreserved: true,
+      scopePreserved: true,
+      snapshotSame: true,
+      resultSame: true,
+      idempotentId: expect.any(Number),
+      canonicalCount: 1,
+    }));
   });
 
   it("P012 runs competitively during a Sales outage, reports four-row reach and named no-fallthrough", async () => {
@@ -1063,6 +1205,41 @@ describe("MRP Generator HTTP contract and safety", () => {
       expect.objectContaining({ itemCode: CODE, status: "suggested" }),
     ]));
     expect(detail.body.results.find((row: any) => row.itemCode === CODE).salesEvidence).toBeNull();
+  });
+
+  it("serves an isolated Prince exposure report without writes or suggestions", async () => {
+    const tableCounts = async () => (await Promise.all([
+      db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM mrp_generator_runs`),
+      db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM mrp_generator_results`),
+      db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM catalog_products`),
+      db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM mrp_price_history`),
+      db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM competitor_prices`),
+    ])).map((result) => result.rows[0]!.count);
+    const before = await tableCounts();
+    const report = await admin.get("/api/mrp-generator/matching")
+      .query({ view: "prince_exposure", competitors: ["ignored"] });
+    expect(report.status).toBe(200);
+    expect(report.body).toEqual(expect.objectContaining({
+      view: "prince_exposure",
+      readOnly: true,
+      suggestions: false,
+      exposure: expect.objectContaining({
+        count: expect.any(Number),
+        categories: expect.arrayContaining([
+          expect.objectContaining({ category: "UPVC Pipe", label: "UPVC Pipe", count: expect.any(Number) }),
+        ]),
+      }),
+    }));
+    const fixturePrinceRows = report.body.products.filter((row: any) =>
+      [PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE].includes(row.itemCode));
+    expect(fixturePrinceRows).toEqual([
+      expect.objectContaining({ itemCode: PRINCE_BELOW_CODE, currentMrp: 100 }),
+    ]);
+    const blocked = await admin.post("/api/mrp-generator/matching")
+      .send({ view: "prince_exposure", reportMode: true });
+    expect(blocked.status).toBe(405);
+    expect(blocked.body.code).toBe("read_only_view");
+    expect(await tableCounts()).toEqual(before);
   });
 
   it("compares three runs across all selected values without a merge or apply action", async () => {

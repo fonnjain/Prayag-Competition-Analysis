@@ -501,6 +501,7 @@ export const MrpGeneratorSimpleRuleTargetMode = {
   match: 'match',
   above: 'above',
   close_gap: 'close_gap',
+  hold: 'hold',
 } as const;
 
 export type MrpGeneratorSimpleRuleAppliesTo = {
@@ -534,6 +535,13 @@ export interface MrpGeneratorSimpleRule {
      * @nullable
      */
   maxDecrease?: number | null;
+  /**
+     * Match only when the nearest competitor is more than this percentage above current MRP.
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  minBelowPercent?: number | null;
   catchAll?: boolean;
 }
 
@@ -641,6 +649,8 @@ export interface MrpGeneratorSimplePreviewSummary {
   excluded: number;
   increases: number;
   decreases: number;
+  /** @nullable */
+  medianChangePercent: number | null;
   rowCounts: MrpGeneratorSimplePreviewSummaryRowCounts;
   tierDistribution: MrpGeneratorSimplePreviewSummaryTierDistribution;
 }
@@ -1205,6 +1215,13 @@ export interface MrpMatchingSessionInputWithCategory {
 
 export type MrpMatchingSessionInput = MrpMatchingSessionInputWithDivision | MrpMatchingSessionInputWithCategory;
 
+export type MrpMatchingWorkbenchView = typeof MrpMatchingWorkbenchView[keyof typeof MrpMatchingWorkbenchView];
+
+
+export const MrpMatchingWorkbenchView = {
+  prince_exposure: 'prince_exposure',
+} as const;
+
 export type MrpMatchingWorkbenchDriver = string | {
   mode: 'lowest' | 'highest' | 'named';
   /** @nullable */
@@ -1244,8 +1261,13 @@ export type MrpMatchingWorkbenchFilteredProductsItem = { [key: string]: unknown 
 
 export type MrpMatchingWorkbenchCounts = {[key: string]: number};
 
+export type MrpMatchingWorkbenchExposure = { [key: string]: unknown };
+
 export interface MrpMatchingWorkbench {
   runType: 'matching';
+  view?: MrpMatchingWorkbenchView;
+  readOnly?: boolean;
+  suggestions?: boolean;
   asOf?: string;
   /** @nullable */
   division: string | null;
@@ -1263,6 +1285,7 @@ export interface MrpMatchingWorkbench {
   products: MrpMatchingWorkbenchProductsItem[];
   filteredProducts: MrpMatchingWorkbenchFilteredProductsItem[];
   counts?: MrpMatchingWorkbenchCounts;
+  exposure?: MrpMatchingWorkbenchExposure;
 }
 
 export type MrpMatchingSessionResponseScope = { [key: string]: unknown };
@@ -1621,6 +1644,11 @@ export const MrpGeneratorScenarioPolicyVersion = {
   NUMBER_3: 3,
 } as const;
 
+export type MrpGeneratorScenarioCanonicalProvenance = {
+  key: 'p017-canonical-default';
+  version: 1;
+} | null;
+
 export type MrpGeneratorScenario = MrpGeneratorScenarioInput & ({
   id: number;
   version: number;
@@ -1631,6 +1659,7 @@ export type MrpGeneratorScenario = MrpGeneratorScenarioInput & ({
   updatedAt: string;
   isDefault?: boolean;
   canReset?: boolean;
+  canonicalProvenance?: MrpGeneratorScenarioCanonicalProvenance;
 });
 
 export type MrpGeneratorRunModelKind = typeof MrpGeneratorRunModelKind[keyof typeof MrpGeneratorRunModelKind];
@@ -1931,6 +1960,11 @@ export const MrpGeneratorRunDetailModelKind = {
   historical: 'historical',
 } as const;
 
+export type MrpGeneratorScenarioSummaryCanonicalProvenance = {
+  key: 'p017-canonical-default';
+  version: 1;
+} | null;
+
 export interface MrpGeneratorScenarioSummary {
   id: number;
   name: string;
@@ -1939,6 +1973,7 @@ export interface MrpGeneratorScenarioSummary {
   advanced?: MrpGeneratorAdvancedPolicy | null;
   isDefault?: boolean;
   canReset?: boolean;
+  canonicalProvenance?: MrpGeneratorScenarioSummaryCanonicalProvenance;
 }
 
 export interface MrpGeneratorRunDetail {
@@ -4654,6 +4689,10 @@ competitors: string[];
 driver?: string;
 filter?: GetMrpMatchingWorkbenchFilter;
 asOf?: string;
+/**
+ * Fixed read-only view; prince_exposure shows mapped Prince products cheaper than Prayag.
+ */
+view?: GetMrpMatchingWorkbenchView;
 };
 
 export type GetMrpMatchingWorkbenchFilter = typeof GetMrpMatchingWorkbenchFilter[keyof typeof GetMrpMatchingWorkbenchFilter];
@@ -4663,6 +4702,13 @@ export const GetMrpMatchingWorkbenchFilter = {
   above: 'above',
   below: 'below',
   all: 'all',
+} as const;
+
+export type GetMrpMatchingWorkbenchView = typeof GetMrpMatchingWorkbenchView[keyof typeof GetMrpMatchingWorkbenchView];
+
+
+export const GetMrpMatchingWorkbenchView = {
+  prince_exposure: 'prince_exposure',
 } as const;
 
 export type GetMrpGeneratorFreshnessParams = {

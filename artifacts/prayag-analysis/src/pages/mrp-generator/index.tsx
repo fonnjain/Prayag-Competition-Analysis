@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useGetMrpGeneratorScopes } from "@workspace/api-client-react";
 
-function ScenarioPreviewSentence({ scenario }: { scenario: any }) {
+export function ScenarioPreviewSentence({ scenario }: { scenario: any }) {
   const previewMutation = usePreviewMrpGeneratorSimpleScenario();
 
   useEffect(() => {
@@ -47,9 +47,12 @@ function ScenarioPreviewSentence({ scenario }: { scenario: any }) {
 
   if (previewMutation.isSuccess && previewMutation.data) {
     const summary = previewMutation.data.summary as any;
+    const direction = summary?.suggested > 0
+      ? summary?.decreases === 0 ? " all increases." : ` ${summary?.increases || 0} increases, ${summary?.decreases || 0} decreases.`
+      : "";
     return (
       <div className="text-sm text-muted-foreground mt-1">
-        Would evaluate {summary?.total || 0} products; {summary?.suggested || 0} would change.
+        Would evaluate {summary?.total || 0} products; {summary?.suggested || 0} would change.{direction}
       </div>
     );
   }
@@ -216,6 +219,12 @@ export default function MrpGeneratorList() {
           <Button variant="outline" onClick={() => setMatchingDialogOpen(true)}>
             <Target className="w-4 h-4 mr-2" />
             Matching MRP
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/mrp-generator/matching?view=prince_exposure">
+              <Target className="w-4 h-4 mr-2" />
+              Where Prince undercuts us
+            </Link>
           </Button>
           <Button variant="outline" onClick={() => setHistoricalDialogOpen(true)}>
             <History className="w-4 h-4 mr-2" />

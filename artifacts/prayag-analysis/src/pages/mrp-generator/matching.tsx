@@ -20,21 +20,27 @@ import { cn } from "@/lib/utils";
 export default function MrpMatchingWorkbench() {
   const [location, setLocation] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
+  const princeExposure = searchParams.get("view") === "prince" || searchParams.get("view") === "prince_exposure";
   const division = searchParams.get("division") || "";
   const category = searchParams.get("category") || "";
-  const competitors = searchParams.getAll("competitors");
-  const initialDriver = searchParams.get("driver") || "lowest";
+  const competitors = princeExposure ? ["Prince"] : searchParams.getAll("competitors");
+  const initialDriver = princeExposure ? "Prince" : searchParams.get("driver") || "lowest";
 
   const { data, isLoading, error } = useGetMrpMatchingWorkbench({
-    division,
+    division: princeExposure ? undefined : division,
     category: category || undefined,
     competitors: competitors.length > 0 ? competitors : [""], // api needs at least 1
     driver: initialDriver,
-    filter: "all",
+    filter: princeExposure ? "all" : "all",
+    ...(princeExposure ? { view: "prince_exposure" } : {}),
   }, {
     query: {
-      enabled: !!division && competitors.length > 0,
-      queryKey: getGetMrpMatchingWorkbenchQueryKey({ division, category: category || undefined, competitors, driver: initialDriver }),
+      enabled: princeExposure || (!!division && competitors.length > 0),
+      queryKey: getGetMrpMatchingWorkbenchQueryKey({
+        division: princeExposure ? undefined : division,
+        category: category || undefined, competitors, driver: initialDriver,
+        filter: "all", ...(princeExposure ? { view: "prince_exposure" } : {}),
+      }),
     }
   });
 
@@ -44,7 +50,7 @@ export default function MrpMatchingWorkbench() {
 
   const [actions, setActions] = useState<Record<string, { action: MrpMatchingActionAction; percent?: number; price?: number; driver?: string }>>({});
   const [bulkActionsList, setBulkActionsList] = useState<Array<{ action: MrpMatchingActionAction; percent?: number; price?: number; driver?: string; filteredCodes: string[]; filter: MrpMatchingWorkbenchFilter }>>([]);
-  const [globalFilter, setGlobalFilter] = useState<MrpMatchingWorkbenchFilter>("above");
+  const [globalFilter, setGlobalFilter] = useState<MrpMatchingWorkbenchFilter>(princeExposure ? "all" : "above");
   const [search, setSearch] = useState("");
 
   const [bulkAction, setBulkAction] = useState<MrpMatchingActionAction>("match");
@@ -106,6 +112,7 @@ export default function MrpMatchingWorkbench() {
   const hasDecisions = Object.keys(actions).length > 0 || bulkActionsList.length > 0;
 
   const handleSave = () => {
+    if (princeExposure) return;
     if (!division || competitors.length === 0 || !hasDecisions) return;
     
     const finalBulkActions = bulkActionsList.map(b => ({
@@ -156,7 +163,7 @@ export default function MrpMatchingWorkbench() {
     });
   };
 
-  if (!division || competitors.length === 0) {
+  if (!princeExposure && (!division || competitors.length === 0)) {
     return <div className="p-8 text-center text-muted-foreground">Please select a scope and competitors from the generator list to begin.</div>;
   }
 
@@ -167,21 +174,42 @@ export default function MrpMatchingWorkbench() {
     <div className="flex flex-col min-h-full bg-muted/20 pb-20">
       <div className="border-b bg-card px-4 py-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-10 shadow-sm">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Matching MRP Workbench</h1>
+          <h1 className="text-lg font-semibold text-foreground">
+            {princeExposure ? "Where Prince undercuts us" : "Matching MRP Workbench"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Scope: <strong className="text-foreground">{division}{category ? ` / ${category === "__uncategorised__" ? "Uncategorised" : category}` : ""}</strong> &middot; 
-            Competitors: <strong className="text-foreground">{competitors.join(", ")}</strong>
+            {princeExposure
+              ? (data as any)?.exposure?.description || "The products where Prince is cheaper. Review only — suggests nothing."
+              : <>Scope: <strong className="text-foreground">{division}{category ? ` / ${category === "__uncategorised__" ? "Uncategorised" : category}` : ""}</strong> &middot;
+                Competitors: <strong className="text-foreground">{competitors.join(", ")}</strong></>}
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saveSession.isPending || !hasDecisions}>
-          {saveSession.isPending ? "Saving..." : <><Save className="w-4 h-4 mr-2" /> Save &amp; Review Run</>}
-        </Button>
+        {!princeExposure && (
+          <Button onClick={handleSave} disabled={saveSession.isPending || !hasDecisions}>
+            {saveSession.isPending ? "Saving..." : <><Save className="w-4 h-4 mr-2" /> Save &amp; Review Run</>}
+          </Button>
+        )}
       </div>
 
       <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full space-y-6">
-        
+        {princeExposure && (data as any).exposure && (
+          <div className="bg-card border rounded-lg p-4 shadow-sm">
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              <div className="text-2xl font-semibold text-foreground">{(data as any).exposure.count}</div>
+              <div className="text-sm text-muted-foreground">mapped products where Prince is cheaper than Prayag</div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {((data as any).exposure.categories || []).map((entry: any) => (
+                <span key={entry.label} className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                  {entry.label}: <strong className="text-foreground">{entry.count}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Controls */}
-        <div className="bg-card border p-4 rounded-lg shadow-sm space-y-4">
+        {!princeExposure && <div className="bg-card border p-4 rounded-lg shadow-sm space-y-4">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[200px] max-w-sm relative">
               <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
@@ -255,7 +283,7 @@ export default function MrpMatchingWorkbench() {
               </span>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Table */}
         <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
@@ -266,14 +294,14 @@ export default function MrpMatchingWorkbench() {
                   <th className="px-4 py-3">Product</th>
                   <th className="px-4 py-3">Prayag MRP</th>
                   {competitors.map(c => <th key={c} className="px-4 py-3">{c}</th>)}
-                  <th className="px-4 py-3">Target Driver</th>
+                  {!princeExposure && <th className="px-4 py-3">Target Driver</th>}
                   <th className="px-4 py-3">Position</th>
-                  <th className="px-4 py-3 border-l">Action / Draft</th>
+                  {!princeExposure && <th className="px-4 py-3 border-l">Action / Draft</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {visibleProducts.length === 0 ? (
-                  <tr><td colSpan={5 + competitors.length} className="p-8 text-center text-muted-foreground">No products match current filters.</td></tr>
+                  <tr><td colSpan={(princeExposure ? 3 : 5) + competitors.length} className="p-8 text-center text-muted-foreground">No products match current filters.</td></tr>
                 ) : visibleProducts.map((p: any) => {
                   let rowBulk;
                   for (let i = bulkActionsList.length - 1; i >= 0; i--) {
@@ -317,7 +345,7 @@ export default function MrpMatchingWorkbench() {
                           </td>
                         );
                       })}
-                      <td className="px-4 py-3 bg-muted/5">
+                      {!princeExposure && <td className="px-4 py-3 bg-muted/5">
                         {targetPrice != null ? (
                           <>
                             <div className="font-medium text-emerald-700">₹{targetPrice.toFixed(2)}</div>
@@ -326,7 +354,7 @@ export default function MrpMatchingWorkbench() {
                         ) : (
                           <span className="text-muted-foreground italic">No evidence</span>
                         )}
-                      </td>
+                      </td>}
                       <td className="px-4 py-3">
                         {p.signedPositionPercent != null ? (
                           <div className={cn("font-medium", p.position === "above" ? "text-amber-600" : p.position === "below" ? "text-emerald-600" : "")}>
@@ -334,7 +362,7 @@ export default function MrpMatchingWorkbench() {
                           </div>
                         ) : "-"}
                       </td>
-                      <td className="px-4 py-3 border-l">
+                      {!princeExposure && <td className="px-4 py-3 border-l">
                         <div className="flex items-center gap-2">
                           <Select value={act.action} onValueChange={(v: any) => updateAction(p.itemCode, { action: v })}>
                             <SelectTrigger className="w-[120px] h-8 bg-background text-xs"><SelectValue /></SelectTrigger>
@@ -387,7 +415,7 @@ export default function MrpMatchingWorkbench() {
                             </div>
                           )}
                         </div>
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })}

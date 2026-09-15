@@ -2204,6 +2204,7 @@ paths:
         - { name: driver, in: query, required: false, schema: { type: string } }
         - { name: filter, in: query, required: false, schema: { type: string, enum: [above, below, all], default: above } }
         - { name: asOf, in: query, required: false, schema: { type: string, format: date } }
+        - { name: view, in: query, required: false, description: Fixed read-only view; prince_exposure shows mapped Prince products cheaper than Prayag., schema: { type: string, enum: [prince_exposure] } }
       responses:
         "200": { description: Matching workbench data, content: { application/json: { schema: { $ref: "#/components/schemas/MrpMatchingWorkbench" } } } }
         "400": { description: Invalid category or competitors }
@@ -2831,10 +2832,11 @@ components:
           type: object
           required: [mode]
           properties:
-            mode: { type: string, enum: [below, match, above, close_gap] }
+            mode: { type: string, enum: [below, match, above, close_gap, hold] }
             percent: { type: [number, "null"], minimum: 0 }
         maxIncrease: { type: [number, "null"], minimum: 0 }
         maxDecrease: { type: [number, "null"], minimum: 0 }
+        minBelowPercent: { type: [number, "null"], minimum: 0, maximum: 100, description: Match only when the nearest competitor is more than this percentage above current MRP. }
         catchAll: { type: boolean }
     MrpGeneratorSimplePolicy:
       type: object
@@ -2908,7 +2910,7 @@ components:
         - $ref: "#/components/schemas/MrpGeneratorSimplePreviewRowCounts"
     MrpGeneratorSimplePreviewSummary:
       type: object
-      required: [total, evaluated, wouldChange, noChange, noCompetitorUntouched, fallthroughUntouched, suggested, excluded, increases, decreases, rowCounts, tierDistribution]
+      required: [total, evaluated, wouldChange, noChange, noCompetitorUntouched, fallthroughUntouched, suggested, excluded, increases, decreases, medianChangePercent, rowCounts, tierDistribution]
       properties:
         total: { type: integer }
         evaluated: { type: integer }
@@ -2920,6 +2922,7 @@ components:
         excluded: { type: integer }
         increases: { type: integer }
         decreases: { type: integer }
+        medianChangePercent: { type: [number, "null"] }
         rowCounts: { type: object, additionalProperties: { $ref: "#/components/schemas/MrpGeneratorSimplePreviewRowCounts" } }
         tierDistribution: { type: object, additionalProperties: { type: integer } }
     MrpGeneratorScenarioPatch:
@@ -3025,6 +3028,9 @@ components:
       required: [runType, division, category, selectedCompetitors, products, filteredProducts, filter]
       properties:
         runType: { type: string, const: matching }
+        view: { type: string, enum: [prince_exposure] }
+        readOnly: { type: boolean }
+        suggestions: { type: boolean }
         asOf: { type: string, format: date }
         division: { type: [string, "null"] }
         category: { type: [string, "null"] }
@@ -3062,6 +3068,9 @@ components:
         products: { type: array, items: { type: object, additionalProperties: true } }
         filteredProducts: { type: array, items: { type: object, additionalProperties: true } }
         counts: { type: object, additionalProperties: { type: integer } }
+        exposure:
+          type: object
+          additionalProperties: true
     MrpMatchingSessionResponse:
       type: object
       required: [runId, runType, modelKind, category, summary]
@@ -3229,6 +3238,10 @@ components:
             updatedAt: { type: string, format: date-time }
             isDefault: { type: boolean }
             canReset: { type: boolean }
+            canonicalProvenance:
+              oneOf:
+                - { type: object, required: [key, version], properties: { key: { type: string, const: p017-canonical-default }, version: { type: integer, const: 1 } } }
+                - { type: "null" }
     MrpGeneratorRun:
       type: object
       required: [runId, scenarioId, modelKind, runType, asOf, policyVersion, inputFingerprint, summary, sourceFreshness]
@@ -3710,6 +3723,10 @@ components:
         advanced: { oneOf: [{ $ref: "#/components/schemas/MrpGeneratorAdvancedPolicy" }, { type: "null" }] }
         isDefault: { type: boolean }
         canReset: { type: boolean }
+        canonicalProvenance:
+          oneOf:
+            - { type: object, required: [key, version], properties: { key: { type: string, const: p017-canonical-default }, version: { type: integer, const: 1 } } }
+            - { type: "null" }
     MrpGeneratorRunListItem:
       allOf:
         - $ref: "#/components/schemas/MrpGeneratorPersistedRun"

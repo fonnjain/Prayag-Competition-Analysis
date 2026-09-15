@@ -26,6 +26,7 @@ import {
   validateP011Policy,
   DEFAULT_P011_POLICY,
   DEFAULT_P012_SCENARIO,
+  DEFAULT_P017_SCENARIO,
   normalizeP012Policy,
   validateP012Policy,
   evaluateP012Scenario,
@@ -82,8 +83,9 @@ const KNOWN_LIMITS = {
   marginPeriod: ["2026-04..2026-06"],
 } as const;
 const json = (value: unknown): string => JSON.stringify(value);
-const parsed = <T>(value: string, fallback: T): T => {
-  try { return JSON.parse(value) as T; } catch { return fallback; }
+const parsed = <T>(value: unknown, fallback: T): T => {
+  if (value && typeof value === "object") return value as T;
+  try { return JSON.parse(String(value)) as T; } catch { return fallback; }
 };
 const scenarioPolicyFromRules = (value: unknown): P011Policy | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -145,8 +147,10 @@ export function classifyBinaryHistoricalCompetitiveCategory(
 }
 function exposedScenario(row: typeof mrpGeneratorScenariosTable.$inferSelect) {
   const storedRules = parsed<unknown>(row.rules, []);
-  const isCanonicalDefault = Boolean(storedRules && typeof storedRules === "object" && !Array.isArray(storedRules) &&
-    (storedRules as { p012DefaultKey?: unknown }).p012DefaultKey === "canonical");
+  const isCanonicalDefault = isVerifiedP017Canonical(row) || isVerifiedP017Policy(row);
+  const p017Migration = storedRules && typeof storedRules === "object" && !Array.isArray(storedRules) &&
+    JSON.stringify((storedRules as { p017Migration?: unknown }).p017Migration) === JSON.stringify(P017_CANONICAL_MARKER)
+    ? P017_CANONICAL_MARKER : null;
   const policy = scenarioPolicyFromRules(storedRules);
   const simplePolicy = scenarioSimplePolicyFromRules(storedRules);
   const advanced = storedRules && typeof storedRules === "object" && !Array.isArray(storedRules)
@@ -162,6 +166,7 @@ function exposedScenario(row: typeof mrpGeneratorScenariosTable.$inferSelect) {
     policyVersion: policy ? 2 : simplePolicy ? 3 : advanced ? 2 : 1,
     isDefault: isCanonicalDefault,
     canReset: isCanonicalDefault,
+    canonicalProvenance: p017Migration,
   };
 }
 const actor = (req: Parameters<typeof requireAdmin>[0]) => req.user?.email ?? req.user?.id ?? null;
@@ -488,11 +493,11 @@ router.get("/mrp-generator/metadata", requireAdmin, async (_req, res) => {
     p012: {
       policyVersion: 3,
       mode: "simple",
-      default: DEFAULT_P012_SCENARIO.policy,
+      default: DEFAULT_P017_SCENARIO.policy,
       defaultScenario: {
-        name: DEFAULT_P012_SCENARIO.name,
-        description: DEFAULT_P012_SCENARIO.description,
-        scope: DEFAULT_P012_SCENARIO.scope,
+        name: DEFAULT_P017_SCENARIO.name,
+        description: DEFAULT_P017_SCENARIO.description,
+        scope: DEFAULT_P017_SCENARIO.scope,
       },
     },
     p011: {
@@ -685,11 +690,13 @@ function matchingRows(products: GeneratorProduct[], competitors: string[], drive
  * once under its stored category/division.
  */
 router.get("/mrp-generator/matching", requireAdmin, async (req, res) => {
-  const division = optionalScopeValue(req.query.division);
+  const requestedView = optionalScopeValue(req.query.view);
+  const princeExposure = requestedView === "prince" || requestedView === "prince_exposure";
+  const division = princeExposure ? null : optionalScopeValue(req.query.division);
   const requestedCategory = optionalScopeValue(req.query.category);
   const category = requestedCategory === UNCATEGORISED_CATEGORY ? null : requestedCategory;
-  if (!division && !requestedCategory) { res.status(400).json({ error: "division is required (category-only matching is retained for compatibility)." }); return; }
-  const competitors = queryList(req.query.competitors ?? req.query.competitor);
+  if (!princeExposure && !division && !requestedCategory) { res.status(400).json({ error: "division is required (category-only matching is retained for compatibility)." }); return; }
+  const competitors = princeExposure ? ["Prince"] : queryList(req.query.competitors ?? req.query.competitor);
   if (!competitors.length) { res.status(400).json({ error: "At least one competitor is required." }); return; }
   const asOf = validDate(req.query.asOf) ? req.query.asOf : today();
   const allProducts = await productsFor(asOf);
@@ -697,10 +704,14 @@ router.get("/mrp-generator/matching", requireAdmin, async (req, res) => {
   const options = [...new Set(allProducts.flatMap((product) => product.competitors.map((value) => value.competitor)))].sort();
   const unknown = competitors.filter((name) => !options.some((option) => normalizeMatchingCompetitorName(option) === normalizeMatchingCompetitorName(name)));
   if (unknown.length) { res.status(400).json({ error: `Unknown competitor(s): ${unknown.join(", ")}.` }); return; }
-  const driver = matchingDriver(req.query.driver);
+  const driver = princeExposure ? { named: "Prince" } as MatchingDriver : matchingDriver(req.query.driver);
   const allRows = matchingRows(products, competitors, driver);
-  const filter = matchingFilter(req.query.filter);
-  const filteredProducts = filter === "all" ? allRows : allRows.filter((row) => filter === row.position);
+  const filter = princeExposure ? "all" : matchingFilter(req.query.filter);
+  // The fixed P017 exposure view is not the generic "below target" filter:
+  // it shows only mapped Prince rows whose actual price is below Prayag MRP.
+  const filteredProducts = princeExposure
+    ? allRows.filter((row) => row.driverPrice != null && row.currentMrp != null && row.driverPrice < row.currentMrp)
+    : filter === "all" ? allRows : allRows.filter((row) => filter === row.position);
   const divisionOptions = [...new Set(allProducts.map(browseDivision))].sort().map((value) => ({
     division: value, count: allProducts.filter((product) => browseDivision(product) === value).length,
   }));
@@ -723,8 +734,29 @@ router.get("/mrp-generator/matching", requireAdmin, async (req, res) => {
       browseDivision(product) === pair.division && product.category === pair.category,
     ).length;
   }
+  const exposureCategories = princeExposure
+    ? [...new Map(filteredProducts.map((row) => [row.category ?? row.division ?? "__uncategorised__", {
+      category: row.category ?? row.division, label: row.category ?? row.division ?? "Uncategorised", count: 0,
+    }])).values()]
+    : [];
+  for (const option of exposureCategories) {
+    option.count = filteredProducts.filter((row) => (row.category ?? row.division) === option.category).length;
+  }
   res.json({
     runType: "matching", asOf, division, category, selectedCompetitors: competitors,
+    ...(princeExposure ? {
+      view: "prince_exposure",
+      readOnly: true,
+      suggestions: false,
+      exposure: {
+        name: "Where Prince undercuts us",
+        description: "The products where Prince is cheaper. Review only — suggests nothing. Use Matching MRP to act on it.",
+        competitor: "Prince",
+        scope: "Products mapped to Prince",
+        count: filteredProducts.length,
+        categories: exposureCategories,
+      },
+    } : {}),
     driver: typeof driver === "object" ? { mode: "named", name: driver.named } : { mode: driver },
     driverSummary: {
       mode: typeof driver === "object" ? "named" : driver,
@@ -736,16 +768,23 @@ router.get("/mrp-generator/matching", requireAdmin, async (req, res) => {
     categories: categoryOptions,
     categoryOptions,
     categoryPairs,
-    competitors: options, products: allRows, filteredProducts,
+    competitors: options, products: princeExposure ? filteredProducts : allRows, filteredProducts,
     counts: {
-      all: allRows.length, above: allRows.filter((row) => row.position === "above").length,
+      all: princeExposure ? filteredProducts.length : allRows.length,
+      above: allRows.filter((row) => row.position === "above").length,
       below: allRows.filter((row) => row.position === "below").length,
+      ...(princeExposure ? { princeCheaper: filteredProducts.length } : {}),
     },
   });
 });
 
 router.post("/mrp-generator/matching", requireAdmin, async (req, res) => {
   const body = req.body as Record<string, unknown> | null;
+  if (body?.view === "prince" || body?.view === "prince_exposure" ||
+    body?.reportMode === true || body?.mode === "report") {
+    res.status(405).json({ error: "The Prince exposure view is read-only and cannot be saved or run.", code: "read_only_view" });
+    return;
+  }
   const division = optionalScopeValue(body?.division);
   const requestedCategory = optionalScopeValue(body?.category);
   const category = requestedCategory === UNCATEGORISED_CATEGORY ? null : requestedCategory;
@@ -1111,35 +1150,155 @@ router.post("/mrp-generator/historical/run", requireAdmin, async (req, res) => {
   }
 });
 
-async function ensureDefaultP012Scenario(createdBy: string | null = null) {
-  const existingRows = await db.select().from(mrpGeneratorScenariosTable);
-  const marked = existingRows.find((row) => {
+const P017_SUPERSEDED_NAME = "5% below nearest (superseded)";
+export const P017_CANONICAL_MARKER = { key: "p017-canonical-default", version: 1 } as const;
+const isReservedCanonicalName = (name: string) =>
+  name === DEFAULT_P017_SCENARIO.name || name === DEFAULT_P012_SCENARIO.name;
+const P017_SUPERSEDED_NOTE =
+  "Superseded by P017: the former 5%-below rule could suggest decreases when Prayag was at or above the competition. " +
+  "It is retained for audit history; the new default captures only products more than 8% below the nearest competitor, " +
+  "with increases only, and explicitly holds everything else.";
+
+type P017MigrationCandidate = {
+  name: string;
+  description: string | null;
+  scope: unknown;
+  rules: unknown;
+};
+
+export function isVerifiedLegacyCanonical(row: P017MigrationCandidate): boolean {
+  const stored = parsed<Record<string, unknown>>(row.rules, {});
+  if (stored.p012DefaultKey === "canonical") return true;
+  if (row.name.trim() !== DEFAULT_P012_SCENARIO.name ||
+    (row.description ?? "").trim() !== DEFAULT_P012_SCENARIO.description ||
+    stableJson(parsed<unknown>(row.scope, {})) !== stableJson(DEFAULT_P012_SCENARIO.scope) ||
+    stored.policyVersion !== 3 || stored.policy == null) return false;
+  return stableJson(normalizeP012Policy(stored.policy)) === stableJson(normalizeP012Policy(DEFAULT_P012_SCENARIO.policy));
+}
+
+export function isVerifiedP017Canonical(row: P017MigrationCandidate): boolean {
+  const stored = parsed<Record<string, unknown>>(row.rules, {});
+  return JSON.stringify(stored.p017Migration) === JSON.stringify(P017_CANONICAL_MARKER);
+}
+
+export function isVerifiedP017Policy(row: P017MigrationCandidate): boolean {
+  const stored = parsed<Record<string, unknown>>(row.rules, {});
+  return stored.policyVersion === 3 &&
+    stableJson(parsed<unknown>(row.scope, {})) === stableJson(DEFAULT_P017_SCENARIO.scope) &&
+    (row.description ?? "").trim() === DEFAULT_P017_SCENARIO.description &&
+    stored.policy != null &&
+    stableJson(normalizeP012Policy(stored.policy)) === stableJson(normalizeP012Policy(DEFAULT_P017_SCENARIO.policy));
+}
+
+export function collisionSafeScenarioName(base: string, usedNames: Iterable<string>): string {
+  const used = new Set(usedNames);
+  if (!used.has(base)) return base;
+  for (let suffix = 2; ; suffix++) {
+    const candidate = `${base} ${suffix}`;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+/**
+ * Idempotent P017 installation migration. The old row is never deleted and
+ * its rules are intentionally left byte-for-byte equivalent apart from the
+ * canonical marker; only its display name and explanatory note change.
+ */
+export async function ensureDefaultP012Scenario(createdBy: string | null = null, database: typeof db = db) {
+  const existingRows = await database.select().from(mrpGeneratorScenariosTable);
+  // A verified legacy marker is authoritative even when a prior P017 row is
+  // already present, including the (bad but recoverable) case where the old
+  // row was saved under the new display name.
+  const markedRows = existingRows.filter((row) => {
     const stored = parsed<unknown>(row.rules, null);
     return stored && typeof stored === "object" && !Array.isArray(stored) &&
-      (stored as { p012DefaultKey?: unknown }).p012DefaultKey === "canonical";
+      (stored as { p012DefaultKey?: unknown }).p012DefaultKey === "canonical" &&
+      !isVerifiedP017Canonical(row);
   });
-  if (marked) return marked;
-  const existing = existingRows.find((row) => row.name === DEFAULT_P012_SCENARIO.name);
-  if (existing) {
-    const stored = parsed<Record<string, unknown>>(existing.rules, {});
-    const updated = (await db.update(mrpGeneratorScenariosTable).set({
-      rules: json({ ...stored, p012DefaultKey: "canonical" }),
-    }).where(eq(mrpGeneratorScenariosTable.id, existing.id)).returning())[0];
-    return updated ?? existing;
+  const p017Marked = existingRows.find((row) => isVerifiedP017Canonical(row));
+  // Once P017 is installed, never use names or an unmarked policy signature
+  // to discover or rename later user-created scenarios. The durable marker is
+  // the migration boundary; the explicit legacy marker above is the one
+  // exception because it is a verified historical identity.
+  if (p017Marked && !markedRows.length) return p017Marked;
+
+  // A marker is authoritative even if the user edited the old canonical row.
+  // Without it, require the complete legacy metadata and executable policy
+  // signature; a matching name by itself is never enough.
+  const legacyCandidates = markedRows.length
+    ? markedRows
+    : existingRows.filter((row) => isVerifiedLegacyCanonical(row));
+  for (const legacy of legacyCandidates) {
+    if (legacy.name === DEFAULT_P017_SCENARIO.name && !markedRows.length) continue;
+    const legacyRules = parsed<unknown>(legacy.rules, []);
+    const preservedRules = legacyRules && typeof legacyRules === "object" && !Array.isArray(legacyRules)
+      ? Object.fromEntries(Object.entries(legacyRules).filter(([key]) => key !== "p012DefaultKey"))
+      : legacyRules;
+    const usedNames = existingRows.filter((row) => row.id !== legacy.id).map((row) => row.name);
+    const renamed = collisionSafeScenarioName(P017_SUPERSEDED_NAME, usedNames);
+    const description = legacy.description?.trim()
+      ? `${legacy.description.trim()}\n\n${P017_SUPERSEDED_NOTE}`
+      : P017_SUPERSEDED_NOTE;
+    const updated = (await database.update(mrpGeneratorScenariosTable).set({
+      name: renamed,
+      description,
+      rules: json(preservedRules),
+      updatedAt: new Date(),
+    }).where(eq(mrpGeneratorScenariosTable.id, legacy.id)).returning())[0];
+    if (updated) {
+      existingRows.splice(existingRows.findIndex((row) => row.id === legacy.id), 1, updated);
+    }
+  }
+
+  const canonical = existingRows.find((row) => {
+    return row.name === DEFAULT_P017_SCENARIO.name &&
+      (isVerifiedP017Canonical(row) || isVerifiedP017Policy(row));
+  });
+  if (canonical) {
+    if (isVerifiedP017Canonical(canonical)) return canonical;
+    const stored = parsed<Record<string, unknown>>(canonical.rules, {});
+    const upgraded = (await database.update(mrpGeneratorScenariosTable).set({
+      rules: json({ ...stored, p012DefaultKey: "canonical", p017Migration: P017_CANONICAL_MARKER }),
+      updatedAt: new Date(),
+    }).where(eq(mrpGeneratorScenariosTable.id, canonical.id)).returning())[0];
+    return upgraded ?? canonical;
+  }
+
+  // A pre-existing new-name row without the marker is an arbitrary user
+  // scenario, not proof of P017. Preserve it under a collision-safe name.
+  const existingNew = existingRows.find((row) => row.name === DEFAULT_P017_SCENARIO.name);
+  if (existingNew) {
+    if (isVerifiedP017Policy(existingNew)) {
+      const stored = parsed<Record<string, unknown>>(existingNew.rules, {});
+    const updated = (await database.update(mrpGeneratorScenariosTable).set({
+        rules: json({ ...stored, p012DefaultKey: "canonical", p017Migration: P017_CANONICAL_MARKER }),
+        updatedAt: new Date(),
+      }).where(eq(mrpGeneratorScenariosTable.id, existingNew.id)).returning())[0];
+      return updated ?? existingNew;
+    }
+    const base = `${DEFAULT_P017_SCENARIO.name} (user saved)`;
+    const renamed = collisionSafeScenarioName(base, existingRows.filter((row) => row.id !== existingNew.id).map((row) => row.name));
+    await database.update(mrpGeneratorScenariosTable).set({ name: renamed, updatedAt: new Date() })
+      .where(eq(mrpGeneratorScenariosTable.id, existingNew.id));
   }
   try {
-    return (await db.insert(mrpGeneratorScenariosTable).values({
-      name: DEFAULT_P012_SCENARIO.name,
-      description: DEFAULT_P012_SCENARIO.description,
-      scope: json(DEFAULT_P012_SCENARIO.scope),
-      rules: json({ policyVersion: 3, p012DefaultKey: "canonical", policy: DEFAULT_P012_SCENARIO.policy }),
+    return (await database.insert(mrpGeneratorScenariosTable).values({
+      name: DEFAULT_P017_SCENARIO.name,
+      description: DEFAULT_P017_SCENARIO.description,
+      scope: json(DEFAULT_P017_SCENARIO.scope),
+      rules: json({
+        policyVersion: 3,
+        p012DefaultKey: "canonical",
+        p017Migration: P017_CANONICAL_MARKER,
+        policy: DEFAULT_P017_SCENARIO.policy,
+      }),
       version: 3,
       createdBy,
     }).returning())[0]!;
   } catch {
     // A concurrent first request may have won the unique-name insert.
-    return (await db.select().from(mrpGeneratorScenariosTable)
-      .where(eq(mrpGeneratorScenariosTable.name, DEFAULT_P012_SCENARIO.name)).limit(1))[0]!;
+    return (await database.select().from(mrpGeneratorScenariosTable)
+      .where(eq(mrpGeneratorScenariosTable.name, DEFAULT_P017_SCENARIO.name)).limit(1))[0]!;
   }
 }
 
@@ -1154,8 +1313,8 @@ router.post("/mrp-generator/scenarios", requireAdmin, async (req, res) => {
     const body = req.body as { name?: unknown; description?: unknown; scope?: unknown; rules?: unknown; policy?: unknown; simplePolicy?: unknown; advancedPolicy?: unknown; policyVersion?: unknown };
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) { res.status(400).json({ error: "name is required." }); return; }
-    if (name === DEFAULT_P012_SCENARIO.name) {
-      const conflict = new Error("The canonical default name is reserved; use the default scenario or choose another name.");
+    if (isReservedCanonicalName(name)) {
+      const conflict = new Error("The canonical default names are reserved; use the shipped default or choose another name.");
       Object.assign(conflict, { httpStatus: 409 });
       throw conflict;
     }
@@ -1210,6 +1369,11 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
     const changes: Partial<typeof mrpGeneratorScenariosTable.$inferInsert> = { updatedAt: new Date() };
     if (body.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim()) throw new Error("name is required.");
+      if (isReservedCanonicalName(body.name.trim()) && body.name.trim() !== current.name) {
+        const conflict = new Error("The canonical default names are reserved and cannot be assigned to user scenarios.");
+        Object.assign(conflict, { httpStatus: 409 });
+        throw conflict;
+      }
       changes.name = body.name.trim();
     }
     if (body.description !== undefined) changes.description = typeof body.description === "string" ? body.description.trim() : null;
@@ -1220,6 +1384,7 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
       changes.rules = json({
         policyVersion: 2,
         ...(currentStored.p012DefaultKey === "canonical" ? { p012DefaultKey: "canonical" } : {}),
+        ...(JSON.stringify(currentStored.p017Migration) === JSON.stringify(P017_CANONICAL_MARKER) ? { p017Migration: P017_CANONICAL_MARKER } : {}),
         advanced: advancedPolicy,
       });
       changes.version = 2;
@@ -1231,6 +1396,7 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
       changes.rules = json({
         policyVersion: 3,
         ...(currentStored.p012DefaultKey === "canonical" ? { p012DefaultKey: "canonical" } : {}),
+        ...(JSON.stringify(currentStored.p017Migration) === JSON.stringify(P017_CANONICAL_MARKER) ? { p017Migration: P017_CANONICAL_MARKER } : {}),
         policy: simplePolicy,
       });
       changes.version = 3;
@@ -1239,7 +1405,12 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
       if (!policyInput || body.policyVersion !== 2 && policyInput.policyVersion !== 2) throw new Error("P011 policy requires policyVersion 2 and a policy object.");
       const policy = { ...DEFAULT_P011_POLICY, ...policyInput, policyVersion: 2 as const };
       validateP011Policy(policy);
-      changes.rules = json({ policyVersion: 2, policy });
+      const currentStored = parsed<Record<string, unknown>>(current.rules, {});
+      changes.rules = json({
+        policyVersion: 2, policy,
+        ...(currentStored.p017Migration && JSON.stringify(currentStored.p017Migration) === JSON.stringify(P017_CANONICAL_MARKER)
+          ? { p017Migration: P017_CANONICAL_MARKER } : {}),
+      });
       changes.version = 2;
     }
     if (body.rules !== undefined) {
@@ -1249,6 +1420,10 @@ router.patch("/mrp-generator/scenarios/:scenarioId", requireAdmin, async (req, r
       if (body.policy !== undefined || body.simplePolicy !== undefined || body.advancedPolicy !== undefined || body.policyVersion !== undefined) {
         // Empty legacy storage is harmless when a P011 policy is supplied.
       } else {
+      const currentStored = parsed<Record<string, unknown>>(current.rules, {});
+      if (JSON.stringify(currentStored.p017Migration) === JSON.stringify(P017_CANONICAL_MARKER)) {
+        throw new Error("The canonical P017 scenario must be edited through its policy fields.");
+      }
       const scope = body.scope !== undefined
         ? body.scope && typeof body.scope === "object" ? body.scope as GeneratorScope : {}
         : parsed<GeneratorScope>(current.scope, {});
@@ -1277,15 +1452,15 @@ router.post("/mrp-generator/scenarios/:scenarioId/reset", requireAdmin, async (r
   if (!current) { res.status(404).json({ error: "Scenario not found." }); return; }
   const currentRules = parsed<unknown>(current.rules, []);
   if (!(currentRules && typeof currentRules === "object" && !Array.isArray(currentRules) &&
-    (currentRules as { p012DefaultKey?: unknown }).p012DefaultKey === "canonical")) {
+    JSON.stringify((currentRules as { p017Migration?: unknown }).p017Migration) === JSON.stringify(P017_CANONICAL_MARKER))) {
     res.status(409).json({ error: "Only the canonical default scenario can be reset.", code: "not_canonical_default" });
     return;
   }
   const updated = (await db.update(mrpGeneratorScenariosTable).set({
-    name: DEFAULT_P012_SCENARIO.name,
-    description: DEFAULT_P012_SCENARIO.description,
-    scope: json(DEFAULT_P012_SCENARIO.scope),
-    rules: json({ policyVersion: 3, p012DefaultKey: "canonical", policy: DEFAULT_P012_SCENARIO.policy }),
+    name: DEFAULT_P017_SCENARIO.name,
+    description: DEFAULT_P017_SCENARIO.description,
+    scope: json(DEFAULT_P017_SCENARIO.scope),
+    rules: json({ policyVersion: 3, p012DefaultKey: "canonical", p017Migration: P017_CANONICAL_MARKER, policy: DEFAULT_P017_SCENARIO.policy }),
     version: 3,
     updatedAt: new Date(),
   }).where(eq(mrpGeneratorScenariosTable.id, id)).returning())[0]!;
@@ -1304,7 +1479,7 @@ router.post("/mrp-generator/scenarios/:scenarioId/duplicate", requireAdmin, asyn
   }
   const duplicateRules = parsed<unknown>(current.rules, []);
   const strippedRules = duplicateRules && typeof duplicateRules === "object" && !Array.isArray(duplicateRules)
-    ? Object.fromEntries(Object.entries(duplicateRules).filter(([key]) => key !== "p012DefaultKey"))
+    ? Object.fromEntries(Object.entries(duplicateRules).filter(([key]) => key !== "p012DefaultKey" && key !== "p017Migration"))
     : duplicateRules;
   const copy = (await db.insert(mrpGeneratorScenariosTable).values({
     name,
@@ -1344,7 +1519,12 @@ router.post("/mrp-generator/scenarios/:scenarioId/promote", requireAdmin, async 
   }
   const currentStored = parsed<Record<string, unknown>>(current.rules, {});
   const updated = (await db.update(mrpGeneratorScenariosTable).set({
-    rules: json({ policyVersion: 2, ...(currentStored.p012DefaultKey === "canonical" ? { p012DefaultKey: "canonical" } : {}), advanced }),
+    rules: json({
+      policyVersion: 2,
+      ...(currentStored.p012DefaultKey === "canonical" ? { p012DefaultKey: "canonical" } : {}),
+      ...(JSON.stringify(currentStored.p017Migration) === JSON.stringify(P017_CANONICAL_MARKER) ? { p017Migration: P017_CANONICAL_MARKER } : {}),
+      advanced,
+    }),
     version: 2,
     updatedAt: new Date(),
   }).where(eq(mrpGeneratorScenariosTable.id, id)).returning())[0]!;
