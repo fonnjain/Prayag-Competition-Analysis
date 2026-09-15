@@ -1,0 +1,126 @@
+# P018 — COMPETITION — Choose the extraction path automatically
+
+> **P018** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P018` when reporting back.
+
+The competitor upload screen says *"Claude will extract prices"* for every PDF. That is right for Sparsh, whose catalogue is image-only, and wrong for Prince, whose PDF is machine-readable and already has a proven text extractor.
+
+The application should decide which path to use, and say why.
+
+---
+
+## 1. The two are trivially distinguishable
+
+Measured on the Prince PDF, 108 pages:
+
+```
+median characters per page      6,615
+median digits per page            630
+pages over 500 characters         105   (97%)
+pages under 50 characters           1   (1%)
+```
+
+Sparsh, being image-only, returns essentially nothing from the same test. There is no ambiguous middle here — the two differ by three orders of magnitude, so any reasonable threshold separates them.
+
+---
+
+## 2. The detector
+
+On upload, before anything else:
+
+```
+1. Sample ~12 pages spread across the document, not all of them
+2. Run pdftotext -layout on each
+3. Per page, record character count and digit count
+4. A page is TEXT-BEARING if it has >200 characters AND >20 digits
+```
+
+**The digit test matters.** A catalogue can carry text headers and marketing copy while the price tables themselves are images. Characters alone would call that text-based and the extractor would return product names with no prices.
+
+Classification:
+
+| Share of sampled pages text-bearing | Path |
+|---|---|
+| **≥ 70%** | text extraction (Poppler positional) |
+| **≤ 20%** | AI vision extraction |
+| **21–69%** | **uncertain** — do not choose silently |
+
+---
+
+## 3. Show the decision, and allow an override
+
+Never switch paths invisibly. On the upload screen, after detection:
+
+```
+Detected: text-based PDF
+  105 of 108 pages carry extractable text (median 6,615 characters)
+  Using positional text extraction -- faster and exact.
+  [ use AI extraction instead ]
+```
+
+```
+Detected: image-only PDF
+  0 of 108 pages carry extractable text
+  Using AI extraction. This takes longer and needs review.
+  [ use text extraction instead ]
+```
+
+For the uncertain band, **present both and ask**, with the evidence:
+
+```
+Mixed PDF -- 44 of 108 pages carry text
+  Some pages may be scanned. Choose:
+  [ text extraction ]   [ AI extraction ]   [ text, then AI for the gaps ]
+```
+
+The third option is worth building if it is cheap: text where text exists, vision only on the pages that lack it. That is the honest answer for a hybrid document, and it avoids paying for vision across 108 pages to recover 44.
+
+**Record the path in provenance.** A batch should say how its prices were extracted. Two batches for the same competitor extracted by different methods are not equally trustworthy, and in six months nobody will remember which was which.
+
+---
+
+## 4. Three other things on that screen
+
+**The date format.** The field shows `03/01/2026`, which must mean **1 March 2026**. In `dd/mm` that reads as 3 January and the prices land in the wrong period. Confirm the format, and display the resolved date in words — *"1 March 2026"* — beneath the field. This project has been caught by ambiguous dates more than once.
+
+**Re-uploading the same catalogue.** Prince's 813 rows are already loaded as batch 1946. What happens if this exact PDF is uploaded again? State the behaviour — duplicate, supersede, or refuse — and make it visible before extraction starts, not after.
+
+**The Ex-GST toggle.** Getting this wrong shifts every comparison by 18%, which is larger than most of the gaps being measured. Two things would help:
+
+- State what the existing competitor data used, so a second upload is consistent with the first
+- After extraction, sanity-check the result against the existing batch. If Prince's median gap moves from −0.6% to −16%, the GST setting is almost certainly wrong, and the preview should say so
+
+---
+
+## 5. Acceptance tests
+
+```
+1.  The Prince PDF is detected as text-based and routed to the text
+    extractor without asking.
+2.  An image-only PDF is detected and routed to AI extraction.
+3.  A PDF with text headers but image price tables is NOT classified as
+    text-based -- the digit test catches it.
+4.  A mixed PDF presents the choice with page counts as evidence.
+5.  The detected path is shown before extraction, with an override.
+6.  The chosen path is recorded in the batch provenance.
+7.  The effective date is displayed in words beneath the field.
+8.  Re-uploading an identical catalogue states what will happen before
+    extraction begins.
+9.  A GST setting that moves the median gap by more than 10 points against
+    the previous batch is flagged in the preview.
+10. No price is written before review and commit.
+```
+
+Test 3 is the one a character-count-only detector would fail, and it fails in the worst way — silently returning products with no prices.
+
+---
+
+## 6. Report
+
+- Detection result for the Prince PDF, with the page statistics.
+- What the screen shows for each of the three classifications.
+- Where the extraction path is recorded in provenance.
+- The date format, and the resolved date display.
+- Re-upload behaviour for an identical catalogue.
+- The GST sanity check, and what the existing Prince batch used.
