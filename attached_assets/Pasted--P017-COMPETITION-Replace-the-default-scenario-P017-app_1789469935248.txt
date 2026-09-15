@@ -1,0 +1,117 @@
+# P017 — COMPETITION — Replace the default scenario
+
+> **P017** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P017` when reporting back.
+
+The shipped default — *"price 5% below the nearest competitor"* — was written when Prayag sat well below the market. That is no longer the position, and the rule now suggests cutting prices.
+
+---
+
+## 1. Why it has to change
+
+```
+Before 01 Sep   Prayag 100, Sparsh 110.83   5%-below target = 105.29   +5.3%
+After  01 Sep   Prayag 100, Sparsh 102.93   5%-below target =  97.78   -2.2%
+```
+
+The September revision lifted Prayag about 8% and closed the Sparsh gap from **+10.8% to +2.9%**. The Sparsh-only run bears it out: **86 decreases against 62 increases, median −2.18%**.
+
+And against Prince, Prayag is **0.6% more expensive overall**, cheaper on only 391 of 803.
+
+So a default that assumes Prayag is below the market is wrong on both counts. It is cutting prices on products that are already at or above the competition.
+
+---
+
+## 2. The replacement
+
+```
+Name         Capture where we are clearly below
+Description  Raises prices only where we sit well under the competition.
+             Holds everywhere else. Edit freely.
+
+Rule 1   Where we are more than 8% below the nearest competitor,
+         close 30% of the gap.          Max increase 15%.
+
+Rule 2   Everything else -- hold. No change.
+```
+
+**Rule 2 is the important one.** An explicit hold means the run reports *"1,240 products reviewed, no change"* rather than leaving them silently untouched. Reviewed and ignored should not look alike.
+
+**No decrease rule in the default.** Cutting a price is a commercial decision that should be made deliberately — through Matching MRP, or a scenario someone wrote on purpose. It should not be what the tool does when you press Run without reading.
+
+Keep the existing limits: no change below ₹50, round to the nearest rupee.
+
+---
+
+## 3. Ship a second default alongside it
+
+One default cannot answer both questions. Add a second, clearly named:
+
+```
+Name         Where Prince undercuts us
+Description  The 410 products where Prince is cheaper. Review only --
+             suggests nothing. Use Matching MRP to act on it.
+
+Scope        Products mapped to Prince
+Rule         Report position only. No suggestions.
+```
+
+That is the more urgent picture — **Prince undercuts Prayag on every one of the 157 UPVC Pipe, AGRI Pipe and Casing Pipe products**, and nothing in the tool currently opens on it.
+
+If a report-only scenario does not fit the run model, make it a saved Matching MRP view instead. The point is that someone opening the page sees the exposure without having to construct it.
+
+---
+
+## 4. Existing defaults
+
+The old default may already be saved, edited, or run.
+
+**Do not delete or silently rewrite it.** Rename it *"5% below nearest (superseded)"*, add a note explaining why, and leave any runs against it intact — they are immutable records and changing their meaning retrospectively would be worse than leaving a stale scenario in the list.
+
+New installations get the new defaults only.
+
+---
+
+## 5. Show what the default does before it is run
+
+Already built, and it must carry over: *"Would evaluate N products; M would change."*
+
+Expected shape for the new default — report the actual figures:
+
+```
+Capture where we are clearly below
+  Would evaluate ~1,600 products; roughly 250-400 would change,
+  all increases.
+```
+
+If the new default produces a large number of changes, say so. A default that moves half the catalogue is not a safe starting point regardless of direction.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  The new default suggests no decreases.
+2.  A product 12% below the nearest competitor is suggested at
+    current + 0.30 x gap, capped at +15%.
+3.  A product 3% below, at parity, or above is HELD and reported as
+    reviewed -- not absent from the output.
+4.  The old default, if present, is renamed and annotated, not deleted.
+5.  Runs against the old default remain readable and unchanged.
+6.  The Prince exposure view opens on the 410 products where Prince is
+    cheaper, suggesting nothing.
+7.  Both defaults show their pre-run estimate.
+8.  No price is written.
+```
+
+Test 3 is what distinguishes a hold from an omission. Test 5 protects the audit record.
+
+---
+
+## 7. Report
+
+- The new default, and what it evaluates against live data — count, direction, median.
+- The Prince exposure view, and the categories it surfaces.
+- Confirmation that the old default was renamed rather than removed, and that prior runs still read correctly.
+- Confirmation that nothing was written.
