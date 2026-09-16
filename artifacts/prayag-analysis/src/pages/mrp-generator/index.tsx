@@ -464,11 +464,11 @@ export default function MrpGeneratorList() {
       </Dialog>
 
       <Dialog open={matchingDialogOpen} onOpenChange={setMatchingDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Matching MRP Workbench</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-2 px-2 py-4">
             <p className="text-sm text-muted-foreground">Select a scope and competitors to begin matching.</p>
 
             <div className="space-y-2">
