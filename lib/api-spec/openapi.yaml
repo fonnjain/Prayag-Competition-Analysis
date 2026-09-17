@@ -2177,6 +2177,85 @@ paths:
         - { name: itemCode, in: query, required: true, schema: { type: string } }
       responses:
         "200": { description: Recent edits, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorEditsResponse" } } } }
+  /catalog/price-editor/new-product/options:
+    get:
+      operationId: getPriceEditorNewProductOptions
+      tags: [catalog]
+      summary: Catalogue classifications available for one-product creation
+      responses:
+        "200": { description: Options, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductOptionsResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/new-product/check:
+    get:
+      operationId: checkPriceEditorNewProductCode
+      tags: [catalog]
+      summary: Normalize and check a proposed catalogue code
+      parameters:
+        - { name: itemCode, in: query, required: true, schema: { type: string } }
+        - { name: division, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: Code check, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductCodeCheckResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/new-product/preview:
+    post:
+      operationId: previewPriceEditorNewProduct
+      tags: [catalog]
+      summary: Preview one manually entered product before creation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewProductRequest" }
+      responses:
+        "200": { description: New product preview, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductPreviewResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/new-product/apply:
+    post:
+      operationId: applyPriceEditorNewProduct
+      tags: [catalog]
+      summary: Create one audited catalogue product and its first MRP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewProductApplyRequest" }
+      responses:
+        "200": { description: Created product, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductApplyResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/price-editor/new-product/undo/{auditId}:
+    get:
+      operationId: getPriceEditorNewProductUndoStatus
+      tags: [catalog]
+      summary: Check whether a manual product creation can be undone
+      parameters:
+        - { name: auditId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Undo status, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductUndoStatusResponse" } } } }
+    post:
+      operationId: undoPriceEditorNewProduct
+      tags: [catalog]
+      summary: Remove an unreferenced manually created product
+      parameters:
+        - { name: auditId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Product reversal, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductUndoResponse" } } } }
+  /catalog/price-editor/new-product/deactivate/{auditId}:
+    post:
+      operationId: deactivatePriceEditorNewProduct
+      tags: [catalog]
+      summary: Deactivate a referenced manually created product
+      parameters:
+        - { name: auditId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties: { reason: { type: string, minLength: 1 } }
+      responses:
+        "200": { description: Deactivated product, content: { application/json: { schema: { $ref: "#/components/schemas/NewProductApplyResponse" } } } }
   /mrp-generator/metadata:
     get:
       operationId: getMrpGeneratorMetadata
@@ -4045,6 +4124,110 @@ components:
       properties:
         edits: { type: array, items: { $ref: "#/components/schemas/PriceEditorAudit" } }
     PriceEditorUndoResponse:
+      type: object
+      required: [ok, reversal]
+      properties:
+        ok: { type: boolean }
+        reversal: { $ref: "#/components/schemas/PriceEditorAudit" }
+    NewProductRequest:
+      type: object
+      required: [itemCode, productName, division, series, category, mrp, effectiveDate, reason]
+      properties:
+        itemCode: { type: string }
+        productName: { type: string }
+        division: { type: string }
+        series: { type: string }
+        category: { type: string }
+        size: { type: [string, "null"] }
+        mrp: { type: number, exclusiveMinimum: 0 }
+        effectiveDate: { type: string, format: date }
+        reason: { type: string, minLength: 1 }
+        newSeriesConfirmed: { type: boolean }
+        unusualCodeConfirmed: { type: boolean }
+    NewProductOptionsResponse:
+      type: object
+      required: [divisions, categories, series, byDivision]
+      properties:
+        divisions: { type: array, items: { type: string } }
+        categories: { type: array, items: { type: string } }
+        series: { type: array, items: { type: string } }
+        byDivision:
+          type: array
+          items:
+            type: object
+            required: [division, categories, series]
+            properties:
+              division: { type: string }
+              categories: { type: array, items: { type: string } }
+              series: { type: array, items: { type: string } }
+    NewProductCodeCheckResponse:
+      type: object
+      required: [normalizedCode, duplicate, unusualShape, closest]
+      properties:
+        normalizedCode: { type: string }
+        duplicate:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [itemCode, productName, division, category, series, currentMrp, currentEffectiveDate]
+              properties:
+                itemCode: { type: string }
+                productName: { type: [string, "null"] }
+                division: { type: [string, "null"] }
+                category: { type: [string, "null"] }
+                series: { type: [string, "null"] }
+                currentMrp: { type: [number, "null"] }
+                currentEffectiveDate: { type: [string, "null"], format: date }
+                mrp: { type: [number, "null"] }
+        unusualShape: { type: boolean }
+        closest: { type: array, items: { type: string } }
+    NewProductPreviewResponse:
+      allOf:
+        - $ref: "#/components/schemas/NewProductRequest"
+        - type: object
+          required: [token, normalizedCode, periodExists, periodCount, goesLiveImmediately, dateMeaning, nearbySeries, unusualShape]
+          properties:
+            token: { type: string }
+            normalizedCode: { type: string }
+            periodExists: { type: boolean }
+            periodCount: { type: integer }
+            goesLiveImmediately: { type: boolean }
+            dateMeaning: { type: string }
+            nearbySeries: { type: array, items: { type: string } }
+            unusualShape: { type: boolean }
+    NewProductApplyRequest:
+      allOf:
+        - $ref: "#/components/schemas/NewProductRequest"
+        - type: object
+          required: [token]
+          properties: { token: { type: string } }
+    NewProductApplyResponse:
+      type: object
+      required: [ok, product, history, audit, movedCompetitorRows]
+      properties:
+        ok: { type: boolean }
+        product: { type: object, additionalProperties: true }
+        history: { type: object, additionalProperties: true }
+        audit: { $ref: "#/components/schemas/PriceEditorAudit" }
+        movedCompetitorRows: { type: array, items: { type: integer } }
+        movedCompetitorDetails:
+          type: array
+          items:
+            type: object
+            required: [competitor, sourceCode, prayagCode, batchId]
+            properties:
+              competitor: { type: string }
+              sourceCode: { type: string }
+              prayagCode: { type: string }
+              batchId: { type: integer }
+    NewProductUndoStatusResponse:
+      type: object
+      required: [canUndo, canDeactivate]
+      properties:
+        canUndo: { type: boolean }
+        reason: { type: [string, "null"] }
+        canDeactivate: { type: boolean }
+    NewProductUndoResponse:
       type: object
       required: [ok, reversal]
       properties:

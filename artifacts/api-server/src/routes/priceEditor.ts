@@ -1,11 +1,21 @@
 import { Router, type IRouter, type Request } from "express";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import {
   db,
   catalogProductsTable,
   catalogPriceEditAuditsTable,
   mrpPriceHistoryTable,
   competitorPricesTable,
+  competitorPriceStagingTable,
+  mrpHistoryProvenanceEventsTable,
+  newProductPreviewStatesTable,
+  competitorCodeAliasesTable,
+  importBatchesTable,
+  mrpRevisionBatchesTable,
+  mrpRevisionRowsTable,
+  mrpGeneratorRunsTable,
+  mrpGeneratorResultsTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import {
@@ -18,6 +28,20 @@ const router: IRouter = Router();
 const iso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const today = () => new Date().toISOString().slice(0, 10);
 const actor = (req: Request) => req.user?.email ?? req.user?.id ?? "unknown";
+const normalizeNewCode = (value: unknown) => String(value ?? "").toUpperCase().replace(/\s+/g, "").replace(/\.0$/, "");
+const editDistance = (a: string, b: string) => {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = row[0]!;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const prior = row[j]!;
+      row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diagonal = prior;
+    }
+  }
+  return row[b.length]!;
+};
 
 async function product(code: string) {
   return (await db.select().from(catalogProductsTable)
@@ -260,6 +284,308 @@ router.post("/catalog/price-editor/undo/:auditId", requireAdmin, async (req, res
     });
     res.json({ ok: true, reversal });
   } catch (e: any) { res.status(e.status ?? 409).json({ error: e.message ?? "Could not undo edit." }); }
+});
+
+// P020: one-product creation stays beside the correction editor.  These routes
+// intentionally never accept a competitor name or write competitor_prices.
+router.get("/catalog/price-editor/new-product/options", requireAdmin, async (_req, res): Promise<any> => {
+  const rows = await db.select({
+    division: catalogProductsTable.division,
+    series: catalogProductsTable.seriesRange,
+    category: catalogProductsTable.category,
+  }).from(catalogProductsTable).where(eq(catalogProductsTable.isActive, true));
+  const divisions = [...new Set(rows.map((r) => r.division).filter((v): v is string => !!v))].sort();
+  const categories = [...new Set(rows.map((r) => r.category).filter((v): v is string => !!v))].sort();
+  const series = [...new Set(rows.map((r) => r.series).filter((v): v is string => !!v))].sort();
+  const byDivision = divisions.map((division) => ({
+    division,
+    categories: [...new Set(rows.filter((r) => r.division === division).map((r) => r.category).filter((v): v is string => !!v))].sort(),
+    series: [...new Set(rows.filter((r) => r.division === division).map((r) => r.series).filter((v): v is string => !!v))].sort(),
+  }));
+  return res.json({ divisions, categories, series, byDivision });
+});
+
+router.get("/catalog/price-editor/new-product/check", requireAdmin, async (req, res): Promise<any> => {
+  const code = normalizeNewCode(req.query.itemCode);
+  const division = String(req.query.division ?? "").trim();
+  if (!code) return res.status(400).json({ error: "itemCode is required." });
+  const products = await db.select({
+    itemCode: catalogProductsTable.itemCode,
+    productName: catalogProductsTable.productName,
+    division: catalogProductsTable.division,
+  }).from(catalogProductsTable);
+  const duplicateBase = products.find((p) => normalizeNewCode(p.itemCode) === code);
+  const duplicateMrp = duplicateBase ? await resolveMrp(duplicateBase.itemCode, today()) : null;
+  const duplicate = duplicateBase ? {
+    itemCode: duplicateBase.itemCode, productName: duplicateBase.productName,
+    division: duplicateBase.division, category: (await product(duplicateBase.itemCode))?.category ?? null,
+    series: (await product(duplicateBase.itemCode))?.seriesRange ?? null,
+    currentMrp: duplicateMrp?.mrp ?? null, currentEffectiveDate: duplicateMrp?.effectiveDate ?? null,
+    mrp: duplicateMrp?.mrp ?? null,
+  } : null;
+  const inDivision = products.filter((p) => !division || p.division === division);
+  const closest = inDivision
+    .map((p) => ({ itemCode: p.itemCode, distance: editDistance(code, normalizeNewCode(p.itemCode)) }))
+    .sort((a, b) => a.distance - b.distance || a.itemCode.localeCompare(b.itemCode))
+    .slice(0, 3);
+  const unusual = closest.length > 0 && closest[0]!.distance > Math.max(2, Math.ceil(code.length * 0.55));
+  return res.json({
+    normalizedCode: code,
+    duplicate,
+    unusualShape: unusual,
+    closest: closest.map(({ itemCode }) => itemCode),
+  });
+});
+
+function newProductInput(body: any) {
+  const itemCode = normalizeNewCode(body?.itemCode);
+  const productName = String(body?.productName ?? "").trim();
+  const division = String(body?.division ?? "").trim();
+  const series = String(body?.series ?? "").trim();
+  const category = String(body?.category ?? "").trim();
+  const size = String(body?.size ?? "").trim() || null;
+  const mrp = Number(body?.mrp);
+  const effectiveDate = String(body?.effectiveDate ?? "");
+  const reason = String(body?.reason ?? "").trim();
+  const newSeriesConfirmed = body?.newSeriesConfirmed === true;
+  const unusualCodeConfirmed = body?.unusualCodeConfirmed === true;
+  return { itemCode, productName, division, series, category, size, mrp, effectiveDate, reason, newSeriesConfirmed, unusualCodeConfirmed };
+}
+
+async function creationReferences(q: any, code: string, auditId: number) {
+  const refs: string[] = [];
+  if ((await q.select({ id: competitorPricesTable.id }).from(competitorPricesTable).where(eq(competitorPricesTable.matchedPrayagCode, code))).length) refs.push("live competitor mapping");
+  if ((await q.select({ id: competitorPriceStagingTable.id }).from(competitorPriceStagingTable).where(sql`${competitorPriceStagingTable.matchedPrayagCode} = ${code} OR ${competitorPriceStagingTable.competitorCodeCatalogue} = ${code}`)).length) refs.push("competitor staging");
+  if ((await q.select({ id: competitorCodeAliasesTable.id }).from(competitorCodeAliasesTable).where(sql`${competitorCodeAliasesTable.oldCode} = ${code} OR ${competitorCodeAliasesTable.newCode} = ${code}`)).length) refs.push("competitor alias");
+  if ((await q.select({ id: catalogPriceEditAuditsTable.id }).from(catalogPriceEditAuditsTable).where(and(eq(catalogPriceEditAuditsTable.itemCode, code), sql`${catalogPriceEditAuditsTable.id} <> ${auditId}`))).length) refs.push("later price/product audit");
+  if ((await q.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, code))).length > 1) refs.push("additional MRP history");
+  if ((await q.select({ id: mrpRevisionRowsTable.id }).from(mrpRevisionRowsTable).where(eq(mrpRevisionRowsTable.itemCode, code))).length) refs.push("revision preview");
+  if ((await q.select({ id: mrpRevisionBatchesTable.id }).from(mrpRevisionBatchesTable).where(sql`${mrpRevisionBatchesTable.fileName} LIKE ${"%" + code + "%"}`)).length) refs.push("revision batch");
+  if ((await q.select({ id: mrpGeneratorResultsTable.id }).from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.itemCode, code))).length) refs.push("scenario result");
+  if ((await q.select({ id: mrpGeneratorRunsTable.id }).from(mrpGeneratorRunsTable).where(sql`${mrpGeneratorRunsTable.inputSnapshot} LIKE ${"%" + code + "%"}`)).length) refs.push("scenario snapshot");
+  return refs;
+}
+
+async function validateNewProductInput(input: ReturnType<typeof newProductInput>) {
+  if (!input.itemCode || !input.productName || !input.division || !input.series || !input.category ||
+      !Number.isFinite(input.mrp) || input.mrp <= 0 || !iso(input.effectiveDate) || !input.reason) {
+    return "Code, product name, division, series, category, positive MRP, effective date, and reason are required.";
+  }
+  const products = await db.select().from(catalogProductsTable).where(eq(catalogProductsTable.isActive, true));
+  if (products.some((p) => normalizeNewCode(p.itemCode) === input.itemCode)) return `Code ${input.itemCode} already exists. Use the price editor above to change its price.`;
+  if (!products.some((p) => p.division === input.division)) return "Division must be selected from the catalogue.";
+  if (!products.some((p) => p.division === input.division && p.category === input.category)) return "Category must be selected from this division's catalogue.";
+  const matchingSeries = products.some((p) => p.division === input.division && p.seriesRange === input.series);
+  if (!matchingSeries && !input.newSeriesConfirmed) return `Series "${input.series}" is new in ${input.division}; explicit confirmation is required.`;
+  return null;
+}
+
+router.post("/catalog/price-editor/new-product/preview", requireAdmin, async (req, res): Promise<any> => {
+  const input = newProductInput(req.body);
+  const error = await validateNewProductInput(input);
+  if (error) return res.status(400).json({ error });
+  const nearby = (await db.select({ series: catalogProductsTable.seriesRange }).from(catalogProductsTable)
+    .where(eq(catalogProductsTable.division, input.division)))
+    .map((r) => r.series).filter((v): v is string => !!v)
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .map((series) => ({ series, distance: editDistance(input.series.toUpperCase(), series.toUpperCase()) }))
+    .sort((a, b) => a.distance - b.distance).slice(0, 3).map(({ series }) => series);
+  const period = await db.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+    .where(and(eq(mrpPriceHistoryTable.effectiveDate, input.effectiveDate), eq(mrpPriceHistoryTable.variant, "Standard")));
+  const divisionCodes = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable)
+    .where(eq(catalogProductsTable.division, input.division));
+  const unusualShape = divisionCodes.length > 0 && Math.min(...divisionCodes.map((r) => editDistance(input.itemCode, normalizeNewCode(r.itemCode)))) > Math.max(2, Math.ceil(input.itemCode.length * 0.55));
+  const payload = JSON.stringify({ ...input, unusualCodeConfirmed: false });
+  const token = randomUUID();
+  await db.insert(newProductPreviewStatesTable).values({
+    token, payload, createdBy: actor(req), expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+  });
+  return res.json({
+    ...input,
+    normalizedCode: input.itemCode,
+    token,
+    periodExists: period.length > 0,
+    periodCount: period.length,
+    goesLiveImmediately: input.effectiveDate <= today(),
+    dateMeaning: input.effectiveDate <= today() ? "The date has passed; this product goes live immediately." : "This product is scheduled and will become current on its effective date.",
+    nearbySeries: nearby,
+    unusualShape,
+  });
+});
+
+router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req, res): Promise<any> => {
+  const input = newProductInput(req.body);
+  const token = String(req.body?.token ?? "");
+  const error = await validateNewProductInput(input);
+  if (error) return res.status(400).json({ error });
+  const codeCheck = await (async () => {
+    const rows = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable).where(eq(catalogProductsTable.division, input.division));
+    return rows.length > 0 && Math.min(...rows.map((r) => editDistance(input.itemCode, normalizeNewCode(r.itemCode)))) > Math.max(2, Math.ceil(input.itemCode.length * 0.55));
+  })();
+  if (codeCheck && !input.unusualCodeConfirmed) return res.status(400).json({ error: "This code is unusual for the selected division. Confirm Continue anyway before creating it." });
+  try {
+    const result = await db.transaction(async (tx) => {
+      const preview = (await tx.select().from(newProductPreviewStatesTable).where(and(
+        eq(newProductPreviewStatesTable.token, token),
+        eq(newProductPreviewStatesTable.status, "preview"),
+        eq(newProductPreviewStatesTable.createdBy, actor(req)),
+        sql`${newProductPreviewStatesTable.expiresAt} > now()`,
+      )).limit(1).for("update"))[0];
+      const previewInput = { ...input, unusualCodeConfirmed: false };
+      if (!preview || preview.payload !== JSON.stringify(previewInput)) throw new Error("Preview is stale, expired, already used, or does not match this product.");
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"new-product:" + input.itemCode}))`);
+      const allProducts = await tx.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable).for("update");
+      const existing = allProducts.filter((p) => normalizeNewCode(p.itemCode) === input.itemCode);
+      if (existing[0]) throw new Error(`Code ${input.itemCode} already exists.`);
+      const productRows = await tx.insert(catalogProductsTable).values({
+        itemCode: input.itemCode, productName: input.productName, division: input.division,
+        seriesRange: input.series, category: input.category, size: input.size,
+        sourceFiles: "single-product-editor", dataFlag: "manual_creation",
+      }).returning();
+      const historyRows = await tx.insert(mrpPriceHistoryTable).values({
+        itemCode: input.itemCode, mrp: input.mrp, netPrice: null, discountPct: null,
+        priceBasis: "MRP", effectiveDate: input.effectiveDate, loadDate: today(),
+        sourceFile: "single-product-editor", reviewStatus: "approved", variant: "Standard",
+        notes: input.reason,
+      }).returning();
+      await tx.insert(mrpHistoryProvenanceEventsTable).values({
+        historyRowId: historyRows[0]!.id, itemCode: input.itemCode, effectiveDate: input.effectiveDate,
+        action: "new_product_manual", reason: input.reason, sourceFile: "single-product-editor",
+        mrp: input.mrp,
+      });
+      const audit = (await tx.insert(catalogPriceEditAuditsTable).values({
+        actor: actor(req), itemCode: input.itemCode, series: "Product creation", operationType: "save",
+        oldValue: null, newValue: input.mrp,
+        effectiveDate: input.effectiveDate, remarks: input.reason, targetRowId: historyRows[0]!.id,
+        creationMetadata: JSON.stringify({ product: productRows[0], history: historyRows[0] }),
+      }).returning())[0]!;
+      await recomputeCurrentFlagsInTransaction(tx);
+      const candidates = await tx.select().from(competitorPriceStagingTable).where(and(
+        eq(competitorPriceStagingTable.status, "needs_review"),
+        sql`${competitorPriceStagingTable.matchedPrayagCode} IS NULL`,
+        eq(competitorPriceStagingTable.reviewReason, "No verified Prayag product match."),
+      ));
+      const eligible = candidates.filter((row) =>
+        normalizeNewCode(row.competitorCodeCatalogue) === input.itemCode ||
+        normalizeNewCode(row.competitorCodeMaster) === input.itemCode);
+      const movedCompetitorRows: Array<{ competitor: string; sourceCode: string; prayagCode: string; batchId: number }> = [];
+      const movedCompetitorIds: number[] = [];
+      const affectedBatches = new Set<number>();
+      if (eligible.length === 1) {
+        const candidate = eligible[0]!;
+        const batch = (await tx.select({ effectiveDate: importBatchesTable.effectiveDate }).from(importBatchesTable).where(eq(importBatchesTable.id, candidate.batchId)).limit(1))[0];
+        const effectiveDate = batch?.effectiveDate ?? input.effectiveDate;
+        const activeOnDate = productRows[0]!.isActive && (!productRows[0]!.discontinuedFrom || productRows[0]!.discontinuedFrom > effectiveDate);
+        const aligned = activeOnDate ? (await tx.select({ mrp: mrpPriceHistoryTable.mrp }).from(mrpPriceHistoryTable).where(and(
+          eq(mrpPriceHistoryTable.itemCode, input.itemCode), eq(mrpPriceHistoryTable.variant, "Standard"),
+          eq(mrpPriceHistoryTable.reviewStatus, "approved"), sql`${mrpPriceHistoryTable.effectiveDate} <= ${effectiveDate}`,
+        )).orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id)).limit(1))[0] : null;
+        if (activeOnDate && aligned) {
+          const competitorPrice = candidate.newMrp ?? candidate.oldMrp;
+          const gapPct = competitorPrice != null && aligned.mrp ? ((competitorPrice - aligned.mrp) / aligned.mrp) * 100 : null;
+          await tx.update(competitorPriceStagingTable).set({
+            matchedPrayagCode: input.itemCode, status: "ok", matchMethod: "new_product_exact",
+            reviewReason: null, prayagMrpCurrent: aligned.mrp, gapPct,
+          }).where(eq(competitorPriceStagingTable.id, candidate.id));
+          movedCompetitorRows.push({
+            competitor: candidate.competitor,
+            sourceCode: candidate.competitorCodeCatalogue ?? candidate.competitorCodeMaster ?? "",
+            prayagCode: input.itemCode, batchId: candidate.batchId,
+          });
+          movedCompetitorIds.push(candidate.id);
+          affectedBatches.add(candidate.batchId);
+        }
+      }
+      for (const batchId of affectedBatches) {
+        const counts = await tx.select({ status: competitorPriceStagingTable.status, count: sql<number>`count(*)::int` })
+          .from(competitorPriceStagingTable).where(eq(competitorPriceStagingTable.batchId, batchId)).groupBy(competitorPriceStagingTable.status);
+        const batch = (await tx.select({ rowCounts: importBatchesTable.rowCounts }).from(importBatchesTable).where(eq(importBatchesTable.id, batchId)).limit(1))[0];
+        const prior = batch?.rowCounts ? JSON.parse(batch.rowCounts) as Record<string, unknown> : {};
+        const next: Record<string, unknown> = { ...prior, ok: 0, needs_review: 0, not_found: 0, new_products: 0 };
+        for (const count of counts) next[count.status] = count.count;
+        await tx.update(importBatchesTable).set({ rowCounts: JSON.stringify(next) }).where(eq(importBatchesTable.id, batchId));
+      }
+      await tx.update(newProductPreviewStatesTable).set({ status: "consumed", consumedAt: new Date() }).where(eq(newProductPreviewStatesTable.id, preview.id));
+      return { product: productRows[0], history: historyRows[0], audit, movedCompetitorRows: movedCompetitorIds, movedCompetitorDetails: movedCompetitorRows };
+    });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    req.log?.error({ err: e }, "single product creation failed");
+    return res.status(409).json({ error: e instanceof Error ? e.message : "Could not create product." });
+  }
+});
+
+router.get("/catalog/price-editor/new-product/undo/:auditId", requireAdmin, async (req, res): Promise<any> => {
+  const id = Number(req.params.auditId);
+  const original = Number.isInteger(id) ? (await db.select().from(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.id, id)).limit(1))[0] : null;
+  if (!original || original.series !== "Product creation") return res.status(404).json({ error: "Product creation not found." });
+  const refs = await creationReferences(db, original.itemCode, id);
+  return res.json({ canUndo: refs.length === 0, reason: refs.length ? `${refs.join(", ")} reference this product; deactivate it instead of deleting it.` : null, canDeactivate: refs.length > 0 });
+});
+
+router.post("/catalog/price-editor/new-product/undo/:auditId", requireAdmin, async (req, res): Promise<any> => {
+  const id = Number(req.params.auditId);
+  try {
+    const reversal = await db.transaction(async (tx) => {
+      const original = Number.isInteger(id) ? (await tx.select().from(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.id, id)).limit(1).for("update"))[0] : null;
+      if (!original || original.series !== "Product creation" || original.operationType !== "save") throw Object.assign(new Error("Product creation not found."), { status: 404 });
+      const already = await tx.select({ id: catalogPriceEditAuditsTable.id }).from(catalogPriceEditAuditsTable).where(and(eq(catalogPriceEditAuditsTable.originalAuditId, id), eq(catalogPriceEditAuditsTable.operationType, "reversal")));
+      if (already.length) throw Object.assign(new Error("Product creation has already been undone."), { status: 409 });
+      const refs = await creationReferences(tx, original.itemCode, id);
+      if (refs.length) throw Object.assign(new Error(`${refs.join(", ")} reference this product; deactivate it instead of deleting it.`), { status: 409 });
+      const history = (await tx.select().from(mrpPriceHistoryTable).where(and(eq(mrpPriceHistoryTable.id, original.targetRowId!), eq(mrpPriceHistoryTable.itemCode, original.itemCode))).limit(1).for("update"))[0];
+      const productRow = (await tx.select().from(catalogProductsTable).where(eq(catalogProductsTable.itemCode, original.itemCode)).limit(1).for("update"))[0];
+      const metadata = original.creationMetadata ? JSON.parse(original.creationMetadata) as { product?: any; history?: any } : {};
+      if (!history || !productRow || history.mrp !== original.newValue ||
+          metadata.product && (productRow.productName !== metadata.product.productName || productRow.division !== metadata.product.division ||
+            productRow.category !== metadata.product.category || productRow.seriesRange !== metadata.product.seriesRange ||
+            productRow.size !== metadata.product.size) ||
+          metadata.history && (history.effectiveDate !== metadata.history.effectiveDate || history.variant !== metadata.history.variant ||
+            history.reviewStatus !== metadata.history.reviewStatus)) throw Object.assign(new Error("Created product or MRP changed; undo rejected."), { status: 409 });
+      await tx.update(mrpHistoryProvenanceEventsTable).set({ historyRowId: null }).where(eq(mrpHistoryProvenanceEventsTable.historyRowId, history.id));
+      await tx.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, history.id));
+      await tx.delete(catalogProductsTable).where(eq(catalogProductsTable.id, productRow.id));
+      await recomputeCurrentFlagsInTransaction(tx);
+      return (await tx.insert(catalogPriceEditAuditsTable).values({
+        actor: actor(req), itemCode: original.itemCode, series: "Product creation",
+        operationType: "reversal", oldValue: original.newValue, newValue: null,
+        effectiveDate: original.effectiveDate, remarks: `Undo of product creation #${id}`,
+        originalAuditId: id, targetRowId: history.id,
+      }).returning())[0]!;
+    });
+    return res.json({ ok: true, reversal });
+  } catch (e: any) { return res.status(e.status ?? 409).json({ error: e.message ?? "Could not undo product." }); }
+});
+
+router.post("/catalog/price-editor/new-product/deactivate/:auditId", requireAdmin, async (req, res): Promise<any> => {
+  const id = Number(req.params.auditId);
+  const reason = String(req.body?.reason ?? "").trim();
+  if (!reason) return res.status(400).json({ error: "Deactivation reason is required." });
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"new-product-deactivate:" + id}))`);
+      const original = Number.isInteger(id) ? (await tx.select().from(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.id, id)).limit(1).for("update"))[0] : null;
+      if (!original || original.series !== "Product creation" || original.operationType !== "save") throw Object.assign(new Error("Product creation not found."), { status: 404 });
+      const already = await tx.select({ id: catalogPriceEditAuditsTable.id }).from(catalogPriceEditAuditsTable).where(and(
+        eq(catalogPriceEditAuditsTable.originalAuditId, id),
+        eq(catalogPriceEditAuditsTable.series, "Product deactivation"),
+        eq(catalogPriceEditAuditsTable.operationType, "save"),
+      ));
+      if (already.length) throw Object.assign(new Error("Product is already deactivated."), { status: 409 });
+      const refs = await creationReferences(tx, original.itemCode, id);
+      if (!refs.length) throw Object.assign(new Error("Undo is still safe; use Undo before deactivation."), { status: 409 });
+      const updated = await tx.update(catalogProductsTable).set({ isActive: false, updatedAt: new Date(), discontinuedStatusNote: reason, discontinuedCheckedBy: actor(req) }).where(and(eq(catalogProductsTable.itemCode, original.itemCode), eq(catalogProductsTable.isActive, true))).returning();
+      if (!updated.length) throw Object.assign(new Error("Product is already inactive or missing."), { status: 409 });
+      await recomputeCurrentFlagsInTransaction(tx);
+      const audit = (await tx.insert(catalogPriceEditAuditsTable).values({
+        actor: actor(req), itemCode: original.itemCode, series: "Product deactivation",
+        operationType: "save", oldValue: 1, newValue: 0, effectiveDate: today(),
+        remarks: reason, originalAuditId: id,
+      }).returning())[0]!;
+      return { product: updated[0], audit };
+    });
+    return res.json({ ok: true, ...result });
+  } catch (e: any) { return res.status(e.status ?? 409).json({ error: e.message ?? "Could not deactivate product." }); }
 });
 
 export default router;

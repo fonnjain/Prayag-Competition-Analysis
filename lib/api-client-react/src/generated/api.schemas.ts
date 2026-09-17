@@ -2356,6 +2356,108 @@ export interface PriceEditorUndoResponse {
   reversal: PriceEditorAudit;
 }
 
+export interface NewProductRequest {
+  itemCode: string;
+  productName: string;
+  division: string;
+  series: string;
+  category: string;
+  /** @nullable */
+  size?: string | null;
+  /** @exclusiveMinimum 0 */
+  mrp: number;
+  effectiveDate: string;
+  /** @minLength 1 */
+  reason: string;
+  newSeriesConfirmed?: boolean;
+  unusualCodeConfirmed?: boolean;
+}
+
+export type NewProductOptionsResponseByDivisionItem = {
+  division: string;
+  categories: string[];
+  series: string[];
+};
+
+export interface NewProductOptionsResponse {
+  divisions: string[];
+  categories: string[];
+  series: string[];
+  byDivision: NewProductOptionsResponseByDivisionItem[];
+}
+
+export type NewProductCodeCheckResponseDuplicate = null | {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  series: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  currentEffectiveDate: string | null;
+  /** @nullable */
+  mrp?: number | null;
+};
+
+export interface NewProductCodeCheckResponse {
+  normalizedCode: string;
+  duplicate: NewProductCodeCheckResponseDuplicate;
+  unusualShape: boolean;
+  closest: string[];
+}
+
+export type NewProductPreviewResponse = NewProductRequest & {
+  token: string;
+  normalizedCode: string;
+  periodExists: boolean;
+  periodCount: number;
+  goesLiveImmediately: boolean;
+  dateMeaning: string;
+  nearbySeries: string[];
+  unusualShape: boolean;
+};
+
+export type NewProductApplyRequest = NewProductRequest & {
+  token: string;
+};
+
+export type NewProductApplyResponseProduct = { [key: string]: unknown };
+
+export type NewProductApplyResponseHistory = { [key: string]: unknown };
+
+export type NewProductApplyResponseMovedCompetitorDetailsItem = {
+  competitor: string;
+  sourceCode: string;
+  prayagCode: string;
+  batchId: number;
+};
+
+export interface NewProductApplyResponse {
+  ok: boolean;
+  product: NewProductApplyResponseProduct;
+  history: NewProductApplyResponseHistory;
+  audit: PriceEditorAudit;
+  movedCompetitorRows: number[];
+  movedCompetitorDetails?: NewProductApplyResponseMovedCompetitorDetailsItem[];
+}
+
+export interface NewProductUndoStatusResponse {
+  canUndo: boolean;
+  /** @nullable */
+  reason?: string | null;
+  canDeactivate: boolean;
+}
+
+export interface NewProductUndoResponse {
+  ok: boolean;
+  reversal: PriceEditorAudit;
+}
+
 export interface ErrorResponse {
   error: string;
 }
@@ -4812,6 +4914,16 @@ asOf?: string;
 
 export type GetPriceEditorEditsParams = {
 itemCode: string;
+};
+
+export type CheckPriceEditorNewProductCodeParams = {
+itemCode: string;
+division?: string;
+};
+
+export type DeactivatePriceEditorNewProductBody = {
+  /** @minLength 1 */
+  reason: string;
 };
 
 export type GetMrpMatchingWorkbenchParams = {

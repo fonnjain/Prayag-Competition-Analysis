@@ -2276,6 +2276,234 @@ export const GetPriceEditorEditsResponse = zod.object({
 
 
 /**
+ * @summary Catalogue classifications available for one-product creation
+ */
+export const GetPriceEditorNewProductOptionsResponse = zod.object({
+  "divisions": zod.array(zod.string()),
+  "categories": zod.array(zod.string()),
+  "series": zod.array(zod.string()),
+  "byDivision": zod.array(zod.object({
+  "division": zod.string(),
+  "categories": zod.array(zod.string()),
+  "series": zod.array(zod.string())
+}))
+})
+
+
+/**
+ * @summary Normalize and check a proposed catalogue code
+ */
+export const CheckPriceEditorNewProductCodeQueryParams = zod.object({
+  "itemCode": zod.coerce.string(),
+  "division": zod.coerce.string().optional()
+})
+
+export const CheckPriceEditorNewProductCodeResponse = zod.object({
+  "normalizedCode": zod.string(),
+  "duplicate": zod.union([zod.null(),zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "series": zod.string().nullable(),
+  "currentMrp": zod.number().nullable(),
+  "currentEffectiveDate": zod.coerce.date().nullable(),
+  "mrp": zod.number().nullish()
+})]),
+  "unusualShape": zod.boolean(),
+  "closest": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Preview one manually entered product before creation
+ */
+export const previewPriceEditorNewProductBodyMrpExclusiveMin = 0;
+
+
+
+
+export const PreviewPriceEditorNewProductBody = zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string(),
+  "division": zod.string(),
+  "series": zod.string(),
+  "category": zod.string(),
+  "size": zod.string().nullish(),
+  "mrp": zod.number().gt(previewPriceEditorNewProductBodyMrpExclusiveMin),
+  "effectiveDate": zod.coerce.date(),
+  "reason": zod.string().min(1),
+  "newSeriesConfirmed": zod.boolean().optional(),
+  "unusualCodeConfirmed": zod.boolean().optional()
+})
+
+export const previewPriceEditorNewProductResponseOneMrpExclusiveMin = 0;
+
+
+
+
+export const PreviewPriceEditorNewProductResponse = zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string(),
+  "division": zod.string(),
+  "series": zod.string(),
+  "category": zod.string(),
+  "size": zod.string().nullish(),
+  "mrp": zod.number().gt(previewPriceEditorNewProductResponseOneMrpExclusiveMin),
+  "effectiveDate": zod.coerce.date(),
+  "reason": zod.string().min(1),
+  "newSeriesConfirmed": zod.boolean().optional(),
+  "unusualCodeConfirmed": zod.boolean().optional()
+}).and(zod.object({
+  "token": zod.string(),
+  "normalizedCode": zod.string(),
+  "periodExists": zod.boolean(),
+  "periodCount": zod.number(),
+  "goesLiveImmediately": zod.boolean(),
+  "dateMeaning": zod.string(),
+  "nearbySeries": zod.array(zod.string()),
+  "unusualShape": zod.boolean()
+}))
+
+
+/**
+ * @summary Create one audited catalogue product and its first MRP
+ */
+export const applyPriceEditorNewProductBodyOneMrpExclusiveMin = 0;
+
+
+
+
+export const ApplyPriceEditorNewProductBody = zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string(),
+  "division": zod.string(),
+  "series": zod.string(),
+  "category": zod.string(),
+  "size": zod.string().nullish(),
+  "mrp": zod.number().gt(applyPriceEditorNewProductBodyOneMrpExclusiveMin),
+  "effectiveDate": zod.coerce.date(),
+  "reason": zod.string().min(1),
+  "newSeriesConfirmed": zod.boolean().optional(),
+  "unusualCodeConfirmed": zod.boolean().optional()
+}).and(zod.object({
+  "token": zod.string()
+}))
+
+export const ApplyPriceEditorNewProductResponse = zod.object({
+  "ok": zod.boolean(),
+  "product": zod.record(zod.string(), zod.unknown()),
+  "history": zod.record(zod.string(), zod.unknown()),
+  "audit": zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+}),
+  "movedCompetitorRows": zod.array(zod.number()),
+  "movedCompetitorDetails": zod.array(zod.object({
+  "competitor": zod.string(),
+  "sourceCode": zod.string(),
+  "prayagCode": zod.string(),
+  "batchId": zod.number()
+})).optional()
+})
+
+
+/**
+ * @summary Check whether a manual product creation can be undone
+ */
+export const GetPriceEditorNewProductUndoStatusParams = zod.object({
+  "auditId": zod.coerce.number()
+})
+
+export const GetPriceEditorNewProductUndoStatusResponse = zod.object({
+  "canUndo": zod.boolean(),
+  "reason": zod.string().nullish(),
+  "canDeactivate": zod.boolean()
+})
+
+
+/**
+ * @summary Remove an unreferenced manually created product
+ */
+export const UndoPriceEditorNewProductParams = zod.object({
+  "auditId": zod.coerce.number()
+})
+
+export const UndoPriceEditorNewProductResponse = zod.object({
+  "ok": zod.boolean(),
+  "reversal": zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+})
+})
+
+
+/**
+ * @summary Deactivate a referenced manually created product
+ */
+export const DeactivatePriceEditorNewProductParams = zod.object({
+  "auditId": zod.coerce.number()
+})
+
+
+
+
+export const DeactivatePriceEditorNewProductBody = zod.object({
+  "reason": zod.string().min(1)
+})
+
+export const DeactivatePriceEditorNewProductResponse = zod.object({
+  "ok": zod.boolean(),
+  "product": zod.record(zod.string(), zod.unknown()),
+  "history": zod.record(zod.string(), zod.unknown()),
+  "audit": zod.object({
+  "id": zod.number(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "itemCode": zod.string(),
+  "series": zod.string(),
+  "operationType": zod.enum(['save', 'reversal']),
+  "oldValue": zod.number().nullish(),
+  "newValue": zod.number().nullish(),
+  "effectiveDate": zod.coerce.date(),
+  "remarks": zod.string(),
+  "originalAuditId": zod.number().nullish(),
+  "targetRowId": zod.number().nullish(),
+  "previousResolvedValue": zod.number().nullish()
+}),
+  "movedCompetitorRows": zod.array(zod.number()),
+  "movedCompetitorDetails": zod.array(zod.object({
+  "competitor": zod.string(),
+  "sourceCode": zod.string(),
+  "prayagCode": zod.string(),
+  "batchId": zod.number()
+})).optional()
+})
+
+
+/**
  * @summary Stage 1 MRP generator capabilities and disabled Sales rules
  */
 export const GetMrpGeneratorMetadataResponse = zod.object({

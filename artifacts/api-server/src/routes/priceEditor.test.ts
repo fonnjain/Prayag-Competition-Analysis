@@ -8,6 +8,7 @@ import {
   catalogProductsTable,
   competitorPricesTable,
   mrpPriceHistoryTable,
+  mrpHistoryProvenanceEventsTable,
 } from "@workspace/db";
 import { dateMeaning } from "./priceEditor";
 import { warningFor } from "./mrpRevision";
@@ -97,6 +98,10 @@ describe("single-product price editor semantics", () => {
     });
     guarded.use(priceEditorRouter);
     await supertest(guarded).post("/catalog/price-editor/save").send({}).expect(403);
+    await supertest(guarded).post("/catalog/price-editor/new-product/preview").send({}).expect(403);
+    await supertest(guarded).post("/catalog/price-editor/new-product/apply").send({}).expect(403);
+    await supertest(guarded).post("/catalog/price-editor/new-product/undo/1").send({}).expect(403);
+    await supertest(guarded).post("/catalog/price-editor/new-product/deactivate/1").send({}).expect(403);
   });
 
   it("requires remarks before any database mutation", async () => {
@@ -230,5 +235,88 @@ describe("single-product price editor semantics", () => {
     ));
     await request.post(`/catalog/price-editor/undo/${stale.body.audit.id}`).expect(409);
     await request.post("/catalog/price-editor/undo/not-an-id").expect(400);
+  });
+
+  it("previews, normalizes, attributes, and safely undoes one new product", async () => {
+    const rawCode = `  p020_test_${Date.now()}.0 `;
+    const preview = await request.post("/catalog/price-editor/new-product/preview").send({
+      itemCode: rawCode, productName: "P020 Manual Product", division: "PTMT",
+      series: "Test Range", category: "Test", size: "1", mrp: 321,
+      effectiveDate: "2000-01-01", reason: "P020 focused creation test", newSeriesConfirmed: true,
+    }).expect(200);
+    expect(preview.body.normalizedCode).toBe(rawCode.toUpperCase().replace(/\s+/g, "").replace(/\.0$/, ""));
+    expect(typeof preview.body.periodExists).toBe("boolean");
+    const applied = await request.post("/catalog/price-editor/new-product/apply").send({
+      ...preview.body, token: preview.body.token, unusualCodeConfirmed: true,
+    });
+    if (applied.status !== 200) throw new Error(`apply failed ${applied.status}: ${JSON.stringify(applied.body)}`);
+    expect(applied.body.product.itemCode).toBe(preview.body.normalizedCode);
+    expect(applied.body.movedCompetitorRows).toEqual([]);
+    expect(applied.body.audit.actor).toBe("editor-test@example.com");
+    const provenance = await db.select().from(mrpHistoryProvenanceEventsTable).where(eq(
+      mrpHistoryProvenanceEventsTable.itemCode, preview.body.normalizedCode,
+    ));
+    expect(provenance).toHaveLength(1);
+    const status = await request.get(`/catalog/price-editor/new-product/undo/${applied.body.audit.id}`).expect(200);
+    expect(status.body.canUndo).toBe(true);
+    await request.post(`/catalog/price-editor/new-product/undo/${applied.body.audit.id}`).expect(200);
+    expect(await db.select().from(catalogProductsTable).where(eq(catalogProductsTable.itemCode, preview.body.normalizedCode))).toHaveLength(0);
+    await request.post("/catalog/price-editor/new-product/apply").send({
+      ...preview.body, token: preview.body.token, unusualCodeConfirmed: true,
+    }).expect(409);
+  });
+
+  it("warns for unusual codes but requires explicit Continue anyway", async () => {
+    const rawCode = `ZZZ_UNUSUAL_${Date.now()}`;
+    const preview = await request.post("/catalog/price-editor/new-product/preview").send({
+      itemCode: rawCode, productName: "P020 Unusual Product", division: "PTMT",
+      series: "Test Range", category: "Test", mrp: 322, effectiveDate: "2099-01-01",
+      reason: "unusual code confirmation test", newSeriesConfirmed: true,
+    }).expect(200);
+    expect(preview.body.unusualShape).toBe(true);
+    await request.post("/catalog/price-editor/new-product/apply").send({
+      ...preview.body, token: preview.body.token,
+    }).expect(400);
+    const applied = await request.post("/catalog/price-editor/new-product/apply").send({
+      ...preview.body, token: preview.body.token, unusualCodeConfirmed: true,
+    }).expect(200);
+    await request.post(`/catalog/price-editor/new-product/undo/${applied.body.audit.id}`).expect(200);
+  });
+
+  it("offers deactivation only after a reference makes undo unsafe", async () => {
+    const rawCode = `P020_REF_${Date.now()}`;
+    const preview = await request.post("/catalog/price-editor/new-product/preview").send({
+      itemCode: rawCode, productName: "P020 Referenced Product", division: "PTMT",
+      series: "Test Range", category: "Test", mrp: 323, effectiveDate: "2099-01-01",
+      reason: "reference safety test", newSeriesConfirmed: true,
+    }).expect(200);
+    const applied = await request.post("/catalog/price-editor/new-product/apply").send({
+      ...preview.body, token: preview.body.token, unusualCodeConfirmed: true,
+    }).expect(200);
+    await db.insert(competitorPricesTable).values({
+      competitor: testCompetitor, price: 40, effectiveDate: "2099-01-01",
+      matchedPrayagCode: rawCode, matchStatus: "matched",
+    });
+    const status = await request.get(`/catalog/price-editor/new-product/undo/${applied.body.audit.id}`).expect(200);
+    expect(status.body.canUndo).toBe(false);
+    await request.post(`/catalog/price-editor/new-product/deactivate/${applied.body.audit.id}`)
+      .send({ reason: "Referenced by competitor mapping" }).expect(200);
+    await request.post(`/catalog/price-editor/new-product/deactivate/${applied.body.audit.id}`)
+      .send({ reason: "Repeat" }).expect(409);
+    await db.delete(competitorPricesTable).where(and(
+      eq(competitorPricesTable.competitor, testCompetitor), eq(competitorPricesTable.matchedPrayagCode, rawCode),
+    ));
+    await db.delete(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.itemCode, rawCode));
+    await db.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, rawCode));
+    await db.delete(catalogProductsTable).where(eq(catalogProductsTable.itemCode, rawCode));
+  });
+
+  it("rejects duplicate normalized product codes with the existing product", async () => {
+    const response = await request.post("/catalog/price-editor/new-product/preview").send({
+      itemCode: ` ${testCode} `, productName: "Collision", division: "PTMT",
+      series: "Test Range", category: "Test", mrp: 10, effectiveDate: "2099-01-01",
+      reason: "duplicate check", newSeriesConfirmed: true,
+    }).expect(400);
+    expect(response.body.error).toContain("already exists");
   });
 });

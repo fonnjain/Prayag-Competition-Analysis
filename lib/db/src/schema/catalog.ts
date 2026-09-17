@@ -664,6 +664,7 @@ export const catalogPriceEditAuditsTable = pgTable(
     remarks: text("remarks").notNull(),
     originalAuditId: integer("original_audit_id"),
     targetRowId: integer("target_row_id"),
+    creationMetadata: text("creation_metadata"),
   },
   (t) => [
     index("catalog_price_edit_audits_item_idx").on(t.itemCode, t.createdAt),
@@ -675,6 +676,26 @@ export const catalogPriceEditAuditsTable = pgTable(
       "catalog_price_edit_audits_operation_check",
       sql`${t.operationType} in ('save', 'reversal')`,
     ),
+  ],
+);
+
+// Server-side one-use preview state for manual product creation. The payload
+// is immutable until consumed or expiry; apply never trusts a client-only hash.
+export const newProductPreviewStatesTable = pgTable(
+  "new_product_preview_states",
+  {
+    id: serial("id").primaryKey(),
+    token: text("token").notNull(),
+    payload: text("payload").notNull(),
+    createdBy: text("created_by").notNull(),
+    status: text("status").notNull().default("preview"), // preview | consumed | expired
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("new_product_preview_states_token_idx").on(t.token),
+    index("new_product_preview_states_expiry_idx").on(t.status, t.expiresAt),
   ],
 );
 
@@ -695,3 +716,4 @@ export type CatalogSyncAudit = typeof catalogSyncAuditsTable.$inferSelect;
 export type CatalogProductNameCorrection =
   typeof catalogProductNameCorrectionsTable.$inferSelect;
 export type CatalogPriceEditAudit = typeof catalogPriceEditAuditsTable.$inferSelect;
+export type NewProductPreviewState = typeof newProductPreviewStatesTable.$inferSelect;
