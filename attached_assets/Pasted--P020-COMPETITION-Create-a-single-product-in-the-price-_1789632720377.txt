@@ -1,0 +1,165 @@
+# P020 — COMPETITION — Create a single product in the price editor
+
+> **P020** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P020` when reporting back.
+
+Add a **New product** mode to the Single Price Editor, where the user types the code, name, classification and MRP directly. One product at a time, no file.
+
+This sits alongside P019r2's file-based mode. Ten products justify a spreadsheet; one does not.
+
+---
+
+## 1. The page's promise changes
+
+The header currently reads:
+
+> *"This page cannot create products or competitors."*
+
+Half of that stops being true. Update it precisely rather than deleting it:
+
+> *"Find one catalogue product and change one price, or create a new Prayag product. This page cannot create competitors, and cannot change a price on a product it did not just create."*
+
+**The competitor half must stay true.** A competitor can never be created here, or anywhere outside the competitor import. That rule is what keeps Prayag's catalogue and competitor data from bleeding into each other.
+
+---
+
+## 2. What the user supplies
+
+```
+Cat No.            typed
+Product name       typed
+Division           chosen
+Series / Range     chosen, or new
+Category           chosen
+Size               typed, optional
+MRP                typed
+Effective from     date
+Reason             typed, required
+```
+
+### Classification comes from dropdowns, not free text
+
+Division, series and category must be **selected from values already in the catalogue**. Free text here produces `Pipes and Fittings` beside `Pipes & Fittings`, and two series that differ by a space — which then split every grouped report silently.
+
+**Series is the exception.** A genuinely new range needs to start somewhere, so allow a new series with an explicit confirmation:
+
+```
+"UGD Pipe SN-6" is not an existing series in Pipes & Fittings.
+Create it as a new series?      [ Yes, it is new ]   [ Pick an existing one ]
+```
+
+Show the nearest existing series names when this fires. Most of the time someone is about to create a near-duplicate of one that already exists.
+
+---
+
+## 3. The code is the part that must not go wrong
+
+**Check uniqueness as it is typed.** A code already in the catalogue is not a new product:
+
+```
+U-11CS already exists -- UGD Self Fit Pipe (6 Mtr) SN-8, Rs 2,987.
+Use the price editor above to change its price.
+```
+
+**Warn on an unusual shape.** Prayag codes follow patterns by division — `PU-3311`, `U-11CS`, `CH82F`, `151`. If a typed code resembles nothing else in its division, say so without blocking:
+
+```
+No other Pipes & Fittings code looks like "UGD11". Closest: U-11CS, U-12CS.
+Continue anyway?
+```
+
+That catches a mistyped code at the only moment it is cheap to catch. Afterwards it is a phantom product nobody can explain.
+
+**Normalise consistently** — uppercase, strip whitespace, strip a trailing `.0` — exactly as the matcher does. A code stored as `U 11CS` will never match anything.
+
+---
+
+## 4. Preview before creating
+
+```
+WILL CREATE
+  U-17CS   UGD Self Fit Pipe (6 Mtr) SN-8
+           Pipes & Fittings · UGD Pipe
+           Rs 32,400 from 10 Aug 2026
+
+  Period 2026-08-10 already exists (590 rows). This product joins it.
+  That date has passed -- the product goes live immediately.
+
+  Reason: new size added by Prayag, Sep 2026
+```
+
+State plainly whether the period exists or is new, and whether the date is past. A product created with a past date appears in the catalogue at once, and someone should know that before pressing the button rather than after.
+
+---
+
+## 5. Reversible, and attributed
+
+**Store who created it, when, and why.** The reason field is required for the same argument as the price editor: a product that exists because someone typed it needs an explanation attached.
+
+**Provide an undo.** Not a general delete — a reversal of this specific creation, available while nothing else references the product:
+
+```
+Created U-17CS 4 minutes ago.     [ undo ]
+```
+
+Once a competitor mapping, a scenario run or a revision preview references it, undo is no longer safe. At that point offer **deactivation** instead, and say why the difference matters.
+
+Never hard-delete a product that anything else points at.
+
+---
+
+## 6. After creating, report the competitor effect
+
+Same as P019r2. Adding a Prayag product can resolve competitor rows that were waiting for it:
+
+```
+Created U-17CS.
+2 competitor rows moved from Needs Review to Ready
+  Prince SIM200966, Ashirvad AV-3341
+```
+
+If none moved, say nothing — this is a notification, not a section that must always be filled.
+
+---
+
+## 7. Access
+
+Admin only, server-side, as the rest of the page. Creating a catalogue product is a wider action than correcting a price, and the page is already behind that guard.
+
+---
+
+## 8. Acceptance tests
+
+```
+1.  A new product can be created with code, name, division, series,
+    category, MRP and effective date.
+2.  An existing code is rejected, naming the product it collides with.
+3.  Division and category cannot be entered as free text.
+4.  A new series requires explicit confirmation and shows near matches.
+5.  A code unlike anything in its division warns but does not block.
+6.  The code is normalised before storage.
+7.  The preview states whether the period exists and whether the date is past.
+8.  A reason is required.
+9.  Creation is attributed and appears in the audit trail.
+10. Undo removes a just-created product with no references.
+11. Undo is unavailable once anything references it; deactivation is offered
+    instead, with the reason explained.
+12. Competitor rows that move out of Needs Review are reported.
+13. A competitor cannot be created from this page.
+14. A non-admin session receives 403.
+15. Creating a product adds exactly one catalog_products row and one
+    mrp_price_history row -- nothing else changes.
+```
+
+Test 2 is the one that keeps the page honest. Test 13 is the rule that must not bend.
+
+---
+
+## 9. Report
+
+- The form as built, and where it sits on the page.
+- The updated header text.
+- What a duplicate code, an unusual code and a new series each produce.
+- How undo and deactivation differ, and when each is offered.
+- Confirmation that competitors cannot be created here.

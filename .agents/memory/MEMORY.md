@@ -28,3 +28,4 @@
 - [Single-row price edit safety](single-price-edit-safety.md) — serialize by product/series; mutate price, recompute flags, and audit atomically; undo only an unchanged target.
 - [MRP Generator safety boundary](mrp-generator-safety.md) — immutable deterministic runs never write prices; exact-current, single-period suggestions can only enter the revision preview.
 - [PDF detector failure policy](pdf-detector-failure-policy.md) — all-zero sampled text is extractor failure, never evidence for silently recommending vision.
+- [P019 new-product rematch boundary](p019-new-product-rematch.md) — the seven Prince rematches are a fixed staging-only exception, not a reusable general matcher.
