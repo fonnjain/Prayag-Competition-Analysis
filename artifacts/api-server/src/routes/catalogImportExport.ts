@@ -62,6 +62,271 @@ const upload = multer({
 });
 
 const PENDING_MRP_BATCH_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const NEW_PRODUCTS_SOURCE = {
+  division: "New Products Upload",
+  sheetId: "__new_products_upload__",
+  sheetUrl: "internal://new-products-upload",
+  expectedFileName: null,
+  notes: "Prayag-only product creation uploads. Existing codes are rejected.",
+  sourceKind: "new_products",
+} as const;
+
+export interface NewProductRow {
+  itemCode: string;
+  division: string;
+  series: string | null;
+  seriesRange?: string | null;
+  productName: string;
+  size: string | null;
+  mrp: number;
+  effectiveDate: string;
+  row: number;
+}
+
+function newProductHeaderKey(value: unknown): string {
+  return norm(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function previewReason(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function newProductDate(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      return `${String(parsed.y).padStart(4, "0")}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+    }
+  }
+  const text = norm(value);
+  if (!text) return null;
+  const iso = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (iso) {
+    const candidate = `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+    return isIsoDate(candidate) ? candidate : null;
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+export function parseNewProductsWorkbook(buffer: Buffer): {
+  rows: NewProductRow[];
+  rejectedRows: Array<{ row: number; itemCode: string | null; reason: string }>;
+} {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const rows: NewProductRow[] = [];
+  const rejectedRows: Array<{ row: number; itemCode: string | null; reason: string }> = [];
+  let foundHeaders = false;
+  const aliases: Record<string, string[]> = {
+    itemCode: ["itemcode", "catno", "catnumber", "productcode"],
+    division: ["division"],
+    series: ["seriesrange", "series", "range"],
+    productName: ["productname", "product"],
+    size: ["size"],
+    mrp: ["mrp", "mrpw.e.f", "mrpw.eff", "mrpwith effect"],
+    effectiveDate: ["priceinforcesince", "effectiveDate", "inforcesince"],
+  };
+  for (const sheetName of workbook.SheetNames) {
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
+      header: 1,
+      defval: null,
+      raw: true,
+    });
+    if (!grid.some((row) => row.some((cell) => norm(cell))) || foundHeaders) continue;
+    let headerRow = -1;
+    let columns = new Map<string, number>();
+    for (let index = 0; index < Math.min(grid.length, 20); index += 1) {
+      const candidate = new Map<string, number>();
+      (grid[index] ?? []).forEach((cell, column) => {
+        const key = newProductHeaderKey(cell);
+        for (const [name, accepted] of Object.entries(aliases)) {
+          if (accepted.some((alias) => key === newProductHeaderKey(alias) || key.startsWith(newProductHeaderKey(alias)))) {
+            candidate.set(name, column);
+          }
+        }
+      });
+      if (
+        ["itemCode", "division", "series", "productName", "size", "mrp", "effectiveDate"]
+          .every((name) => candidate.has(name))
+      ) {
+        headerRow = index;
+        columns = candidate;
+        break;
+      }
+    }
+    if (headerRow < 0) continue;
+    foundHeaders = true;
+    for (let index = headerRow + 1; index < grid.length; index += 1) {
+      const input = grid[index] ?? [];
+      if (!input.some((cell) => norm(cell))) continue;
+      const itemCode = norm(input[columns.get("itemCode")!]) || null;
+      const division = norm(input[columns.get("division")!]);
+      const series = norm(input[columns.get("series")!]) || null;
+      const productName = norm(input[columns.get("productName")!]);
+      const size = norm(input[columns.get("size")!]) || null;
+      const rawMrp = input[columns.get("mrp")!];
+      const mrp = typeof rawMrp === "number" ? rawMrp : Number(String(rawMrp ?? "").replace(/[,₹Rs\s]/gi, ""));
+      const effectiveDate = newProductDate(input[columns.get("effectiveDate")!]);
+      const reason =
+        !itemCode ? "Missing item code." :
+        !division ? "Missing division." :
+        !productName ? "Missing product name." :
+        !Number.isFinite(mrp) || mrp <= 0 ? "MRP must be a positive number." :
+        !effectiveDate ? "Effective date must be a valid date." :
+        null;
+      if (reason) {
+        rejectedRows.push({ row: index + 1, itemCode, reason });
+      } else {
+        rows.push({ itemCode: itemCode!, division, series, seriesRange: series, productName, size, mrp, effectiveDate: effectiveDate!, row: index + 1 });
+      }
+    }
+  }
+  if (!foundHeaders) throw new Error("Workbook must contain all seven columns: item_code, division, series, product_name, size, mrp, and effective_date.");
+  return { rows, rejectedRows };
+}
+
+function newProductsResponse(batch: typeof mrpPendingBatchesTable.$inferSelect) {
+  const preview = JSON.parse(batch.preview);
+  return {
+    batchId: batch.id,
+    status: batch.status,
+    expiresAt: batch.expiresAt,
+    fileName: batch.fileName,
+    fileSha256: batch.fileSha256,
+    catalogBefore: preview.catalogBefore,
+    catalogAfter: preview.catalogAfter,
+    willCreateCount: preview.willCreateCount,
+    rejectedCount: preview.rejectedCount,
+    immediateCount: preview.immediateCount,
+    immediateMessage: preview.immediateMessage,
+    preview,
+    result: batch.result ? JSON.parse(batch.result) : null,
+  };
+}
+
+const P019_PRINCE_REMAP: Record<string, string> = {
+  SIM200965: "U-11CS",
+  SIM200960: "U-13CS",
+  SIM200961: "U-14CS",
+  SIM200962: "U-15CS",
+  SIM200963: "U-16CS",
+  SIM200955: "U-13BS",
+  SIM200956: "U-14BS",
+};
+
+export async function applyP019PrinceRematch(
+  tx: DatabaseTransaction,
+  createdRows: NewProductRow[],
+  today: string,
+) {
+  const createdCodes = new Set(createdRows.map((row) => normCode(row.itemCode)));
+  const products = await tx.select({
+    itemCode: catalogProductsTable.itemCode,
+    isActive: catalogProductsTable.isActive,
+    discontinuedFrom: catalogProductsTable.discontinuedFrom,
+  }).from(catalogProductsTable);
+  const canonicalProduct = new Map(products.map((row) => [normCode(row.itemCode), row]));
+  const candidates = await tx.select({
+    id: competitorPriceStagingTable.id,
+    batchId: competitorPriceStagingTable.batchId,
+    competitorCodeMaster: competitorPriceStagingTable.competitorCodeMaster,
+    competitorCodeCatalogue: competitorPriceStagingTable.competitorCodeCatalogue,
+    competitor: competitorPriceStagingTable.competitor,
+    newMrp: competitorPriceStagingTable.newMrp,
+    oldMrp: competitorPriceStagingTable.oldMrp,
+    status: competitorPriceStagingTable.status,
+    reviewReason: competitorPriceStagingTable.reviewReason,
+  }).from(competitorPriceStagingTable).where(and(
+    eq(competitorPriceStagingTable.competitor, "Prince"),
+    eq(competitorPriceStagingTable.status, "needs_review"),
+    sql`${competitorPriceStagingTable.matchedPrayagCode} IS NULL`,
+    eq(competitorPriceStagingTable.reviewReason, "No verified Prayag product match."),
+  ));
+  const batches = await tx.select({
+    id: importBatchesTable.id,
+    effectiveDate: importBatchesTable.effectiveDate,
+  }).from(importBatchesTable).where(inArray(importBatchesTable.id, [...new Set(candidates.map((row) => row.batchId))]));
+  const batchDate = new Map(batches.map((row) => [row.id, row.effectiveDate]));
+  const affectedCandidateBatchIds = new Set(candidates.map((row) => row.batchId));
+  const moved: Array<{ competitorCode: string; prayagCode: string; batchId: number }> = [];
+  const affectedBatchIds = new Set<number>();
+  for (const row of candidates) {
+    const masterCode = normCode(row.competitorCodeMaster);
+    const catalogueCode = normCode(row.competitorCodeCatalogue);
+    const rawCompetitorCode = P019_PRINCE_REMAP[masterCode]
+      ? masterCode
+      : catalogueCode;
+    const mappedCode = P019_PRINCE_REMAP[masterCode] ?? P019_PRINCE_REMAP[catalogueCode];
+    if (!mappedCode || !createdCodes.has(normCode(mappedCode))) continue;
+    const product = canonicalProduct.get(normCode(mappedCode));
+    const effectiveDate = batchDate.get(row.batchId) ?? today;
+    const activeOnDate = product?.isActive && (!product.discontinuedFrom || product.discontinuedFrom > effectiveDate);
+    if (!product || !activeOnDate) continue;
+    const targetDate = effectiveDate < today ? effectiveDate : today;
+    const history = await tx.select({
+      mrp: mrpPriceHistoryTable.mrp,
+    }).from(mrpPriceHistoryTable).where(and(
+      eq(mrpPriceHistoryTable.itemCode, product.itemCode),
+      eq(mrpPriceHistoryTable.variant, "Standard"),
+      eq(mrpPriceHistoryTable.reviewStatus, "approved"),
+      lte(mrpPriceHistoryTable.effectiveDate, targetDate),
+    )).orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id)).limit(1);
+    const prayagMrp = history[0]?.mrp ?? null;
+    const competitorPrice = row.newMrp ?? row.oldMrp;
+    const gapPct = prayagMrp != null && competitorPrice != null && prayagMrp !== 0
+      ? ((competitorPrice - prayagMrp) / prayagMrp) * 100
+      : null;
+    await tx.update(competitorPriceStagingTable).set({
+      matchedPrayagCode: product.itemCode,
+      status: "ok",
+      matchMethod: "trusted_prince_master_p019",
+      reviewReason: null,
+      prayagMrpCurrent: prayagMrp,
+      gapPct,
+    }).where(eq(competitorPriceStagingTable.id, row.id));
+    moved.push({ competitorCode: rawCompetitorCode, prayagCode: product.itemCode, batchId: row.batchId });
+    affectedBatchIds.add(row.batchId);
+  }
+  if (affectedBatchIds.size) {
+    for (const batchId of affectedBatchIds) {
+      const counts = await tx.select({
+        status: competitorPriceStagingTable.status,
+        count: sql<number>`count(*)::int`,
+      }).from(competitorPriceStagingTable).where(eq(competitorPriceStagingTable.batchId, batchId)).groupBy(competitorPriceStagingTable.status);
+      const [batch] = await tx.select({ rowCounts: importBatchesTable.rowCounts }).from(importBatchesTable).where(eq(importBatchesTable.id, batchId)).limit(1);
+      const prior = batch?.rowCounts ? JSON.parse(batch.rowCounts) as Record<string, unknown> : {};
+      const next: Record<string, unknown> = { ...prior, ok: 0, needs_review: 0, not_found: 0, new_products: 0 };
+      for (const count of counts) {
+        if (count.status in next) next[count.status] = count.count;
+      }
+      await tx.update(importBatchesTable).set({ rowCounts: JSON.stringify(next) }).where(eq(importBatchesTable.id, batchId));
+    }
+  }
+  const remaining = affectedCandidateBatchIds.size === 0 ? [] : await tx.select({
+    batchId: competitorPriceStagingTable.batchId,
+    competitorCodeMaster: competitorPriceStagingTable.competitorCodeMaster,
+    competitorCodeCatalogue: competitorPriceStagingTable.competitorCodeCatalogue,
+    matchedPrayagCode: competitorPriceStagingTable.matchedPrayagCode,
+    status: competitorPriceStagingTable.status,
+  }).from(competitorPriceStagingTable).where(and(
+    eq(competitorPriceStagingTable.competitor, "Prince"),
+    eq(competitorPriceStagingTable.status, "needs_review"),
+    inArray(competitorPriceStagingTable.batchId, [...affectedCandidateBatchIds]),
+  ));
+  return {
+    movedCount: moved.length,
+    byCompetitor: { Prince: moved },
+    remainingNeedsReview: remaining.map((row) => ({
+      batchId: row.batchId,
+      competitorCode: normCode(row.competitorCodeMaster ?? row.competitorCodeCatalogue),
+      prayagCode: row.matchedPrayagCode,
+      status: row.status,
+    })),
+  };
+}
 
 export function pendingAuthoritativePreview(
   parsed: ParsedAuthoritativeMaster,
@@ -1304,6 +1569,197 @@ async function persistParsedRows(
 
   return summary;
 }
+
+router.post("/catalog/new-products/preview", requireAdmin, upload.single("file"), async (req, res): Promise<void> => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: "No workbook uploaded." });
+    return;
+  }
+  if (!/\.(xlsx|xls)$/i.test(file.originalname)) {
+    res.status(400).json({ error: "New products upload accepts .xlsx or .xls files only." });
+    return;
+  }
+  if (!previewReason(req.body?.reason)) {
+    res.status(400).json({ error: "A reason is required for a new-products upload." });
+    return;
+  }
+  try {
+    const parsed = parseNewProductsWorkbook(file.buffer);
+    const fileSha256 = sha256ForBuffer(file.buffer);
+    await db.insert(mrpSourcesTable).values(NEW_PRODUCTS_SOURCE).onConflictDoNothing({ target: mrpSourcesTable.sheetId });
+    const [source] = await db.select().from(mrpSourcesTable).where(eq(mrpSourcesTable.sheetId, NEW_PRODUCTS_SOURCE.sheetId)).limit(1);
+    if (!source) throw new Error("New-products provenance source could not be created.");
+    const [duplicateLoad] = await db.select({ id: mrpLoadBatchesTable.id }).from(mrpLoadBatchesTable)
+      .where(and(eq(mrpLoadBatchesTable.sourceId, source.id), eq(mrpLoadBatchesTable.fileSha256, fileSha256))).limit(1);
+    const [duplicatePending] = await db.select({ id: mrpPendingBatchesTable.id }).from(mrpPendingBatchesTable)
+      .where(and(eq(mrpPendingBatchesTable.sourceId, source.id), eq(mrpPendingBatchesTable.fileSha256, fileSha256), eq(mrpPendingBatchesTable.status, "pending"), gt(mrpPendingBatchesTable.expiresAt, new Date()))).limit(1);
+    if (duplicateLoad || duplicatePending) {
+      res.status(409).json({ error: duplicatePending ? "This new-products workbook is already awaiting review." : "This new-products workbook has already been applied.", duplicate: true });
+      return;
+    }
+    const existing = await db.select({ itemCode: catalogProductsTable.itemCode, productName: catalogProductsTable.productName }).from(catalogProductsTable);
+    const existingCodes = new Set(existing.map((row) => normCode(row.itemCode)));
+    const seen = new Set<string>();
+    const rejectedRows = [...parsed.rejectedRows];
+    const accepted: NewProductRow[] = [];
+    for (const row of parsed.rows) {
+      const code = normCode(row.itemCode);
+      if (existingCodes.has(code)) {
+        rejectedRows.push({ row: row.row, itemCode: row.itemCode, reason: "This code already exists in the catalogue. Use the MRP revision upload to change its price." });
+      } else if (seen.has(code)) {
+        rejectedRows.push({ row: row.row, itemCode: row.itemCode, reason: "Duplicate item code in this workbook." });
+      } else {
+        seen.add(code);
+        accepted.push(row);
+      }
+    }
+    const history = await db.select({ effectiveDate: mrpPriceHistoryTable.effectiveDate }).from(mrpPriceHistoryTable);
+    const periodCounts = new Map<string, number>();
+    history.forEach((row) => periodCounts.set(row.effectiveDate, (periodCounts.get(row.effectiveDate) ?? 0) + 1));
+    const today = new Date().toISOString().slice(0, 10);
+    const periods = [...new Set(accepted.map((row) => row.effectiveDate))].sort().map((effectiveDate) => {
+      const existingRowCount = periodCounts.get(effectiveDate) ?? 0;
+      const createCount = accepted.filter((row) => row.effectiveDate === effectiveDate).length;
+      return {
+        effectiveDate,
+        isNew: existingRowCount === 0,
+        isExisting: existingRowCount > 0,
+        existingRowCount,
+        existingCount: existingRowCount,
+        createCount,
+        afterRowCount: existingRowCount + createCount,
+        afterCount: existingRowCount + createCount,
+        goesLiveImmediately: effectiveDate <= today,
+        isImmediate: effectiveDate <= today,
+      };
+    });
+    const preview = {
+      kind: "new-products", mode: "new_products",
+      reason: req.body.reason.trim(),
+      fileName: file.originalname,
+      fileSha256,
+      willCreate: accepted, rejectedRows, rowsToCreate: accepted.length,
+      willCreateCount: accepted.length,
+      rejectedCount: rejectedRows.length,
+      catalogBeforeCount: existing.length, catalogAfterCount: existing.length + accepted.length,
+      catalogBefore: existing.length, catalogAfter: existing.length + accepted.length,
+      periods,
+      immediateProductCount: accepted.filter((row) => row.effectiveDate <= today).length,
+      immediateCount: accepted.filter((row) => row.effectiveDate <= today).length,
+      immediateMessage: accepted.some((row) => row.effectiveDate <= today)
+        ? `${accepted.filter((row) => row.effectiveDate <= today).length} product(s) will go live immediately because the effective date has passed.`
+        : null,
+      canApply: accepted.length > 0,
+      noChangeReason: accepted.length > 0 ? null : "No valid new products would be created.",
+    };
+    const [pending] = await db.insert(mrpPendingBatchesTable).values({
+      sourceId: source.id, fileName: file.originalname, fileSha256, fileSizeBytes: file.size,
+      downloadedAt: today, uploadedBy: req.user?.email ?? req.user?.id ?? null,
+      payload: JSON.stringify({ kind: "new_products", reason: preview.reason, rows: accepted }),
+      preview: JSON.stringify(preview), expiresAt: new Date(Date.now() + PENDING_MRP_BATCH_LIFETIME_MS),
+    }).returning();
+    res.json(newProductsResponse(pending!));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not read new-products workbook." });
+  }
+});
+
+router.get("/catalog/new-products/:batchId", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.batchId);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "batchId must be a positive integer." }); return; }
+  const [batch] = await db.select().from(mrpPendingBatchesTable).where(eq(mrpPendingBatchesTable.id, id)).limit(1);
+  if (!batch) { res.status(404).json({ error: "New-products batch not found." }); return; }
+  const [source] = await db.select({ sourceKind: mrpSourcesTable.sourceKind }).from(mrpSourcesTable).where(eq(mrpSourcesTable.id, batch.sourceId)).limit(1);
+  if (source?.sourceKind !== "new_products") { res.status(404).json({ error: "New-products batch not found." }); return; }
+  res.json(newProductsResponse(batch));
+});
+
+router.post("/catalog/new-products/:batchId/discard", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.batchId);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "batchId must be a positive integer." }); return; }
+  const [sourceForBatch] = await db.select({ sourceKind: mrpSourcesTable.sourceKind }).from(mrpPendingBatchesTable)
+    .innerJoin(mrpSourcesTable, eq(mrpPendingBatchesTable.sourceId, mrpSourcesTable.id))
+    .where(eq(mrpPendingBatchesTable.id, id)).limit(1);
+  if (sourceForBatch?.sourceKind !== "new_products") { res.status(404).json({ error: "New-products batch not found." }); return; }
+  const [batch] = await db.update(mrpPendingBatchesTable).set({
+    status: "discarded", discardedAt: new Date(), discardedBy: req.user?.email ?? req.user?.id ?? null,
+  }).where(and(eq(mrpPendingBatchesTable.id, id), eq(mrpPendingBatchesTable.status, "pending"))).returning();
+  if (!batch) { res.status(409).json({ error: "Only a pending new-products batch can be discarded." }); return; }
+  res.json(newProductsResponse(batch));
+});
+
+router.post("/catalog/new-products/:batchId/apply", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.batchId);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "batchId must be a positive integer." }); return; }
+  const confirmed = Number(req.body?.rowsToCreate);
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(917_902)`);
+      const [batch] = await tx.select().from(mrpPendingBatchesTable).where(eq(mrpPendingBatchesTable.id, id)).limit(1);
+      if (!batch) throw new Error("New-products batch not found.");
+      const [source] = await tx.select({ sourceKind: mrpSourcesTable.sourceKind }).from(mrpSourcesTable).where(eq(mrpSourcesTable.id, batch.sourceId)).limit(1);
+      if (source?.sourceKind !== "new_products") throw new Error("New-products batch not found.");
+      if (batch.status !== "pending") throw new Error(`New-products batch is ${batch.status}; only pending batches can be applied.`);
+      if (batch.expiresAt <= new Date()) {
+        await tx.update(mrpPendingBatchesTable).set({ status: "expired" }).where(eq(mrpPendingBatchesTable.id, id));
+        throw new Error("New-products batch has expired and cannot be applied.");
+      }
+      const preview = JSON.parse(batch.preview) as {
+        canApply: boolean;
+        rowsToCreate: number;
+        willCreate: NewProductRow[];
+        noChangeReason: string | null;
+        catalogBefore: number;
+        catalogAfter: number;
+        periods: unknown[];
+      };
+      if (!preview.canApply) throw new Error(preview.noChangeReason ?? "No valid new products would be created.");
+      if (confirmed !== preview.rowsToCreate) throw new Error(`Confirmation must repeat ${preview.rowsToCreate} products to create.`);
+      const payload = JSON.parse(batch.payload) as { rows: NewProductRow[]; reason?: string };
+      const existing = await tx.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
+      const existingCodes = new Set(existing.map((row) => normCode(row.itemCode)));
+      if (payload.rows.some((row) => existingCodes.has(normCode(row.itemCode)))) throw new Error("One or more products now exist in the catalogue. Refresh the preview; no rows were written.");
+      const [load] = await tx.insert(mrpLoadBatchesTable).values({
+        sourceId: batch.sourceId, fileName: batch.fileName, fileSha256: batch.fileSha256, fileSizeBytes: batch.fileSizeBytes,
+        downloadedAt: batch.downloadedAt, loadedBy: req.user?.email ?? req.user?.id ?? null, rowCount: payload.rows.length,
+        notes: JSON.stringify({ mode: "new_products", reason: payload.reason ?? "" }),
+      }).returning({ id: mrpLoadBatchesTable.id });
+      if (!load) throw new Error("Could not create load provenance batch.");
+      const today = new Date().toISOString().slice(0, 10);
+      await tx.insert(catalogProductsTable).values(payload.rows.map((row) => ({
+        itemCode: row.itemCode, productName: row.productName, division: row.division, seriesRange: row.series, size: row.size,
+        sourceFiles: batch.fileName, dataFlag: "new_products_upload",
+      })));
+      const insertedHistory = await tx.insert(mrpPriceHistoryTable).values(payload.rows.map((row) => ({
+        itemCode: row.itemCode, mrp: row.mrp, priceBasis: "MRP", effectiveDate: row.effectiveDate, loadDate: today,
+        sourceFile: batch.fileName, reviewStatus: "approved", reviewedAt: new Date(), loadBatchId: load.id, variant: "Standard",
+        notes: "Created by new-products upload",
+      }))).returning({ id: mrpPriceHistoryTable.id, itemCode: mrpPriceHistoryTable.itemCode, effectiveDate: mrpPriceHistoryTable.effectiveDate, mrp: mrpPriceHistoryTable.mrp });
+      await tx.insert(mrpHistoryProvenanceEventsTable).values(insertedHistory.map((row) => ({
+        historyRowId: row.id, itemCode: row.itemCode, effectiveDate: row.effectiveDate, action: "new_product_upload",
+        sourceFile: batch.fileName, loadBatchId: load.id, mrp: row.mrp,
+      })));
+      await recomputeCurrentFlagsInTransaction(tx);
+      const competitorEffect = await applyP019PrinceRematch(tx, payload.rows, today);
+      const result = {
+        kind: "new_products", mode: "new_products", loadBatchId: load.id, createdProducts: payload.rows.length,
+        createdCount: payload.rows.length,
+        catalogBefore: preview.catalogBefore,
+        catalogAfter: preview.catalogAfter,
+        periods: preview.periods,
+        competitorEffect,
+      };
+      await tx.update(mrpPendingBatchesTable).set({
+        status: "applied", appliedAt: new Date(), appliedBy: req.user?.email ?? req.user?.id ?? null, loadBatchId: load.id, result: JSON.stringify(result),
+      }).where(eq(mrpPendingBatchesTable.id, id));
+      return { batchId: id, status: "applied", preview, result };
+    });
+    res.json(outcome);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Could not apply new-products batch." });
+  }
+});
 
 router.get("/catalog/mrp-loads/:batchId", requireAdmin, async (req, res): Promise<void> => {
   const id = Number(req.params.batchId);

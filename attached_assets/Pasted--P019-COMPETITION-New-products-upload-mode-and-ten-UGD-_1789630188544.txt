@@ -1,0 +1,211 @@
+# P019 — COMPETITION — New-products upload mode, and ten UGD Pipe products
+
+> **P019** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE/DATA.**
+> **Revision 2** — adds the new-products upload mode. The ten products are the first use of it.
+> Quote `P019` when reporting back.
+
+Two things. A **new-products upload mode**, because adding ten products should not require the full catalogue loader. And the ten UGD Self Fit Pipe products that prompted it, which also close most of an open gap on the Prince side.
+
+Build section 3 first, then use it for the rest.
+
+Input file: `New_Products_-_Prayag.xlsx`, sheet `Sheet1`
+SHA-256: `b50914c28bdbf81c54dd8f2c1eb5d0660a125f65ff837b8ecbe096b84ba4b73b`
+
+---
+
+## 1. The products
+
+```
+Cat No.    Product                              MRP        In force since
+U-11CS     UGD Self Fit Pipe (6 Mtr) SN-8      2,987      2026-08-10
+U-12CS     UGD Self Fit Pipe (6 Mtr) SN-8      4,582      2026-08-10
+U-13CS     UGD Self Fit Pipe (6 Mtr) SN-8      6,322      2026-08-10
+U-14CS     UGD Self Fit Pipe (6 Mtr) SN-8     10,005      2026-08-10
+U-15CS     UGD Self Fit Pipe (6 Mtr) SN-8     15,805      2026-08-10
+U-16CS     UGD Self Fit Pipe (6 Mtr) SN-8     25,230      2026-08-10
+U-11BS     UGD Self Fit Pipe (6 Mtr) SN-4      2,196      2026-08-10
+U-12BS     UGD Self Fit Pipe (6 Mtr) SN-4      2,896      2026-08-10
+U-13BS     UGD Self Fit Pipe (6 Mtr) SN-4      4,790      2026-08-10
+U-14BS     UGD Self Fit Pipe (6 Mtr) SN-4      7,368      2026-08-10
+```
+
+Division **Pipes & Fittings**, series **UGD Pipe**. Two SN grades — SN-8 (the `CS` codes) and SN-4 (the `BS` codes) — in ascending size order within each.
+
+**Verified: none of the ten exists in the catalogue.** All are genuinely new. The catalogue currently holds 38 UGD products, all fittings (`PU-` codes); these are the first UGD *pipes*.
+
+---
+
+## 2. Two things about the date
+
+**`2026-08-10` is an existing period.** The Pipes & Fittings revision of 10 August already holds 580 rows. These join it rather than creating a new one.
+
+**It is already past.** These products go live the moment they load, and will appear in the catalogue and Price Finder immediately. That is correct — they have been sellable since 10 August — but report how many products the catalogue gains so nobody is surprised by the count moving.
+
+---
+
+## 3. A new-products upload mode
+
+Today the options are the **MRP revision upload**, which by design cannot create a product, and the **Load MRP** form, built for a full authoritative catalogue. Neither fits ten new products, and the loader is far too heavy an instrument for it.
+
+Add a third mode. Small, explicit, and narrower than both.
+
+### It is for Prayag products only
+
+**The mode must not be available on competitor uploads.** A competitor file has never been allowed to create a Prayag product, and that rule is load-bearing — it is what stops a Sparsh or Prince catalogue inventing entries in our own. Do not offer the option there at all; an option that must never be chosen is still a way to choose it.
+
+### What it accepts
+
+```
+item_code · division · series · product_name · size · mrp · effective_date
+```
+
+Same shape as the authoritative master's `products` sheet, so a slice of that file works without reformatting.
+
+### Creating a product is not the same as changing a price
+
+The preview must separate the two plainly:
+
+```
+Will CREATE 10 products
+  U-11CS   UGD Self Fit Pipe (6 Mtr) SN-8   Rs 2,987   from 10 Aug 2026
+  U-12CS   ...
+
+Rejected 2 rows
+  PU-3311  already exists in the catalogue.
+           Use the price revision upload to change its price.
+```
+
+**An existing code is a rejection, not an update.** If a row names a code already in the catalogue, that is not a new product — reject it and say which tool handles it. Silently updating an existing product from a file labelled "new products" is how a price changes without anyone deciding it should.
+
+### Periods
+
+A row may name an **existing** period, as these ten do with `2026-08-10`, or a genuinely new one. Both are legitimate for a loader — but state clearly which is happening:
+
+```
+2026-08-10   existing period, currently 580 rows   ->   590
+```
+
+If the date has already passed, say so and give the count going live immediately.
+
+### After it commits, report the competitor effect
+
+Adding a Prayag product can resolve competitor rows that were waiting for it — as these ten do for Prince. The upload should report that without being asked:
+
+```
+7 competitor rows moved from Needs Review to Ready
+  Prince: SIM200965, SIM200960, SIM200961, SIM200962,
+          SIM200963, SIM200955, SIM200956
+```
+
+That is the connection someone would otherwise have to go and look for.
+
+### Provenance
+
+A load batch as usual — file name, SHA-256, upload date, reason, and the mode used. A batch that created products should be distinguishable from one that loaded prices.
+
+---
+
+## 4. Loading these ten
+
+Use the new mode. Reason: *"Ten new UGD Self Fit Pipe products supplied by Prayag."*
+
+Nothing else in the catalogue changes. No existing product, price or period is touched.
+
+---
+
+## 5. What this resolves on the Prince side
+
+Prince batch 16 currently has **10 rows in Needs Review** — Prince prices whose paired Prayag code does not exist in our catalogue.
+
+**Seven of those ten are in this file:**
+
+```
+Prince       Prayag     now resolved
+SIM200965    U-11CS     yes
+SIM200960    U-13CS     yes
+SIM200961    U-14CS     yes
+SIM200962    U-15CS     yes
+SIM200963    U-16CS     yes
+SIM200955    U-13BS     yes
+SIM200956    U-14BS     yes
+```
+
+**After loading these ten, re-run the Prince match.** Those seven should move from Needs Review to Ready.
+
+Three remain open and are not in this file:
+
+```
+C133     paired with Prince IT101915    CPVC Fittings
+PMR-8    paired with Prince SIM200923   Casing Pipe
+PMR-9    paired with Prince SIM200928   Casing Pipe
+```
+
+Report them again after the reload so they stay visible.
+
+**Three of the ten have no Prince pairing** — `U-11BS`, `U-12BS`, `U-12CS`. Prince may not carry those sizes.
+
+### Where the seven will sit once matched
+
+Worth knowing before anyone reads the comparison, because the two grades point in opposite directions:
+
+```
+SN-8 grade -- Prince cheaper on every size, widening with size
+  U-11CS   2,987  vs  2,951    -1.2%
+  U-13CS   6,322  vs  6,182    -2.2%
+  U-14CS  10,005  vs  9,675    -3.3%
+  U-15CS  15,805  vs 15,075    -4.6%
+  U-16CS  25,230  vs 24,074    -4.6%
+
+SN-4 grade -- Prayag cheaper
+  U-13BS   4,790  vs  5,303   +10.7%
+  U-14BS   7,368  vs  8,064    +9.4%
+```
+
+One product family, two grades, opposite positions. Report it as a finding rather than folding it into a UGD average, which would show roughly zero and hide both.
+
+---
+
+## 6. Acceptance tests
+
+```
+1.  Ten products exist in catalog_products, division Pipes & Fittings,
+    series UGD Pipe.
+2.  Ten mrp_price_history rows at effective_date 2026-08-10, matching the
+    MRPs above exactly.
+3.  The 2026-08-10 period grows from 580 to 590 rows.
+4.  U-16CS resolves to 25,230 today; U-11BS to 2,196.
+5.  Every new row carries a load_batch_id.
+6.  Catalogue count rises by exactly 10 — no other product created.
+7.  No existing price, period or product is modified.
+8.  After re-running the Prince match, seven of the ten Needs Review rows
+    move to Ready.
+9.  C133, PMR-8 and PMR-9 remain in Needs Review and are reported.
+10. Sparsh and Ashirvad mappings are unchanged.
+
+11. The new-products mode is NOT offered on a competitor upload.
+12. A row naming an existing catalogue code is REJECTED, with the reason
+    naming the price revision tool — never silently updated.
+13. The preview separates "will create" from "rejected", and states whether
+    each period is existing or new.
+14. A past effective date reports how many products go live immediately.
+15. The commit reports competitor rows that moved out of Needs Review.
+16. The batch records that it created products, distinguishably from a
+    price load.
+```
+
+Test 12 is the one that keeps the mode safe — a file called "new products" must never change an existing price. Test 11 protects the rule that a competitor file cannot create a Prayag product. Test 7 remains the guard for this particular load: it is an addition, and nothing existing should move.
+
+---
+
+## 7. Report
+
+- Catalogue and MRP history counts, before and after.
+- The 2026-08-10 period row count, before and after.
+- The batch id.
+- Prince Needs Review, before and after the re-match.
+- Confirmation that no existing price or product changed.
+- The new-products upload screen, and what it shows for a rejected existing code.
+- Confirmation that the mode is unavailable on competitor uploads.
+
+Build the mode, load these ten in development, verify, then production.

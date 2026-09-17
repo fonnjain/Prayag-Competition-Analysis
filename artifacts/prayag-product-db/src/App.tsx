@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import CatalogPage from "@/pages/catalog";
 import ProductDetailPage from "@/pages/product-detail";
 import LoadMrpPage from "@/pages/load-mrp";
+import NewProductsPage from "@/pages/new-products";
 import DataHealthPage from "@/pages/data-health";
 import ComparisonPage from "@/pages/comparison";
 import MappingReviewPage from "@/pages/mapping-review";
@@ -113,6 +114,7 @@ function Router() {
       <Route path="/product" component={ProductDetailPage} />
       <Route path="/product/:itemCode" component={ProductDetailPage} />
       <Route path="/load-mrp" component={LoadMrpPage} />
+      <Route path="/new-products" component={NewProductsPage} />
       <Route path="/data-health" component={DataHealthPage} />
       <Route path="/comparison" component={ComparisonPage} />
       <Route path="/mapping-review" component={MappingReviewPage} />
