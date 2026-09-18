@@ -235,3 +235,17 @@ mtime_ms = 1788857208898
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/055f2faf-8b1c-4c94-9a50-09733893be22/9da2747f-ea5d-40dc-a3d6-a6c911e504da"
 storage_version_token = "1788857267100278"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "pyKZXpjB8rpxyBzrgsZ3H"
+uri = "file://reports/P021_SALES_Read_Only_Investigation.docx"
+type = "word_document"
+title = "P021 — SALES Read-Only Investigation"
+description = "Word document containing the MRP refresh-path investigation, count reconciliation, source split, historical-price findings, limitations, and visibility recommendations."
+logical_id = "c2ceb502-6c11-4f19-a7ad-bbf4130ccccd"
+content_hash = "sha256:64c07f79576dd3cec9fbbd62e3981c69f4be384ce6d7e841d67fef5e23b86a77"
+size = 9294
+mtime_ms = 1789714832503
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c2ceb502-6c11-4f19-a7ad-bbf4130ccccd/e01bdd4b-31d6-41eb-871b-be7d983d889f"
+storage_version_token = "1789714846179668"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
