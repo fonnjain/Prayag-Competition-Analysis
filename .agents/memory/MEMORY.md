@@ -29,3 +29,4 @@
 - [MRP Generator safety boundary](mrp-generator-safety.md) — immutable deterministic runs never write prices; exact-current, single-period suggestions can only enter the revision preview.
 - [PDF detector failure policy](pdf-detector-failure-policy.md) — all-zero sampled text is extractor failure, never evidence for silently recommending vision.
 - [P019 new-product rematch boundary](p019-new-product-rematch.md) — the seven Prince rematches are a fixed staging-only exception, not a reusable general matcher.
+- [Single-product creation audits](single-product-creation-audits.md) — creation/deactivation use save audits distinguished by series; keep the production save/reversal constraint unchanged.

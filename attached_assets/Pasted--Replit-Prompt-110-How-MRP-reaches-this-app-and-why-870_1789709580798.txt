@@ -1,0 +1,180 @@
+# Replit Prompt 110 — How MRP reaches this app, and why 870 codes have none
+
+**Date:** 18 September 2026
+**Scope:** All read-only. Change nothing.
+
+**Standing rule:** every figure states which database or source it came from.
+
+---
+
+## Two questions, and the second explains the first
+
+**Q7:** 870 sold codes have no MRP, worth ₹11.03 Cr — 328 selling steadily at
+₹5.19 Cr. That should not be possible for a product being sold.
+
+**The cadence question:** how often does this app fetch MRP from the pricing app,
+and what happens to a code the pricing app does not yet know about?
+
+**And one interpretation to apply throughout:** a code with **no historic price
+for a period is treated as not offered in that period**, not as a price of zero
+and not as missing data. A product that had no price in March was not for sale in
+March.
+
+---
+
+## Section A — the refresh path
+
+```
+Read-only.
+
+A1. HOW DOES MRP REACH THIS APP? Print the full path:
+      what fetches it - a scheduled job, a startup task, an on-demand call
+      from where - prayag-price.com, a Drive workbook, an API, a scrape
+      into which table - mrp_current_catalogue, mrp_history, something else
+      what the trigger is and what the interval is
+
+A2. WHEN DID IT LAST RUN? Print the last twenty fetches with timestamps,
+    row counts and outcomes.
+
+    NOTE THE KNOWN PATTERN: the MRP refresh was found to be RESTART-DRIVEN,
+    firing 18 times in 10 days on deployments rather than on a schedule.
+    Confirm whether that is still the case.
+
+    A restart-driven refresh means the price data is as fresh as the last
+    deploy, not as fresh as the last price change.
+
+A3. IS THERE A SCHEDULE AT ALL? If the interval is nominal but the actual
+    trigger is process start, say so plainly.
+
+A4. WHAT HAPPENS ON FAILURE? If the fetch fails, does the app keep the
+    previous catalogue, serve nothing, or serve partial data? Print the
+    behaviour and whether a failure is visible anywhere.
+
+A5. HOW WOULD ANYONE KNOW THE CATALOGUE IS STALE? Is there a freshness
+    indicator on any surface, or in Data Health?
+```
+
+---
+
+## Section B — why 870 codes have no price
+
+```
+Read-only.
+
+B1. ARE THEY ABSENT FROM THE PRICING APP, OR LOST IN TRANSIT?
+
+    For the 870, check each against the pricing source directly:
+      present in the pricing app, absent from our catalogue  -> transit loss
+      absent from the pricing app too                        -> genuinely unpriced
+
+    That split decides whether this is our problem or Prayag's. Print
+    counts and value for each.
+
+B2. IF ANY ARE TRANSIT LOSSES, why? Candidates:
+      code normalisation - case, hyphens, whitespace (see rules 8.1, 8.5)
+      division or series filtering excluding them
+      a row limit or pagination cutoff
+      an exclusion list applied at fetch time
+
+    The P008 hyphen work recovered 8 codes worth Rs 54.17 lakh from exactly
+    this class of defect. Check whether more remain.
+
+B3. THE 328 STEADY SELLERS ARE THE PRIORITY. Print them with:
+      code, group, FY2026-27 quantity and value
+      whether the pricing app knows the code
+      last month sold
+
+    A product selling steadily with no price means every discount and
+    realisation figure on it is unusable.
+
+B4. CROSS-CHECK AGAINST WHAT IS ALREADY KNOWN. Several of the 870 are
+    already explained and should not be counted as unexplained:
+      824XD, 924XD, 824SD, HD140B, HD160B, HD200B - ambiguous, Rs 1.50 Cr
+      WCT-3LL-05, -07, -10 - distinct new products, Rs 1.22 Cr
+      324-K, 323-K - recovered by hyphen normalisation
+      70 codes already in the discontinued sheet
+
+    Print the residue after removing those - the genuinely unexplained set.
+```
+
+---
+
+## Section C — historic prices and the "not offered" rule
+
+```
+Read-only. This establishes an interpretation to apply consistently.
+
+RULE TO APPLY: a code with no price effective in a given period was NOT
+OFFERED in that period. It is not a zero price and not missing data.
+
+C1. Does mrp_history support period-effective lookup - "what was this
+    code's price in March 2026" - or does it only hold current prices with
+    an effective date?
+
+    The MRP cache holds 6,109 rows from the pricing app. mrp_history was
+    found stale and only affecting price-shrinker detection.
+
+C2. FOR EACH OF THE 870, was there EVER a price? Print:
+      never priced in any period        -> new or never offered
+      priced previously, not now        -> withdrawn
+      priced now, not when it sold      -> the interesting case
+
+    The third group is the one that matters: a product that sold in a month
+    where it had no effective price.
+
+C3. HOW DOES THE APP CURRENTLY TREAT a sale in a period with no effective
+    price? Does it use the nearest price, the current price, or exclude the
+    row?
+
+    Using the CURRENT price against a past sale would compute a discount
+    against a price that did not exist at the time. Print which it does.
+
+C4. Under the not-offered rule, those rows should be EXCLUDED from discount
+    and realisation calculations, with the exclusion counted and stated -
+    not silently priced at the nearest available figure.
+
+    Print how much value would be excluded on that basis, per FY.
+```
+
+---
+
+## Section D — what would make this visible
+
+```
+Recommend, do not build.
+
+D1. A MRP FRESHNESS INDICATOR. Where should it live - Data Health, or on
+    every surface showing a price-derived figure?
+
+    It should state: when the catalogue was last fetched, how many codes it
+    holds, and how many sold codes it cannot price.
+
+D2. AN UNPRICED-CODE COUNT AS A STANDING CHECK. 870 codes at Rs 11.03 Cr
+    should be a number someone sees, not one that has to be asked for.
+
+    Recommend where it belongs and what threshold should raise it.
+
+D3. Should a discount or realisation figure be shown at all for a group
+    where a material share of value is unpriceable? Recommend a coverage
+    floor, consistent with the 75% rule already agreed for cost roll-ups.
+
+Report only. Do not change the MRP resolver or the fetch schedule.
+```
+
+---
+
+## Notes
+
+- **A2 is the question I would read first.** If the refresh is still
+  restart-driven, the price catalogue is as fresh as the last deployment rather
+  than the last price change — and that alone could explain codes the pricing app
+  has and we do not.
+- **B1 splits the problem in one query.** Present in the pricing app but absent
+  here is our defect; absent in both is Prayag's. The 870 are currently being
+  treated as one thing and they are two.
+- **C3 is the quiet risk.** Applying today's price to a past sale computes a
+  discount against a price that did not exist then. The not-offered rule is the
+  correct treatment and it needs to be stated rather than assumed.
+- **B4 matters for the number itself.** Roughly ₹2.9 Cr of the ₹11.03 Cr is
+  already explained. Quoting 870 unexplained codes overstates the gap, and the
+  residue is the figure worth chasing.

@@ -45,11 +45,11 @@ export default function PriceEditorPage() {
             <TabsTrigger value="correction">Correct price</TabsTrigger>
             <TabsTrigger value="creation">Create product</TabsTrigger>
           </TabsList>
-          
+
           <div className={tab === "correction" ? "mt-6 block" : "hidden"}>
             <PriceCorrectionTab />
           </div>
-          
+
           <div className={tab === "creation" ? "mt-6 block" : "hidden"}>
             <ProductCreationTab />
           </div>
