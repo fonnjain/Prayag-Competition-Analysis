@@ -1,0 +1,141 @@
+# P023 — COMPETITION — Push the workspace to GitHub, and report honestly if it fails
+
+> **P023** · app: **COMPETITION** (`prayag-price.com`)
+> This prompt pushes existing commits. It must not write new application code.
+> Quote `P023` when reporting back.
+
+Push the current workspace to GitHub at `fonnjain/Prayag-Competition-Analysis`, branch `main`.
+
+This has failed silently before. Read section 2 before running anything.
+
+---
+
+## 1. First, report the state — change nothing yet
+
+Run these and paste the **raw output**, not a summary:
+
+```bash
+git remote -v
+git status --short --branch
+git log --oneline -15
+git branch -a
+```
+
+Then, for every remote listed, report:
+
+```bash
+git log --oneline <remote>/main..HEAD     # commits here that the remote does not have
+git log --oneline HEAD..<remote>/main     # commits the remote has that are not here
+```
+
+If a remote cannot be reached to answer that, say so and give the exact error. Do not skip the remote.
+
+**Stop here and report if any of the following is true:**
+
+- the working tree is dirty
+- `HEAD` is not on `main`
+- a remote other than the GitHub one has commits `main` does not
+- there is more than one remote and you are not certain which is GitHub
+
+---
+
+## 2. What went wrong last time
+
+Two facts about this repository, both of which have already caused a loss:
+
+**The GitHub remote is not called `origin`.** It is named `subrepl-3cv9mk78`, or something similar. A push to `origin` may succeed against something that is not GitHub, and the report will say "pushed" while GitHub is untouched. Resolve the remote by its **URL**, not its name — the correct one has `github.com/fonnjain/Prayag-Competition-Analysis` in its URL.
+
+**Commit `89c7f6c` is already in this position.** It exists on the backup remote `gitsafe-backup/main` and has never reached GitHub, because the credential expired at the time. If that commit is still absent from GitHub, it must go up with this push. Confirm explicitly whether it does or does not exist on the GitHub remote.
+
+There is also an **empty repository named `Prayag-Competition-Analysis-New`** on the account. It is not the target. Nothing may be pushed to it.
+
+---
+
+## 3. Push
+
+Once section 1 is reported and clean:
+
+```bash
+git push <github-remote> main
+```
+
+Then verify from the remote, not from local state:
+
+```bash
+git fetch <github-remote>
+git log --oneline <github-remote>/main -10
+git rev-parse HEAD
+git rev-parse <github-remote>/main
+```
+
+The last two must print the same hash. Quote both.
+
+---
+
+## 4. If it fails
+
+**Report the exact error text, verbatim, and stop.**
+
+Do not resolve it by rebasing, squashing, amending, force-pushing, cherry-picking, creating a new branch, creating a new repository, or switching to a different remote. Every one of those hides the cause and some of them lose commits.
+
+The likely causes, in order, so you can say which one it is:
+
+| Symptom | Cause |
+|---|---|
+| `403`, `invalid credentials`, `authentication failed` | the GitHub token has expired — the human must reissue it |
+| `rejected — non-fast-forward` | GitHub has commits this workspace does not; report what they are, do not merge |
+| `remote: Repository not found` | the remote URL points at the wrong repo, possibly `-New` |
+| `file exceeds GitHub's file size limit` | a large file was committed; name it, do not rewrite history |
+| `push declined due to repository rule violations` | secret scanning has caught something — see section 5 |
+
+If the cause is an expired credential, say so plainly. That is a five-minute fix for the human and an unfixable one for you.
+
+---
+
+## 5. Secrets — check before pushing, not after
+
+This workspace holds `SALES_API_KEY`, the credential for `prayag-sales.com`. It lives in Replit Secrets and must **never** appear in a commit.
+
+Before pushing, confirm:
+
+```bash
+git grep -n "pk_02423ac08" $(git rev-list --all) -- 2>/dev/null | head
+git log --all --oneline -S "SALES_API_KEY" -- | head
+```
+
+Report what those return. A key committed once is a key that must be revoked, so it is better to find it now than after it is on GitHub.
+
+Also confirm `.env`, `.env.local` and any file holding a database URL are covered by `.gitignore`.
+
+---
+
+## 6. What must not be in this push
+
+- No application code changes. If the working tree is dirty, report the diff and ask; do not commit it as part of a "push" task.
+- No database changes of any kind.
+- No `.replit` or `replit.nix` edits unless they were already committed.
+- No deletion of the backup remote.
+
+---
+
+## 7. Report
+
+1. Raw output of every command in section 1.
+2. Which remote is GitHub, and its URL.
+3. Whether `89c7f6c` was already on GitHub, and whether it is now.
+4. The list of commits this push carried, oldest first, with hashes and subjects.
+5. `git rev-parse HEAD` and `git rev-parse <github-remote>/main`, both quoted, matching.
+6. The secret-scan results from section 5.
+7. If it failed: the verbatim error, and which row of the section 4 table it matches.
+
+---
+
+## The same prompt for SALES
+
+To push `prayag-sales.com`, reuse this prompt with three substitutions:
+
+- repository `fonnjain/Prayag-Distributor-Ananlysis` *(the misspelling is in the real repository name — do not correct it)*
+- app tag `SALES`
+- the secret to scan for is the **Sales** application's own database credential and any issued API key, including key ID 6, prefix `pk_02423ac08`
+
+Everything else — resolve the remote by URL, report before acting, never force-push, report the verbatim error — applies unchanged.
