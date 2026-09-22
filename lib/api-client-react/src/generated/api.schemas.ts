@@ -4331,7 +4331,169 @@ export interface AdminActivityDetail {
   events: AdminActivityEvent[];
 }
 
-export interface CatalogNameChangeResponse { [key: string]: unknown }
+export interface CatalogNameChangeMismatch {
+  row: number;
+  itemCode: string;
+  reasons: string[];
+  /** @nullable */
+  storedName: string | null;
+}
+
+export type CatalogNameChangePreviewPriceRowsToWrite = typeof CatalogNameChangePreviewPriceRowsToWrite[keyof typeof CatalogNameChangePreviewPriceRowsToWrite];
+
+
+export const CatalogNameChangePreviewPriceRowsToWrite = {
+  NUMBER_0: 0,
+} as const;
+
+export type CatalogNameChangePreviewCompetitorRowsToTouch = typeof CatalogNameChangePreviewCompetitorRowsToTouch[keyof typeof CatalogNameChangePreviewCompetitorRowsToTouch];
+
+
+export const CatalogNameChangePreviewCompetitorRowsToTouch = {
+  NUMBER_0: 0,
+} as const;
+
+export type CatalogNameChangePreviewProductsToCreate = typeof CatalogNameChangePreviewProductsToCreate[keyof typeof CatalogNameChangePreviewProductsToCreate];
+
+
+export const CatalogNameChangePreviewProductsToCreate = {
+  NUMBER_0: 0,
+} as const;
+
+export interface CatalogNameChangePreview {
+  rowsRead: number;
+  codesMatched: number;
+  oldNameVerified: number;
+  oldNameMismatched: number;
+  alreadyCorrect: number;
+  wouldUpdate: number;
+  eligibleRows: number;
+  priceRowsToWrite: CatalogNameChangePreviewPriceRowsToWrite;
+  competitorRowsToTouch: CatalogNameChangePreviewCompetitorRowsToTouch;
+  productsToCreate: CatalogNameChangePreviewProductsToCreate;
+  duplicateNameCount?: number;
+  discontinued?: boolean;
+  trimmed?: boolean;
+  mismatched: CatalogNameChangeMismatch[];
+}
+
+export interface CatalogNameChangeProduct {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  series: string | null;
+  /** @nullable */
+  size: string | null;
+  /** @nullable */
+  currentMrp: number | null;
+  /** @nullable */
+  discontinuedFrom: string | null;
+  discontinued: boolean;
+}
+
+export interface CatalogNameChangeProductsResponse {
+  products: CatalogNameChangeProduct[];
+}
+
+export interface CatalogNameChangePreviewResponse {
+  pendingBatchId: number;
+  loadBatchId: number;
+  fileName?: string;
+  fileSha256?: string;
+  preview: CatalogNameChangePreview;
+}
+
+export interface CatalogNameChangeSinglePreviewResponse {
+  pendingBatchId?: number;
+  loadBatchId?: number;
+  noop?: boolean;
+  message?: string;
+  preview: CatalogNameChangePreview;
+}
+
+export type CatalogNameChangeResultPricesWritten = typeof CatalogNameChangeResultPricesWritten[keyof typeof CatalogNameChangeResultPricesWritten];
+
+
+export const CatalogNameChangeResultPricesWritten = {
+  NUMBER_0: 0,
+} as const;
+
+export type CatalogNameChangeResultCompetitorRowsTouched = typeof CatalogNameChangeResultCompetitorRowsTouched[keyof typeof CatalogNameChangeResultCompetitorRowsTouched];
+
+
+export const CatalogNameChangeResultCompetitorRowsTouched = {
+  NUMBER_0: 0,
+} as const;
+
+export type CatalogNameChangeResultProductsCreated = typeof CatalogNameChangeResultProductsCreated[keyof typeof CatalogNameChangeResultProductsCreated];
+
+
+export const CatalogNameChangeResultProductsCreated = {
+  NUMBER_0: 0,
+} as const;
+
+export interface CatalogNameChangeResult {
+  pendingBatchId: number;
+  loadBatchId: number;
+  rowsRead: number;
+  updated: number;
+  alreadyCorrect: number;
+  skipped: number;
+  pricesWritten: CatalogNameChangeResultPricesWritten;
+  competitorRowsTouched: CatalogNameChangeResultCompetitorRowsTouched;
+  productsCreated: CatalogNameChangeResultProductsCreated;
+}
+
+export interface CatalogNameChangeApplyResponse {
+  ok: boolean;
+  result: CatalogNameChangeResult;
+}
+
+export interface CatalogNameChangeUndoResult {
+  batchId: number;
+  undone: number;
+}
+
+export interface CatalogNameChangeUndoResponse {
+  ok: boolean;
+  result: CatalogNameChangeUndoResult;
+}
+
+export interface CatalogNameChangeConflictResponse {
+  error: string;
+  submittedOldName?: string;
+  expectedOldName?: string;
+  currentName?: string;
+}
+
+export interface CatalogNameChangeBatchResponse {
+  batchId: number;
+  status: string;
+  preview: CatalogNameChangePreview;
+  result: CatalogNameChangeResult | null;
+}
+
+export interface CatalogNameChangeAuditBatch {
+  id: number;
+  sourceId: number;
+  fileName: string;
+  fileSha256: string;
+  fileSizeBytes: number;
+  downloadedAt: string;
+  loadedAt: string;
+  /** @nullable */
+  loadedBy?: string | null;
+  rowCount: number;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface CatalogNameChangeAuditResponse {
+  batches: CatalogNameChangeAuditBatch[];
+}
 
 /**
  * Bearer session token (used by mobile clients).
@@ -4916,6 +5078,21 @@ asOf?: string;
 
 export type PreviewCatalogNameChangesBody = {
   file: Blob;
+};
+
+export type SearchCatalogNameChangeProductsParams = {
+q: string;
+};
+
+export type PreviewSingleCatalogNameChangeBody = {
+  /** @maxLength 500 */
+  itemCode: string;
+  /** @maxLength 500 */
+  oldName: string;
+  /** @maxLength 500 */
+  newName: string;
+  /** @maxLength 500 */
+  reason: string;
 };
 
 export type GetPriceEditorEditsParams = {

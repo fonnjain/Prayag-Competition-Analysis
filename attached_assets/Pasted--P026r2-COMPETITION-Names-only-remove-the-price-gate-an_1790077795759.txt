@@ -1,0 +1,270 @@
+# P026r2 — COMPETITION — Names only: remove the price gate, and add a single-name editor
+
+> **P026r2** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P026r2` when reporting back.
+> This replaces P026 in full and unblocks **P024**. If P026 was already sent, follow this instead.
+
+Three parts:
+
+1. The name-change path must stop reading prices. That is what is blocking P024's Apply.
+2. A reissued workbook with no price column.
+3. A **single-name editor** — change one product's name without a file, the same way the Single Price Editor changes one price.
+
+The thread running through all three: **names and prices are separate paths, and the name path must be structurally incapable of writing a price.**
+
+---
+
+# PART 1 — Remove the MRP gate
+
+P024's Apply is blocked because the workbook carried an `mrp` column and the loader turned it into a hard equality gate against the live catalogue. Nine CM Casing codes failed it — `PMC-1` through `PMC-9`, each about 10.3% higher in the catalogue than in the file.
+
+**The live prices are correct.** Prayag has confirmed it. They are newer than the authoritative master, which is what the master is for and not what this upload is for.
+
+## 1.1 Two guards. One goes, one stays.
+
+This distinction is the heart of the prompt. Do not read this as a request to weaken safety.
+
+**Guard A — remove it.**
+
+> *compare the workbook's `mrp` column to the live catalogue MRP; block Apply if they differ*
+
+Not a safety property. A staleness check on a column that should never have been in a name-change file, blocking a change that cannot touch prices on the grounds that a price moved.
+
+**Guard B — keep it, exactly as strict.**
+
+> *Apply runs in one transaction; it captures `mrp_price_history` before and after; if anything differs, the whole transaction rolls back*
+
+This is the real guarantee. It is enforced at the database, not by comparing a spreadsheet, and it holds whatever the input contains.
+
+Removing A does not weaken B. B is what makes "no price change" true. A only made it *look* true when a stale file happened to agree with the catalogue.
+
+Strengthen B while you are there: if it is a bare row count, add a checksum over the price rows for the affected codes. A count catches an insert or a delete — which is what batch 154 was — but not an in-place `UPDATE` of an existing price.
+
+## 1.2 What the name path reads
+
+From a workbook, exactly three fields:
+
+```
+item_code · old_name · new_name
+```
+
+`division`, `series`, `change_type` and `note` are context for the human reading the sheet. The loader may display them. It must not compare or act on them.
+
+Any other column — `mrp`, `price`, `effective_date`, anything resembling a price — is **ignored**: not read, not compared, not stored, not used in any gate.
+
+Preferred, and stronger: build the row objects from the three named fields only, so a price column in some future file is structurally incapable of reaching the logic. An option that must never be chosen is still a way to choose it.
+
+## 1.3 The safety gate panel
+
+Keep the panel. Change what the numbers mean.
+
+```
+Price rows to write: 0 · Competitor rows to touch: 0 · Products to create: 0
+```
+
+These now state **what this endpoint will write** — nothing — enforced by the transaction guards. They are no longer derived from comparing input to catalogue. If any is non-zero, the preview still refuses to offer Apply.
+
+Remove the "Standard MRP changed — Apply is blocked" panel. There is no MRP in the input to change.
+
+---
+
+# PART 2 — The reissued workbook
+
+**`Prayag_Name_Changes_v2_01Sep2026.xlsx`**
+SHA-256 `cfde963bce3b9123a47cffb4a66a37edb7eebaccddd1d379a8f1a9b2415baaac`
+
+```
+item_code · division · series · old_name · new_name · change_type · note
+```
+
+No price column. 155 rows. The same 155 codes and the same 155 target names as v1 — only `mrp` is gone.
+
+Record the hash before reading a row. If the file you receive hashes differently, stop and report it.
+
+The v1 file, `Prayag_Name_Changes_01Sep2026.xlsx` (SHA-256 `d3fa5735…`), is **withdrawn**. Do not load it.
+
+Expected preview:
+
+```
+rows read                        155
+codes matched                    155
+old_name verified                155
+old_name mismatched                0
+name already correct               0
+would update                     155
+
+Price rows to write: 0 · Competitor rows to touch: 0 · Products to create: 0
+```
+
+---
+
+# PART 3 — The single-name editor
+
+155 products justify a spreadsheet. One does not. Give the same flexibility as the Single Price Editor, for names only.
+
+## 3.1 Where it lives — and where it must not
+
+Put it on **Product Database → Product Name Changes**, as a second mode beside the workbook upload:
+
+```
+[ Upload a workbook ]   [ Edit one name ]
+```
+
+**Do not add a name field to the Single Price Editor.** That page writes prices. A single form that can write either a name or a price is exactly the coupling this work has been separating — and it would mean the name path no longer runs through the endpoint that cannot write a price.
+
+Both modes here call the **same name-only endpoint**. A single edit is a batch of one. It gets the same provenance, the same audit row, the same Undo, and appears in the same history.
+
+## 3.2 The flow
+
+```
+find        search by Cat No. or by name, same lookup as the Single Price Editor
+select      the product, showing:
+                Cat No. · current name · division · series · size · current MRP (read-only)
+                a "discontinued" flag if it is discontinued
+new name    typed
+reason      typed, required
+preview     shown before anything is written
+apply       admin only
+```
+
+Current MRP is displayed **read-only**, for the admin's orientation. It is not an input, it is not submitted, and the endpoint must reject it if it arrives in the payload.
+
+## 3.3 The preview
+
+```
+Cat No.            PMC-1
+Current name       Medium Well Casing (CM)
+New name           Medium Well Casing (CM) Pipe (3 MTR)
+Division/Series    Pipes & Fittings / Casing Pipe      unchanged
+MRP                752                                 unchanged
+Other products that would share this name    8
+
+Price rows to write: 0 · Competitor rows to touch: 0 · Products to create: 0
+```
+
+## 3.4 Validation
+
+**Reject:**
+- a blank or whitespace-only name
+- a name longer than the column allows — state the limit
+- a name identical to the current one after trimming; this is a no-op, so write no audit row and say so
+- any payload carrying a price, effective date, division, series, category or size
+
+**Trim** leading and trailing whitespace. Report it in the preview if trimming changed the string. Do not otherwise alter what was typed — no case correction, no collapsing internal spaces, no "helpful" reformatting. The string is written character for character.
+
+**Warn, do not block, on duplicate names.** Duplicate names are normal in this catalogue — 30 PPR products legitimately share one name and 9 Casing products share another. Show the count of products that would share the name and let the admin proceed. A block here would be wrong.
+
+**Flag a discontinued product** clearly in the preview, and allow the edit. A discontinued product can have a wrong name too. The admin should know what they are editing, not be stopped from editing it.
+
+## 3.5 Concurrency
+
+Capture the product's name at the moment the form was loaded, and verify at write time that it still matches. If someone else changed it in between, refuse, show both values, and let the admin re-decide.
+
+This is the single-edit equivalent of the workbook's `old_name` check, and it exists for the same reason: **a row whose starting point has moved is a row whose ending point cannot be trusted.**
+
+---
+
+# PART 4 — What both paths share
+
+Unchanged from what was already built for P024, and it applies to the single editor too:
+
+1. **`old_name` / current-name verification.** The gate that proves the starting point.
+2. **Competitor and Needs Review snapshots inside the transaction**, with rollback if either differs. A rename can silently reshuffle competitor matches if any matching logic reads `product_name` — this is what catches it.
+3. **The `mrp_price_history` guard**, count and checksum, with rollback.
+4. **A `mrp_load_batches` provenance row** — for a single edit, row count 1, source recorded as a manual edit rather than a file hash.
+5. **`catalog_product_name_corrections`** — one immutable row per product, `previous_name` and `corrected_name`, actor and timestamp. Bulk and single edits land in the same table, so one history covers both.
+6. **Transactional Undo**, admin-only, refusing a partial restore.
+7. **Admin only.** Non-admin gets 403 on both modes.
+8. **Reason required** on the single editor. The workbook's reason is the file itself.
+
+## Historical name copies stay untouched
+
+Both paths leave these alone, as already reported for P024:
+
+`mrp_generator_results.product_name` · `mrp_generator_runs.input_snapshot` · `mrp_generator_scenarios.rules` · `competitor_prices.description` · `competitor_price_staging.catalogue_description` and `description`
+
+A run made on 15 September recorded what the catalogue said on 15 September. That is a record, not a live view.
+
+---
+
+# PART 5 — What neither path may ever do
+
+1. Write a price. Any price. In any column, in any table.
+2. Create a product. That is the Single Price Editor's job under P020, and it stays there.
+3. Create a competitor. Not here, not anywhere outside the competitor import.
+4. Change division, series, category or size.
+5. Deactivate or reactivate a product.
+6. Retro-edit a historical snapshot.
+
+---
+
+# Tests
+
+```
+BULK PATH
+ 1. A workbook with no price column loads and previews cleanly
+ 2. A workbook that DOES carry an mrp column loads identically --
+    the column is ignored and cannot block, alter or gate anything
+ 3. old_name mismatch skips and lists the code
+ 4. 155 rows read, 155 matched, 0 mismatched, would update 155
+
+SINGLE EDITOR
+ 5. One name changes; nothing else about the product does
+ 6. PMC-1 renamed to "Medium Well Casing (CM) Pipe (3 MTR)"
+    still shows MRP 752 afterwards
+ 7. A blank name is rejected
+ 8. A name identical to the current one is a no-op and writes no audit row
+ 9. Leading/trailing whitespace is trimmed and the trim is reported
+10. A duplicate name WARNS with a count and still allows Apply
+11. A discontinued product is flagged and can still be edited
+12. A name changed by someone else between load and submit is refused,
+    showing both values
+13. A payload carrying mrp, effective_date, division, series or size
+    is rejected, not silently ignored
+14. Non-admin receives 403
+
+BOTH
+15. mrp_price_history identical before and after -- count AND checksum
+16. competitor_prices and Needs Review identical before and after
+17. A deliberately injected price write inside the transaction is caught
+    and rolls the whole transaction back
+18. A single edit and a bulk edit appear in the same audit history
+19. Undo works on both, restores every prior name in one action,
+    and writes no price
+20. HD110D reads "PE-63 SDR-21 PN-4 HDPE Pipe 110mm"
+21. P10A02 reads "Anti-Freezing Triple Layer Pipe (3 MTR)"
+```
+
+Test 6 is the one that proves the whole prompt: **the name changes and the price does not.**
+Test 17 proves Guard B is doing the work Guard A was mistakenly credited with.
+Test 13 matters because silently ignoring a price in a payload and refusing it are different promises.
+
+---
+
+# Before production
+
+The P024 preflight ran against **development**. Production is a separate database, and on this project that difference has caused three separate incidents — publishing code has never copied data.
+
+Run the preflight against **production** and report its counts separately before applying there. Do not assume they match development.
+
+---
+
+# Report
+
+- The diff removing Guard A, and confirmation that Guard B is untouched.
+- Which fields the bulk parser now reads, and how a stray price column is excluded.
+- Whether the `mrp_price_history` guard is a count, a checksum, or both.
+- The single editor as built, with a screenshot of the preview for `PMC-1`.
+- What a blank name, a no-op name, a duplicate name, a discontinued product and a concurrent edit each produce.
+- Confirmation that the single editor and the bulk upload call the same endpoint.
+- Preview counts against development **and** production, separately.
+- After Apply: `PMC-1` name **and MRP**, `HD110D` name, `P10A02` name.
+- `mrp_price_history` row count and checksum, before and after.
+- The competitor and Needs Review diff, stated as empty.
+
+---
+
+## Still outstanding from P024
+
+**Job B — Indian digit grouping** has no Apply step and no admin gate, and has still never been reported on. Confirm separately that `WT-3LH-50` renders **₹1,00,000.00**, and that an exported .xlsx MRP column still returns a correct `SUM`.

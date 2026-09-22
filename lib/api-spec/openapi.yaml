@@ -2133,7 +2133,7 @@ paths:
     post:
       operationId: previewCatalogNameChanges
       tags: [catalog]
-      summary: Preview the controlled P024 product-name workbook
+      summary: Preview the controlled P026r2 product-name workbook
       requestBody:
         required: true
         content:
@@ -2144,48 +2144,82 @@ paths:
               properties:
                 file: { type: string, format: binary }
       responses:
-        "200": { description: Immutable name-change preview, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "200": { description: Immutable name-change preview, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangePreviewResponse" } } } }
         "400": { description: Invalid workbook or checksum }
+        "403": { description: Administrator access required }
+  /catalog/name-changes/products:
+    get:
+      operationId: searchCatalogNameChangeProducts
+      tags: [catalog]
+      summary: Search products for the P026r2 single name editor
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Matching products, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeProductsResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/name-changes/single/preview:
+    post:
+      operationId: previewSingleCatalogNameChange
+      tags: [catalog]
+      summary: Preview one P026r2 name-only edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [itemCode, oldName, newName, reason]
+              additionalProperties: false
+              properties:
+                itemCode: { type: string, maxLength: 500 }
+                oldName: { type: string, maxLength: 500 }
+                newName: { type: string, maxLength: 500 }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200": { description: Single name preview or explicit no-op, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeSinglePreviewResponse" } } } }
+        "400": { description: Invalid or forbidden payload }
+        "404": { description: Product code not found }
+        "409": { description: Submitted old name differs from current live name, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeConflictResponse" } } } }
         "403": { description: Administrator access required }
   /catalog/name-changes/{batchId}:
     get:
       operationId: getCatalogNameChangePreview
       tags: [catalog]
-      summary: Get a persisted P024 preview and apply result
+      summary: Get a persisted P026r2 preview and apply result
       parameters:
         - { name: batchId, in: path, required: true, schema: { type: integer } }
       responses:
-        "200": { description: Name-change preview, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "200": { description: Name-change preview, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeBatchResponse" } } } }
         "403": { description: Administrator access required }
   /catalog/name-changes/{batchId}/apply:
     post:
       operationId: applyCatalogNameChanges
       tags: [catalog]
-      summary: Apply a previously previewed P024 name-change batch
+      summary: Apply a previously previewed P026r2 name-change batch
       parameters:
         - { name: batchId, in: path, required: true, schema: { type: integer } }
       responses:
-        "200": { description: Applied name changes, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
-        "409": { description: Preview stale or catalogue changed }
+        "200": { description: Applied name changes, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeApplyResponse" } } } }
+        "409": { description: Preview stale or catalogue changed, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeConflictResponse" } } } }
         "403": { description: Administrator access required }
   /catalog/name-changes/{batchId}/undo:
     post:
       operationId: undoCatalogNameChanges
       tags: [catalog]
-      summary: Guarded single-action undo for a P024 name-change batch
+      summary: Guarded single-action undo for a P026r2 name-change batch
       parameters:
         - { name: batchId, in: path, required: true, schema: { type: integer } }
       responses:
-        "200": { description: Undone name changes, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "200": { description: Undone name changes, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeUndoResponse" } } } }
         "409": { description: Current name changed or already undone }
         "403": { description: Administrator access required }
   /catalog/name-changes/audit:
     get:
       operationId: getCatalogNameChangeAudit
       tags: [catalog]
-      summary: List P024 name-change provenance batches
+      summary: List P026r2 name-change provenance batches
       responses:
-        "200": { description: Audit batches, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "200": { description: Audit batches, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeAuditResponse" } } } }
         "403": { description: Administrator access required }
   /catalog/price-editor/preview:
     post:
@@ -6813,9 +6847,156 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminActivityEvent"
-    CatalogNameChangeResponse:
+    CatalogNameChangeMismatch:
       type: object
-      additionalProperties: true
+      additionalProperties: false
+      required: [row, itemCode, reasons, storedName]
+      properties:
+        row: { type: integer }
+        itemCode: { type: string }
+        reasons: { type: array, items: { type: string } }
+        storedName: { type: ["string", "null"] }
+    CatalogNameChangePreview:
+      type: object
+      additionalProperties: false
+      required: [rowsRead, codesMatched, oldNameVerified, oldNameMismatched, alreadyCorrect, wouldUpdate, eligibleRows, priceRowsToWrite, competitorRowsToTouch, productsToCreate, mismatched]
+      properties:
+        rowsRead: { type: integer }
+        codesMatched: { type: integer }
+        oldNameVerified: { type: integer }
+        oldNameMismatched: { type: integer }
+        alreadyCorrect: { type: integer }
+        wouldUpdate: { type: integer }
+        eligibleRows: { type: integer }
+        priceRowsToWrite: { type: integer, enum: [0] }
+        competitorRowsToTouch: { type: integer, enum: [0] }
+        productsToCreate: { type: integer, enum: [0] }
+        duplicateNameCount: { type: integer }
+        discontinued: { type: boolean }
+        trimmed: { type: boolean }
+        mismatched:
+          type: array
+          items: { $ref: "#/components/schemas/CatalogNameChangeMismatch" }
+    CatalogNameChangeProduct:
+      type: object
+      additionalProperties: false
+      required: [itemCode, productName, division, series, size, currentMrp, discontinuedFrom, discontinued]
+      properties:
+        itemCode: { type: string }
+        productName: { type: ["string", "null"] }
+        division: { type: ["string", "null"] }
+        series: { type: ["string", "null"] }
+        size: { type: ["string", "null"] }
+        currentMrp: { type: ["number", "null"] }
+        discontinuedFrom: { type: ["string", "null"], format: date }
+        discontinued: { type: boolean }
+    CatalogNameChangeProductsResponse:
+      type: object
+      additionalProperties: false
+      required: [products]
+      properties:
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/CatalogNameChangeProduct" }
+    CatalogNameChangePreviewResponse:
+      type: object
+      additionalProperties: false
+      required: [pendingBatchId, loadBatchId, preview]
+      properties:
+        pendingBatchId: { type: integer }
+        loadBatchId: { type: integer }
+        fileName: { type: string }
+        fileSha256: { type: string }
+        preview: { $ref: "#/components/schemas/CatalogNameChangePreview" }
+    CatalogNameChangeSinglePreviewResponse:
+      type: object
+      additionalProperties: false
+      required: [preview]
+      properties:
+        pendingBatchId: { type: integer }
+        loadBatchId: { type: integer }
+        noop: { type: boolean }
+        message: { type: string }
+        preview: { $ref: "#/components/schemas/CatalogNameChangePreview" }
+    CatalogNameChangeResult:
+      type: object
+      additionalProperties: false
+      required: [pendingBatchId, loadBatchId, rowsRead, updated, alreadyCorrect, skipped, pricesWritten, competitorRowsTouched, productsCreated]
+      properties:
+        pendingBatchId: { type: integer }
+        loadBatchId: { type: integer }
+        rowsRead: { type: integer }
+        updated: { type: integer }
+        alreadyCorrect: { type: integer }
+        skipped: { type: integer }
+        pricesWritten: { type: integer, enum: [0] }
+        competitorRowsTouched: { type: integer, enum: [0] }
+        productsCreated: { type: integer, enum: [0] }
+    CatalogNameChangeApplyResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, result]
+      properties:
+        ok: { type: boolean }
+        result: { $ref: "#/components/schemas/CatalogNameChangeResult" }
+    CatalogNameChangeUndoResult:
+      type: object
+      additionalProperties: false
+      required: [batchId, undone]
+      properties:
+        batchId: { type: integer }
+        undone: { type: integer }
+    CatalogNameChangeUndoResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, result]
+      properties:
+        ok: { type: boolean }
+        result: { $ref: "#/components/schemas/CatalogNameChangeUndoResult" }
+    CatalogNameChangeConflictResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string }
+        submittedOldName: { type: string }
+        expectedOldName: { type: string }
+        currentName: { type: string }
+    CatalogNameChangeBatchResponse:
+      type: object
+      additionalProperties: false
+      required: [batchId, status, preview, result]
+      properties:
+        batchId: { type: integer }
+        status: { type: string }
+        preview: { $ref: "#/components/schemas/CatalogNameChangePreview" }
+        result:
+          anyOf:
+            - { $ref: "#/components/schemas/CatalogNameChangeResult" }
+            - { type: "null" }
+    CatalogNameChangeAuditBatch:
+      type: object
+      additionalProperties: false
+      required: [id, sourceId, fileName, fileSha256, fileSizeBytes, downloadedAt, loadedAt, rowCount]
+      properties:
+        id: { type: integer }
+        sourceId: { type: integer }
+        fileName: { type: string }
+        fileSha256: { type: string }
+        fileSizeBytes: { type: integer }
+        downloadedAt: { type: string, format: date }
+        loadedAt: { type: string, format: date-time }
+        loadedBy: { type: ["string", "null"] }
+        rowCount: { type: integer }
+        notes: { type: ["string", "null"] }
+    CatalogNameChangeAuditResponse:
+      type: object
+      additionalProperties: false
+      required: [batches]
+      properties:
+        batches:
+          type: array
+          items: { $ref: "#/components/schemas/CatalogNameChangeAuditBatch" }
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

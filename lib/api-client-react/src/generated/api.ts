@@ -56,7 +56,14 @@ import type {
   BulkMappingUpdate,
   CatalogDataHealth,
   CatalogFilters,
-  CatalogNameChangeResponse,
+  CatalogNameChangeApplyResponse,
+  CatalogNameChangeAuditResponse,
+  CatalogNameChangeBatchResponse,
+  CatalogNameChangeConflictResponse,
+  CatalogNameChangePreviewResponse,
+  CatalogNameChangeProductsResponse,
+  CatalogNameChangeSinglePreviewResponse,
+  CatalogNameChangeUndoResponse,
   CatalogProductDetail,
   CatalogProductList,
   CheckPriceEditorNewProductCodeParams,
@@ -169,6 +176,7 @@ import type {
   PdfPreflight,
   PreflightCataloguePdfBody,
   PreviewCatalogNameChangesBody,
+  PreviewSingleCatalogNameChangeBody,
   PriceEditorEditRequest,
   PriceEditorEditsResponse,
   PriceEditorPreviewResponse,
@@ -190,6 +198,7 @@ import type {
   RollbackMrpRevisionResult,
   RunMrpGeneratorScenarioParams,
   SanitarywareVariantReconciliationResult,
+  SearchCatalogNameChangeProductsParams,
   UpdateUserRoleBody
 } from './api.schemas';
 
@@ -6346,13 +6355,13 @@ export const getPreviewCatalogNameChangesUrl = () => {
 }
 
 /**
- * @summary Preview the controlled P024 product-name workbook
+ * @summary Preview the controlled P026r2 product-name workbook
  */
-export const previewCatalogNameChanges = async (previewCatalogNameChangesBody: PreviewCatalogNameChangesBody, options?: RequestInit): Promise<CatalogNameChangeResponse> => {
+export const previewCatalogNameChanges = async (previewCatalogNameChangesBody: PreviewCatalogNameChangesBody, options?: RequestInit): Promise<CatalogNameChangePreviewResponse> => {
     const formData = new FormData();
 formData.append(`file`, previewCatalogNameChangesBody.file);
 
-  return customFetch<CatalogNameChangeResponse>(getPreviewCatalogNameChangesUrl(),
+  return customFetch<CatalogNameChangePreviewResponse>(getPreviewCatalogNameChangesUrl(),
   {
     ...options,
     method: 'POST'
@@ -6397,7 +6406,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PreviewCatalogNameChangesMutationError = ErrorType<void>
 
     /**
- * @summary Preview the controlled P024 product-name workbook
+ * @summary Preview the controlled P026r2 product-name workbook
  */
 export const usePreviewCatalogNameChanges = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCatalogNameChanges>>, TError,{data: BodyType<PreviewCatalogNameChangesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -6410,6 +6419,161 @@ export const usePreviewCatalogNameChanges = <TError = ErrorType<void>,
       return useMutation(getPreviewCatalogNameChangesMutationOptions(options));
     }
 
+export const getSearchCatalogNameChangeProductsUrl = (params: SearchCatalogNameChangeProductsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/name-changes/products?${stringifiedParams}` : `/api/catalog/name-changes/products`
+}
+
+/**
+ * @summary Search products for the P026r2 single name editor
+ */
+export const searchCatalogNameChangeProducts = async (params: SearchCatalogNameChangeProductsParams, options?: RequestInit): Promise<CatalogNameChangeProductsResponse> => {
+
+  return customFetch<CatalogNameChangeProductsResponse>(getSearchCatalogNameChangeProductsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchCatalogNameChangeProductsQueryKey = (params?: SearchCatalogNameChangeProductsParams,) => {
+    return [
+    `/api/catalog/name-changes/products`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchCatalogNameChangeProductsQueryOptions = <TData = Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>, TError = ErrorType<void>>(params: SearchCatalogNameChangeProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchCatalogNameChangeProductsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>> = ({ signal }) => searchCatalogNameChangeProducts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchCatalogNameChangeProductsQueryResult = NonNullable<Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>>
+export type SearchCatalogNameChangeProductsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Search products for the P026r2 single name editor
+ */
+
+export function useSearchCatalogNameChangeProducts<TData = Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>, TError = ErrorType<void>>(
+ params: SearchCatalogNameChangeProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchCatalogNameChangeProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchCatalogNameChangeProductsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewSingleCatalogNameChangeUrl = () => {
+
+
+
+
+  return `/api/catalog/name-changes/single/preview`
+}
+
+/**
+ * @summary Preview one P026r2 name-only edit
+ */
+export const previewSingleCatalogNameChange = async (previewSingleCatalogNameChangeBody: PreviewSingleCatalogNameChangeBody, options?: RequestInit): Promise<CatalogNameChangeSinglePreviewResponse> => {
+
+  return customFetch<CatalogNameChangeSinglePreviewResponse>(getPreviewSingleCatalogNameChangeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      previewSingleCatalogNameChangeBody,)
+  }
+);}
+
+
+
+
+export const getPreviewSingleCatalogNameChangeMutationOptions = <TError = ErrorType<void | CatalogNameChangeConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSingleCatalogNameChange>>, TError,{data: BodyType<PreviewSingleCatalogNameChangeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewSingleCatalogNameChange>>, TError,{data: BodyType<PreviewSingleCatalogNameChangeBody>}, TContext> => {
+
+const mutationKey = ['previewSingleCatalogNameChange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewSingleCatalogNameChange>>, {data: BodyType<PreviewSingleCatalogNameChangeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewSingleCatalogNameChange(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewSingleCatalogNameChangeMutationResult = NonNullable<Awaited<ReturnType<typeof previewSingleCatalogNameChange>>>
+    export type PreviewSingleCatalogNameChangeMutationBody = BodyType<PreviewSingleCatalogNameChangeBody>
+    export type PreviewSingleCatalogNameChangeMutationError = ErrorType<void | CatalogNameChangeConflictResponse>
+
+    /**
+ * @summary Preview one P026r2 name-only edit
+ */
+export const usePreviewSingleCatalogNameChange = <TError = ErrorType<void | CatalogNameChangeConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSingleCatalogNameChange>>, TError,{data: BodyType<PreviewSingleCatalogNameChangeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewSingleCatalogNameChange>>,
+        TError,
+        {data: BodyType<PreviewSingleCatalogNameChangeBody>},
+        TContext
+      > => {
+      return useMutation(getPreviewSingleCatalogNameChangeMutationOptions(options));
+    }
+
 export const getGetCatalogNameChangePreviewUrl = (batchId: number,) => {
 
 
@@ -6419,11 +6583,11 @@ export const getGetCatalogNameChangePreviewUrl = (batchId: number,) => {
 }
 
 /**
- * @summary Get a persisted P024 preview and apply result
+ * @summary Get a persisted P026r2 preview and apply result
  */
-export const getCatalogNameChangePreview = async (batchId: number, options?: RequestInit): Promise<CatalogNameChangeResponse> => {
+export const getCatalogNameChangePreview = async (batchId: number, options?: RequestInit): Promise<CatalogNameChangeBatchResponse> => {
 
-  return customFetch<CatalogNameChangeResponse>(getGetCatalogNameChangePreviewUrl(batchId),
+  return customFetch<CatalogNameChangeBatchResponse>(getGetCatalogNameChangePreviewUrl(batchId),
   {
     ...options,
     method: 'GET'
@@ -6466,7 +6630,7 @@ export type GetCatalogNameChangePreviewQueryError = ErrorType<void>
 
 
 /**
- * @summary Get a persisted P024 preview and apply result
+ * @summary Get a persisted P026r2 preview and apply result
  */
 
 export function useGetCatalogNameChangePreview<TData = Awaited<ReturnType<typeof getCatalogNameChangePreview>>, TError = ErrorType<void>>(
@@ -6496,11 +6660,11 @@ export const getApplyCatalogNameChangesUrl = (batchId: number,) => {
 }
 
 /**
- * @summary Apply a previously previewed P024 name-change batch
+ * @summary Apply a previously previewed P026r2 name-change batch
  */
-export const applyCatalogNameChanges = async (batchId: number, options?: RequestInit): Promise<CatalogNameChangeResponse> => {
+export const applyCatalogNameChanges = async (batchId: number, options?: RequestInit): Promise<CatalogNameChangeApplyResponse> => {
 
-  return customFetch<CatalogNameChangeResponse>(getApplyCatalogNameChangesUrl(batchId),
+  return customFetch<CatalogNameChangeApplyResponse>(getApplyCatalogNameChangesUrl(batchId),
   {
     ...options,
     method: 'POST'
@@ -6512,7 +6676,7 @@ export const applyCatalogNameChanges = async (batchId: number, options?: Request
 
 
 
-export const getApplyCatalogNameChangesMutationOptions = <TError = ErrorType<void>,
+export const getApplyCatalogNameChangesMutationOptions = <TError = ErrorType<void | CatalogNameChangeConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyCatalogNameChanges>>, TError,{batchId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof applyCatalogNameChanges>>, TError,{batchId: number}, TContext> => {
 
@@ -6541,12 +6705,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ApplyCatalogNameChangesMutationResult = NonNullable<Awaited<ReturnType<typeof applyCatalogNameChanges>>>
 
-    export type ApplyCatalogNameChangesMutationError = ErrorType<void>
+    export type ApplyCatalogNameChangesMutationError = ErrorType<void | CatalogNameChangeConflictResponse>
 
     /**
- * @summary Apply a previously previewed P024 name-change batch
+ * @summary Apply a previously previewed P026r2 name-change batch
  */
-export const useApplyCatalogNameChanges = <TError = ErrorType<void>,
+export const useApplyCatalogNameChanges = <TError = ErrorType<void | CatalogNameChangeConflictResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyCatalogNameChanges>>, TError,{batchId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof applyCatalogNameChanges>>,
@@ -6566,11 +6730,11 @@ export const getUndoCatalogNameChangesUrl = (batchId: number,) => {
 }
 
 /**
- * @summary Guarded single-action undo for a P024 name-change batch
+ * @summary Guarded single-action undo for a P026r2 name-change batch
  */
-export const undoCatalogNameChanges = async (batchId: number, options?: RequestInit): Promise<CatalogNameChangeResponse> => {
+export const undoCatalogNameChanges = async (batchId: number, options?: RequestInit): Promise<CatalogNameChangeUndoResponse> => {
 
-  return customFetch<CatalogNameChangeResponse>(getUndoCatalogNameChangesUrl(batchId),
+  return customFetch<CatalogNameChangeUndoResponse>(getUndoCatalogNameChangesUrl(batchId),
   {
     ...options,
     method: 'POST'
@@ -6614,7 +6778,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UndoCatalogNameChangesMutationError = ErrorType<void>
 
     /**
- * @summary Guarded single-action undo for a P024 name-change batch
+ * @summary Guarded single-action undo for a P026r2 name-change batch
  */
 export const useUndoCatalogNameChanges = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoCatalogNameChanges>>, TError,{batchId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -6636,11 +6800,11 @@ export const getGetCatalogNameChangeAuditUrl = () => {
 }
 
 /**
- * @summary List P024 name-change provenance batches
+ * @summary List P026r2 name-change provenance batches
  */
-export const getCatalogNameChangeAudit = async ( options?: RequestInit): Promise<CatalogNameChangeResponse> => {
+export const getCatalogNameChangeAudit = async ( options?: RequestInit): Promise<CatalogNameChangeAuditResponse> => {
 
-  return customFetch<CatalogNameChangeResponse>(getGetCatalogNameChangeAuditUrl(),
+  return customFetch<CatalogNameChangeAuditResponse>(getGetCatalogNameChangeAuditUrl(),
   {
     ...options,
     method: 'GET'
@@ -6683,7 +6847,7 @@ export type GetCatalogNameChangeAuditQueryError = ErrorType<void>
 
 
 /**
- * @summary List P024 name-change provenance batches
+ * @summary List P026r2 name-change provenance batches
  */
 
 export function useGetCatalogNameChangeAudit<TData = Awaited<ReturnType<typeof getCatalogNameChangeAudit>>, TError = ErrorType<void>>(

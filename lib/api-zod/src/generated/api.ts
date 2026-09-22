@@ -2152,49 +2152,212 @@ export const GetPriceEditorProductResponse = zod.object({
 
 
 /**
- * @summary Preview the controlled P024 product-name workbook
+ * @summary Preview the controlled P026r2 product-name workbook
  */
 export const PreviewCatalogNameChangesBody = zod.object({
   "file": zod.instanceof(File)
 })
 
-export const PreviewCatalogNameChangesResponse = zod.record(zod.string(), zod.unknown())
+export const PreviewCatalogNameChangesResponse = zod.object({
+  "pendingBatchId": zod.number(),
+  "loadBatchId": zod.number(),
+  "fileName": zod.string().optional(),
+  "fileSha256": zod.string().optional(),
+  "preview": zod.object({
+  "rowsRead": zod.number(),
+  "codesMatched": zod.number(),
+  "oldNameVerified": zod.number(),
+  "oldNameMismatched": zod.number(),
+  "alreadyCorrect": zod.number(),
+  "wouldUpdate": zod.number(),
+  "eligibleRows": zod.number(),
+  "priceRowsToWrite": zod.literal(0),
+  "competitorRowsToTouch": zod.literal(0),
+  "productsToCreate": zod.literal(0),
+  "duplicateNameCount": zod.number().optional(),
+  "discontinued": zod.boolean().optional(),
+  "trimmed": zod.boolean().optional(),
+  "mismatched": zod.array(zod.object({
+  "row": zod.number(),
+  "itemCode": zod.string(),
+  "reasons": zod.array(zod.string()),
+  "storedName": zod.string().nullable()
+}))
+})
+})
 
 
 /**
- * @summary Get a persisted P024 preview and apply result
+ * @summary Search products for the P026r2 single name editor
+ */
+export const SearchCatalogNameChangeProductsQueryParams = zod.object({
+  "q": zod.coerce.string()
+})
+
+export const SearchCatalogNameChangeProductsResponse = zod.object({
+  "products": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "series": zod.string().nullable(),
+  "size": zod.string().nullable(),
+  "currentMrp": zod.number().nullable(),
+  "discontinuedFrom": zod.coerce.date().nullable(),
+  "discontinued": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Preview one P026r2 name-only edit
+ */
+export const previewSingleCatalogNameChangeBodyItemCodeMax = 500;
+
+export const previewSingleCatalogNameChangeBodyOldNameMax = 500;
+
+export const previewSingleCatalogNameChangeBodyNewNameMax = 500;
+
+export const previewSingleCatalogNameChangeBodyReasonMax = 500;
+
+
+
+export const PreviewSingleCatalogNameChangeBody = zod.object({
+  "itemCode": zod.string().max(previewSingleCatalogNameChangeBodyItemCodeMax),
+  "oldName": zod.string().max(previewSingleCatalogNameChangeBodyOldNameMax),
+  "newName": zod.string().max(previewSingleCatalogNameChangeBodyNewNameMax),
+  "reason": zod.string().max(previewSingleCatalogNameChangeBodyReasonMax)
+})
+
+export const PreviewSingleCatalogNameChangeResponse = zod.object({
+  "pendingBatchId": zod.number().optional(),
+  "loadBatchId": zod.number().optional(),
+  "noop": zod.boolean().optional(),
+  "message": zod.string().optional(),
+  "preview": zod.object({
+  "rowsRead": zod.number(),
+  "codesMatched": zod.number(),
+  "oldNameVerified": zod.number(),
+  "oldNameMismatched": zod.number(),
+  "alreadyCorrect": zod.number(),
+  "wouldUpdate": zod.number(),
+  "eligibleRows": zod.number(),
+  "priceRowsToWrite": zod.literal(0),
+  "competitorRowsToTouch": zod.literal(0),
+  "productsToCreate": zod.literal(0),
+  "duplicateNameCount": zod.number().optional(),
+  "discontinued": zod.boolean().optional(),
+  "trimmed": zod.boolean().optional(),
+  "mismatched": zod.array(zod.object({
+  "row": zod.number(),
+  "itemCode": zod.string(),
+  "reasons": zod.array(zod.string()),
+  "storedName": zod.string().nullable()
+}))
+})
+})
+
+
+/**
+ * @summary Get a persisted P026r2 preview and apply result
  */
 export const GetCatalogNameChangePreviewParams = zod.object({
   "batchId": zod.coerce.number()
 })
 
-export const GetCatalogNameChangePreviewResponse = zod.record(zod.string(), zod.unknown())
+export const GetCatalogNameChangePreviewResponse = zod.object({
+  "batchId": zod.number(),
+  "status": zod.string(),
+  "preview": zod.object({
+  "rowsRead": zod.number(),
+  "codesMatched": zod.number(),
+  "oldNameVerified": zod.number(),
+  "oldNameMismatched": zod.number(),
+  "alreadyCorrect": zod.number(),
+  "wouldUpdate": zod.number(),
+  "eligibleRows": zod.number(),
+  "priceRowsToWrite": zod.literal(0),
+  "competitorRowsToTouch": zod.literal(0),
+  "productsToCreate": zod.literal(0),
+  "duplicateNameCount": zod.number().optional(),
+  "discontinued": zod.boolean().optional(),
+  "trimmed": zod.boolean().optional(),
+  "mismatched": zod.array(zod.object({
+  "row": zod.number(),
+  "itemCode": zod.string(),
+  "reasons": zod.array(zod.string()),
+  "storedName": zod.string().nullable()
+}))
+}),
+  "result": zod.union([zod.object({
+  "pendingBatchId": zod.number(),
+  "loadBatchId": zod.number(),
+  "rowsRead": zod.number(),
+  "updated": zod.number(),
+  "alreadyCorrect": zod.number(),
+  "skipped": zod.number(),
+  "pricesWritten": zod.literal(0),
+  "competitorRowsTouched": zod.literal(0),
+  "productsCreated": zod.literal(0)
+}),zod.null()])
+})
 
 
 /**
- * @summary Apply a previously previewed P024 name-change batch
+ * @summary Apply a previously previewed P026r2 name-change batch
  */
 export const ApplyCatalogNameChangesParams = zod.object({
   "batchId": zod.coerce.number()
 })
 
-export const ApplyCatalogNameChangesResponse = zod.record(zod.string(), zod.unknown())
+export const ApplyCatalogNameChangesResponse = zod.object({
+  "ok": zod.boolean(),
+  "result": zod.object({
+  "pendingBatchId": zod.number(),
+  "loadBatchId": zod.number(),
+  "rowsRead": zod.number(),
+  "updated": zod.number(),
+  "alreadyCorrect": zod.number(),
+  "skipped": zod.number(),
+  "pricesWritten": zod.literal(0),
+  "competitorRowsTouched": zod.literal(0),
+  "productsCreated": zod.literal(0)
+})
+})
 
 
 /**
- * @summary Guarded single-action undo for a P024 name-change batch
+ * @summary Guarded single-action undo for a P026r2 name-change batch
  */
 export const UndoCatalogNameChangesParams = zod.object({
   "batchId": zod.coerce.number()
 })
 
-export const UndoCatalogNameChangesResponse = zod.record(zod.string(), zod.unknown())
+export const UndoCatalogNameChangesResponse = zod.object({
+  "ok": zod.boolean(),
+  "result": zod.object({
+  "batchId": zod.number(),
+  "undone": zod.number()
+})
+})
 
 
 /**
- * @summary List P024 name-change provenance batches
+ * @summary List P026r2 name-change provenance batches
  */
-export const GetCatalogNameChangeAuditResponse = zod.record(zod.string(), zod.unknown())
+export const GetCatalogNameChangeAuditResponse = zod.object({
+  "batches": zod.array(zod.object({
+  "id": zod.number(),
+  "sourceId": zod.number(),
+  "fileName": zod.string(),
+  "fileSha256": zod.string(),
+  "fileSizeBytes": zod.number(),
+  "downloadedAt": zod.coerce.date(),
+  "loadedAt": zod.coerce.date(),
+  "loadedBy": zod.string().nullish(),
+  "rowCount": zod.number(),
+  "notes": zod.string().nullish()
+}))
+})
 
 
 /**
