@@ -3091,6 +3091,8 @@ router.post(
            normalizedMatches: princeMaster.normalizedMatches,
            rejectedRows: princeMaster.rejectedRows,
            worksheetDiagnostics: princeMaster.worksheetDiagnostics,
+           worksheetNames: princeMaster.worksheetNames,
+           effectiveDates: princeMaster.effectiveDates,
            liveCatalogueChecks,
          } : null,
         periods: sparshMaster?.periods.map((period) => ({
@@ -3141,6 +3143,13 @@ router.post(
           throw error;
         }
       })();
+      if (competitor === PRINCE_COMPETITOR && !princeMaster) {
+        res.status(409).json({
+          error: "Prince imports must use the trusted 13-sheet Competitor Master and pass its content and date gates.",
+          code: "TRUSTED_PRINCE_MASTER_REQUIRED",
+        });
+        return;
+      }
       const sourceHash = sha256ForBuffer(file.buffer);
       const priceBasis = req.body.priceBasis === "Ex-GST" ? "Ex-GST" : "MRP";
       const gstPct = priceBasis === "Ex-GST" && !isNaN(Number(req.body.gstPct))
@@ -3154,6 +3163,7 @@ router.post(
           price: number | null; competitorCode: string | null; status: "ok" | "needs_review";
           prayagMrp?: number | null;
           reviewReason?: string | null;
+          effectiveDate?: string;
         }>,
         counts: Record<string, unknown>,
         loadBatchId?: number | null,
@@ -3168,6 +3178,7 @@ router.post(
         if (rows.length) {
           await db.insert(competitorPriceStagingTable).values(rows.map((row) => ({
             batchId: batch.id, competitor: batchCompetitor,
+            effectiveDate: row.effectiveDate ?? effectiveDate,
             competitorCodeMaster: row.competitorCode, competitorCodeCatalogue: row.competitorCode,
             matchedPrayagCode: row.prayagCode, description: row.description,
             catalogueDescription: row.description, variant: row.variant, oldMrp: null,
@@ -3204,6 +3215,7 @@ router.post(
             competitorCode: row.princeCode,
             status: row.catalogMatched ? "ok" as const : "needs_review" as const,
             reviewReason: row.catalogMatched ? null : "No verified Prayag product match.",
+            effectiveDate: row.effectiveDate,
           })),
           ...princeMaster.rejectedRows.map((row) => ({
             prayagCode: null,
@@ -3213,6 +3225,7 @@ router.post(
             competitorCode: row.princeCode || null,
             status: "needs_review" as const,
             reviewReason: row.reason,
+            effectiveDate: PRINCE_EFFECTIVE_DATE,
           })),
         ];
         const actor = req.user?.email ?? req.user?.id ?? null;
@@ -3235,7 +3248,7 @@ router.post(
             fileSizeBytes: file.size,
             downloadedAt: new Date().toISOString().slice(0, 10),
             loadedBy: actor,
-            rowCount: princeMaster.contentFingerprint ? 813 : princeMaster.rows.length,
+            rowCount: princeMaster.contentFingerprint ? 950 : princeMaster.rows.length,
             notes: JSON.stringify({ contentFingerprint: princeMaster.contentFingerprint }),
           }).returning();
           provenanceLoadBatchId = load?.id ?? null;
@@ -3259,7 +3272,7 @@ router.post(
             worksheet_diagnostics: princeMaster.worksheetDiagnostics,
             source: "trusted_prince_competitor_master",
             source_sha256: princeMaster.sourceSha256,
-            source_effective_date: PRINCE_EFFECTIVE_DATE,
+            source_effective_date: "per-worksheet",
           },
           provenanceLoadBatchId,
         );
@@ -3373,6 +3386,13 @@ router.post(
         : null;
     if (!competitor) {
       res.status(400).json({ error: "competitor name is required" });
+      return;
+    }
+    if (competitor === PRINCE_COMPETITOR) {
+      res.status(409).json({
+        error: "Prince trusted workbooks must use preview → stage → approve; the legacy direct-load route is disabled.",
+        code: "TRUSTED_STAGE_REQUIRED",
+      });
       return;
     }
 

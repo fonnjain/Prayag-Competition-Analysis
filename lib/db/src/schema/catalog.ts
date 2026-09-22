@@ -531,6 +531,7 @@ export const competitorPriceStagingTable = pgTable(
     id: serial("id").primaryKey(),
     batchId: integer("batch_id").notNull(),
     competitor: text("competitor").notNull(),
+    effectiveDate: date("effective_date", { mode: "string" }),
     // The code as it appears in the existing competitor_prices mapping (master).
     competitorCodeMaster: text("competitor_code_master"),
     // The code as it appears in the uploaded catalogue (may differ via alias).

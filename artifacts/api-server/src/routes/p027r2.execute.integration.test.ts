@@ -1,5 +1,5 @@
 /**
- * Destructive-by-design operational rehearsal for P027r2.
+ * Destructive-by-design operational rehearsal for P028.
  *
  * This is permanently skipped unless RUN_P027R2_EXECUTE=true.  It deliberately
  * does not clean up: the point is to prove the real preview/apply path against
@@ -37,7 +37,7 @@ async function snapshot(table: "catalog_products" | "mrp_price_history") {
   return { count: Number(result.rows[0]?.count ?? 0), digest: result.rows[0]?.digest ?? "" };
 }
 
-enabled("P027r2 execute rehearsal", () => {
+enabled("P028 execute rehearsal", () => {
   it("previews, safely rolls back, then applies and is idempotent", async () => {
     const buffer = readFileSync(workbookPath);
     const [catalogBefore, mrpBefore, competitorsBefore] = await Promise.all([
@@ -49,12 +49,17 @@ enabled("P027r2 execute rehearsal", () => {
       .attach("file", buffer, "Competitor_Master_-_Plumbing_Prince.xlsx");
     expect(preview.status).toBe(200);
     expect(preview.body.prince).toMatchObject({
-      rows: 813, loadableRows: 811, contentFingerprint: "901d63a62e8eb4ea9de728e1cec2b3d4c1a1ef23d871a0b3246fa8e090658a17",
-      priceSum: 1049375.55, exactMatches: 736, normalizedMatches: 74,
+      rows: 950, loadableRows: 948, contentFingerprint: "2b5b79da680b5a9e386811ee3a845a461e91a58d5ea0943fd847609502beb7ff",
+      priceSum: 1225371.20, exactMatches: 872, normalizedMatches: 74,
     });
-    expect(preview.body.prince.unmatched).toBe(3);
+    expect(preview.body.prince.unmatched).toBe(4);
     expect(preview.body.prince.unmatchedCodes).toEqual(["C133", "PMR-8", "PMR-9"]);
     expect(preview.body.prince.rejectedRows).toHaveLength(3);
+    expect(preview.body.prince.worksheetNames).toHaveLength(13);
+    expect(preview.body.prince.effectiveDates.filter((r: any) => r.effectiveDate === "2026-08-18")).toEqual([
+      { sheet: "PPR PIPE", effectiveDate: "2026-08-18" },
+      { sheet: "PPR FITTINGS", effectiveDate: "2026-08-18" },
+    ]);
     expect(preview.body.prince.worksheetDiagnostics.find((r: any) => r.sheet === "AGRI PIPE").princePriced).toBe(90);
 
     const stage = await request.post("/catalog/stage-competitor-workbook")
@@ -74,9 +79,9 @@ enabled("P027r2 execute rehearsal", () => {
         SELECT count(*)::int AS count
         FROM competitor_prices cp
         JOIN latest_mrp m ON m.item_code = cp.matched_prayag_code
-        WHERE cp.competitor = 'Prince' AND cp.effective_date = '2026-03-01' AND m.mrp IS NOT NULL
+        WHERE cp.competitor = 'Prince' AND cp.effective_date IN ('2026-03-01', '2026-08-18') AND m.mrp IS NOT NULL
       `);
-      expect(Number(comparable.rows[0]?.count ?? 0)).toBe(810);
+      expect(Number(comparable.rows[0]?.count ?? 0)).toBe(946);
       expect(await snapshot("catalog_products")).toEqual(catalogBefore);
       expect(await snapshot("mrp_price_history")).toEqual(mrpBefore);
       return;
@@ -86,8 +91,12 @@ enabled("P027r2 execute rehearsal", () => {
     const batch = await db.select().from(importBatchesTable).where(eq(importBatchesTable.id, batchId)).then((r) => r[0]!);
     const staged = await db.select().from(competitorPriceStagingTable).where(eq(competitorPriceStagingTable.batchId, batchId));
     expect(batch.status).toBe("pending");
-    expect(staged.filter((r) => r.status === "ok")).toHaveLength(808);
-    expect(staged.filter((r) => r.status === "needs_review")).toHaveLength(6);
+    expect(staged.filter((r) => r.status === "ok")).toHaveLength(944);
+    expect(staged.filter((r) => r.status === "needs_review")).toHaveLength(7);
+    expect(staged.filter((r) => r.effectiveDate === "2026-08-18")).toHaveLength(137);
+    expect(staged.find((r) => r.competitorCodeMaster === "SIM205525")).toMatchObject({
+      matchedPrayagCode: null, status: "needs_review", effectiveDate: "2026-08-18",
+    });
     expect((await request.get(`/catalog/import-batches/${batchId}`)).status).toBe(200);
 
     const failed = await request.post(`/catalog/import-batches/${batchId}/approve`).send({ injectMrpMutation: true });
@@ -98,14 +107,25 @@ enabled("P027r2 execute rehearsal", () => {
 
     const applied = await request.post(`/catalog/import-batches/${batchId}/approve`).send({});
     expect(applied.status).toBe(200);
-    expect(applied.body).toMatchObject({ inserted: 7, updated: 0, unchanged: 801, comparableBefore: 803, comparableAfter: 810 });
+    expect(applied.body).toMatchObject({ inserted: 136, updated: 0, unchanged: 808, comparableBefore: 803, comparableAfter: 939 });
     expect(await snapshot("catalog_products")).toEqual(catalogBefore);
     expect(await snapshot("mrp_price_history")).toEqual(mrpBefore);
     expect(await db.select({ competitor: competitorPriceStagingTable.competitor }).from(competitorPriceStagingTable)
-      .where(and(eq(competitorPriceStagingTable.batchId, batchId), eq(competitorPriceStagingTable.competitor, "Prince")))).toHaveLength(814);
+      .where(and(eq(competitorPriceStagingTable.batchId, batchId), eq(competitorPriceStagingTable.competitor, "Prince")))).toHaveLength(951);
     const provenance = (await db.select({ id: competitorPricesTable.id, loadBatchId: competitorPricesTable.loadBatchId })
-      .from(competitorPricesTable).where(and(eq(competitorPricesTable.competitor, "Prince"), eq(competitorPricesTable.effectiveDate, "2026-03-01"))));
-    expect(provenance.filter((r) => r.loadBatchId != null).length).toBeGreaterThanOrEqual(10);
+      .from(competitorPricesTable).where(and(eq(competitorPricesTable.competitor, "Prince"), eq(competitorPricesTable.effectiveDate, "2026-08-18"))));
+    expect(provenance).toHaveLength(136);
+    expect(provenance.every((r) => r.loadBatchId === batch.loadBatchId)).toBe(true);
+    const princePeriodCounts = await db.execute<{ effective_date: string; count: number | string }>(sql`
+      SELECT effective_date, count(*)::int AS count
+      FROM competitor_prices
+      WHERE competitor = 'Prince' AND effective_date IN ('2026-03-01', '2026-08-18')
+      GROUP BY effective_date ORDER BY effective_date
+    `);
+    expect(princePeriodCounts.rows.map((row) => [row.effective_date, Number(row.count)])).toEqual([
+      ["2026-03-01", 810],
+      ["2026-08-18", 136],
+    ]);
     expect(await db.select({ id: competitorPricesTable.id }).from(competitorPricesTable)
       .where(sql`${competitorPricesTable.competitor} <> 'Prince'`).orderBy(sql`id`)).toEqual(competitorsBefore);
     expect((await request.post(`/catalog/import-batches/${batchId}/approve`).send({})).body.idempotent).toBe(true);

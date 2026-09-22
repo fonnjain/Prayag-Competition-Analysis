@@ -6,25 +6,27 @@ export const PRINCE_EFFECTIVE_DATE = "2026-03-01";
 export const PRINCE_MASTER_SHA256 =
   "20a3c363e7d2b8fd3dab54563db8844ea738d492f95d4007da0f6ebb6ae5b89f";
 export const PRINCE_CONTENT_FINGERPRINT =
-  "901d63a62e8eb4ea9de728e1cec2b3d4c1a1ef23d871a0b3246fa8e090658a17";
-export const PRINCE_MASTER_ROW_COUNT = 813;
+  "2b5b79da680b5a9e386811ee3a845a461e91a58d5ea0943fd847609502beb7ff";
+export const PRINCE_MASTER_ROW_COUNT = 950;
 const PRINCE_REQUIRED_SHEETS = new Set([
   "CPVC PIPE", "CPVC FITTINGS", "UPVC PIPE", "UPVC FITTINGS", "AGRI PIPE",
   "AGRI FITTINGS", "AGRI SMART FITTINGS", "SWR PIPE", "SWR FITTINGS",
-  "CASING PIPE", "UGD PIPE",
+  "CASING PIPE", "UGD PIPE", "PPR PIPE", "PPR FITTINGS",
 ]);
-const PRINCE_ALLOWED_NON_MARCH_SHEETS = new Set(["PPR PIPE", "PPR FITTINGS"]);
-
+const PRINCE_EFFECTIVE_DATE_BY_SHEET = new Map(
+  [...PRINCE_REQUIRED_SHEETS].map((sheet) => [
+    sheet,
+    sheet === "PPR PIPE" || sheet === "PPR FITTINGS" ? "2026-08-18" : PRINCE_EFFECTIVE_DATE,
+  ]),
+);
 export function isPrinceCompetitorMasterWorkbook(workbook: XLSX.WorkBook): boolean {
   const sheets = new Set(workbook.SheetNames.map((name) => name.trim().toUpperCase()));
   const requiredFound = [...PRINCE_REQUIRED_SHEETS].filter((name) => sheets.has(name)).length;
   if (requiredFound === 0) return false;
   if (requiredFound !== PRINCE_REQUIRED_SHEETS.size) {
-    throw new Error(`Prince-like workbook is incomplete: found ${requiredFound} of 11 required March worksheets.`);
+    throw new Error(`Prince-like workbook is incomplete: found ${requiredFound} of 13 required worksheets.`);
   }
-  const unexpected = [...sheets].filter(
-    (name) => !PRINCE_REQUIRED_SHEETS.has(name) && !PRINCE_ALLOWED_NON_MARCH_SHEETS.has(name),
-  );
+  const unexpected = [...sheets].filter((name) => !PRINCE_REQUIRED_SHEETS.has(name));
   if (unexpected.length) {
     throw new Error(`Prince master contains unexpected worksheets: ${unexpected.join(", ")}.`);
   }
@@ -45,6 +47,7 @@ export type PrinceMasterRow = {
   canonicalPrayagCode: string | null;
   /** 1-based source row, retained to pair duplicate codes deterministically. */
   sourceRow: number;
+  effectiveDate: string;
 };
 
 export type PrinceMasterParseResult = {
@@ -60,6 +63,8 @@ export type PrinceMasterParseResult = {
   normalizedMatches: number;
   rejectedRows: Array<{ sheet: string; sourceRow: number; prayagCode: string; princeCode: string; price: number | null; reason: string }>;
   effectiveDate: string;
+  worksheetNames: string[];
+  effectiveDates: Array<{ sheet: string; effectiveDate: string }>;
 };
 
 const clean = (value: unknown): string => String(value ?? "").trim();
@@ -100,6 +105,8 @@ function sheetLayout(sheetName: string) {
   if (name === "AGRI FITTINGS") return { prayag: 2, prayagPrice: 3, prince: 4, princePrice: 5, length: null };
   if (name === "AGRI SMART FITTINGS") return { prayag: 1, prayagPrice: 2, prince: 3, princePrice: 4, length: null };
   if (name === "AGRI PIPE") return { prayag: 2, prayagPrice: 3, prince: 4, princePrice: 5, length: null };
+  if (name === "PPR PIPE") return { prayag: 2, prayagPrice: 4, prince: 5, princePrice: 7, length: null };
+  if (name === "PPR FITTINGS") return { prayag: 3, prayagPrice: 4, prince: 5, princePrice: 6, length: null };
   return { prayag: 3, prayagPrice: 4, prince: 5, princePrice: 6, length: null };
 }
 
@@ -133,9 +140,10 @@ export function parsePrinceCompetitorMaster(
   const worksheetDiagnostics: Array<{ sheet: string; prayagCodes: number; princePriced: number }> = [];
   const rejectedRows: PrinceMasterParseResult["rejectedRows"] = [];
   const sourceSheets = workbook.SheetNames.filter((name) => PRINCE_REQUIRED_SHEETS.has(name.trim().toUpperCase()));
-  if (sourceSheets.length !== PRINCE_REQUIRED_SHEETS.size) {
-    throw new Error(`Prince master must contain all 11 required worksheets; found ${sourceSheets.length}.`);
+  if (workbook.SheetNames.length !== 13 || sourceSheets.length !== PRINCE_REQUIRED_SHEETS.size) {
+    throw new Error(`Prince master must contain all 13 required worksheets; found ${sourceSheets.length}. Worksheets: ${workbook.SheetNames.join(", ")}`);
   }
+  const effectiveDates: Array<{ sheet: string; effectiveDate: string }> = [];
   for (const sheetName of sourceSheets) {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
@@ -146,9 +154,13 @@ export function parsePrinceCompetitorMaster(
     // scanning numeric cells can silently select the former.
     const princePrice = layout.princePrice;
     const headerDate = dateValue(grid[1]?.[princePrice]);
-    if (headerDate !== PRINCE_EFFECTIVE_DATE) {
-      throw new Error(`Prince sheet ${sheetName.trim()} has no dated 2026-03-01 price column at audited position ${princePrice}.`);
+    const expectedDate = PRINCE_EFFECTIVE_DATE_BY_SHEET.get(sheetName.trim().toUpperCase());
+    if (!headerDate || headerDate !== expectedDate) {
+      throw new Error(
+        `Prince sheet ${sheetName.trim()} must use effective date ${expectedDate} at audited position ${princePrice}; found ${headerDate ?? "none"}.`,
+      );
     }
+    effectiveDates.push({ sheet: sheetName.trim(), effectiveDate: headerDate });
     const prince = layout.prince;
     const headerRow = Math.max(0, grid.findIndex((row) => row.some((cell, col) => col === prince && /item\s*code/i.test(clean(cell)))));
     const codeHeaders = (grid[headerRow] ?? []).flatMap((cell, col) => /item\s*code/i.test(clean(cell)) ? [col] : []);
@@ -191,21 +203,17 @@ export function parsePrinceCompetitorMaster(
         lengthMeters: sheetLength(category, row, layout.length),
         catalogMatched: canonical != null,
         canonicalPrayagCode: canonical,
-          sourceRow: sourceRowIndex + 1,
+        sourceRow: sourceRowIndex + 1,
+        effectiveDate: headerDate,
       });
     }
     worksheetDiagnostics.push(counts);
   }
-  if (rows.length !== PRINCE_MASTER_ROW_COUNT) {
-    const diagnostics = worksheetDiagnostics.map((row) => `${row.sheet}: ${row.prayagCodes}/${row.princePriced}`).join(", ");
-    if (rows.length + rejectedRows.filter((row) => row.princeCode && row.price != null).length !== PRINCE_MASTER_ROW_COUNT) {
-      throw new Error(`Prince content gate failed: row count ${rows.length}; price sum ${rows.reduce((sum, row) => sum + row.price, 0).toFixed(2)}; worksheets ${diagnostics}`);
-    }
-  }
+  const diagnostics = worksheetDiagnostics.map((row) => `${row.sheet}: ${row.prayagCodes}/${row.princePriced}`).join(", ");
   const unmatchedRows = rows.filter((row) => !row.catalogMatched);
   const lines = [
-    ...rows.filter((row) => row.prayagCode).map((row) => `${normalizePrinceCode(row.prayagCode)}|${normalizePrinceCode(row.princeCode)}|${row.price.toFixed(2)}`),
-    ...rejectedRows.filter((row) => row.prayagCode && row.princeCode && row.price != null && row.price > 0)
+    ...rows.map((row) => `${normalizePrinceCode(row.prayagCode)}|${normalizePrinceCode(row.princeCode)}|${row.price.toFixed(2)}`),
+    ...rejectedRows.filter((row) => row.princeCode && row.price != null && row.price > 0)
       .map((row) => `${normalizePrinceCode(row.prayagCode)}|${normalizePrinceCode(row.princeCode)}|${row.price!.toFixed(2)}`),
   ].sort();
   const contentFingerprint = createHash("sha256").update(lines.join("\n"), "utf8").digest("hex");
@@ -222,7 +230,7 @@ export function parsePrinceCompetitorMaster(
     rows,
     catalogMatchedRows: rows.filter((row) => row.catalogMatched),
     unmatchedRows,
-    unmatchedCodes: [...new Set(unmatchedRows.map((row) => row.prayagCode))].sort(),
+    unmatchedCodes: [...new Set(unmatchedRows.map((row) => row.prayagCode).filter(Boolean))].sort(),
     sourceSha256,
     contentFingerprint,
     priceSum,
@@ -231,5 +239,7 @@ export function parsePrinceCompetitorMaster(
     normalizedMatches: classified.filter((row) => row.canonical != null).length - exactMatches,
     rejectedRows,
     effectiveDate: PRINCE_EFFECTIVE_DATE,
+    worksheetNames: sourceSheets.map((name) => name.trim()),
+    effectiveDates,
   };
 }

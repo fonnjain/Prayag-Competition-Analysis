@@ -1,0 +1,176 @@
+# P028 — COMPETITION — Load the two PPR worksheets P027r2 never read
+
+> **P028** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES DATA.**
+> Quote `P028` when reporting back.
+> **You do not need a new file.** This is the same workbook you already loaded.
+
+---
+
+## 1. What went wrong, so it is not repeated
+
+P027r2 loaded 813 Prince prices from 11 worksheets. **The workbook has 13.** The two it never read are `PPR PIPE` and `PPR FITTINGS`, carrying **137 more Prince prices**.
+
+The prompt caused this, not the loader. P027r2 supplied an eleven-row worksheet table and a fingerprint computed over eleven sheets, so the run had a target to conform to and conformed to it. Its own test — *"all 11 worksheets are read, none silently skipped"* — encoded the wrong number and therefore passed while 137 prices went unread.
+
+```
+byte hash received by the loader     20a3c363...ae5b89f     <- the 13-sheet workbook
+fingerprint over 11 sheets           901d63a6...90658a17    813 rows   <- what was loaded
+fingerprint over all 13 sheets       2b5b79da...02beb7ff    950 rows   <- what was in the file
+```
+
+Both fingerprints are real. The 813 that loaded are correct and stay. The 137 in PPR were never seen.
+
+**The rule that follows:** a loader enumerates every worksheet the workbook actually contains and reports the list it found. It never takes the expected sheet list from the prompt. A count in a prompt is something to check *after* reading, never a filter applied while reading.
+
+---
+
+## 2. The gate
+
+Same workbook, byte hash `20a3c363e7d2b8fd3dab54563db8844ea738d492f95d4007da0f6ebb6ae5b89f`.
+
+**First, enumerate.** Read the worksheet names out of the workbook itself and report them, in order, before anything else. There must be 13. If there are not, stop and report the list you found.
+
+**Then fingerprint across every sheet**, built exactly as in P027r2 — `NORM(prayag)|NORM(prince)|price_2dp`, sorted ASCII ascending, joined by `\n`, no trailing newline, UTF-8, SHA-256:
+
+```
+rows with a Prince code and price     950
+CONTENT FINGERPRINT
+  2b5b79da680b5a9e386811ee3a845a461e91a58d5ea0943fd847609502beb7ff
+```
+
+If it matches, proceed. If not, report your row count, your price sum and your per-sheet counts against the table below.
+
+```
+worksheet               Prayag   Prince priced
+CPVC PIPE                   40              40
+CPVC FITTINGS              247             172
+UPVC PIPE                   52              52
+UPVC FITTINGS              269             169
+AGRI PIPE                  123              90
+AGRI FITTINGS              135              29
+AGRI SMART Fittings         33               9
+SWR PIPE                   160             125
+SWR FITTINGS               149              96
+CASING PIPE                 18              17
+UGD PIPE                    20              14
+PPR PIPE                    30              31     <- not previously read
+PPR FITTINGS               112             106     <- not previously read
+TOTAL                     1388             950
+```
+
+---
+
+## 3. The effective date is per worksheet, not global
+
+**This is the second thing P027r2 got wrong, and it would corrupt this load if carried over.**
+
+P027r2 said *"the effective date is 2026-03-01, from the Prince column header."* That is true of the eleven sheets it read. It is **not** true of the two it did not:
+
+```
+CPVC ... UGD PIPE   Prince column header   2026-03-01
+PPR PIPE            Prince column header   2026-08-18
+PPR FITTINGS        Prince column header   2026-08-18
+```
+
+The PPR prices are five and a half months fresher. **Read the date from each worksheet's own Prince header and apply it to that worksheet's rows.** Do not take one date for the workbook. Do not fall back to the load date — that was batch 154, which wrote 1,828 rows dated the day they were loaded and overrode correct March prices.
+
+Report the date you read for every worksheet.
+
+---
+
+## 4. Scope
+
+This is incremental. The 813 already in the database are correct.
+
+```
+already loaded                810 Prince price rows
+PPR rows to add               136
+expected after                946
+```
+
+`PPR PIPE` carries 31 Prince prices but only 30 pair with a Prayag product — see §5.
+
+Re-reading the eleven loaded sheets is fine and expected to produce **zero changes**; the loader proved idempotent on a second run. If it reports changes on those eleven, stop and report before applying.
+
+## 5. One row is held, not created
+
+```
+PPR PIPE   row 14   Prince SIM205525   18525.00   no Prayag code in the row
+```
+
+A Prince product with no Prayag counterpart — the first one this file has contained. **Hold it and list it.** A competitor upload never creates a Prayag product, and it has nothing here to attach to.
+
+## 6. The PPR data is clean
+
+Unusually so, and worth stating because it means there is nothing to reject:
+
+```
+zero prices                    0
+duplicate Prince codes         0
+Prince codes with no price     0
+Prayag codes resolving exactly 136 of 136   (no normalisation needed)
+```
+
+The rejection rules from P027r2 still stand for the eleven sheets already loaded — `SIM200032` stays rejected on both rows, `PMR-5` stays rejected — but PPR itself introduces nothing new to reject.
+
+---
+
+## 7. Rules that do not bend
+
+1. A competitor upload never creates a Prayag product.
+2. **Do not read the Prayag price column.** Dated 10 August and known stale — its Casing Pipe values sit about 10% below the live catalogue.
+3. Effective date from each worksheet's own header. See §3.
+4. Preview, then Apply.
+5. Provenance: byte hash, the 13-sheet fingerprint, row count, actor, `load_batch_id` on every row written.
+6. No direct SQL against production.
+7. Development first, then publish, then the same Preview → Apply in production.
+
+---
+
+## 8. Tests
+
+```
+1.  The worksheet list is enumerated FROM THE FILE and reported: 13 names
+2.  The fingerprint is computed over every sheet found, not a fixed subset
+3.  Fingerprint matches 2b5b79da...02beb7ff at 950 rows
+4.  Per-sheet counts match the table in §2, including PPR 31 and 106
+5.  PPR effective dates are 2026-08-18; the other eleven are 2026-03-01
+6.  No effective date equals the load date
+7.  SIM205525 is held and listed, not created
+8.  The eleven previously loaded sheets produce zero changes
+9.  Prince price rows go 810 -> 946
+10. No mrp_price_history row written -- count and checksum unchanged
+11. No Prayag product created
+12. Running the same file twice changes nothing
+13. Non-admin receives 403
+```
+
+Test 1 is the one this prompt exists for. Test 5 is the one that would otherwise put 137 August prices on a March date.
+
+---
+
+## 9. Report
+
+- The 13 worksheet names, read from the file.
+- The fingerprint and row count.
+- Per-sheet counts against §2.
+- **The effective date read from each worksheet**, all 13.
+- Inserted / updated / unchanged, split between the eleven old sheets and the two new ones.
+- `SIM205525`, held.
+- Prince price rows before and after.
+- `mrp_price_history` count and checksum, unchanged.
+- Second-run result.
+
+---
+
+## What this adds to the picture
+
+Against Prince, **Prayag wins PPR outright**:
+
+```
+PPR PIPE       30 pairs   Prince cheaper on  0   median +2.9%
+PPR FITTINGS  106 pairs   Prince cheaper on  1   median +3.1%
+```
+
+Worth knowing alongside the Apollo master, where the same category runs the other way — Apollo undercuts Prayag by 20.7% on PPR pipe and 26.9% on PPR fittings. Same products, two competitors, opposite verdicts. Neither is visible in the application until both are loaded.

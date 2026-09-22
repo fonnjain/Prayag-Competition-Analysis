@@ -33,13 +33,13 @@ function canonicalMap(workbook: XLSX.WorkBook): Map<string, string> {
   const parsed = parsePrinceCompetitorMaster(buffer, workbook, new Map());
   return new Map(
     parsed.rows
-      .filter((row) => !unmatchedCodes.includes(row.prayagCode))
+      .filter((row) => row.prayagCode && !unmatchedCodes.includes(row.prayagCode))
        .map((row) => [normalizePrinceCode(row.prayagCode), row.prayagCode]),
   );
 }
 
 describe("trusted Prince workbook parser", () => {
-  it("gates parsed content and returns 811 loadable rows", () => {
+  it("gates all parsed content and returns 948 loadable rows", () => {
     const { buffer, workbook } = source();
     const result = parsePrinceCompetitorMaster(buffer, workbook, canonicalMap(workbook));
 
@@ -47,9 +47,11 @@ describe("trusted Prince workbook parser", () => {
     expect(result.effectiveDate).toBe(PRINCE_EFFECTIVE_DATE);
     expect(result.sourceSha256).toBe(PRINCE_MASTER_SHA256);
     expect(result.contentFingerprint).toBe(PRINCE_CONTENT_FINGERPRINT);
-    expect(result.rows).toHaveLength(811);
-    expect(result.catalogMatchedRows).toHaveLength(801);
-    expect(result.unmatchedRows).toHaveLength(10);
+    expect(result.rows).toHaveLength(948);
+    expect(result.catalogMatchedRows).toHaveLength(937);
+    expect(result.unmatchedRows).toHaveLength(11);
+    expect(result.worksheetNames).toHaveLength(13);
+    expect(result.contentFingerprint).toBe(PRINCE_CONTENT_FINGERPRINT);
     expect(result.unmatchedCodes).toEqual([...unmatchedCodes].sort());
   });
 
@@ -70,6 +72,8 @@ describe("trusted Prince workbook parser", () => {
       "SWR FITTINGS": 96,
       "CASING PIPE": 17,
       "UGD PIPE": 14,
+      "PPR PIPE": 31,
+      "PPR FITTINGS": 106,
     });
     expect(result.worksheetDiagnostics.find((row) => row.sheet === "AGRI PIPE")?.princePriced).toBe(90);
     expect(result.rejectedRows.filter((row) => row.princeCode === "SIM200032")).toHaveLength(2);
@@ -87,6 +91,29 @@ describe("trusted Prince workbook parser", () => {
     expect(result.rows.filter((row) => row.sheet === "UGD PIPE").every((row) =>
       row.princePriceBasis === "piece" && row.lengthMeters === 6,
     )).toBe(true);
+  });
+
+  it("enumerates both PPR worksheets and preserves their August effective date", () => {
+    const { buffer, workbook } = source();
+    const result = parsePrinceCompetitorMaster(buffer, workbook, canonicalMap(workbook));
+    expect(result.worksheetNames).toEqual(workbook.SheetNames.map((name) => name.trim()));
+    expect(result.effectiveDates.filter((row) => row.effectiveDate === "2026-08-18")).toEqual([
+      { sheet: "PPR PIPE", effectiveDate: "2026-08-18" },
+      { sheet: "PPR FITTINGS", effectiveDate: "2026-08-18" },
+    ]);
+    expect(result.rows.filter((row) => row.sheet === "PPR PIPE")).toHaveLength(31);
+    expect(result.rows.find((row) => row.princeCode === "SIM205525")).toMatchObject({
+      sheet: "PPR PIPE", prayagCode: "", price: 18525, effectiveDate: "2026-08-18",
+    });
+  });
+
+  it("fails closed when a worksheet carries another supported sheet's date", () => {
+    const { buffer, workbook } = source();
+    const pprPipe = workbook.Sheets["PPR PIPE"]!;
+    pprPipe.H2 = { ...pprPipe.H2, t: "d", v: new Date("2026-03-01T00:00:00.000Z") };
+    expect(() => parsePrinceCompetitorMaster(buffer, workbook, new Map())).toThrow(
+      /PPR PIPE must use effective date 2026-08-18/i,
+    );
   });
 
   it("retains source order for every duplicate Prince code identity", () => {

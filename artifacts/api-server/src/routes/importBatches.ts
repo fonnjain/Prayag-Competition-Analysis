@@ -1317,13 +1317,13 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
     const result = await tx.execute(sql`
       SELECT count(*)::int AS count FROM competitor_prices cp
       WHERE cp.competitor = 'Prince' AND cp.matched_prayag_code IS NOT NULL
-        AND cp.effective_date = ${batch.effectiveDate}
+        AND cp.effective_date IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM (
             SELECT DISTINCT ON (h.item_code) h.item_code, h.mrp
             FROM mrp_price_history h
             WHERE h.variant = 'Standard' AND h.review_status = 'approved'
-              AND h.effective_date <= CURRENT_DATE
+              AND h.effective_date <= cp.effective_date
             ORDER BY h.item_code, h.effective_date DESC, h.id DESC
           ) latest
           WHERE latest.item_code = cp.matched_prayag_code AND latest.mrp IS NOT NULL
@@ -1348,16 +1348,16 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
     if (trustedPrince) {
       const existing = await tx.select().from(competitorPricesTable).where(and(
         eq(competitorPricesTable.competitor, batch.competitor),
-        eq(competitorPricesTable.effectiveDate, batch.effectiveDate),
       ));
-      const byCode = new Map(existing.map((row) => [row.matchedPrayagCode, row]));
+      const byCode = new Map(existing.map((row) => [`${row.effectiveDate}|${row.matchedPrayagCode}`, row]));
       for (const r of trustedToCommit) {
-        const prior = byCode.get(r.matchedPrayagCode);
+        const rowDate = r.effectiveDate ?? batch.effectiveDate;
+        const prior = byCode.get(`${rowDate}|${r.matchedPrayagCode}`);
         if (!prior) {
           await tx.insert(competitorPricesTable).values({
             competitor: batch.competitor, category: null, description: r.description, size: r.variant,
             price: r.newMrp!, unit: null, competitorCode: r.competitorCodeCatalogue ?? r.competitorCodeMaster,
-            effectiveDate: batch.effectiveDate, matchedPrayagCode: r.matchedPrayagCode,
+            effectiveDate: rowDate, matchedPrayagCode: r.matchedPrayagCode,
             matchStatus: "matched", matchConfidence: r.matchMethod === "code+desc" ? "High" : "Medium",
             prayagMrpAtCompare: r.prayagMrpCurrent, isCurrent: false, priceBasis: batch.priceBasis,
             gstPct: batch.gstPct, loadBatchId: batch.loadBatchId,

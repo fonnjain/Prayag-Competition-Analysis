@@ -88,6 +88,30 @@ async function committedRows() {
 }
 
 describe("staged competitor workbook import", () => {
+  it("rejects generic and legacy-direct files labeled Prince before staging", async () => {
+    const before = await db.select({ id: importBatchesTable.id })
+      .from(importBatchesTable).where(eq(importBatchesTable.competitor, "Prince"));
+    const genericStage = await request
+      .post("/catalog/stage-competitor-workbook")
+      .field("competitor", "Prince")
+      .field("effectiveDate", effectiveDate)
+      .attach("file", workbookCsv(), { filename: "not-the-trusted-master.csv", contentType: "text/csv" });
+    expect(genericStage.status).toBe(409);
+    expect(genericStage.body.code).toBe("TRUSTED_PRINCE_MASTER_REQUIRED");
+
+    const legacyDirect = await request
+      .post("/catalog/load-competitor")
+      .field("competitor", "Prince")
+      .field("effectiveDate", effectiveDate)
+      .attach("file", workbookCsv(), { filename: "not-the-trusted-master.csv", contentType: "text/csv" });
+    expect(legacyDirect.status).toBe(409);
+    expect(legacyDirect.body.code).toBe("TRUSTED_STAGE_REQUIRED");
+
+    const after = await db.select({ id: importBatchesTable.id })
+      .from(importBatchesTable).where(eq(importBatchesTable.competitor, "Prince"));
+    expect(after).toEqual(before);
+  });
+
   it("persists a pending CSV preview without changing prices, then commits only on approval", async () => {
     const beforeUpload = await committedRows();
     expect(beforeUpload).toHaveLength(0);
