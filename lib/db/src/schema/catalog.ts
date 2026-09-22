@@ -253,6 +253,7 @@ export const competitorPricesTable = pgTable(
     priceBasis: text("price_basis"),
     // GST percentage to apply when priceBasis = 'Ex-GST'. Default 18 when null.
     gstPct: doublePrecision("gst_pct"),
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
     // See mrp_price_history.last_revision_batch_id.
     lastRevisionBatchId: integer("last_revision_batch_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -499,6 +500,7 @@ export const importBatchesTable = pgTable(
     // the same PDF may be intentionally re-extracted to investigate variance.
     fileSha256: text("file_sha256"),
     fileSizeBytes: integer("file_size_bytes"),
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
     // Versioned extractor inputs make two batches comparable without relying on
     // filenames or deployment timestamps.
     extractorVersion: text("extractor_version"),

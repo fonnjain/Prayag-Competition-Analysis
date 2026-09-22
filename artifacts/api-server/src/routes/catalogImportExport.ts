@@ -41,6 +41,8 @@ import {
 } from "../lib/authoritativeMrpMaster";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 import {
+  isPrinceCompetitorMasterWorkbook,
+  normalizePrinceCode,
   parsePrinceCompetitorMaster,
   PRINCE_COMPETITOR,
   PRINCE_EFFECTIVE_DATE,
@@ -3032,6 +3034,9 @@ router.post(
       const canonical = new Map<string, string>(
         existingProducts.map((product) => [normCode(product.itemCode), product.itemCode]),
       );
+      const princeCanonical = new Map<string, string>(
+        existingProducts.map((product) => [normalizePrinceCode(product.itemCode), product.itemCode]),
+      );
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
        const ashirvadMaster = parseAshirvadCompetitorMaster(
          file.buffer,
@@ -3040,8 +3045,9 @@ router.post(
        );
       const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
        const princeMaster = (() => {
+         if (!isPrinceCompetitorMasterWorkbook(workbook)) return null;
          try {
-           return parsePrinceCompetitorMaster(file.buffer, workbook, canonical);
+            return parsePrinceCompetitorMaster(file.buffer, workbook, princeCanonical);
          } catch (error) {
            // A workbook that is not the locked Prince snapshot is an ordinary
            // workbook; preserve the generic preview behaviour.
@@ -3050,17 +3056,42 @@ router.post(
          }
        })();
 
+      const liveCheckCodes = ["C133", "PMR-8", "PMR-9"];
+      const liveProducts = existingProducts.filter((row) => liveCheckCodes.includes(row.itemCode));
+      const liveMrps = await db.execute<{ item_code: string; mrp: number | null }>(sql`
+        SELECT DISTINCT ON (item_code) item_code, mrp
+        FROM mrp_price_history
+        WHERE item_code IN ('C133', 'PMR-8', 'PMR-9')
+          AND variant = 'Standard' AND review_status = 'approved'
+          AND effective_date <= CURRENT_DATE
+        ORDER BY item_code, effective_date DESC, id DESC
+      `);
+      const liveMrpByCode = new Map(liveMrps.rows.map((row) => [row.item_code, row.mrp]));
+      const liveCatalogueChecks = liveCheckCodes.map((itemCode) => ({
+        itemCode,
+        exists: liveProducts.some((row) => row.itemCode === itemCode),
+        hasCurrentPrice: liveMrpByCode.get(itemCode) != null,
+        currentMrp: liveMrpByCode.get(itemCode) ?? null,
+      }));
       res.json({
         isSparshMaster: Boolean(sparshMaster),
          isAshirvadMaster: Boolean(ashirvadMaster),
          isPrinceMaster: Boolean(princeMaster),
          prince: princeMaster ? {
-           rows: princeMaster.rows.length,
+           rows: princeMaster.rows.length + princeMaster.rejectedRows.filter((row) => row.princeCode && row.price != null).length,
+           loadableRows: princeMaster.rows.length,
            catalogMatched: princeMaster.catalogMatchedRows.length,
            unmatched: princeMaster.unmatchedRows.length,
            unmatchedCodes: princeMaster.unmatchedCodes,
            effectiveDate: princeMaster.effectiveDate,
            sourceSha256: princeMaster.sourceSha256,
+           contentFingerprint: princeMaster.contentFingerprint,
+           priceSum: princeMaster.priceSum,
+           exactMatches: princeMaster.exactMatches,
+           normalizedMatches: princeMaster.normalizedMatches,
+           rejectedRows: princeMaster.rejectedRows,
+           worksheetDiagnostics: princeMaster.worksheetDiagnostics,
+           liveCatalogueChecks,
          } : null,
         periods: sparshMaster?.periods.map((period) => ({
           key: period.key,
@@ -3097,12 +3128,14 @@ router.post(
       const products = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
       const knownCodes = new Set(products.map((p) => normCode(p.itemCode)));
       const canonical = new Map(products.map((p) => [normCode(p.itemCode), p.itemCode]));
+      const princeCanonical = new Map(products.map((p) => [normalizePrinceCode(p.itemCode), p.itemCode]));
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
       const ashirvadMaster = parseAshirvadCompetitorMaster(file.buffer, workbook, canonical);
       const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
       const princeMaster = (() => {
+        if (!isPrinceCompetitorMasterWorkbook(workbook)) return null;
         try {
-          return parsePrinceCompetitorMaster(file.buffer, workbook, canonical);
+          return parsePrinceCompetitorMaster(file.buffer, workbook, princeCanonical);
         } catch (error) {
           if (error instanceof Error && /checksum/i.test(error.message)) return null;
           throw error;
@@ -3120,13 +3153,16 @@ router.post(
           prayagCode: string | null; description: string | null; variant: string | null;
           price: number | null; competitorCode: string | null; status: "ok" | "needs_review";
           prayagMrp?: number | null;
+          reviewReason?: string | null;
         }>,
         counts: Record<string, unknown>,
+        loadBatchId?: number | null,
       ) => {
         const [batch] = await db.insert(importBatchesTable).values({
           competitor: batchCompetitor, effectiveDate, sourceFileName: file.originalname,
           priceBasis, gstPct, status: "pending", fileSha256: sourceHash,
           fileSizeBytes: file.size, rowCounts: JSON.stringify(counts),
+          loadBatchId: loadBatchId ?? null,
         }).returning();
         if (!batch) throw new Error("Could not create import batch.");
         if (rows.length) {
@@ -3138,7 +3174,7 @@ router.post(
             newMrp: row.price, increasePct: null, prayagMrpCurrent: row.prayagMrp ?? null,
             gapPct: null, page: null, discoveryEvidence: null, adjudicated: false,
             matchMethod: row.prayagCode ? "code+desc" : null, status: row.status,
-            reviewReason: row.prayagCode ? null : "No verified Prayag product match.",
+            reviewReason: row.reviewReason ?? (row.prayagCode ? null : "No verified Prayag product match."),
           })));
         }
         return batch.id;
@@ -3149,37 +3185,94 @@ router.post(
           res.status(400).json({ error: `The trusted Prince master must be imported as ${PRINCE_COMPETITOR}.` });
           return;
         }
-        const batchId = await createBatch(
-          PRINCE_COMPETITOR,
-          PRINCE_EFFECTIVE_DATE,
-          princeMaster.rows.map((row) => ({
+        const existingPrinceBatch = await db.select().from(importBatchesTable)
+          .where(and(eq(importBatchesTable.competitor, PRINCE_COMPETITOR), eq(importBatchesTable.effectiveDate, PRINCE_EFFECTIVE_DATE)))
+          .orderBy(desc(importBatchesTable.id));
+        const existingContent = existingPrinceBatch.find((batch) => {
+          try { return JSON.parse(batch.rowCounts ?? "{}").content_fingerprint === princeMaster.contentFingerprint; } catch { return false; }
+        });
+        if (existingContent) {
+          res.status(200).json({ batchId: existingContent.id, batchIds: [existingContent.id], status: existingContent.status, idempotent: true });
+          return;
+        }
+        const stagedRows = [
+          ...princeMaster.rows.map((row) => ({
             prayagCode: row.canonicalPrayagCode,
             description: null,
             variant: row.lengthMeters ? `${row.lengthMeters} m` : null,
             price: row.price,
             competitorCode: row.princeCode,
             status: row.catalogMatched ? "ok" as const : "needs_review" as const,
+            reviewReason: row.catalogMatched ? null : "No verified Prayag product match.",
           })),
+          ...princeMaster.rejectedRows.map((row) => ({
+            prayagCode: null,
+            description: null,
+            variant: null,
+            price: row.price,
+            competitorCode: row.princeCode || null,
+            status: "needs_review" as const,
+            reviewReason: row.reason,
+          })),
+        ];
+        const actor = req.user?.email ?? req.user?.id ?? null;
+        let provenanceLoadBatchId: number | null = null;
+        const [source] = await db.insert(mrpSourcesTable).values({
+          division: "Prince competitor",
+          sheetId: "prince-competitor-master",
+          sheetUrl: "internal://prince-competitor-master",
+          expectedFileName: null,
+          notes: "Trusted P027r2 Prince competitor source",
+          sourceKind: "competitor",
+        }).onConflictDoNothing().returning();
+        const sourceRow = source ?? (await db.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+          .where(eq(mrpSourcesTable.sheetId, "prince-competitor-master")).limit(1))[0];
+        if (sourceRow) {
+          const [load] = await db.insert(mrpLoadBatchesTable).values({
+            sourceId: sourceRow.id,
+            fileName: file.originalname,
+            fileSha256: princeMaster.sourceSha256,
+            fileSizeBytes: file.size,
+            downloadedAt: new Date().toISOString().slice(0, 10),
+            loadedBy: actor,
+            rowCount: princeMaster.contentFingerprint ? 813 : princeMaster.rows.length,
+            notes: JSON.stringify({ contentFingerprint: princeMaster.contentFingerprint }),
+          }).returning();
+          provenanceLoadBatchId = load?.id ?? null;
+        }
+        const batchId = await createBatch(
+          PRINCE_COMPETITOR,
+          PRINCE_EFFECTIVE_DATE,
+          stagedRows,
           {
-            total: princeMaster.rows.length,
+            total: princeMaster.rows.length + princeMaster.rejectedRows.filter((row) => row.princeCode && row.price != null).length,
             ok: princeMaster.catalogMatchedRows.length,
-            needs_review: princeMaster.unmatchedRows.length,
-            not_found: princeMaster.unmatchedRows.length,
+            needs_review: princeMaster.unmatchedRows.length + princeMaster.rejectedRows.length,
+            not_found: princeMaster.unmatchedRows.length + princeMaster.rejectedRows.length,
             new_products: 0,
             unmatched_prayag_codes: princeMaster.unmatchedCodes,
+            rejected_rows: princeMaster.rejectedRows,
+            content_fingerprint: princeMaster.contentFingerprint,
+            price_sum: princeMaster.priceSum,
+            exact_matches: princeMaster.exactMatches,
+            normalized_matches: princeMaster.normalizedMatches,
+            worksheet_diagnostics: princeMaster.worksheetDiagnostics,
             source: "trusted_prince_competitor_master",
             source_sha256: princeMaster.sourceSha256,
             source_effective_date: PRINCE_EFFECTIVE_DATE,
           },
+          provenanceLoadBatchId,
         );
         res.status(201).json({
           batchId, batchIds: [batchId], status: "pending",
           summary: {
-            total: princeMaster.rows.length,
+            total: princeMaster.rows.length + princeMaster.rejectedRows.filter((row) => row.princeCode && row.price != null).length,
             matched: princeMaster.catalogMatchedRows.length,
             unmatched: princeMaster.unmatchedRows.length,
             unmatchedCodes: princeMaster.unmatchedCodes,
             effectiveDate: PRINCE_EFFECTIVE_DATE,
+            contentFingerprint: princeMaster.contentFingerprint,
+            rejectedRows: princeMaster.rejectedRows,
           },
         });
         return;

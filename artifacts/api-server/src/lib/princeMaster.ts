@@ -4,8 +4,32 @@ import * as XLSX from "xlsx";
 export const PRINCE_COMPETITOR = "Prince";
 export const PRINCE_EFFECTIVE_DATE = "2026-03-01";
 export const PRINCE_MASTER_SHA256 =
-  "5338bb3bc49e07f7aa39f8f913559cac015c57ef265ba64ce23c4a02ba381b0c";
+  "20a3c363e7d2b8fd3dab54563db8844ea738d492f95d4007da0f6ebb6ae5b89f";
+export const PRINCE_CONTENT_FINGERPRINT =
+  "901d63a62e8eb4ea9de728e1cec2b3d4c1a1ef23d871a0b3246fa8e090658a17";
 export const PRINCE_MASTER_ROW_COUNT = 813;
+const PRINCE_REQUIRED_SHEETS = new Set([
+  "CPVC PIPE", "CPVC FITTINGS", "UPVC PIPE", "UPVC FITTINGS", "AGRI PIPE",
+  "AGRI FITTINGS", "AGRI SMART FITTINGS", "SWR PIPE", "SWR FITTINGS",
+  "CASING PIPE", "UGD PIPE",
+]);
+const PRINCE_ALLOWED_NON_MARCH_SHEETS = new Set(["PPR PIPE", "PPR FITTINGS"]);
+
+export function isPrinceCompetitorMasterWorkbook(workbook: XLSX.WorkBook): boolean {
+  const sheets = new Set(workbook.SheetNames.map((name) => name.trim().toUpperCase()));
+  const requiredFound = [...PRINCE_REQUIRED_SHEETS].filter((name) => sheets.has(name)).length;
+  if (requiredFound === 0) return false;
+  if (requiredFound !== PRINCE_REQUIRED_SHEETS.size) {
+    throw new Error(`Prince-like workbook is incomplete: found ${requiredFound} of 11 required March worksheets.`);
+  }
+  const unexpected = [...sheets].filter(
+    (name) => !PRINCE_REQUIRED_SHEETS.has(name) && !PRINCE_ALLOWED_NON_MARCH_SHEETS.has(name),
+  );
+  if (unexpected.length) {
+    throw new Error(`Prince master contains unexpected worksheets: ${unexpected.join(", ")}.`);
+  }
+  return true;
+}
 
 export type PrinceMasterRow = {
   sheet: string;
@@ -29,12 +53,18 @@ export type PrinceMasterParseResult = {
   unmatchedRows: PrinceMasterRow[];
   unmatchedCodes: string[];
   sourceSha256: string;
+  contentFingerprint: string;
+  priceSum: number;
+  worksheetDiagnostics: Array<{ sheet: string; prayagCodes: number; princePriced: number }>;
+  exactMatches: number;
+  normalizedMatches: number;
+  rejectedRows: Array<{ sheet: string; sourceRow: number; prayagCode: string; princeCode: string; price: number | null; reason: string }>;
   effectiveDate: string;
 };
 
 const clean = (value: unknown): string => String(value ?? "").trim();
 export const normalizePrinceCode = (value: unknown): string =>
-  clean(value).toUpperCase().replace(/\s+/g, "");
+  clean(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 function numberCell(value: unknown): number | null {
   if (value == null || clean(value) === "" || clean(value) === "-") return null;
@@ -42,17 +72,23 @@ function numberCell(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function isPrinceDate(value: unknown): boolean {
-  if (value instanceof Date) {
-    return value.getUTCFullYear() === 2026 && value.getUTCMonth() === 2 && value.getUTCDate() === 1;
+function dateValue(value: unknown): string | null {
+  if (value instanceof Date || Object.prototype.toString.call(value) === "[object Date]") {
+    const date = value as Date;
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
   const text = clean(value).toLowerCase();
-  if (text.includes("2026-03-01") || text.includes("1-mar-26") || text.includes("01-mar-26")) return true;
+  if (/2026[-/ ]03[-/ ]01|2026.*mar.*01|01.*mar.*2026/i.test(text)) return "2026-03-01";
   if (typeof value === "number") {
     const date = XLSX.SSF.parse_date_code(value);
-    return date?.y === 2026 && date.m === 3 && date.d === 1;
+    return date ? `${date.y}-${String(date.m).padStart(2, "0")}-${String(date.d).padStart(2, "0")}` : null;
   }
-  return false;
+  const parsedTextDate = Date.parse(text);
+  if (Number.isFinite(parsedTextDate)) {
+    const parsed = new Date(parsedTextDate);
+    return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}-${String(parsed.getUTCDate()).padStart(2, "0")}`;
+  }
+  return null;
 }
 
 function sheetLayout(sheetName: string) {
@@ -93,29 +129,52 @@ export function parsePrinceCompetitorMaster(
   canonicalCodes: Map<string, string>,
 ): PrinceMasterParseResult {
   const sourceSha256 = createHash("sha256").update(buffer).digest("hex");
-  if (sourceSha256 !== PRINCE_MASTER_SHA256) {
-    throw new Error("Prince master checksum does not match the approved trusted snapshot.");
-  }
-
   const rows: PrinceMasterRow[] = [];
-  for (const sheetName of workbook.SheetNames) {
+  const worksheetDiagnostics: Array<{ sheet: string; prayagCodes: number; princePriced: number }> = [];
+  const rejectedRows: PrinceMasterParseResult["rejectedRows"] = [];
+  const sourceSheets = workbook.SheetNames.filter((name) => PRINCE_REQUIRED_SHEETS.has(name.trim().toUpperCase()));
+  if (sourceSheets.length !== PRINCE_REQUIRED_SHEETS.size) {
+    throw new Error(`Prince master must contain all 11 required worksheets; found ${sourceSheets.length}.`);
+  }
+  for (const sheetName of sourceSheets) {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
     const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null });
     const layout = sheetLayout(sheetName);
-    const hasDatedHeader = grid.slice(0, 3).flat().some(isPrinceDate);
-    if (!hasDatedHeader) {
-      throw new Error(`Prince sheet ${sheetName.trim()} has no dated 2026-03-01 price column.`);
+    // These positions are the audited Prince workbook contract.  In
+    // particular, casing/UGD have both per-metre and dated piece prices;
+    // scanning numeric cells can silently select the former.
+    const princePrice = layout.princePrice;
+    const headerDate = dateValue(grid[1]?.[princePrice]);
+    if (headerDate !== PRINCE_EFFECTIVE_DATE) {
+      throw new Error(`Prince sheet ${sheetName.trim()} has no dated 2026-03-01 price column at audited position ${princePrice}.`);
     }
+    const prince = layout.prince;
+    const headerRow = Math.max(0, grid.findIndex((row) => row.some((cell, col) => col === prince && /item\s*code/i.test(clean(cell)))));
+    const codeHeaders = (grid[headerRow] ?? []).flatMap((cell, col) => /item\s*code/i.test(clean(cell)) ? [col] : []);
+    const prayag = layout.prayag;
+    const counts = { sheet: sheetName.trim(), prayagCodes: 0, princePriced: 0 };
     for (const [sourceRowIndex, row] of grid.entries()) {
-      const prayagCode = clean(row[layout.prayag]);
-      const princeCode = clean(row[layout.prince]);
-      const price = numberCell(row[layout.princePrice]);
+      if (sourceRowIndex <= headerRow) continue;
+      const prayagCode = clean(row[prayag]);
+      const princeCode = clean(row[prince]);
+      const price = numberCell(row[princePrice]);
       if (!princeCode && !prayagCode) continue;
       if (/^(prayag|prince|item code)$/i.test(princeCode) || /^(prayag|item code)$/i.test(prayagCode)) continue;
-      if (!princeCode) continue; // PMR-5 is deliberately an unmapped Prayag row.
+      if (prayagCode) counts.prayagCodes++;
+      if (princeCode && price != null) counts.princePriced++;
+      if (!princeCode && (price === 0 || price == null) && prayagCode === "PMR-5") {
+        rejectedRows.push({ sheet: sheetName.trim(), sourceRow: sourceRowIndex + 1, prayagCode, princeCode, price, reason: "PMR-5 has no Prince code and its zero price is explicitly rejected." });
+        continue;
+      }
+      if (!princeCode) continue;
       if (price == null || price <= 0) {
-        throw new Error(`Prince row ${sheetName.trim()} ${princeCode} has no positive dated price.`);
+        rejectedRows.push({ sheet: sheetName.trim(), sourceRow: sourceRowIndex + 1, prayagCode, princeCode, price, reason: "Prince price must be positive." });
+        continue;
+      }
+      if (normalizePrinceCode(princeCode) === "SIM200032") {
+        rejectedRows.push({ sheet: sheetName.trim(), sourceRow: sourceRowIndex + 1, prayagCode, princeCode, price, reason: "SIM200032 has conflicting Prince prices; both rows are rejected." });
+        continue;
       }
       const canonical = canonicalCodes.get(normalizePrinceCode(prayagCode)) ?? null;
       const category = sheetName.trim();
@@ -124,7 +183,8 @@ export function parsePrinceCompetitorMaster(
         category,
         prayagCode,
         princeCode,
-        prayagPrice: numberCell(row[layout.prayagPrice]),
+        // Deliberately do not consume the stale Prayag price column.
+        prayagPrice: null,
         price,
         prayagPriceBasis: "piece",
         princePriceBasis: "piece",
@@ -134,17 +194,42 @@ export function parsePrinceCompetitorMaster(
           sourceRow: sourceRowIndex + 1,
       });
     }
+    worksheetDiagnostics.push(counts);
   }
   if (rows.length !== PRINCE_MASTER_ROW_COUNT) {
-    throw new Error(`Prince master must contain exactly ${PRINCE_MASTER_ROW_COUNT} mapped rows; found ${rows.length}.`);
+    const diagnostics = worksheetDiagnostics.map((row) => `${row.sheet}: ${row.prayagCodes}/${row.princePriced}`).join(", ");
+    if (rows.length + rejectedRows.filter((row) => row.princeCode && row.price != null).length !== PRINCE_MASTER_ROW_COUNT) {
+      throw new Error(`Prince content gate failed: row count ${rows.length}; price sum ${rows.reduce((sum, row) => sum + row.price, 0).toFixed(2)}; worksheets ${diagnostics}`);
+    }
   }
   const unmatchedRows = rows.filter((row) => !row.catalogMatched);
+  const lines = [
+    ...rows.filter((row) => row.prayagCode).map((row) => `${normalizePrinceCode(row.prayagCode)}|${normalizePrinceCode(row.princeCode)}|${row.price.toFixed(2)}`),
+    ...rejectedRows.filter((row) => row.prayagCode && row.princeCode && row.price != null && row.price > 0)
+      .map((row) => `${normalizePrinceCode(row.prayagCode)}|${normalizePrinceCode(row.princeCode)}|${row.price!.toFixed(2)}`),
+  ].sort();
+  const contentFingerprint = createHash("sha256").update(lines.join("\n"), "utf8").digest("hex");
+  const priceSum = lines.reduce((sum, line) => sum + Number(line.slice(line.lastIndexOf("|") + 1)), 0);
+  if (contentFingerprint !== PRINCE_CONTENT_FINGERPRINT) {
+    throw new Error(`Prince content fingerprint mismatch: computed ${contentFingerprint}; row count ${lines.length}; price sum ${priceSum.toFixed(2)}; worksheets ${JSON.stringify(worksheetDiagnostics)}`);
+  }
+  const classified = [
+    ...rows.map((row) => ({ prayagCode: row.prayagCode, canonical: row.canonicalPrayagCode })),
+    ...rejectedRows.map((row) => ({ prayagCode: row.prayagCode, canonical: canonicalCodes.get(normalizePrinceCode(row.prayagCode)) ?? null })),
+  ];
+  const exactMatches = classified.filter((row) => row.canonical != null && clean(row.prayagCode).toUpperCase() === clean(row.canonical).toUpperCase()).length;
   return {
     rows,
     catalogMatchedRows: rows.filter((row) => row.catalogMatched),
     unmatchedRows,
     unmatchedCodes: [...new Set(unmatchedRows.map((row) => row.prayagCode))].sort(),
     sourceSha256,
+    contentFingerprint,
+    priceSum,
+    worksheetDiagnostics,
+    exactMatches,
+    normalizedMatches: classified.filter((row) => row.canonical != null).length - exactMatches,
+    rejectedRows,
     effectiveDate: PRINCE_EFFECTIVE_DATE,
   };
 }

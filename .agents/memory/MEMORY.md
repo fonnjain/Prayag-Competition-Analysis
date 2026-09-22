@@ -31,3 +31,4 @@
 - [P019 new-product rematch boundary](p019-new-product-rematch.md) — the seven Prince rematches are a fixed staging-only exception, not a reusable general matcher.
 - [Single-product creation audits](single-product-creation-audits.md) — creation/deactivation use save audits distinguished by series; keep the production save/reversal constraint unchanged.
 - [Names-only catalogue corrections](names-only-catalogue-corrections.md) — bulk and single rename paths accept names only; protect prices and matching evidence transactionally.
+- [Workbook content identity](workbook-content-identity.md) — authorize trusted spreadsheet loads by canonical content fingerprint; retain byte SHA only as received-file provenance.

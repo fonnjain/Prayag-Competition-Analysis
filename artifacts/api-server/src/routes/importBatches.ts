@@ -13,6 +13,7 @@
  */
 
 import { Router, type IRouter } from "express";
+import { createHash } from "node:crypto";
 import multer from "multer";
 import { and, eq, sql, desc } from "drizzle-orm";
 import * as XLSX from "xlsx";
@@ -1271,7 +1272,16 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
 
   const [batch] = await db.select().from(importBatchesTable).where(eq(importBatchesTable.id, batchId));
   if (!batch) { res.status(404).json({ error: "Not found" }); return; }
-  if (batch.status !== "pending") { res.status(409).json({ error: `Batch is already ${batch.status}` }); return; }
+  const batchTrusted = batch.competitor === "Prince" && (() => {
+    try { return JSON.parse(batch.rowCounts ?? "{}").source === "trusted_prince_competitor_master"; } catch { return false; }
+  })();
+  if (batch.status !== "pending") {
+    if (batch.status === "approved" && batchTrusted) {
+      res.json({ ok: true, idempotent: true, inserted: 0, updated: 0, unchanged: 0, committed: 0 });
+      return;
+    }
+    res.status(409).json({ error: `Batch is already ${batch.status}` }); return;
+  }
 
   const stagingRows = await db
     .select()
@@ -1281,13 +1291,89 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
   const toCommit = stagingRows.filter(
     (r) => (r.status === "ok" || r.status === "needs_review") && r.newMrp != null && r.matchedPrayagCode,
   );
+  const trustedPrince = batchTrusted;
+  const trustedToCommit = trustedPrince
+    ? stagingRows.filter((r) => r.status === "ok" && r.newMrp != null && r.matchedPrayagCode)
+    : toCommit;
+  let inserted = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let beforeSnapshot: unknown;
+  let afterSnapshot: unknown;
+  let comparableBefore = 0;
+  let comparableAfter = 0;
+  const snapshot = async (tx: any) => {
+    const [catalog, history] = await Promise.all([
+      tx.execute(sql`SELECT * FROM catalog_products ORDER BY id`),
+      tx.execute(sql`SELECT * FROM mrp_price_history ORDER BY id`),
+    ]);
+    const digest = (rows: unknown[]) => createHash("md5").update(JSON.stringify(rows)).digest("hex");
+    return {
+      catalogProducts: { count: catalog.rows.length, md5: digest(catalog.rows) },
+      mrpPriceHistory: { count: history.rows.length, md5: digest(history.rows) },
+    };
+  };
+  const comparable = async (tx: any) => {
+    const result = await tx.execute(sql`
+      SELECT count(*)::int AS count FROM competitor_prices cp
+      WHERE cp.competitor = 'Prince' AND cp.matched_prayag_code IS NOT NULL
+        AND cp.effective_date = ${batch.effectiveDate}
+        AND EXISTS (
+          SELECT 1 FROM (
+            SELECT DISTINCT ON (h.item_code) h.item_code, h.mrp
+            FROM mrp_price_history h
+            WHERE h.variant = 'Standard' AND h.review_status = 'approved'
+              AND h.effective_date <= CURRENT_DATE
+            ORDER BY h.item_code, h.effective_date DESC, h.id DESC
+          ) latest
+          WHERE latest.item_code = cp.matched_prayag_code AND latest.mrp IS NOT NULL
+        )
+    `);
+    return Number(result.rows[0]?.count ?? 0);
+  };
 
   await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`DELETE FROM competitor_prices WHERE competitor = ${batch.competitor} AND effective_date = ${batch.effectiveDate}`,
-    );
+    beforeSnapshot = await snapshot(tx);
+    comparableBefore = await comparable(tx);
+    if (trustedPrince && process.env.NODE_ENV === "test" &&
+      (req.body?.injectMrpMutation === "true" || req.body?.injectMrpMutation === true)) {
+      await tx.execute(sql`UPDATE mrp_price_history SET mrp = mrp + 0.01 WHERE id = (SELECT id FROM mrp_price_history ORDER BY id LIMIT 1)`);
+    }
+    if (!trustedPrince) {
+      await tx.execute(
+        sql`DELETE FROM competitor_prices WHERE competitor = ${batch.competitor} AND effective_date = ${batch.effectiveDate}`,
+      );
+    }
 
-    if (toCommit.length > 0) {
+    if (trustedPrince) {
+      const existing = await tx.select().from(competitorPricesTable).where(and(
+        eq(competitorPricesTable.competitor, batch.competitor),
+        eq(competitorPricesTable.effectiveDate, batch.effectiveDate),
+      ));
+      const byCode = new Map(existing.map((row) => [row.matchedPrayagCode, row]));
+      for (const r of trustedToCommit) {
+        const prior = byCode.get(r.matchedPrayagCode);
+        if (!prior) {
+          await tx.insert(competitorPricesTable).values({
+            competitor: batch.competitor, category: null, description: r.description, size: r.variant,
+            price: r.newMrp!, unit: null, competitorCode: r.competitorCodeCatalogue ?? r.competitorCodeMaster,
+            effectiveDate: batch.effectiveDate, matchedPrayagCode: r.matchedPrayagCode,
+            matchStatus: "matched", matchConfidence: r.matchMethod === "code+desc" ? "High" : "Medium",
+            prayagMrpAtCompare: r.prayagMrpCurrent, isCurrent: false, priceBasis: batch.priceBasis,
+            gstPct: batch.gstPct, loadBatchId: batch.loadBatchId,
+          });
+          inserted++;
+        } else if (prior.price !== r.newMrp) {
+          await tx.update(competitorPricesTable).set({
+            price: r.newMrp!, competitorCode: r.competitorCodeCatalogue ?? r.competitorCodeMaster,
+            loadBatchId: batch.loadBatchId, updatedAt: new Date(),
+          }).where(eq(competitorPricesTable.id, prior.id));
+          updated++;
+        } else {
+          unchanged++;
+        }
+      }
+    } else if (toCommit.length > 0) {
       type Ins = typeof competitorPricesTable.$inferInsert;
       const values: Ins[] = toCommit.map((r) => ({
         competitor: batch.competitor,
@@ -1305,6 +1391,7 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
         isCurrent: false,
         priceBasis: batch.priceBasis,
         gstPct: batch.gstPct,
+        loadBatchId: batch.loadBatchId,
       }));
       for (let i = 0; i < values.length; i += 200) {
         await tx.insert(competitorPricesTable).values(values.slice(i, i + 200));
@@ -1328,11 +1415,20 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
     }
 
     await tx.update(importBatchesTable).set({ status: "approved" }).where(eq(importBatchesTable.id, batchId));
+    comparableAfter = await comparable(tx);
+    afterSnapshot = await snapshot(tx);
+    if (JSON.stringify(beforeSnapshot) !== JSON.stringify(afterSnapshot)) {
+      throw new Error("P027r2 safety guard: catalog_products or mrp_price_history changed during competitor apply.");
+    }
   });
 
   await recomputeCurrentFlags(batch.competitor);
 
-  res.json({ ok: true, committed: toCommit.length });
+  res.json({ ok: true, committed: trustedPrince ? trustedToCommit.length : toCommit.length,
+    inserted: trustedPrince ? inserted : undefined, updated: trustedPrince ? updated : undefined,
+    unchanged: trustedPrince ? unchanged : undefined,
+    beforeSnapshot, afterSnapshot,
+    comparableBefore, comparableAfter });
 });
 
 // ---------------------------------------------------------------------------

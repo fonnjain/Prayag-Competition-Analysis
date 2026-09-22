@@ -1,0 +1,174 @@
+# P027r2 — COMPETITION — Load the Prince prices, gated on content rather than file bytes
+
+> **P027r2** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES DATA.** It may also require a code change — see §4.
+> Quote `P027r2` when reporting back.
+> This replaces P027. Everything in P027 still applies except §1, which this section replaces.
+
+You were right to stop. The gate was wrong, not your handling of it.
+
+---
+
+## 1. Why the hash did not match
+
+A `.xlsx` is a zip. Opening it and saving it — in Excel, in Google Sheets, on the way through Drive — rewrites that zip with new timestamps and a different compression order. **Every byte changes while every value stays the same.** A byte hash therefore proves the file was never re-saved; it does not prove the data is the same, and it fails constantly on files that travel through a spreadsheet application.
+
+So do not authorise the received hash and carry on. Verify the **content** instead, which is what the gate was trying to protect in the first place.
+
+Record both hashes in `mrp_load_batches`: the byte hash of the file you actually received, and the content fingerprint below. The byte hash still has a job — proving *which* file you read — it is just not the thing that decides whether to proceed.
+
+## 2. The content gate
+
+Read the workbook. Before writing anything, compute this fingerprint and compare.
+
+**How to build it.** For every row that has both a Prince item code and a Prince price:
+
+```
+line = NORM(prayag_code) + "|" + NORM(prince_code) + "|" + price_to_2dp
+
+NORM(s)  = uppercase s, then remove every character that is not A-Z or 0-9
+price    = formatted to exactly two decimal places, e.g. "536.25", "273.00"
+```
+
+Sort the lines as plain ASCII strings, ascending. Join with a single `\n` — no trailing newline. Encode UTF-8. SHA-256.
+
+```
+rows with a Prince code and price     813
+sum of all Prince prices              1049375.55
+CONTENT FINGERPRINT
+  901d63a62e8eb4ea9de728e1cec2b3d4c1a1ef23d871a0b3246fa8e090658a17
+```
+
+**If the fingerprint matches, proceed.** The data is identical to what was analysed, whatever the file bytes say.
+
+**If it does not match, stop again** — but this time report the three diagnostics below so the difference can be identified, rather than only the hash:
+
+```
+your row count            (expected 813)
+your price sum            (expected 1049375.55)
+your per-worksheet counts (expected, below)
+```
+
+## 3. Structural checks
+
+Eleven worksheets. Two brand groups only, Prayag and Prince. Nothing beyond column 7 on any sheet.
+
+```
+worksheet               Prayag codes   Prince priced
+CPVC PIPE                         40              40
+CPVC FITTINGS                    255             172
+UPVC PIPE                         52              52
+UPVC FITTINGS                    269             169
+AGRI PIPE                        123              90
+AGRI FITTINGS                    135              29
+AGRI SMART Fittings               33               9
+SWR PIPE                         160             125
+SWR FITTINGS                     149              96
+CASING PIPE                       18              17
+UGD PIPE                          20              14
+TOTAL                           1254             813
+```
+
+Header dates, which must be read from the file and not assumed:
+
+```
+Prayag column     "10th Aug, 2026"
+Prince column     2026-03-01
+```
+
+Five spot checks:
+
+```
+CPVC PIPE      PS-1     ->  SIM207553      273.00
+CASING PIPE    PMC-1    ->  SIM200558      536.25
+UGD PIPE       U-11CS   ->  SIM200965     2951.40
+SWR PIPE       PW 71    ->  SIM203308      560.00
+AGRI PIPE      A-86B    ->  SIM200032     1265.00
+```
+
+Report all five. `PW 71` carries a space in the file and `SIM200032` is one half of the duplicate-price conflict, so those two are the ones worth reading closely.
+
+`CASING PIPE` and `UGD PIPE` carry two price columns per brand. **Take the dated per-pipe column, not `MRP (Per Mtr)`.** If your Prince count for those sheets is 17 and 14, you have taken the right one.
+
+---
+
+## 4. Everything else from P027 stands
+
+Restated so this prompt can be sent on its own.
+
+**Code normalisation is mandatory.** 74 of the 813 rows resolve only after normalising — the file writes `PU-1 T` where the catalogue holds `PU-1T`, and `PW 71` where it holds `PW71`. This is P008 again, where `324-K` and `324K` were one product and eight codes worth Rs 54.2 lakh were being lost. If this import path does not normalise, **that is the code change**, and it is made before the load, not worked around by editing the spreadsheet. Report exact matches, normalised matches and failures separately; a normalised match is never reported as exact.
+
+**Reject, do not skip.** A rejected row is named in the report; a skipped row vanishes.
+
+- `SIM200032` appears twice with different prices — `A-86B` at 1265 and `A-86A` at 759. Reject **both**, name both. Do not pick one, average them, or take the last read.
+- `PMR-5` carries a Prince price of `0.00` with no Prince code. Reject it. Zero is not a price, and a zero here would display as Prince undercutting Prayag by 100% on a casing pipe.
+
+**Load but flag** three Prince codes that each map to two Prayag codes at a consistent price: `SIM100150` → `A-414`/`A-464` at 30, `SIM103500` → `5711S`/`5712S` at 83, `SIM103501` → `5111S`/`5112S` at 155. Already loaded this way; report them for Prayag to confirm.
+
+**Check against the live catalogue**, not against the master file: `C133`, `PMR-8`, `PMR-9`. Report whether each Prayag product exists and whether it has a price. A product with no current price still validly holds a competitor price — the pair is simply not comparable yet, and is reported as such rather than dropped.
+
+**Rules that do not bend.**
+
+1. A competitor upload never creates a Prayag product. Unresolved rows are held and listed.
+2. **Do not read the Prayag price column.** It is dated 10 August and is known stale — its Casing Pipe values are the February prices, about 10% below what the catalogue now holds.
+3. **The effective date is `2026-03-01`, from the Prince column header** — not the upload date. Batch 154 wrote 1,828 rows dated the day they were loaded and overrode correct March prices.
+4. Preview, then Apply.
+5. Provenance: byte hash, content fingerprint, row count, actor; `load_batch_id` on every row written.
+6. No direct SQL against production.
+
+**Expected outcome:**
+
+```
+comparable pairs before    803
+comparable pairs after     810
+net new                     +7    all UGD S-variants
+```
+
+`U-11CS`, `U-13CS`, `U-14CS`, `U-15CS`, `U-16CS`, `U-13BS`, `U-14BS` — Prayag has confirmed these products are already created. If the load reports hundreds of changes, stop and report before applying.
+
+---
+
+## 5. Tests
+
+```
+1.  Content fingerprint computed and reported, matching or not
+2.  Both hashes recorded in the load batch
+3.  All 11 worksheets read; none silently skipped
+4.  CASING and UGD take the dated per-pipe column (17 and 14)
+5.  'PW 71' resolves to PW71 and is reported as a normalised match
+6.  All 74 normalised matches resolve
+7.  SIM200032 rows both rejected, both named
+8.  PMR-5 rejected; no zero price stored anywhere
+9.  Prince effective dates are 2026-03-01, not the load date
+10. No Prayag product created
+11. No mrp_price_history row written -- count and checksum unchanged
+12. The 7 UGD S-variants each gain a Prince price
+13. Comparable pairs go 803 -> 810
+14. Running the same file twice changes nothing
+15. Non-admin receives 403
+```
+
+---
+
+## 6. Report
+
+- Byte hash received, content fingerprint computed, and whether it matched.
+- Row count and price sum.
+- Per-worksheet counts against the table in §3.
+- The five spot checks.
+- Match counts: exact, normalised, unresolved — unresolved listed in full.
+- Every rejected row with its reason.
+- Status of `C133`, `PMR-8`, `PMR-9` in the live catalogue.
+- Inserted / updated / unchanged counts, and comparable pairs before and after.
+- Confirmation that `mrp_price_history` is unchanged and no Prayag product was created.
+- The result of a second run of the same file.
+
+---
+
+## 7. Make this the standard
+
+This is P006's subject — the authoritative load hash contract, written and never issued. The lesson is now paid for, so build it in rather than repeating this exchange on the next file:
+
+**Every workbook load gates on a content fingerprint and records the byte hash alongside it.** The byte hash identifies the file. The fingerprint decides whether to proceed. A spreadsheet that has been opened and saved is the normal case, not an anomaly, and a contract that fails on it will simply be switched off by whoever is in a hurry.
+
+Report how much of this already exists in the loader and what it would take to apply it to the MRP path as well.
