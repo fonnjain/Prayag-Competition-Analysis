@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import React, { useState } from "react";
 import { useGetAnalysisOpportunities, useGetPriceHistory, useGetMrpIncreases } from "@workspace/api-client-react";
 import type { AnalysisOpportunityItem } from "@workspace/api-client-react";
@@ -58,7 +59,7 @@ function RevisionLine({
     <div className="mt-0.5 whitespace-nowrap text-[10px] font-normal text-orange-600">
       {unchanged
         ? `No change on ${shortDate(nextDate)}`
-        : `${next > current ? "↑" : "↓"} ₹${next.toFixed(2)} on ${shortDate(nextDate)}${
+        : `${next > current ? "↑" : "↓"} ${formatMoney(next)} on ${shortDate(nextDate)}${
             changePct == null
               ? ""
               : ` (${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%)`
@@ -177,7 +178,7 @@ function OpportunityTable({ items, isThreat, prayagMrpDate, asOf }: { items: Ana
                     <Badge variant="outline" className="font-normal">{item.competitor}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div>₹{item.prayagMrp?.toFixed(2) ?? '-'}</div>
+                    <div>{item.prayagMrp == null ? "—" : formatMoney(item.prayagMrp)}</div>
                     <div className="mt-0.5 whitespace-nowrap text-[10px] font-normal text-muted-foreground">
                       {validityLabel(item.prayagEffectiveDate, item.prayagValidTo)}
                     </div>
@@ -190,7 +191,7 @@ function OpportunityTable({ items, isThreat, prayagMrpDate, asOf }: { items: Ana
                   </TableCell>
                   <TableCell className="text-right">
                     <div>
-                      ₹{item.competitorEffectivePrice?.toFixed(2) ?? '-'}
+                      {item.competitorEffectivePrice == null ? "—" : formatMoney(item.competitorEffectivePrice)}
                       {item.unit && <span className="text-xs text-muted-foreground ml-1">/{item.unit}</span>}
                     </div>
                     <div className="mt-0.5 whitespace-nowrap text-[10px] font-normal text-muted-foreground">
@@ -273,7 +274,7 @@ function PriceHistoryPanel({ itemCode, asOf }: { itemCode: string; asOf?: string
                     <TableCell className="py-1.5 font-mono">{formatDisplayDate(p.effectiveDate)}</TableCell>
                     <TableCell className="py-1.5 text-muted-foreground">{p.priceBasis ?? '—'}</TableCell>
                     <TableCell className="py-1.5 text-right font-medium">
-                      {p.mrp != null ? `₹${p.mrp.toFixed(2)}` : '—'}
+                      {p.mrp != null ? `${formatMoney(p.mrp)}` : '—'}
                     </TableCell>
                     <TableCell className="py-1.5 text-right">
                       {p.changePct != null ? (
@@ -324,11 +325,11 @@ function PriceHistoryPanel({ itemCode, asOf }: { itemCode: string; asOf?: string
                         <TableRow key={p.id} className="text-xs">
                           <TableCell className="py-1.5 font-mono">{formatDisplayDate(p.effectiveDate)}</TableCell>
                           <TableCell className="py-1.5 text-right">
-                            {p.price != null ? `₹${p.price.toFixed(2)}` : '—'}
+                            {p.price != null ? `${formatMoney(p.price)}` : '—'}
                             {p.unit && <span className="text-muted-foreground ml-1">/{p.unit}</span>}
                           </TableCell>
                           <TableCell className="py-1.5 text-right font-medium">
-                            ₹{p.effectivePrice.toFixed(2)}
+                            {formatMoney(p.effectivePrice)}
                           </TableCell>
                           <TableCell className="py-1.5 text-right">
                             {p.changePct != null ? (
@@ -411,11 +412,11 @@ function BiggestMrpIncreasesTab({ filters }: { filters: { division?: string; cat
                 {row.category || '—'}
               </TableCell>
               <TableCell className="text-right text-muted-foreground">
-                ₹{row.prevMrp.toFixed(2)}
+                {formatMoney(row.prevMrp)}
                 <span className="text-xs ml-1">({row.prevDate})</span>
               </TableCell>
               <TableCell className="text-right font-medium">
-                ₹{row.currentMrp.toFixed(2)}
+                {formatMoney(row.currentMrp)}
                 <span className="text-xs text-muted-foreground ml-1">({row.currentDate})</span>
               </TableCell>
               <TableCell className="text-right">

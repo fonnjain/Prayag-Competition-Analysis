@@ -1,0 +1,289 @@
+# P024 — COMPETITION — Update 155 Prayag product names, and switch every money figure to Indian digit grouping
+
+> **P024** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE AND DATA.**
+> Quote `P024` when reporting back.
+> This prompt supersedes **P022**, which is folded in as Job B. Do not run P022 separately.
+
+Two jobs.
+
+**Job A** — update the `product_name` of 155 existing Prayag products. Names only.
+**Job B** — every rupee figure in the application renders in the Indian system: thousand, lakh, crore.
+
+They are one prompt because they touch the same screens and must be verified in one pass.
+
+---
+
+# JOB A — 155 product names
+
+## A1. The input
+
+File: **`Prayag_Name_Changes_01Sep2026.xlsx`**
+SHA-256 `d3fa57358c6044a9dc5c9b712142e44e8aab49b43857df66335fa0390b0396b1`
+
+Record the hash in `mrp_load_batches` before reading a row. If the file you receive hashes differently, stop and report it.
+
+Sheet `name_changes` carries one row per product:
+
+```
+item_code · division · series · old_name · new_name · change_type · mrp_unchanged · note
+```
+
+`old_name` is there so you can **verify before you write**. If the name currently in the database does not equal `old_name` for a code, do not update that code — collect it and report it. A row whose starting point has moved is a row whose ending point cannot be trusted.
+
+All 155 codes were checked against the authoritative master v2 before this file was built:
+
+```
+matched in priced master     155 of 155   (exact code match, no normalisation needed)
+matched in discontinued        0
+not found                      0
+division differs               0
+series differs                 0
+```
+
+## A2. What changes — three patterns
+
+| Pattern | Series | Codes | Change |
+|---|---|---|---|
+| `SUFFIX_ADDED` | PPR Pipe | 90 | append `" Pipe (3 MTR)"` |
+| `SUFFIX_ADDED` | Casing Pipe | 15 | append `" Pipe (3 MTR)"` |
+| `SDR_RESPEC` | HDPE Pipe | 50 | the SDR value is replaced |
+
+The HDPE half is not cosmetic. Every pressure class moves one step thicker while the PN label stays where it is:
+
+```
+PN-4     SDR-26    ->  SDR-21      15 codes
+PN-6     SDR-17    ->  SDR-13.6    17 codes
+PN-8     SDR-13.6  ->  SDR-11      18 codes
+```
+
+Apply exactly what the file says. There is an open question about this with Prayag (sheet `open_question` in the workbook), but it is a question about what the catalogue should say, not a reason to hold the update. **Do not "helpfully" adjust a PN value to match an SDR.** Write the `new_name` string, character for character.
+
+## A3. What must not change — this is most of the job
+
+Nothing in this batch is a price change and nothing in it is a mapping change.
+
+1. **No price is written.** Not one row in `mrp_price_history`. No new period, no new effective date, no re-rounding. The `mrp_unchanged` column is in the file so you can assert this, not so you can load it.
+2. **No competitor mapping changes.** Not one row in `competitor_prices`, and no row moves into or out of Needs Review.
+3. **No division, series, category or size changes.** The file repeats division and series only so they can be checked; they are identical to what is stored.
+4. **No product is created and none is deactivated.**
+5. **No discontinued product is touched.**
+
+### The mapping risk, stated plainly
+
+If any matching, scoring or Needs-Review logic anywhere in this application reads `product_name`, then renaming 155 products can silently re-shuffle competitor matches — and it will do so quietly, because nobody is watching the mapping table during a rename.
+
+So, as part of this job:
+
+```
+before the update:
+    snapshot every competitor_prices row for the 155 codes
+    snapshot the full Needs Review queue (count and membership)
+
+after the update:
+    take the same two snapshots
+    diff them
+```
+
+**The diff must be empty.** If it is not empty, roll back and report — do not accept a changed mapping as a side effect of a rename. Report which code moved, which competitor, and which line of code keyed on the name.
+
+Also report, before you start: **every place `product_name` is stored rather than joined.** If a saved generator run, a scenario snapshot or an export record carries a copy of the name, say so and leave it alone. A run made on 15 September recorded what the catalogue said on 15 September; that is a record, not a live view, and retro-editing it destroys the audit trail.
+
+## A4. Preview, then Apply
+
+Same gate as every other load in this application. Nothing is written until the user presses Apply.
+
+The preview shows:
+
+```
+rows read                    155
+codes matched                155
+old_name verified            <n>
+old_name mismatched          <n>   listed in full
+name already correct         <n>   skipped, not an error
+would update                 <n>
+
+price rows to be written       0
+competitor rows to be touched  0
+products to be created         0
+```
+
+Those last three lines print as literal zeros on the preview. If any of them is non-zero, the preview refuses to offer Apply and explains why.
+
+## A5. Provenance
+
+A name change is a change. It gets the same treatment as a price:
+
+- a `mrp_load_batches` row with the SHA-256, the row count and the timestamp
+- the batch id recorded against each updated product
+- old value and new value both retained, so the change is reversible
+- attributed to the user who applied it
+- visible in the audit trail
+
+Undo must restore all 155 names in one action.
+
+## A6. One thing to be aware of, not to fix
+
+After the change, names in two of the three series are still not unique:
+
+```
+PPR Pipe      90 codes ->  3 distinct names
+Casing Pipe   15 codes ->  2 distinct names
+HDPE Pipe     50 codes -> 50 distinct names
+```
+
+Thirty products will read `Green Triple Layer Pipe (3 MTR)`. The `size` field is blank for all 155, so the only thing distinguishing them on screen is the code.
+
+That is already true today and this change does not make it worse, so **do not invent a size or append one to the name.** Report it, and the human will take it to Prayag.
+
+---
+
+# JOB B — Indian digit grouping
+
+Every rupee figure the application shows must group the **last three digits, then pairs**.
+
+```
+wrong    ₹100,000.00          ₹13,592,000.00        ₹1,352,320,560.20
+right    ₹1,00,000.00         ₹1,35,92,000.00       ₹1,35,23,20,560.20
+```
+
+## B1. One shared formatter
+
+Not scattered `toLocaleString()` calls — a single module every screen and every export goes through, so the next number added to the application is correct by default.
+
+```js
+// shared/format.ts
+
+const inrMoney = new Intl.NumberFormat("en-IN", {
+  style: "currency", currency: "INR",
+  minimumFractionDigits: 2, maximumFractionDigits: 2,
+});
+const inrMoneyWhole = new Intl.NumberFormat("en-IN", {
+  style: "currency", currency: "INR", maximumFractionDigits: 0,
+});
+const inrCount = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+
+export const formatMoney      = (n) => inrMoney.format(n);
+export const formatMoneyWhole = (n) => inrMoneyWhole.format(n);
+export const formatCount      = (n) => inrCount.format(n);
+```
+
+This is a **locale change, not string logic**. Do not write a regex that inserts commas — `Intl` already knows the rule, handles negatives, and handles the crore boundary.
+
+Verified output:
+
+```
+        318.24        ₹318.24                  (identical either way)
+       1614.00        ₹1,614.00                (identical either way)
+      25230.00        ₹25,230.00               (identical either way)
+     100000.00        ₹1,00,000.00             was ₹100,000.00
+    1352320.00        ₹13,52,320.00            was ₹1,352,320.00
+   13592000.00        ₹1,35,92,000.00          was ₹13,592,000.00
+ 1352320560.20        ₹1,35,23,20,560.20       was ₹1,352,320,560.20
+   -1080007.94        ₹-10,80,007.94           was ₹-1,080,007.94
+```
+
+## B2. Where it applies
+
+Price Finder · product detail and price history · Comparison · Competition Analysis · MRP Generator input table, generated MRPs, run summaries, scenario comparison tab, collective margin values · Matching MRP view · Historical MRP series and tooltips · Single Price Editor · MRP upload preview and apply · every toast, banner and error that names a rupee figure. And counts that can exceed five digits.
+
+## B3. What must never be grouped
+
+| Never | Example |
+|---|---|
+| Years | `2026`, not `2,026` |
+| Batch IDs | `batch 1946` |
+| Product codes | `148-LSB`, `HD110D` |
+| Percentages | `10.8%` |
+| Any hash or commit id | — |
+
+If a number is an **identifier**, it is never formatted. If it is a **quantity**, it is.
+
+## B4. Exports — read this carefully
+
+**Excel:** write the **raw number** and apply an Indian number format to the cell:
+
+```
+₹ with decimals    [$₹-en-IN]##,##,##0.00
+₹ whole rupees     [$₹-en-IN]##,##,##0
+plain count        ##,##,##0
+```
+
+If you write `"₹1,35,92,000.00"` as text, the column becomes unusable — `SUM` returns zero, and the Prayag team will not report it, they will simply stop trusting the file.
+
+**CSV:** raw ungrouped numbers, no symbol. A comma inside a number breaks a comma-separated file.
+
+## B5. What must not change
+
+1. No stored value changes — not one row anywhere.
+2. No arithmetic changes. Values are computed as numbers and formatted only at the edge. If any calculation currently parses a formatted string back into a number, **report it as a bug, do not preserve it**.
+3. No API response changes. JSON carries numbers.
+4. Input parsing is out of scope. If the editor accepts `100000` today it must still accept it. Report any field that would now reject a value pasted back from a display.
+
+## B6. Do not verify Job B on Job A's products
+
+The 155 products in Job A run from **₹44.50 to ₹9,890.60**. **None reaches ₹1,00,000.** The two grouping systems are identical below six digits, so these products will look unchanged — that is correct, not a failure.
+
+Verify Job B on `WT-3LH-50` (₹1,00,000), on a generator run summary, and on a sales value pulled from the Sales API.
+
+---
+
+# Tests
+
+```
+JOB A
+ 1. 155 rows read, 155 codes matched, 0 not found
+ 2. A code whose stored name != old_name is skipped and listed, not updated
+ 3. mrp_price_history row count is identical before and after
+ 4. competitor_prices for the 155 codes is byte-identical before and after
+ 5. Needs Review count and membership are identical before and after
+ 6. division, series, size unchanged on all 155
+ 7. HD110D reads "PE-63 SDR-21 PN-4 HDPE Pipe 110mm"
+ 8. PMC-1 reads "Medium Well Casing (CM) Pipe (3 MTR)"
+ 9. P10A02 reads "Anti-Freezing Triple Layer Pipe (3 MTR)"
+10. No product created, none deactivated, no discontinued row touched
+11. Undo restores all 155 prior names in one action
+12. The load batch carries the SHA-256 and row_count 155
+
+JOB B
+13. 100000            renders ₹1,00,000.00
+14. 13592000          renders ₹1,35,92,000.00
+15. 1352320560.2      renders ₹1,35,23,20,560.20
+16. -1080007.94       keeps Indian grouping and the sign
+17. 0                 renders ₹0.00, not blank
+18. null              renders the existing "no price" treatment, NOT ₹0.00
+19. The year 2026 on screen is still 2026
+20. SUM works on an exported .xlsx MRP column
+21. An exported .csv contains no grouping comma inside a number
+22. A scenario run produces the same generated MRPs as before, digit for digit
+```
+
+Test 4 is the one the human asked for by name. Test 18 is the one that catches the common mistake — **missing is not zero**, and a null competitor price must not appear as ₹0.00. Test 22 is the proof that Job B was display-only.
+
+---
+
+# Report
+
+**Job A**
+- The batch id, the hash you recorded, and the row count.
+- Counts: matched, verified against `old_name`, mismatched, already correct, updated.
+- Every mismatched code, in full.
+- The competitor mapping diff — stated as empty, or explained.
+- Every place `product_name` is stored rather than joined, and which you left alone.
+- Screenshots of `HD110D`, `PMC-1` and `P10A02` after the change.
+- Confirmation that `mrp_price_history` is unchanged, with the before and after row counts.
+
+**Job B**
+- The shared formatter module and its path, and the number of call sites replaced.
+- Whether any call site was computing on a formatted string, and where.
+- The Excel format codes applied, and confirmation that `SUM` works on an exported column.
+- Screenshots of `WT-3LH-50` and one generator run summary.
+
+**Both**
+- Confirmation that no price row and no generated MRP changed anywhere in this prompt.
+
+---
+
+## Note for the SALES app
+
+`prayag-sales.com` displays crore-scale figures routinely and needs the same formatter. One addition when that prompt is written: Sales already abbreviates in places (`₹54.2 L`, `₹135.23 Cr`). Abbreviated and fully grouped forms may both exist, but not mixed in the same column.

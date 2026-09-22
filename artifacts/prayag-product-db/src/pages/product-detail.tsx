@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { useRoute } from "wouter";
 import { useGetCatalogProduct, getGetCatalogProductQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -109,9 +110,9 @@ export default function ProductDetailPage() {
                         {row.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-medium">₹{row.mrp?.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-mono font-medium">{row.mrp == null ? "—" : formatMoney(row.mrp)}</td>
                     <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                      {row.netPrice ? `₹${row.netPrice.toFixed(2)}` : '-'}
+                      {row.netPrice != null ? `${formatMoney(row.netPrice)}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate" title={row.sourceFile || ''}>
                       {row.sourceFile}

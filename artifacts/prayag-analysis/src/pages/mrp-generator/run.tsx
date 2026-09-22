@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import React, { useState } from "react";
 import { useRoute } from "wouter";
 import { useGetMrpGeneratorRun, useHandoffMrpGeneratorRun, getGetMrpGeneratorRunQueryKey, MrpGeneratorTrace, MrpGeneratorCompetitorValue, MrpGeneratorFreshnessCompetitor } from "@workspace/api-client-react";
@@ -278,7 +279,7 @@ export default function MrpGeneratorRun() {
                   <div className="text-muted-foreground"><strong className="text-foreground">{summary.fallthroughUntouched}</strong> fallthrough -- untouched</div>
                 )}
                 {summary.salesValueRepresented != null && (
-                  <div className="text-muted-foreground"><strong className="text-foreground text-emerald-700">₹{summary.salesValueRepresented.toLocaleString()}</strong> matched FY Sales</div>
+                  <div className="text-muted-foreground"><strong className="text-foreground text-emerald-700">{formatMoney(summary.salesValueRepresented)}</strong> matched FY Sales</div>
                 )}
               </div>
 
@@ -315,7 +316,7 @@ export default function MrpGeneratorRun() {
                       {counts.matchedFySalesValue != null && (
                         <>
                           <span>&middot;</span>
-                          <span className="text-emerald-700">₹{counts.matchedFySalesValue.toLocaleString()} FY Sales</span>
+                          <span className="text-emerald-700">{formatMoney(counts.matchedFySalesValue)} FY Sales</span>
                         </>
                       )}
                       {counts.tierDistribution && Object.keys(counts.tierDistribution).length > 0 && (
@@ -409,7 +410,7 @@ export default function MrpGeneratorRun() {
                    <h3 className="font-semibold text-foreground border-b pb-1">Value & Action Distribution</h3>
                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                      <span className="text-muted-foreground">Sales Value Represented:</span>
-                     <span className="text-right font-medium">₹{summary.salesValueRepresented?.toLocaleString() ?? "0"}</span>
+                      <span className="text-right font-medium">{formatMoney(summary.salesValueRepresented)}</span>
 
                      <span className="col-span-2 text-xs font-semibold uppercase mt-2 mb-1">Actions</span>
                      {Object.entries(summary.actionCounts || {}).map(([action, count]) => {
@@ -421,8 +422,8 @@ export default function MrpGeneratorRun() {
                              {count as React.ReactNode} items<br/>
                              {impact ? (
                                <span className="text-muted-foreground">
-                                 ₹{(impact.fySalesValue/1e5).toFixed(1)}L FY Sales<br/>
-                                 Δ ₹{(impact.grossContributionDelta/1e5).toFixed(1)}L GC
+                                 {formatMoney(impact.fySalesValue)} FY Sales<br/>
+                                 Δ {formatMoney(impact.grossContributionDelta)} GC
                                </span>
                              ) : "-"}
                            </span>
@@ -466,8 +467,8 @@ export default function MrpGeneratorRun() {
 
                          <span className="text-muted-foreground">Coverage:</span>
                          <span className="text-right text-xs">
-                            {summary.portfolio.coveredProductCount} items (₹{(summary.portfolio.coveredSalesValue/1e5).toFixed(1)}L)<br/>
-                            {summary.portfolio.omittedProductCount} omitted (₹{(summary.portfolio.omittedSalesValue/1e5).toFixed(1)}L)
+                            {summary.portfolio.coveredProductCount} items ({formatMoney(summary.portfolio.coveredSalesValue)})<br/>
+                            {summary.portfolio.omittedProductCount} omitted ({formatMoney(summary.portfolio.omittedSalesValue)})
                          </span>
                        </>
                      )}
@@ -493,9 +494,9 @@ export default function MrpGeneratorRun() {
                             <tr key={h.itemCode} className="border-b last:border-0 border-border/50">
                               <td className="py-1 font-medium">{h.itemCode}</td>
                               <td className="py-1">{h.band}</td>
-                              <td className="py-1 text-right">₹{(h.fySalesValue/1e5).toFixed(1)}L</td>
-                              <td className="py-1 text-right text-emerald-600">₹{h.additionalRealizedSaleValue.toLocaleString()}</td>
-                              <td className="py-1 text-right text-emerald-600">₹{h.additionalGrossContribution.toLocaleString()}</td>
+                              <td className="py-1 text-right">{formatMoney(h.fySalesValue)}</td>
+                              <td className="py-1 text-right text-emerald-600">{formatMoney(h.additionalRealizedSaleValue)}</td>
+                              <td className="py-1 text-right text-emerald-600">{formatMoney(h.additionalGrossContribution)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -574,13 +575,13 @@ export default function MrpGeneratorRun() {
                 <span className="text-right font-medium truncate">{freshness.coverageSummary?.dataSource || "Unavailable"}</span>
 
                 <span className="text-muted-foreground">Recon Variance:</span>
-                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.variance != null ? `₹${freshness.coverageSummary.reconciliation.sales.variance.toLocaleString()}` : "Unavailable"}</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.variance != null ? `${formatMoney(freshness.coverageSummary.reconciliation.sales.variance)}` : "Unavailable"}</span>
 
                 <span className="text-muted-foreground">Recon Control:</span>
-                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.control != null ? `₹${freshness.coverageSummary.reconciliation.sales.control.toLocaleString()}` : "Unavailable"}</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.control != null ? `${formatMoney(freshness.coverageSummary.reconciliation.sales.control)}` : "Unavailable"}</span>
 
                 <span className="text-muted-foreground">Recon Actual:</span>
-                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.actual != null ? `₹${freshness.coverageSummary.reconciliation.sales.actual.toLocaleString()}` : "Unavailable"}</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.actual != null ? `${formatMoney(freshness.coverageSummary.reconciliation.sales.actual)}` : "Unavailable"}</span>
 
                 <span className="text-muted-foreground">Recon Pct:</span>
                 <span className="text-right font-medium">{freshness.coverageSummary?.reconciliation?.sales?.variancePct != null ? `${freshness.coverageSummary.reconciliation.sales.variancePct.toFixed(2)}%` : "Unavailable"}</span>
@@ -589,7 +590,7 @@ export default function MrpGeneratorRun() {
                 <span className="text-right font-medium">{freshness.coverageSummary?.awaitingConfirmation?.count ?? "Unavailable"}</span>
 
                 <span className="text-muted-foreground">Awaiting Conf (Value):</span>
-                <span className="text-right font-medium">{freshness.coverageSummary?.awaitingConfirmation?.value != null ? `₹${freshness.coverageSummary.awaitingConfirmation.value.toLocaleString()}` : "Unavailable"}</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.awaitingConfirmation?.value != null ? `${formatMoney(freshness.coverageSummary.awaitingConfirmation.value)}` : "Unavailable"}</span>
 
                 <span className="text-muted-foreground col-span-2 mt-1 border-t pt-1">Awaiting Conf (List):</span>
                 <span className="col-span-2 text-right font-medium text-amber-700">
@@ -600,7 +601,7 @@ export default function MrpGeneratorRun() {
                 <span className="text-right font-medium">{freshness.coverageSummary?.absentSoldCodes?.count ?? "Unavailable"}</span>
 
                 <span className="text-muted-foreground">Absent Sold Value:</span>
-                <span className="text-right font-medium">{freshness.coverageSummary?.absentSoldCodes?.value != null ? `₹${freshness.coverageSummary.absentSoldCodes.value.toLocaleString()}` : "Unavailable"}</span>
+                <span className="text-right font-medium">{freshness.coverageSummary?.absentSoldCodes?.value != null ? `${formatMoney(freshness.coverageSummary.absentSoldCodes.value)}` : "Unavailable"}</span>
 
                 <span className="text-muted-foreground col-span-2 mt-1 border-t pt-1">Named Holds / Reasons:</span>
                 <span className="col-span-2 text-right font-medium text-amber-700">
@@ -779,12 +780,12 @@ export default function MrpGeneratorRun() {
                           <div className="text-center font-bold text-muted-foreground">{r.band || "-"}</div>
                         )}
                         <div className="text-right text-muted-foreground">
-                          {r.currentMrp != null ? `₹${r.currentMrp.toFixed(2)}` : "No data"}
+                          {r.currentMrp != null ? `${formatMoney(r.currentMrp)}` : "No data"}
                         </div>
                         {isHistorical ? (
                           <>
                             <div className="text-right font-semibold">
-                              {r.suggestedMrp != null ? `₹${r.suggestedMrp.toFixed(2)}` : "No data"}
+                              {r.suggestedMrp != null ? `${formatMoney(r.suggestedMrp)}` : "No data"}
                             </div>
                             <div className="text-right text-muted-foreground">
                               {historicalEvidence?.typicalRate != null ? `${(historicalEvidence.typicalRate).toFixed(1)}%` : "-"}
@@ -805,7 +806,7 @@ export default function MrpGeneratorRun() {
                         ) : (
                           <>
                             <div className="text-right font-semibold">
-                              {r.suggestedMrp != null ? `₹${r.suggestedMrp.toFixed(2)}` : "No data"}
+                              {r.suggestedMrp != null ? `${formatMoney(r.suggestedMrp)}` : "No data"}
                             </div>
                             <div className={cn("text-right font-medium", (r.changePercent || 0) > 0 ? "text-emerald-600" : (r.changePercent || 0) < 0 ? "text-red-600" : "text-muted-foreground")}>
                               {r.changePercent != null ? `${r.changePercent > 0 ? "+" : ""}${r.changePercent.toFixed(1)}%` : "—"}
@@ -856,7 +857,7 @@ export default function MrpGeneratorRun() {
                               <>
                                 {r.matchedRowLabel && <span className="mx-2 border-l h-3 border-border"></span>}
                                 <span className="font-medium text-emerald-700">Tier {r.salesEvidence.tier || "F"}</span>
-                                <span>(₹{r.salesEvidence.salesAmount?.toLocaleString() || "0"} FY Sales)</span>
+                                <span>({formatMoney(r.salesEvidence.salesAmount)} FY Sales)</span>
                               </>
                             )}
                           </div>
@@ -897,7 +898,7 @@ export default function MrpGeneratorRun() {
                                         {t.evidence && (
                                           <>
                                             <span className="text-muted-foreground">Target Evidence:</span>
-                                            <span className="text-emerald-700 font-medium">₹{t.evidence.effectivePrice?.toFixed(2)} ({t.evidence.competitor})</span>
+                                            <span className="text-emerald-700 font-medium">{t.evidence.effectivePrice == null ? "—" : formatMoney(t.evidence.effectivePrice)} ({t.evidence.competitor})</span>
                                           </>
                                         )}
                                       </div>
@@ -961,7 +962,7 @@ export default function MrpGeneratorRun() {
                                   <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Sales Evidence</h5>
                                   <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs bg-muted/20 p-2 border rounded">
                                     <span className="text-muted-foreground">Sales Amount:</span>
-                                    <span className="text-right">₹{r.salesEvidence.salesAmount?.toLocaleString() || "0"}</span>
+                                    <span className="text-right">{formatMoney(r.salesEvidence.salesAmount)}</span>
                                     <span className="text-muted-foreground">Quantity:</span>
                                     <span className="text-right">{r.salesEvidence.qtyUnknown ? "Unknown" : r.salesEvidence.qty}</span>
                                     <span className="text-muted-foreground">FY Sales Exists:</span>
@@ -993,19 +994,19 @@ export default function MrpGeneratorRun() {
                                     {r.marginEvidence.saleValue != null && (
                                       <>
                                         <span className="text-muted-foreground">Sale Value:</span>
-                                        <span className="text-right">₹{r.marginEvidence.saleValue.toFixed(2)}</span>
+                                        <span className="text-right">{formatMoney(r.marginEvidence.saleValue)}</span>
                                       </>
                                     )}
                                     {r.marginEvidence.bomValue != null && (
                                       <>
                                         <span className="text-muted-foreground">BOM Value:</span>
-                                        <span className="text-right">₹{r.marginEvidence.bomValue.toFixed(2)}</span>
+                                        <span className="text-right">{formatMoney(r.marginEvidence.bomValue)}</span>
                                       </>
                                     )}
                                     {r.marginEvidence.unitBomValue != null && (
                                       <>
                                         <span className="text-muted-foreground">Unit BOM Value:</span>
-                                        <span className="text-right">₹{r.marginEvidence.unitBomValue.toFixed(2)}</span>
+                                        <span className="text-right">{formatMoney(r.marginEvidence.unitBomValue)}</span>
                                       </>
                                     )}
                                     <span className="text-muted-foreground">Qty Unknown:</span>
@@ -1026,7 +1027,7 @@ export default function MrpGeneratorRun() {
                                      </div>
                                      <div>
                                        <span className="text-muted-foreground mr-2">FY Sales Value:</span>
-                                       <span className="font-medium">{r.fySalesAmount != null ? `₹${r.fySalesAmount.toLocaleString()}` : "No Data"}</span>
+                                       <span className="font-medium">{r.fySalesAmount != null ? `${formatMoney(r.fySalesAmount)}` : "No Data"}</span>
                                      </div>
                                      <div>
                                        <span className="text-muted-foreground mr-2">Gap & Position:</span>
@@ -1038,7 +1039,7 @@ export default function MrpGeneratorRun() {
                                      </div>
                                      <div className="col-span-1 md:col-span-2">
                                        <span className="text-muted-foreground mr-2">Competitive Target:</span>
-                                       <span className="font-medium">{r.competitiveTarget != null ? `₹${r.competitiveTarget.toFixed(2)}` : "None"}</span>
+                                       <span className="font-medium">{r.competitiveTarget != null ? `${formatMoney(r.competitiveTarget)}` : "None"}</span>
                                      </div>
                                      {r.marginFloorEvidence && (
                                        <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-x-2 gap-y-1 bg-muted/20 p-2 border rounded">
@@ -1047,7 +1048,7 @@ export default function MrpGeneratorRun() {
                                          <span className="text-muted-foreground">Category Floor:</span>
                                          <span className="text-right">{r.marginFloorEvidence.floorPercent != null ? `${r.marginFloorEvidence.floorPercent.toFixed(1)}%` : "N/A"}</span>
                                          <span className="text-muted-foreground">Minimum MRP:</span>
-                                         <span className="text-right">{r.marginFloorEvidence.minimumMrp != null ? `₹${r.marginFloorEvidence.minimumMrp.toFixed(2)}` : "N/A"}</span>
+                                         <span className="text-right">{r.marginFloorEvidence.minimumMrp != null ? `${formatMoney(r.marginFloorEvidence.minimumMrp)}` : "N/A"}</span>
                                        </div>
                                      )}
                                      {r.escalation && (
@@ -1081,7 +1082,7 @@ export default function MrpGeneratorRun() {
                                         {c.stale && <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 font-semibold text-amber-900">18+ months old</span>}
                                       </span>
                                       <div className="text-right">
-                                        <div>{c.effectivePrice != null ? `₹${c.effectivePrice.toFixed(2)}` : "No data"}</div>
+                                        <div>{c.effectivePrice != null ? `${formatMoney(c.effectivePrice)}` : "No data"}</div>
                                         <div className={cn("text-muted-foreground", c.stale && "font-medium text-amber-800")}>
                                           {c.effectiveDate ? formatDisplayDate(c.effectiveDate) : "Undated"}
                                           {c.ageDays != null && ` · ${c.ageDays} days old`}
@@ -1113,7 +1114,7 @@ export default function MrpGeneratorRun() {
                                         <span className="font-medium mr-1">{t.ruleType}:</span>
                                         <span>{t.reason}</span>
                                         {t.target !== undefined && t.target !== null && t.outcome === "fired" && (
-                                          <span className="block mt-0.5 font-mono text-[10px] text-foreground">→ ₹{t.target.toFixed(2)}</span>
+                                          <span className="block mt-0.5 font-mono text-[10px] text-foreground">→ {formatMoney(t.target)}</span>
                                         )}
                                       </div>
                                     </div>

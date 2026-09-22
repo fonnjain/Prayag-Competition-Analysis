@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { createHash } from "node:crypto";
 
 export type GeneratorScope = {
@@ -699,7 +700,7 @@ function p011RoundAndConstrain(
   // representable price satisfying every bound or must escalate.
   if (rejectInfeasible && !preferIncreaseCap && lowerBound > maxIncrease) {
     if (floorBound != null && floorBound > maxIncrease) {
-      constraints.push(`category margin floor ₹${floorBound}`);
+      constraints.push(`category margin floor ${formatMoney(floorBound)}`);
     }
     constraints.push(`maximum increase ${policy.maxIncreasePercent}%`);
     return { value: current, constraints, infeasible: true };
@@ -711,11 +712,11 @@ function p011RoundAndConstrain(
     if (minDecrease >= (floorBound ?? Number.NEGATIVE_INFINITY) && value === minDecrease) {
       constraints.push(`maximum decrease ${policy.maxDecreasePercent}%`);
     }
-    if (floorBound != null && value === floorBound) constraints.push(`category margin floor ₹${floorBound}`);
+    if (floorBound != null && value === floorBound) constraints.push(`category margin floor ${formatMoney(floorBound)}`);
   }
   if (floorBound != null && candidate < floorBound &&
     !constraints.some((constraint) => constraint.startsWith("category margin floor"))) {
-    constraints.push(`category margin floor ₹${floorBound}`);
+    constraints.push(`category margin floor ${formatMoney(floorBound)}`);
   }
   value = roundValue(value, policy.rounding.unit, policy.rounding.direction);
   // Rounding is subordinate to every configured binding constraint. Lower
@@ -726,7 +727,7 @@ function p011RoundAndConstrain(
   // A coarse rounding unit can leave no representable value in the closed
   // interval.  Do not return a rounded price outside either binding bound.
   if (rejectInfeasible && (value < lowerBound || value > maxIncrease)) {
-    constraints.push(`rounding cannot represent a price between ₹${lowerBound} and ₹${maxIncrease}`);
+    constraints.push(`rounding cannot represent a price between ${formatMoney(lowerBound)} and ${formatMoney(maxIncrease)}`);
     return { value: current, constraints, infeasible: true };
   }
   return { value, constraints, infeasible: false };
@@ -785,7 +786,7 @@ export function evaluateP011Product(
     action = "EXCLUDED"; exclusions.push("Current approved Standard Prayag MRP is missing.");
     add("p011_current_mrp", "blocked", current, null, exclusions[0]!);
   } else if (current < (p.holdThreshold ?? 50)) {
-    action = "HOLD"; constraints.push(`MRP below hold threshold ₹${p.holdThreshold}`);
+    action = "HOLD"; constraints.push(`MRP below hold threshold ${formatMoney(p.holdThreshold)}`);
     add("p011_hold_threshold", "fired", current, current, constraints[0]!);
   } else {
     selected = p011SelectedCompetitor(safeProduct, p);
@@ -794,7 +795,7 @@ export function evaluateP011Product(
       position = gap > p.position.wellBelowAbove ? "well_below"
         : gap >= p.position.parityBelow ? "parity" : "above";
       add("p011_competitor_selection", "fired", current, current,
-        `${selected.competitor} selected by ${p.competitor.mode}; effective price ₹${selected.effectivePrice}.`);
+        `${selected.competitor} selected by ${p.competitor.mode}; effective price ${formatMoney(selected.effectivePrice)}.`);
       add("p011_position", "fired", current, current, `Gap ${(gap * 100).toFixed(2)}%; position ${position}.`, gap);
     } else add("p011_competitor_selection", "blocked", current, current,
       p.competitor.mode === "named"
@@ -825,7 +826,7 @@ export function evaluateP011Product(
           const increaseCap = current * (1 + (p.maxIncreasePercent ?? 15) / 100);
           if (target > increaseCap || value < target) {
             escalation = true;
-            escalationReason = `Cannot reach the ${floorEvidence.category ?? "category"} margin floor plus ${(p.marginTargetUpliftPoints ?? 0).toFixed(2)}-point uplift within the maximum increase of ${p.maxIncreasePercent}%; capped at ₹${value}.`;
+            escalationReason = `Cannot reach the ${floorEvidence.category ?? "category"} margin floor plus ${(p.marginTargetUpliftPoints ?? 0).toFixed(2)}-point uplift within the maximum increase of ${p.maxIncreasePercent}%; capped at ${formatMoney(value)}.`;
           }
           add("p011_margin_only", "fired", current, value, `Margin-only target gross margin ${(targetMargin * 100).toFixed(2)}%.`, target);
           }
@@ -855,7 +856,7 @@ export function evaluateP011Product(
         value = current;
         constraints.push(...constrained.constraints);
         escalation = true;
-        escalationReason = `No feasible automatic DEFEND price satisfies both the ${floorEvidence.category ?? "category"} margin floor (minimum MRP ₹${floorEvidence.minimumMrp}) and the maximum increase of ${p.maxIncreasePercent}% (upper bound ₹${Number((current * (1 + (p.maxIncreasePercent ?? 15) / 100)).toFixed(10))}); no automatic price change was made.`;
+        escalationReason = `No feasible automatic DEFEND price satisfies both the ${floorEvidence.category ?? "category"} margin floor (minimum MRP ${formatMoney(floorEvidence.minimumMrp)}) and the maximum increase of ${p.maxIncreasePercent}% (upper bound ${formatMoney(Number((current * (1 + (p.maxIncreasePercent ?? 15) / 100)).toFixed(10)))}); no automatic price change was made.`;
         add("p011_defend", "blocked", current, current, escalationReason, Number.isFinite(target) ? target : null);
       } else {
         value = constrained.value; constraints.push(...constrained.constraints);
@@ -868,7 +869,7 @@ export function evaluateP011Product(
           const reason = floorEvidence.minimumMrp != null && floorEvidence.minimumMrp >= decreaseBound
             ? `the ${floorEvidence.category ?? "category"} ${floorEvidence.floorPercent}% gross-margin floor`
             : `the maximum decrease of ${p.maxDecreasePercent}%`;
-          escalationReason = `Cannot reach ${selected.competitor} at ${(p.defendTargetUndercut! * 100).toFixed(0)}% undercut without breaching ${reason}; held at ₹${value}.`;
+          escalationReason = `Cannot reach ${selected.competitor} at ${(p.defendTargetUndercut! * 100).toFixed(0)}% undercut without breaching ${reason}; held at ${formatMoney(value)}.`;
         }
         add("p011_defend", "fired", current, value, escalationReason ?? `Defend at ${(p.defendTargetUndercut! * 100).toFixed(0)}% under competitor.`, target);
       }
@@ -895,7 +896,7 @@ export function evaluateP011Product(
     status: action === "EXCLUDED" ? "excluded" : changed ? "suggested" : "no_change",
     exclusions: [...new Set(exclusions)], competitorValues: safeProduct.competitors, trace,
     fullTrace: trace, competitiveTarget: actionTarget,
-    bindingConstraint: constraints[0] ?? (floorEvidence.minimumMrp != null ? `Margin floor minimum MRP ₹${floorEvidence.minimumMrp}` : null),
+    bindingConstraint: constraints[0] ?? (floorEvidence.minimumMrp != null ? `Margin floor minimum MRP ${formatMoney(floorEvidence.minimumMrp)}` : null),
     bindingConstraints: constraints, escalation, escalationReason,
     changePercent: changed ? ((value! - current!) / Math.abs(current!)) * 100 : 0,
     salesEvidence: safeProduct.sales ?? null, marginEvidence: safeProduct.margin ?? null, marginFloorEvidence: floorEvidence, warnings,
@@ -1236,7 +1237,7 @@ export function evaluateP012Product(
   });
   if (current == null || !Number.isFinite(current)) return untouched("No current MRP; untouched.");
   if (!matched) return untouched("No simple policy row matched; fallthrough untouched.");
-  if (current < policy.holdBelow) return untouched(`Current MRP ₹${current} is below the ₹${policy.holdBelow} hold threshold; untouched.`);
+  if (current < policy.holdBelow) return untouched(`Current MRP ${formatMoney(current)} is below the ${formatMoney(policy.holdBelow)} hold threshold; untouched.`);
   if (matched.target.mode === "hold") {
     return untouched(`Row ${rowNumber}: ${matched.label}; reviewed — no change.`, [], "explicit hold");
   }
@@ -1252,7 +1253,7 @@ export function evaluateP012Product(
   const rowLower = matched.maxDecrease == null ? Number.NEGATIVE_INFINITY : current * (1 - matched.maxDecrease / 100);
   const rowUpper = matched.maxIncrease == null ? Number.POSITIVE_INFINITY : current * (1 + matched.maxIncrease / 100);
   if (minimumMrp != null && minimumMrp > rowUpper + 1e-9) {
-    const reason = `Row ${rowNumber}: margin floor minimum ₹${minimumMrp.toFixed(2)} conflicts with maximum increase cap ₹${rowUpper.toFixed(2)}; review required.`;
+    const reason = `Row ${rowNumber}: margin floor minimum ${formatMoney(minimumMrp)} conflicts with maximum increase cap ${formatMoney(rowUpper)}; review required.`;
     return untouched(reason, [reason], "margin floor conflicts with row movement cap");
   }
   const rounded = p012RoundBounded(rawTarget, current, policy, matched, minimumMrp);
@@ -1274,7 +1275,7 @@ export function evaluateP012Product(
     matchedRowNumber: rowNumber, matchedRowId: matched.id, matchedRowLabel: matched.label,
     selectedCompetitor: competitor.competitor, competitorMode: matched.competitor.mode,
     selectedCompetitorPrice: competitor.effectivePrice, rawTarget,
-    decisionSentence: `Row ${rowNumber}: ${matched.label} -> ${competitor.competitor} ₹${competitor.effectivePrice}; raw target ₹${rawTarget.toFixed(2)}, ${direction} to ₹${suggested}.`,
+    decisionSentence: `Row ${rowNumber}: ${matched.label} -> ${competitor.competitor} ${formatMoney(competitor.effectivePrice)}; raw target ${formatMoney(rawTarget)}, ${direction} to ${formatMoney(suggested)}.`,
     policyVersion: 3,
     volumeTier: tier, fySalesAmount,
   };
@@ -1631,7 +1632,7 @@ export function evaluateProduct(
           if (constrained.reason) {
             value = constrained.value;
             binding = constrained.reason;
-            add(i + 1, type, "fired", before, value, `${marginFloorReason}; minimum MRP ₹${minimum}.`, minimum);
+            add(i + 1, type, "fired", before, value, `${marginFloorReason}; minimum MRP ${formatMoney(minimum)}.`, minimum);
           } else add(i + 1, type, "skipped", before, value, `${marginFloorReason}; current MRP satisfies floor.`, minimum);
         } else {
           const reason = `${marginFloorReason}; unit BOM evidence or usable quantity is missing.`;
@@ -1659,7 +1660,7 @@ export function evaluateProduct(
         const tier = sales.tier ?? tiers?.get(canonicalItemCode(product.itemCode));
         const wanted = typeof rule.tier === "string" ? rule.tier.toUpperCase() : "";
         eligible = wanted === "A" || wanted === "B" || wanted === "C" ? tier === wanted : false;
-        reason = `Volume tier ${tier ?? "unknown"}; sales amount ₹${sales.salesAmount}; qty ${sales.qty ?? "unknown"}.`;
+        reason = `Volume tier ${tier ?? "unknown"}; sales amount ${formatMoney(sales.salesAmount)}; qty ${sales.qty ?? "unknown"}.`;
       } else {
         const threshold = numberRule(rule, "salesValue", "threshold", "value");
         const operator = rule.operator === "below" ? "below" : rule.operator === "above" ? "above" : null;
@@ -1668,7 +1669,7 @@ export function evaluateProduct(
           eligible = false;
         } else {
           eligible = operator === "above" ? sales.salesAmount >= threshold : sales.salesAmount < threshold;
-          reason = `Volume sales value ₹${sales.salesAmount} ${operator} ₹${threshold}; qty ${sales.qty ?? "unknown"}.`;
+          reason = `Volume sales value ${formatMoney(sales.salesAmount)} ${operator} ${formatMoney(threshold)}; qty ${sales.qty ?? "unknown"}.`;
         }
       }
       if (!eligible) {
@@ -1739,11 +1740,11 @@ export function evaluateProduct(
       const threshold = numberRule(rule, "threshold", "under", "maxCurrent") ?? 0;
       if (product.currentMrp != null && product.currentMrp < threshold) {
         heldValue = product.currentMrp;
-        holdReason = `Hold below ₹${threshold}`;
+        holdReason = `Hold below ${formatMoney(threshold)}`;
         value = heldValue;
-        binding = `Hold below ₹${threshold}`;
+        binding = `Hold below ${formatMoney(threshold)}`;
         add(i + 1, type, "fired", before, value, binding, target);
-      } else add(i + 1, type, "skipped", before, value, `Current MRP is not under ₹${threshold}`, target);
+      } else add(i + 1, type, "skipped", before, value, `Current MRP is not under ${formatMoney(threshold)}`, target);
       continue;
     }
     if (type === "rounding") {
@@ -1752,7 +1753,7 @@ export function evaluateProduct(
       if (value == null) add(i + 1, type, "blocked", before, value, "No value available to round.");
       else {
         const rounded = roundValue(value, unit, direction);
-        addConstrained(i + 1, type, before, rounded, target, `Rounded ${direction} to ₹${unit}`);
+        addConstrained(i + 1, type, before, rounded, target, `Rounded ${direction} to ${formatMoney(unit)}`);
       }
       continue;
     }

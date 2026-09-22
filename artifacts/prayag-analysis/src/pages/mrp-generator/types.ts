@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import type {
   MrpGeneratorScope,
   MrpGeneratorRule,
@@ -53,15 +54,15 @@ export function getRuleDescription(rule: MrpGeneratorRule) {
     case "max_decrease":
       return `Max decrease ${rule.percent}%`;
     case "hold_below":
-      return `Hold under ₹${rule.threshold}`;
+      return `Hold under ${formatMoney(rule.threshold)}`;
     case "rounding":
-      return `Round ${rule.direction} to nearest ₹${rule.unit}`;
+      return `Round ${rule.direction} to nearest ${formatMoney(rule.unit)}`;
     case "margin_floor":
       return `Maintain category-specific margin floors`;
     case "volume_tier":
       return rule.mode === "cumulative_contribution"
         ? `${rule.tier} tier by cumulative contribution for ${rule.period}`
-        : `FY sales ${(rule as any).operator} ₹${(rule as any).salesValue} for ${(rule as any).period}`;
+        : `FY sales ${(rule as any).operator} ${formatMoney((rule as any).salesValue)} for ${(rule as any).period}`;
     default:
       return "Unknown rule";
   }

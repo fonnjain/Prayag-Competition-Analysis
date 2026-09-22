@@ -2129,6 +2129,64 @@ paths:
       responses:
         "200": { description: Product editor data, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorProductResponse" } } } }
         "403": { description: Administrator access required }
+  /catalog/name-changes/preview:
+    post:
+      operationId: previewCatalogNameChanges
+      tags: [catalog]
+      summary: Preview the controlled P024 product-name workbook
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200": { description: Immutable name-change preview, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "400": { description: Invalid workbook or checksum }
+        "403": { description: Administrator access required }
+  /catalog/name-changes/{batchId}:
+    get:
+      operationId: getCatalogNameChangePreview
+      tags: [catalog]
+      summary: Get a persisted P024 preview and apply result
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Name-change preview, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "403": { description: Administrator access required }
+  /catalog/name-changes/{batchId}/apply:
+    post:
+      operationId: applyCatalogNameChanges
+      tags: [catalog]
+      summary: Apply a previously previewed P024 name-change batch
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Applied name changes, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "409": { description: Preview stale or catalogue changed }
+        "403": { description: Administrator access required }
+  /catalog/name-changes/{batchId}/undo:
+    post:
+      operationId: undoCatalogNameChanges
+      tags: [catalog]
+      summary: Guarded single-action undo for a P024 name-change batch
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Undone name changes, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "409": { description: Current name changed or already undone }
+        "403": { description: Administrator access required }
+  /catalog/name-changes/audit:
+    get:
+      operationId: getCatalogNameChangeAudit
+      tags: [catalog]
+      summary: List P024 name-change provenance batches
+      responses:
+        "200": { description: Audit batches, content: { application/json: { schema: { $ref: "#/components/schemas/CatalogNameChangeResponse" } } } }
+        "403": { description: Administrator access required }
   /catalog/price-editor/preview:
     post:
       operationId: previewPriceEditorChange
@@ -6755,6 +6813,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminActivityEvent"
+    CatalogNameChangeResponse:
+      type: object
+      additionalProperties: true
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

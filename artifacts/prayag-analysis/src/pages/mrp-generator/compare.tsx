@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import React, { useState, useMemo } from "react";
 import { useCompareMrpGeneratorRuns, getCompareMrpGeneratorRunsQueryKey, useListMrpGeneratorRuns, MrpGeneratorComparison } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -243,7 +244,7 @@ export default function MrpGeneratorCompare() {
                           <span className="text-right">{cm.coverage?.share != null ? (cm.coverage.share * 100).toFixed(1) + '%' : "0%"} ({cm.includedCount} items)</span>
 
                           <span className="text-muted-foreground">Value at Risk:</span>
-                          <span className="text-right text-amber-700">₹{(cm.valueAtRisk?.value / 1e5 || 0).toFixed(1)}L</span>
+                          <span className="text-right text-amber-700">{formatMoney(cm.valueAtRisk?.value)}</span>
 
                           <span className="text-muted-foreground">Missing Data:</span>
                           <span className="text-right text-destructive">{cm.excludedCount} items</span>
@@ -319,7 +320,7 @@ export default function MrpGeneratorCompare() {
 
                                 return (
                                   <div key={id} className={cn("text-right px-2", isDiff ? "font-medium" : "")}>
-                                    {val == null ? "Not in scope" : val.suggestedMrp != null ? `₹${val.suggestedMrp.toFixed(2)}` : val.status}
+                                    {val == null ? "Not in scope" : val.suggestedMrp != null ? `${formatMoney(val.suggestedMrp)}` : val.status}
                                     {val?.action && (
                                       <div className="text-[10px] text-muted-foreground mt-1">
                                         {val.action} {val.band && `• Bnd ${val.band}`}
@@ -351,7 +352,7 @@ export default function MrpGeneratorCompare() {
                                           {val.currentMrp != null && (
                                             <>
                                               <span className="text-muted-foreground">Current MRP:</span>
-                                              <span className="text-right">₹{val.currentMrp.toFixed(2)}</span>
+                                              <span className="text-right">{formatMoney(val.currentMrp)}</span>
                                             </>
                                           )}
                                         </div>

@@ -1,3 +1,4 @@
+import { formatCount } from "@workspace/formatting";
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
@@ -238,9 +239,9 @@ const ChartTooltipContent = React.forwardRef<
                             {itemConfig?.label || item.name}
                           </span>
                         </div>
-                        {item.value && (
+                        {item.value != null && (
                           <span className="font-mono font-medium tabular-nums text-foreground">
-                            {item.value.toLocaleString()}
+                            {formatCount(typeof item.value === "number" ? item.value : Number(item.value))}
                           </span>
                         )}
                       </div>

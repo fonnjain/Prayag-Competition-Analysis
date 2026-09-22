@@ -1,3 +1,4 @@
+import { formatMoney, formatCount } from "@workspace/formatting";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBrowse } from "@/lib/browseContext";
 import {
@@ -81,7 +82,7 @@ function CompetitorLine({
         <Minus className="w-3 h-3 shrink-0" />
       )}
       <span>
-        Closest: {brand} ₹{price.toFixed(0)}
+        Closest: {brand} {formatMoney(price)}
         {absGap != null && absGap >= 0.05 && (
           <span className="ml-1 opacity-80">
             · Prayag {absGap.toFixed(1)}% {cheaper ? "cheaper" : "costlier"}
@@ -744,7 +745,7 @@ export default function PriceFinderPage() {
                       </div>
                       <div className="shrink-0 text-right ml-2">
                         {res.currentMrp != null ? (
-                          <span className="font-mono font-bold text-sm text-foreground">₹{res.currentMrp.toFixed(2)}</span>
+                          <span className="font-mono font-bold text-sm text-foreground">{formatMoney(res.currentMrp)}</span>
                         ) : (
                           <span className="text-xs font-medium text-amber-600">Pending</span>
                         )}
@@ -785,7 +786,7 @@ export default function PriceFinderPage() {
             <div className="divide-y divide-border/50">
               {totalCount > results.length && (
               <p className="px-3 py-2 text-xs text-muted-foreground">
-                  Showing the first {results.length.toLocaleString("en-IN")} of {totalCount.toLocaleString("en-IN")} matching products. Add another filter to narrow the list.
+                  Showing the first {formatCount(results.length)} of {formatCount(totalCount)} matching products. Add another filter to narrow the list.
                 </p>
               )}
               {results.map((res) => (
@@ -834,7 +835,7 @@ export default function PriceFinderPage() {
                      <div className="flex items-center gap-2 text-right">
                     <div className="hidden sm:block">
                       {res.currentMrp != null ? (
-                         <p className="font-black text-lg text-foreground">₹{res.currentMrp.toFixed(2)}</p>
+                         <p className="font-black text-lg text-foreground">{formatMoney(res.currentMrp)}</p>
                       ) : (
                         <p className="text-sm font-bold text-amber-600">Pending</p>
                       )}
@@ -900,7 +901,7 @@ export default function PriceFinderPage() {
       </div>
       {hasSearch && (
         <p className="text-sm font-semibold text-foreground" aria-live="polite">
-          {isSearchLoading ? "Narrowing products…" : `${totalCount.toLocaleString("en-IN")} products`}
+          {isSearchLoading ? "Narrowing products…" : `${formatCount(totalCount)} products`}
           {filters.length > 0 && " · keep narrowing or choose a product"}
         </p>
       )}
@@ -1041,7 +1042,7 @@ export default function PriceFinderPage() {
                       </span>
                       <span className="shrink-0 text-right">
                            <span className="block font-mono text-sm font-semibold">
-                          {item.currentMrp != null ? `₹${item.currentMrp.toFixed(2)}` : "Pending"}
+                          {item.currentMrp != null ? `${formatMoney(item.currentMrp)}` : "Pending"}
                         </span>
                         <PriceWindowDetails
                           compact
@@ -1169,7 +1170,7 @@ function ProductView({
             <p className="text-[11px] font-bold text-muted-foreground mb-1 uppercase tracking-wide">Current MRP</p>
             {product.currentMrp != null ? (
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">₹{product.currentMrp.toFixed(2)}</span>
+                <span className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">{formatMoney(product.currentMrp)}</span>
               </div>
             ) : (
               <span className="text-xl font-bold text-muted-foreground">Price Pending</span>
@@ -1214,7 +1215,7 @@ function ProductView({
                           )}
                         </p>
                         <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                          ₹{comp.price.toFixed(2)} {comp.priceBasis ? `(${comp.priceBasis})` : ""}
+                          {formatMoney(comp.price)} {comp.priceBasis ? `(${comp.priceBasis})` : ""}
                         </p>
                         <PriceWindowDetails
                           compact
@@ -1285,12 +1286,12 @@ function ProductView({
                         {v.variant}
                       </td>
                      <td className="px-3 py-2 text-right font-mono font-semibold">
-                        {v.currentMrp != null ? `₹${v.currentMrp.toFixed(2)}` : "—"}
+                        {v.currentMrp != null ? `${formatMoney(v.currentMrp)}` : "—"}
                       </td>
                      <td className="px-3 py-2 text-right font-mono">
                         {v.upcomingMrp != null ? (
                           <span className="text-amber-700 dark:text-amber-400">
-                            ₹{v.upcomingMrp.toFixed(2)}
+                            {formatMoney(v.upcomingMrp)}
                             {v.upcomingChangePct != null && (
                               <span className="ml-1 text-[10px]">({v.upcomingChangePct > 0 ? "+" : ""}{v.upcomingChangePct.toFixed(1)}%)</span>
                             )}

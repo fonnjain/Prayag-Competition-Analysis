@@ -634,13 +634,18 @@ export const catalogProductNameCorrectionsTable = pgTable(
     previousName: text("previous_name"),
     correctedName: text("corrected_name").notNull(),
     reason: text("reason").notNull(),
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
+    actor: text("actor"),
     appliedAt: timestamp("applied_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    undoneBy: text("undone_by"),
   },
   (t) => [
     uniqueIndex("catalog_product_name_corrections_key_idx").on(t.correctionKey),
     index("catalog_product_name_corrections_item_idx").on(t.itemCode),
+    index("catalog_product_name_corrections_batch_idx").on(t.loadBatchId),
   ],
 );
 

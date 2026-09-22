@@ -16,6 +16,7 @@ import ImportReviewPage from "@/pages/import-review";
 import ApiKeysPage from "@/pages/api-keys";
 import MrpRevisionsPage from "@/pages/mrp-revisions";
 import PriceEditorPage from "@/pages/price-editor";
+import NameChangesPage from "@/pages/name-changes";
 import { useAuth, AuthProvider, PasswordChangeGate } from "@workspace/replit-auth-web";
 import { useEffect, useState } from "react";
 
@@ -123,6 +124,7 @@ function Router() {
       <Route path="/api-keys" component={ApiKeysPage} />
       <Route path="/mrp-revisions" component={MrpRevisionsPage} />
       <Route path="/price-editor" component={PriceEditorPage} />
+      <Route path="/name-changes" component={NameChangesPage} />
       <Route component={NotFound} />
     </Switch>
   );

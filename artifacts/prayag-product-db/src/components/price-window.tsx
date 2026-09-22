@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { AlertTriangle, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { formatDisplayDate } from "@/lib/date-format";
 import { cn } from "@/lib/utils";
@@ -99,13 +100,11 @@ export function PriceWindowDetails({
           <span>
             {unchanged ? (
               <>
-                No price change on {formatPriceDate(upcomingEffectiveDate)} (₹
-                {upcomingPrice.toFixed(2)})
+                No price change on {formatPriceDate(upcomingEffectiveDate)} ({formatMoney(upcomingPrice)})
               </>
             ) : (
               <>
-                {direction === "increase" ? "Increases" : "Decreases"} to ₹
-                {upcomingPrice.toFixed(2)} on {formatPriceDate(upcomingEffectiveDate)}
+                {direction === "increase" ? "Increases" : "Decreases"} to {formatMoney(upcomingPrice)} on {formatPriceDate(upcomingEffectiveDate)}
                 {upcomingChangePct != null
                   ? ` (${upcomingChangePct > 0 ? "+" : ""}${upcomingChangePct.toFixed(1)}%)`
                   : ""}
@@ -176,8 +175,7 @@ export function UpcomingGapDetails({
       data-testid="upcoming-competitive-gap"
     >
       <div className="font-semibold">
-        From {formatPriceDate(effectiveDate)}: ₹{prayagPrice.toFixed(2)} vs ₹
-        {competitorPrice.toFixed(2)} → {signedGap}
+        From {formatPriceDate(effectiveDate)}: {formatMoney(prayagPrice)} vs {formatMoney(competitorPrice)} → {signedGap}
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
         <span>{direction}</span>

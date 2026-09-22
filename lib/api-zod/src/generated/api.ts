@@ -2152,6 +2152,52 @@ export const GetPriceEditorProductResponse = zod.object({
 
 
 /**
+ * @summary Preview the controlled P024 product-name workbook
+ */
+export const PreviewCatalogNameChangesBody = zod.object({
+  "file": zod.instanceof(File)
+})
+
+export const PreviewCatalogNameChangesResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Get a persisted P024 preview and apply result
+ */
+export const GetCatalogNameChangePreviewParams = zod.object({
+  "batchId": zod.coerce.number()
+})
+
+export const GetCatalogNameChangePreviewResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Apply a previously previewed P024 name-change batch
+ */
+export const ApplyCatalogNameChangesParams = zod.object({
+  "batchId": zod.coerce.number()
+})
+
+export const ApplyCatalogNameChangesResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Guarded single-action undo for a P024 name-change batch
+ */
+export const UndoCatalogNameChangesParams = zod.object({
+  "batchId": zod.coerce.number()
+})
+
+export const UndoCatalogNameChangesResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary List P024 name-change provenance batches
+ */
+export const GetCatalogNameChangeAuditResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
  * @summary Preview one dated price edit and its warnings
  */
 export const previewPriceEditorChangeBodyValueExclusiveMin = 0;

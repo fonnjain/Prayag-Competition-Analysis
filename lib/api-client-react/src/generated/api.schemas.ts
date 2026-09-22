@@ -4331,6 +4331,8 @@ export interface AdminActivityDetail {
   events: AdminActivityEvent[];
 }
 
+export interface CatalogNameChangeResponse { [key: string]: unknown }
+
 /**
  * Bearer session token (used by mobile clients).
  */
@@ -4910,6 +4912,10 @@ returnTo?: string;
 export type GetPriceEditorProductParams = {
 itemCode: string;
 asOf?: string;
+};
+
+export type PreviewCatalogNameChangesBody = {
+  file: Blob;
 };
 
 export type GetPriceEditorEditsParams = {

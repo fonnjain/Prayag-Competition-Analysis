@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -572,10 +573,10 @@ export default function ComparisonPage() {
                         <td className="px-4 py-3 text-right font-mono">
                           {row.prayagMrp != null ? (
                             <div className="flex flex-col items-end">
-                              <span className={cn(row.prayagLowest && "text-green-600 font-semibold")}>₹{row.prayagMrp.toFixed(2)}</span>
+                              <span className={cn(row.prayagLowest && "text-green-600 font-semibold")}>{formatMoney(row.prayagMrp)}</span>
                               {row.prayagPerMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                  ₹{row.prayagPerMetre.toFixed(2)}/m
+                                  {formatMoney(row.prayagPerMetre)}/m
                                 </div>
                               )}
                               <PriceWindowDetails
@@ -612,12 +613,12 @@ export default function ComparisonPage() {
                                   cell.isCheapest && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-semibold"
                                 )}>
                                   {cell.isCheapest && <Trophy className="w-3 h-3" />}
-                                  ₹{cell.price.toFixed(2)}
+                                  {formatMoney(cell.price)}
                                 </span>
                               </div>
                               {cell.perMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                  ₹{cell.perMetre.toFixed(2)}/m
+                                  {formatMoney(cell.perMetre)}/m
                                 </div>
                               )}
                               <PriceWindowDetails
@@ -660,11 +661,11 @@ export default function ComparisonPage() {
                           {row.marketMin != null && row.marketMax != null ? (
                             <div>
                               <div className="text-sm">
-                                ₹{row.marketMin.toFixed(2)}
+                                {formatMoney(row.marketMin)}
                                 <span className="text-muted-foreground"> · </span>
-                                <span className="font-semibold">₹{row.marketMedian!.toFixed(2)}</span>
+                                <span className="font-semibold">{formatMoney(row.marketMedian)}</span>
                                 <span className="text-muted-foreground"> · </span>
-                                ₹{row.marketMax.toFixed(2)}
+                                {formatMoney(row.marketMax)}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {row.rivalCount} {row.rivalCount === 1 ? "brand" : "brands"}
@@ -680,7 +681,7 @@ export default function ComparisonPage() {
                         <td className="px-4 py-3 text-right font-mono">
                           {row.cheapestRival != null ? (
                             <div>
-                              <div className="font-semibold">₹{row.cheapestRival.toFixed(2)}</div>
+                              <div className="font-semibold">{formatMoney(row.cheapestRival)}</div>
                               <div className="text-xs text-muted-foreground">{row.cheapestRivalName}</div>
                             </div>
                           ) : (
@@ -754,11 +755,11 @@ export default function ComparisonPage() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{row.size || "-"}</td>
                         <td className="px-4 py-3 text-right font-mono">
-                          ₹{row.competitorPrice?.toFixed(2)}
+                          {formatMoney(row.competitorPrice)}
                           {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
                           {row.compPerMetre != null && (
                             <div className="mt-0.5 text-[11px] text-muted-foreground">
-                              ₹{row.compPerMetre.toFixed(2)}/m
+                              {formatMoney(row.compPerMetre)}/m
                             </div>
                           )}
                           <PriceWindowDetails
@@ -805,10 +806,10 @@ export default function ComparisonPage() {
                         <td className="px-4 py-3 text-right">
                           {row.prayagMrp != null ? (
                             <>
-                              <span className="font-mono">₹{row.prayagMrp.toFixed(2)}</span>
+                              <span className="font-mono">{formatMoney(row.prayagMrp)}</span>
                               {row.prayagPerMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground font-mono">
-                                  ₹{row.prayagPerMetre.toFixed(2)}/m
+                                  {formatMoney(row.prayagPerMetre)}/m
                                 </div>
                               )}
                               <PriceWindowDetails

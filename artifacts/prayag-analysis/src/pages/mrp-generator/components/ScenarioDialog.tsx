@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -665,11 +666,11 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                     <div>
                       <h5 className="font-medium text-xs text-muted-foreground mb-1">Hold Below Threshold</h5>
-                      <div>₹{advancedPolicy.holdBelow}</div>
+                      <div>{formatMoney(advancedPolicy.holdBelow)}</div>
                     </div>
                     <div>
                       <h5 className="font-medium text-xs text-muted-foreground mb-1">Rounding</h5>
-                      <div>Nearest ₹{advancedPolicy.rounding.unit} ({advancedPolicy.rounding.direction})</div>
+                      <div>Nearest {formatMoney(advancedPolicy.rounding.unit)} ({advancedPolicy.rounding.direction})</div>
                     </div>
                     <div>
                       <h5 className="font-medium text-xs text-muted-foreground mb-1">Margin Floors</h5>
@@ -1010,7 +1011,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                                 {reach.matchedFySalesValue != null && (
                                   <>
                                     <span>&middot;</span>
-                                    <span className="text-emerald-700">₹{reach.matchedFySalesValue.toLocaleString()} FY Sales</span>
+                                    <span className="text-emerald-700">{formatMoney(reach.matchedFySalesValue)} FY Sales</span>
                                   </>
                                 )}
                               </div>

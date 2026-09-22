@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { useState, useEffect } from "react";
 import {
   useGetCatalogProducts,
@@ -145,7 +146,7 @@ function MrpCell({
   return (
     <div className="flex items-center justify-end gap-1 group">
       {hasPrice ? (
-        <span className="font-mono">₹{currentMrp?.toFixed(2)}</span>
+        <span className="font-mono">{currentMrp == null ? "—" : formatMoney(currentMrp)}</span>
       ) : (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
           MRP Pending

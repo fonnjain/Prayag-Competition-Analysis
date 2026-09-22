@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { useEffect } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useGetPriceFinderComparison, getExportPriceFinderComparisonUrl } from "@workspace/api-client-react";
@@ -196,7 +197,7 @@ export default function ComparisonPage() {
                         <td className="px-2.5 py-3 align-top text-right bg-indigo-50/30 dark:bg-indigo-950/10">
                          {row.prayag.price != null ? (
                            <>
-                              <div className="font-black text-lg text-indigo-950 dark:text-indigo-100">₹{row.prayag.price.toFixed(2)}</div>
+                              <div className="font-black text-lg text-indigo-950 dark:text-indigo-100">{formatMoney(row.prayag.price)}</div>
                                <div className="text-[10px] font-medium text-indigo-700/70 dark:text-indigo-300/70 mt-0.5">from {formatPriceDate(row.prayag.effectiveDate)}</div>
                            </>
                          ) : (
@@ -205,7 +206,7 @@ export default function ComparisonPage() {
                          {row.prayag.upcomingPrice != null && (
                             <div className="mt-2 p-1.5 bg-amber-50 dark:bg-amber-900/30 rounded border border-amber-200/60 dark:border-amber-800 text-[10px] text-amber-900 dark:text-amber-100 text-right inline-block shadow-sm max-w-full">
                               <div className="font-black flex flex-wrap items-center justify-end gap-1">
-                                <span>₹{row.prayag.upcomingPrice.toFixed(2)}</span>
+                                <span>{formatMoney(row.prayag.upcomingPrice)}</span>
                                 <span className="text-[8px] uppercase tracking-wide opacity-70 bg-amber-200 dark:bg-amber-800 px-1 rounded-sm">Upcoming</span>
                              </div>
                                <div className="opacity-80 mt-0.5 font-medium">from {formatPriceDate(row.prayag.upcomingEffectiveDate)}</div>
@@ -222,7 +223,7 @@ export default function ComparisonPage() {
                          
                          return (
                             <td key={compName} className="px-2.5 py-3 align-top text-right break-words">
-                              <div className="font-bold text-base text-slate-900 dark:text-foreground">₹{compData.price.toFixed(2)}</div>
+                              <div className="font-bold text-base text-slate-900 dark:text-foreground">{formatMoney(compData.price)}</div>
                              
                              {compData.differencePct != null && (
                                <div className={cn(
@@ -246,7 +247,7 @@ export default function ComparisonPage() {
                              {compData.upcomingPrice != null && (
                                 <div className="mt-2 p-1.5 bg-slate-50 dark:bg-muted/50 rounded border border-border/60 text-[10px] text-right inline-block shadow-sm max-w-full">
                                   <div className="font-bold text-foreground flex flex-wrap items-center justify-end gap-1">
-                                    <span>₹{compData.upcomingPrice.toFixed(2)}</span>
+                                    <span>{formatMoney(compData.upcomingPrice)}</span>
                                     <span className="text-[8px] uppercase tracking-wide text-muted-foreground bg-slate-200 dark:bg-muted px-1 rounded-sm">Upcoming</span>
                                  </div>
                                    <div className="text-muted-foreground mt-0.5 font-medium">from {formatPriceDate(compData.upcomingEffectiveDate)}</div>

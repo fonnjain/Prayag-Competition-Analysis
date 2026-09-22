@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { sql, eq, ne, asc, desc, and, inArray } from "drizzle-orm";
 import * as XLSX from "xlsx";
+import { applyIndianNumberFormats } from "@workspace/formatting";
 import {
   db,
   competitorPricesTable,
@@ -39,8 +40,10 @@ function sendSheet(
   sheetName: string,
   fileBase: string,
   format: string,
+  moneyColumns: number[] = [],
 ): void {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
+  applyIndianNumberFormats(ws, { moneyColumns });
   if (format === "csv") {
     const csv = XLSX.utils.sheet_to_csv(ws);
     res.setHeader("Content-Type", "text/csv");
@@ -708,7 +711,7 @@ router.get("/catalog/comparison/export", async (req, res) => {
     r.normalizationNote,
     r.matchStatus,
   ]);
-  sendSheet(res, [header, ...body], "Comparison", "prayag-comparison", format);
+  sendSheet(res, [header, ...body], "Comparison", "prayag-comparison", format, [4, 8, 18, 21, 25, 26]);
 });
 
 // GET /catalog/comparison/summary — competitive share KPI + category win-rate.
@@ -1907,6 +1910,7 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
     "Mapping Review",
     "prayag-mapping-review",
     format,
+    [4, 8, 13, 16],
   );
 });
 

@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,7 +16,7 @@ import { AlertTriangle, CheckCircle2, Search, Undo2 } from "lucide-react";
 import { useEditorInvalidate } from "./price-editor";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (n: number | null | undefined) => n == null ? "—" : `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (n: number | null | undefined) => n == null ? "—" : `${formatMoney(n)}`;
 const date = (s?: string | null) => s ? new Date(`${s}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const errorText = (e: unknown) => e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "The request failed. Try again.";
 

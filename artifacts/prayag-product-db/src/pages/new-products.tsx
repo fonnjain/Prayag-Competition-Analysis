@@ -1,3 +1,4 @@
+import { formatMoney, formatCount } from "@workspace/formatting";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,7 +101,7 @@ function formatDisplayDate(value: string | null | undefined): string {
 }
 
 const money = (value: number | null) =>
-  value == null ? "—" : `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  value == null ? "—" : `${formatMoney(value)}`;
 
 function getAuthHeaders(): Record<string, string> {
   try {
@@ -224,7 +225,7 @@ export default function NewProductsPage() {
       invalidateAfterApply();
       toast({
         title: "Products created",
-        description: `${preview.willCreateCount.toLocaleString()} products have been added.`,
+        description: `${formatCount(preview.willCreateCount)} products have been added.`,
       });
     } catch (error) {
       toast({
@@ -365,19 +366,19 @@ export default function NewProductsPage() {
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg bg-muted/45 p-3">
                 <p className="text-xs text-muted-foreground">Catalogue Before</p>
-                <p className="mt-1 text-xl font-bold" data-testid="text-catalog-before">{preview.catalogBefore.toLocaleString()}</p>
+                <p className="mt-1 text-xl font-bold" data-testid="text-catalog-before">{formatCount(preview.catalogBefore)}</p>
               </div>
               <div className="rounded-lg bg-[#2d7c78]/10 p-3 border border-[#2d7c78]/20">
                 <p className="text-xs font-medium text-[#1d5d5a]">Will CREATE</p>
-                <p className="mt-1 text-xl font-bold text-[#1d5d5a]" data-testid="text-will-create">{preview.willCreateCount.toLocaleString()}</p>
+                <p className="mt-1 text-xl font-bold text-[#1d5d5a]" data-testid="text-will-create">{formatCount(preview.willCreateCount)}</p>
               </div>
               <div className="rounded-lg bg-destructive/10 p-3 border border-destructive/20">
                 <p className="text-xs font-medium text-destructive">Rejected Rows</p>
-                <p className="mt-1 text-xl font-bold text-destructive" data-testid="text-rejected">{preview.rejectedCount.toLocaleString()}</p>
+                <p className="mt-1 text-xl font-bold text-destructive" data-testid="text-rejected">{formatCount(preview.rejectedCount)}</p>
               </div>
               <div className="rounded-lg bg-muted/45 p-3">
                 <p className="text-xs text-muted-foreground">Catalogue After</p>
-                <p className="mt-1 text-xl font-bold" data-testid="text-catalog-after">{preview.catalogAfter.toLocaleString()}</p>
+                <p className="mt-1 text-xl font-bold" data-testid="text-catalog-after">{formatCount(preview.catalogAfter)}</p>
               </div>
             </div>
 
@@ -386,7 +387,7 @@ export default function NewProductsPage() {
                 <div className="flex gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                   <div>
-                    <h3 className="font-bold">{preview.immediateCount.toLocaleString()} products become live immediately</h3>
+                    <h3 className="font-bold">{formatCount(preview.immediateCount)} products become live immediately</h3>
                     <p className="mt-1 text-sm">{preview.immediateMessage}</p>
                   </div>
                 </div>
@@ -409,9 +410,9 @@ export default function NewProductsPage() {
                         )}
                       </div>
                       <div className="text-muted-foreground">
-                        {period.existingCount.toLocaleString()} existing + 
-                        <strong className="mx-1 text-foreground">{period.createCount.toLocaleString()} new</strong>
-                        = {period.afterCount.toLocaleString()} products
+                        {formatCount(period.existingCount)} existing +
+                        <strong className="mx-1 text-foreground">{formatCount(period.createCount)} new</strong>
+                        = {formatCount(period.afterCount)} products
                       </div>
                     </div>
                   ))}
@@ -576,12 +577,12 @@ export default function NewProductsPage() {
       <AlertDialog open={showApplyConfirmation} onOpenChange={setShowApplyConfirmation}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Create {preview?.willCreateCount.toLocaleString()} new products?</AlertDialogTitle>
+            <AlertDialogTitle>Create {formatCount(preview?.willCreateCount)} new products?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently add <strong>{preview?.willCreateCount.toLocaleString()}</strong> novel item codes to the catalogue. 
+              This will permanently add <strong>{formatCount(preview?.willCreateCount)}</strong> novel item codes to the catalogue.
               {preview && preview.immediateCount > 0 && (
                 <span className="block mt-2 font-medium text-amber-600">
-                  {preview.immediateCount.toLocaleString()} products will go live immediately and appear in Price Finder.
+                  {formatCount(preview.immediateCount)} products will go live immediately and appear in Price Finder.
                 </span>
               )}
             </AlertDialogDescription>

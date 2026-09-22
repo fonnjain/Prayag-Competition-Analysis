@@ -1,3 +1,4 @@
+import { formatCount } from "@workspace/formatting";
 import { useEffect } from "react";
 import { useGetAnalysisOverview } from "@workspace/api-client-react";
 import type { DashboardFilters } from "@/pages/dashboard";
@@ -67,7 +68,7 @@ export function OverviewCards({
         <CardContent className="p-3 pt-1 sm:p-4 sm:pt-1">
           <div className="text-2xl font-bold">{coveragePct?.toFixed(1) ?? 0}%</div>
           <p className="text-xs text-muted-foreground mt-1">
-            {matchedSkus.toLocaleString()} / {totalSkus.toLocaleString()} SKUs matched
+            {formatCount(matchedSkus)} / {formatCount(totalSkus)} SKUs matched
           </p>
         </CardContent>
       </Card>
@@ -82,7 +83,7 @@ export function OverviewCards({
             {prayagCheaperPct?.toFixed(1) ?? 0}%
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Prayag cheaper in {prayagCheaperCount.toLocaleString()} / {comparableSkus.toLocaleString()} comparable
+            Prayag cheaper in {formatCount(prayagCheaperCount)} / {formatCount(comparableSkus)} comparable
           </p>
         </CardContent>
       </Card>
@@ -112,7 +113,7 @@ export function OverviewCards({
             {medianPriceDiffPct != null ? (medianPriceDiffPct > 0 ? "+" : "") + medianPriceDiffPct.toFixed(1) + "%" : "N/A"}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Across {comparableSkus.toLocaleString()} comparable items
+            Across {formatCount(comparableSkus)} comparable items
           </p>
         </CardContent>
       </Card>

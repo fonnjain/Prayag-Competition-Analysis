@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import {
@@ -331,14 +332,14 @@ export default function MrpMatchingWorkbench() {
                         <div className="text-xs text-muted-foreground truncate w-48" title={p.productName}>{p.productName}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium">₹{p.currentMrp?.toFixed(2) ?? "-"}</div>
+                        <div className="font-medium">{p.currentMrp == null ? "—" : formatMoney(p.currentMrp)}</div>
                       </td>
                       {competitors.map(comp => {
                         const matchedC = (p.competitors || []).find((c: any) => c.competitor === comp);
                         return (
                           <td key={comp} className="px-4 py-3">
                             {matchedC?.matched && matchedC.normalizedPrice != null ? (
-                              <div className="font-medium">₹{matchedC.normalizedPrice.toFixed(2)}</div>
+                              <div className="font-medium">{formatMoney(matchedC.normalizedPrice)}</div>
                             ) : (
                               <span className="text-muted-foreground italic text-xs">No data</span>
                             )}
@@ -348,7 +349,7 @@ export default function MrpMatchingWorkbench() {
                       {!princeExposure && <td className="px-4 py-3 bg-muted/5">
                         {targetPrice != null ? (
                           <>
-                            <div className="font-medium text-emerald-700">₹{targetPrice.toFixed(2)}</div>
+                            <div className="font-medium text-emerald-700">{formatMoney(targetPrice)}</div>
                             <div className="text-xs text-muted-foreground">via {effectiveDriver}</div>
                           </>
                         ) : (
@@ -411,7 +412,7 @@ export default function MrpMatchingWorkbench() {
                           {isModified && (
                             <div className="flex items-center gap-1 ml-auto bg-background border px-2 py-1 rounded shadow-sm text-xs font-medium text-primary whitespace-nowrap">
                               <CornerDownRight className="w-3 h-3" />
-                              ₹{draftMrp?.toFixed(2) ?? "?"}
+                              {draftMrp == null ? "?" : formatMoney(draftMrp)}
                             </div>
                           )}
                         </div>

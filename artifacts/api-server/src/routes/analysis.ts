@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
+import { applyIndianNumberFormats } from "@workspace/formatting";
 import {
   db,
   competitorPricesTable,
@@ -587,6 +588,9 @@ function sendSheet(
   format: string,
 ): void {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
+  applyIndianNumberFormats(ws, {
+    moneyColumns: [7, 10, 13, 15, 18, 19, 26],
+  });
   if (format === "csv") {
     const csv = XLSX.utils.sheet_to_csv(ws);
     res.setHeader("Content-Type", "text/csv");

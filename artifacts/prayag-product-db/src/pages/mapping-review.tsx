@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { useState, useEffect, Fragment, useMemo } from "react";
 import { 
   useGetMappingReview,
@@ -682,7 +683,7 @@ export default function MappingReviewPage() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{row.size || "-"}</td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {row.price == null ? "—" : `₹${row.price.toFixed(2)}`}
+                        {row.price == null ? "—" : `${formatMoney(row.price)}`}
                         {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
                       </td>
                       <td className="px-4 py-3">
@@ -744,7 +745,7 @@ export default function MappingReviewPage() {
                                   s.productName,
                                   s.category,
                                   s.size,
-                                  s.currentMrp != null ? `MRP ₹${s.currentMrp.toFixed(2)}` : null,
+                                  s.currentMrp != null ? `MRP ${formatMoney(s.currentMrp)}` : null,
                                 ].filter(Boolean).join(" · ")}
                                 className="group flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
                               >

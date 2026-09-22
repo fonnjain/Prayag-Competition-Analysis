@@ -1,3 +1,4 @@
+import { formatCount } from "@workspace/formatting";
 import { useGetAnalysisCoverageMatrix } from "@workspace/api-client-react";
 import type { DashboardFilters } from "@/pages/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,14 +55,14 @@ export function CoverageMatrix({ filters }: { filters: DashboardFilters }) {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                <TableCell className="text-right">{row.matched.toLocaleString()}</TableCell>
+                <TableCell className="text-right">{formatCount(row.total)}</TableCell>
+                <TableCell className="text-right">{formatCount(row.matched)}</TableCell>
                 <TableCell className="text-right font-medium">
                   {row.coveragePct?.toFixed(1) ?? 0}%
                 </TableCell>
-                <TableCell className="text-right text-success">{row.high.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-muted-foreground">{row.medium.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-destructive">{row.low.toLocaleString()}</TableCell>
+                <TableCell className="text-right text-success">{formatCount(row.high)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{formatCount(row.medium)}</TableCell>
+                <TableCell className="text-right text-destructive">{formatCount(row.low)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -71,7 +72,7 @@ export function CoverageMatrix({ filters }: { filters: DashboardFilters }) {
           <div className="font-semibold text-muted-foreground uppercase tracking-wider">Overall Totals</div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono">
             <span>Coverage: <span className="font-bold text-foreground">{data.totals.coveragePct?.toFixed(1) ?? 0}%</span></span>
-            <span>Matched: <span className="font-bold text-foreground">{data.totals.matched.toLocaleString()}</span></span>
+            <span>Matched: <span className="font-bold text-foreground">{formatCount(data.totals.matched)}</span></span>
           </div>
         </div>
       </CardContent>

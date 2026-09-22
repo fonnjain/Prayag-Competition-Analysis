@@ -38,6 +38,7 @@ const navItems = [
   { href: "/new-products", label: "New Products", icon: FilePlus, adminOnly: true },
   { href: "/mrp-revisions", label: "Price Revisions", icon: PencilLine, adminOnly: true },
   { href: "/price-editor", label: "Single Price Editor", icon: PencilLine, adminOnly: true },
+  { href: "/name-changes", label: "Product Name Changes", icon: FileSpreadsheet, adminOnly: true },
   { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
   { href: "/data-health", label: "Data Health", icon: Database },
   { href: "/api-keys", label: "API Keys", icon: Key, adminOnly: true },

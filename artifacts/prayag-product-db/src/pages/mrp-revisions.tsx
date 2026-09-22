@@ -1,3 +1,4 @@
+import { formatCount, formatMoney } from "@workspace/formatting";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -80,7 +81,7 @@ function warningText(row: RevisionRow) {
 }
 
 function money(value: number | null) {
-  return value == null ? "—" : `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return value == null ? "—" : `${formatMoney(value)}`;
 }
 
 function formatRevisionDate(value: string | null | undefined): string {
@@ -96,7 +97,7 @@ function formatRevisionText(value: string): string {
 }
 
 function compactPeriodLabel(scope: RevisionScope) {
-  return `${formatRevisionDate(scope.effectiveDate)} · ${scope.rowCount.toLocaleString("en-IN")} rows`;
+  return `${formatRevisionDate(scope.effectiveDate)} · ${formatCount(scope.rowCount)} rows`;
 }
 
 export default function MrpRevisionsPage() {
@@ -412,16 +413,16 @@ export default function MrpRevisionsPage() {
               <dt className="font-medium text-muted-foreground">Period</dt>
               <dd>{formatRevisionDate(selectedScope.effectiveDate)}</dd>
               <dt className="font-medium text-muted-foreground">Rows</dt>
-              <dd>{selectedScope.rowCount.toLocaleString("en-IN")}</dd>
+              <dd>{formatCount(selectedScope.rowCount)}</dd>
               {"divisions" in selectedScope ? (
                 <>
                   <dt className="font-medium text-muted-foreground">Divisions</dt>
                   <dd
                     className="truncate"
-                    title={selectedScope.divisions.map((entry) => `${entry.division} (${entry.count.toLocaleString("en-IN")})`).join(", ") || "Not recorded"}
+                    title={selectedScope.divisions.map((entry) => `${entry.division} (${formatCount(entry.count)})`).join(", ") || "Not recorded"}
                   >
                     {selectedScope.divisions.length > 1 && "Multiple divisions · "}
-                    {selectedScope.divisions.slice(0, 3).map((entry) => `${entry.division} · ${entry.count.toLocaleString("en-IN")}`).join(", ") || "Not recorded"}
+                    {selectedScope.divisions.slice(0, 3).map((entry) => `${entry.division} · ${formatCount(entry.count)}`).join(", ") || "Not recorded"}
                     {selectedScope.divisions.length > 3 && ` · +${selectedScope.divisions.length - 3} more division${selectedScope.divisions.length === 4 ? "" : "s"}`}
                   </dd>
                 </>

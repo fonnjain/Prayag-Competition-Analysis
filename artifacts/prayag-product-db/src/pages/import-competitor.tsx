@@ -1,3 +1,4 @@
+import { formatCount } from "@workspace/formatting";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -791,7 +792,7 @@ export default function ImportCompetitorPage() {
                 </div>
                 <p className="text-sm">{pdfPreflight.humanReason}</p>
                 <p className="text-xs text-muted-foreground">
-                  Median: {pdfPreflight.medianCharacters.toLocaleString()} characters / {pdfPreflight.medianDigits.toLocaleString()} digits · {pdfPreflight.totalPages} total pages.
+                  Median: {formatCount(pdfPreflight.medianCharacters)} characters / {formatCount(pdfPreflight.medianDigits)} digits · {pdfPreflight.totalPages} total pages.
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Full assignment: {pdfPreflight.assignmentTextBearingCount} text-bearing + {pdfPreflight.assignmentNonTextBearingCount} vision pages = {pdfPreflight.totalPages} pages.

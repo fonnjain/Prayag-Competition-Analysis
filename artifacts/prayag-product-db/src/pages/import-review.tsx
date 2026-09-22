@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { formatMoney } from "@workspace/formatting";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -108,9 +109,8 @@ function getAuthHeaders(): Record<string, string> {
   return {};
 }
 
-function fmt(v: number | null, decimals = 0): string {
-  if (v == null) return "—";
-  return v.toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+function fmt(v: number | null): string {
+  return formatMoney(v);
 }
 
 function pctColor(pct: number | null, invert = false): string {
@@ -203,7 +203,7 @@ function RowCard({ row }: { row: StagingRow }) {
           <div>
             <div className="text-xs text-muted-foreground">Old → New MRP</div>
             <div className="font-mono text-sm">
-              ₹{fmt(row.oldMrp)} → <span className="font-semibold">₹{fmt(row.newMrp)}</span>
+              {fmt(row.oldMrp)} → <span className="font-semibold">{fmt(row.newMrp)}</span>
             </div>
           </div>
           <div>
@@ -247,7 +247,7 @@ function RowCard({ row }: { row: StagingRow }) {
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-0.5">Prayag MRP (current)</div>
-              <span className="font-mono">₹{fmt(row.prayagMrpCurrent)}</span>
+              <span className="font-mono">{fmt(row.prayagMrpCurrent)}</span>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-0.5">Match Method</div>
@@ -643,7 +643,7 @@ export default function ImportReviewPage() {
                   </div>
                   <div className="text-sm font-mono shrink-0">
                     <div className="text-xs text-muted-foreground">Current price</div>
-                    ₹{fmt(r.oldMrp)}
+                    {fmt(r.oldMrp)}
                   </div>
                 </div>
               ))}
@@ -670,7 +670,7 @@ export default function ImportReviewPage() {
                   </div>
                   <div className="text-sm font-mono shrink-0">
                     <div className="text-xs text-muted-foreground">MRP</div>
-                    ₹{fmt(r.newMrp)}
+                    {fmt(r.newMrp)}
                   </div>
                 </div>
               ))}

@@ -184,6 +184,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/formatting':
+        specifier: workspace:*
+        version: link:../../lib/formatting
       adm-zip:
         specifier: ^0.6.0
         version: 0.6.0
@@ -578,6 +581,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/formatting':
+        specifier: workspace:*
+        version: link:../../lib/formatting
       '@workspace/replit-auth-web':
         specifier: workspace:*
         version: link:../../lib/replit-auth-web
@@ -779,6 +785,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/formatting':
+        specifier: workspace:*
+        version: link:../../lib/formatting
       '@workspace/replit-auth-web':
         specifier: workspace:*
         version: link:../../lib/replit-auth-web
@@ -978,6 +987,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/formatting':
+        specifier: workspace:*
+        version: link:../../lib/formatting
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -1170,6 +1182,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/formatting':
+        specifier: workspace:*
+        version: link:../../lib/formatting
       '@workspace/replit-auth-web':
         specifier: workspace:*
         version: link:../../lib/replit-auth-web
@@ -1288,6 +1303,8 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+
+  lib/formatting: {}
 
   lib/replit-auth-web:
     dependencies:

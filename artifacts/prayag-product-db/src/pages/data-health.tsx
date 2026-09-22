@@ -1,3 +1,4 @@
+import { formatMoney, formatCount } from "@workspace/formatting";
 import {
   useGetCatalogDataHealth,
   useReconcileSanitarywareVariantProvenance,
@@ -125,7 +126,7 @@ function SyncSummary({
         {metrics.map(([label, value]) => (
           <div key={label} className="flex items-center justify-between gap-3">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-mono font-medium">{value.toLocaleString()}</dd>
+            <dd className="font-mono font-medium">{formatCount(value)}</dd>
           </div>
         ))}
       </dl>
@@ -706,7 +707,7 @@ export default function DataHealthPage() {
                       : `${source.snapshotAgeDays} day${source.snapshotAgeDays === 1 ? "" : "s"}`}
                   </td>
                   <td className="px-4 py-3 align-top text-right font-mono">
-                    <div>{source.rowCount?.toLocaleString() ?? "—"} / {source.liveLinkedRows?.toLocaleString() ?? "—"}</div>
+                    <div>{formatCount(source.rowCount)} / {formatCount(source.liveLinkedRows)}</div>
                     {(source.rowsRemovedAfterLoad ?? 0) > 0 && (
                       <p className="mt-1 text-xs font-sans text-amber-800">
                         {source.rowsRemovedAfterLoad} removed after load
@@ -757,7 +758,7 @@ export default function DataHealthPage() {
                     <td className="px-4 py-2 text-muted-foreground">{row.productName ?? "—"}</td>
                     <td className="px-4 py-2 font-mono">{formatDisplayDate(row.effectiveDate)}</td>
                     <td className="px-4 py-2 text-right font-mono">
-                      {row.mrp == null ? "—" : `₹${row.mrp.toFixed(2)}`}
+                      {row.mrp == null ? "—" : `${formatMoney(row.mrp)}`}
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{row.sourceFile ?? "—"}</td>
                   </tr>

@@ -1,3 +1,4 @@
+import { formatMoney } from "@workspace/formatting";
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -168,7 +169,7 @@ export function warningFor(
     /PTMT|CP Fittings|Sanitaryware/i.test(division) &&
     !LEGITIMATE_LOW_PRICE_CODES.has(normCode(itemCode))
   ) {
-    warnings.push(`New value ₹${next} is below ₹50 for ${division}.`);
+    warnings.push(`New value ${formatMoney(next)} is below ₹50 for ${division}.`);
   }
   if (previous != null && previous !== 0) {
     const changePct = ((next - previous) / Math.abs(previous)) * 100;

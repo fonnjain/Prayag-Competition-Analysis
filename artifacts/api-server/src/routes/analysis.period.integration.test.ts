@@ -899,6 +899,20 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
     });
   }
 
+  async function fetchXLSXWorksheet(qs: URLSearchParams): Promise<XLSX.WorkSheet> {
+    const res = await exportRequest
+      .get(`/analysis/export?${qs}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    const wb = XLSX.read(res.body as Buffer, { type: "buffer", cellNF: true });
+    return wb.Sheets[wb.SheetNames[0]];
+  }
+
   /** Return the first data row whose Competitor column (index 0) matches. */
   function findXLSXRow(
     aoa: (string | number | null)[][],
@@ -927,6 +941,7 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
         dataRow,
         `Row for ${EX_COMP} not found in CSV (effectivePeriod=${AS_OF_BETWEEN})`,
       ).toBeDefined();
+      expect(dataRow![13]).toBe(String(EX_JAN_PRICE));
       // Column 13 = "Competitor Current Listed Price"
       expect(Number(dataRow![13])).toBe(EX_JAN_PRICE);
     },
@@ -991,6 +1006,22 @@ describe("GET /analysis/export — period-filtered row data (CSV + XLSX)", () =>
       expect(Number(dataRow![13])).toBe(EX_JUN_PRICE);
     },
   );
+
+  it("XLSX keeps export prices numeric and applies exact Indian formats", async () => {
+    const ws = await fetchXLSXWorksheet(new URLSearchParams({
+      effectivePeriod: AS_OF_AFTER,
+      format: "xlsx",
+      competitor: EX_COMP,
+    }));
+    expect(ws.A1?.v).toBe("Competitor");
+    expect(ws.H1?.v).toBe("Prayag Current MRP");
+    expect(ws.H2?.t).toBe("n");
+    expect(ws.H2?.v).toBe(EX_MRP);
+    expect(ws.H2?.z).toBe("[$₹-en-IN]##,##,##0.00");
+    expect(ws.N2?.t).toBe("n");
+    expect(ws.N2?.v).toBe(EX_JUN_PRICE);
+    expect(ws.N2?.z).toBe("[$₹-en-IN]##,##,##0.00");
+  });
 });
 
 // ---------------------------------------------------------------------------
