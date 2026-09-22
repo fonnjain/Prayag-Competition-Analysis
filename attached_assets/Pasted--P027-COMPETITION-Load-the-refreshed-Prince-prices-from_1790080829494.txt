@@ -1,0 +1,182 @@
+# P027 — COMPETITION — Load the refreshed Prince prices from the Competitor Master
+
+> **P027** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES DATA.** It may also require code changes — see §3.
+> Quote `P027` when reporting back.
+
+Load the Prince column from the refreshed Competitor Master. **Prince only.** Nothing about Prayag changes.
+
+**File:** `Competitor Master - Plumbing_1.xlsx`
+**SHA-256** `5338bb3bc49e07f7aa39f8f913559cac015c57ef265ba64ce23c4a02ba381b0c`
+
+Record the hash in `mrp_load_batches` before reading a row. If the file you receive hashes differently, stop and report it.
+
+---
+
+## 1. What is in the file
+
+Eleven worksheets, all audited. Two brand groups only — Prayag and Prince. Nothing beyond column 7 on any sheet.
+
+Each sheet carries a two-row header: row 1 names the brand group, row 2 names the columns under it. Rows below are a mix of section headings (no item code) and data rows.
+
+```
+Prayag price column header     "10th Aug, 2026"
+Prince price column header     2026-03-01
+```
+
+`CASING PIPE` and `UGD PIPE` carry **two** price columns per brand — `MRP (Per Mtr)` and the dated per-pipe price. **Take the dated column**, which is the per-pipe MRP, consistent with how Prince was loaded before.
+
+```
+Prince rows with a code and a price        813
+  Prayag code matches exactly              729
+  Prayag code matches only after           74
+    normalising                            
+  Prayag code not in the 01 Sep master     10
+```
+
+## 2. Expected outcome
+
+```
+comparable pairs before this load          803
+comparable pairs after                     810
+net new                                     +7   all UGD
+```
+
+The seven new ones are the UGD S-variant products — `U-11CS`, `U-13CS`, `U-14CS`, `U-15CS`, `U-16CS`, `U-13BS`, `U-14BS`. Prayag has confirmed these products are already created in the catalogue.
+
+**Everything else should land unchanged.** If this load reports hundreds of changes, something is wrong — stop and report before applying.
+
+---
+
+## 3. Code normalisation is mandatory
+
+**74 of the 813 rows will fail to match without it.** The Competitor Master writes codes with spaces where the catalogue has none:
+
+```
+'PU-1 T'   ->  'PU-1T'
+'PU-6 TS'  ->  'PU-6TS'
+'PW 71'    ->  'PW71'
+'PW 54'    ->  'PW54'
+```
+
+This is the same class of problem as P008, where `324-K` and `324K` were the same product and eight codes worth Rs 54.2 lakh were being lost.
+
+Apply the same normalisation the resolver already uses — strip everything that is not a letter or a digit, compare case-insensitively. If this import path does not already normalise, **that is the code change this prompt requires**, and it must be made before the load rather than worked around by editing the spreadsheet.
+
+Report how many rows matched exactly, how many matched only after normalising, and how many did not match at all. A normalised match must be reported as such, never silently treated as exact.
+
+---
+
+## 4. Rows that must be rejected, not skipped
+
+A rejected row is named in the report. A skipped row disappears. These must be rejected:
+
+**`SIM200032` appears twice with different prices.** AGRI PIPE: `A-86B` at 1265 and `A-86A` at 759. One Prince SKU cannot carry two prices — one of those rows has the wrong code on it. Reject **both** rows and name them. Do not pick one. Do not average. Do not take the last one read.
+
+**`PMR-5` carries a Prince price of `0.00` with no Prince code and no Prayag price.** Reject it. Zero is not a price. Missing data is not zero — a zero here would show Prince undercutting Prayag by 100% on a casing pipe.
+
+## 5. Rows to load but flag
+
+Three Prince codes each map to two Prayag codes, at a consistent price in each case:
+
+```
+SIM100150   ->  A-414  and  A-464    both 30
+SIM103500   ->  5711S  and  5712S    both 83
+SIM103501   ->  5111S  and  5112S    both 155
+```
+
+These were already loaded this way, so load them as before — but report them. One Prince SKU serving two Prayag codes is plausible; it is also how a mapping error looks. Prayag should confirm.
+
+## 6. Rows whose Prayag code was not in the 01 Sep master
+
+Ten rows. Seven are the new UGD products, now created. The other three need checking against the **live** catalogue, not against the master file:
+
+```
+CPVC FITTINGS    C133     IT101915     489.00
+CASING PIPE      PMR-8    SIM200923   6305.25
+CASING PIPE      PMR-9    SIM200928   8545.35
+```
+
+Report for each whether the Prayag product exists, and whether it has a price. If a product exists, the Prince price loads against it normally — a Prayag product with no current price is still a valid product to hold a competitor price for; the pair simply is not comparable yet, and must be reported as such rather than dropped.
+
+**If the product does not exist, the row is held, not created.** See §7.
+
+---
+
+## 7. Rules that do not bend
+
+1. **A competitor upload must never create a Prayag product.** Not in this load, not as a convenience, not behind a checkbox. Any row whose Prayag code cannot be resolved is held and listed for a human.
+2. **Do not read the Prayag price column.** It is dated 10 August and is known stale — its Casing Pipe values are the February prices, about 10% below what the catalogue now holds. Reading it would silently overwrite correct prices with old ones. This load takes the Prince columns only.
+3. **The effective date is `2026-03-01`, from the Prince column header.** It is not the upload date. Batch 154 wrote 1,828 rows dated the day they were loaded and overrode correct March prices; if an effective date here falls back to today, stop and report it.
+4. **Preview, then Apply.** Nothing is written until a human applies it.
+5. **Provenance.** `mrp_load_batches` row with the SHA-256, row count and actor; `load_batch_id` on every competitor price row written.
+6. **No direct SQL against production.** The load goes through the application's own validated path.
+
+---
+
+## 8. Preview must show
+
+```
+worksheets read                     11
+Prince rows with code and price    813
+  matched exactly                  729
+  matched after normalising         74
+  unresolved                         ?   listed in full
+rejected                             3   SIM200032 x2, PMR-5
+held - Prayag product not found      ?   listed in full
+
+competitor prices to insert          ?
+competitor prices to update          ?
+competitor prices unchanged          ?
+Prayag products to create            0
+Prayag price rows to write           0
+```
+
+The last two print as literal zeros. If either is non-zero the preview refuses to offer Apply.
+
+---
+
+## 9. Tests
+
+```
+1.  All 11 worksheets are read; none is silently skipped
+2.  CASING PIPE and UGD PIPE take the dated per-pipe column, not MRP (Per Mtr)
+3.  'PW 71' resolves to PW71 and is reported as a normalised match
+4.  All 74 normalised matches resolve
+5.  SIM200032 rows are both rejected and both named
+6.  PMR-5 is rejected; no zero price is stored anywhere
+7.  Prince effective dates are 2026-03-01, not the load date
+8.  No Prayag product is created
+9.  No mrp_price_history row is written -- count and checksum unchanged
+10. U-11CS, U-13CS, U-14CS, U-15CS, U-16CS, U-13BS, U-14BS each gain a Prince price
+11. Comparable pairs go 803 -> 810
+12. A second run of the same file changes nothing (idempotent)
+13. Non-admin receives 403
+```
+
+Test 12 matters. The PTMT reload that became batch 154 was an idempotency failure — the same file loaded twice wrote a second set of rows at the wrong date.
+
+---
+
+## 10. Report
+
+- The batch id, hash and row count.
+- Match counts: exact, normalised, unresolved — with the unresolved listed in full.
+- Every rejected row, with the reason.
+- The three duplicate Prince mappings, for Prayag to confirm.
+- Status of `C133`, `PMR-8`, `PMR-9` in the live catalogue.
+- Inserted / updated / unchanged competitor price counts.
+- Comparable pair count before and after.
+- Confirmation that `mrp_price_history` is unchanged, count and checksum.
+- Confirmation that no Prayag product was created.
+- The result of running the same file a second time.
+
+---
+
+## Afterwards
+
+Once this is loaded, the Prince comparison changes in two places worth knowing about:
+
+**UGD becomes the first category where Prayag is winning.** Prince is dearer on six of fourteen — `U-13B` +12.9%, `U-13BS` +10.7%, `U-14B` +10.3%, `U-14BS` +9.4%, `U-16C` +5.7%, `U-11C` +1.0%. Every other group has run one way until now.
+
+**Casing gets worse than previously reported.** The earlier figures were computed against the stale 10 August Prayag prices. Against the live catalogue, Prince undercuts the CM casing family by 23% to 30%, not 15% to 23%.
