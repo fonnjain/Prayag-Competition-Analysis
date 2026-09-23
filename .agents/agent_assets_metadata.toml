@@ -333,3 +333,17 @@ mtime_ms = 1790167385179
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e4fe4753-d1ba-49fc-a6f6-a826452824cf/b13b9bed-9fc7-4b39-b940-fdfb80678c59"
 storage_version_token = "1790167419759806"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "R82PzVsMVUlqw8HLxo8d5"
+uri = "file://reports/P037-environment-state-reconciliation.csv"
+type = "table"
+title = "P037 environment state reconciliation"
+description = "Complete read-only row-level MRP and catalog-product differences between development and production."
+logical_id = "7eb66d9a-1da1-43fd-8fc4-eaaaf3f4b6e0"
+content_hash = "sha256:1850d2b7c53525168d59ceb9cb6158d887ad2a39012e6e200f1cd900fe549281"
+size = 98178
+mtime_ms = 1790169150903
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/7eb66d9a-1da1-43fd-8fc4-eaaaf3f4b6e0/5a885753-7e7d-4a06-b520-8a7bea13de91"
+storage_version_token = "1790169152704308"
+content_type = "text/csv"
