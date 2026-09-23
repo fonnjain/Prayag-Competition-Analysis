@@ -1,0 +1,111 @@
+# P040 — COMPETITION — Stand down P033r3, and check the unit basis of every length-priced category
+
+> **P040** · app: **COMPETITION** (`prayag-price.com`)
+> **Part 1 is an instruction. Part 2 is READ-ONLY — change nothing.**
+> Quote `P040` when reporting back.
+
+---
+
+# PART 1 — P033r3 is closed. Do not run it.
+
+**P033r3 must not run against production, and it is finished in development.**
+
+P038 established why:
+
+```
+production PPR rows                      180   (90 at 2026-02-01, 90 at 2026-08-10)
+production rows at 2026-05-01              0   nothing to delete
+production basis                    per pipe   nothing to restate
+production vs Prayag's PPR file       90/90 at both periods
+```
+
+**CORRECTION — the premise above is wrong, and the agent was right to say so.**
+
+Those figures were read at **13:31 UTC**. P033r3 was applied to production at **11:37 UTC the same morning** — batch 5, 270 rows, 180 restatements and 90 deletions. Production was not always correct; it had been correct for under two hours when it was read. The prompt asked what the basis **was** and never asked when it last **changed**, so a fresh correction read as a permanent state.
+
+**The instruction still stands, for a different reason.** P033r3 must not run again — not because it is a no-op, but because it is **already done in both environments**: development at 11:03:57 UTC (batch 949), production at 11:37:24 UTC (batch 5). A second run would restate already-restated values and multiply them by three again.
+
+A corrected master (**v3**, SHA-256 `35739b6bda3ec7347018c10e550e52be523aa9424c5a170fa69714d211bf8609`, now superseded by **v4** `00a4565605578d72f6ab727c91be9a242ce5c4bf0f335fd4b8ee5f1ab9929cd7`) carries the per-pipe values.
+
+**Every figure in a report must carry the time it was read.** That is the rule this mistake bought.
+
+So:
+
+- Do not run P033r3 in production. Both halves are no-ops there.
+- Do not re-run it in development. It is done.
+- If any part of it is mid-flight, stop and report where it got to.
+
+**Confirm in your report that P033r3 will not be run.**
+
+---
+
+# PART 2 — Which other categories are priced per metre?
+
+This is the question P038 answered for PPR and nobody has answered for anything else.
+
+## 2.1 Why it matters
+
+A pipe sold in a 3-metre or 6-metre length has two possible prices, and they differ by 3× or 6×. If the application stores one basis and the competitor master quotes the other, **every comparison in that category is wrong by a factor of three or six** — and it will look like a plausible competitive position rather than an error.
+
+PPR was found only because Prayag happened to send a file. That is not a detection method.
+
+## 2.2 What is already known
+
+```
+category        length         master v3    production    status
+PPR Pipe        3 MTR          per pipe     per pipe      corrected, verified
+Casing Pipe     3 MTR          per pipe     per pipe      verified
+UGD Pipe        6 MTR          per pipe     per pipe      verified
+CPVC Pipe       3 M            ?            ?             NOT CHECKED
+UPVC Pipe       3 M            ?            ?             NOT CHECKED
+AGRI Pipe       6 METERS       ?            ?             NOT CHECKED
+SWR Pipe        3 M and 6 M    ?            ?             NOT CHECKED
+```
+
+Roughly **375 products** sit in the four unchecked categories: CPVC Pipe 40, UPVC Pipe 52, AGRI Pipe 123, SWR Pipe 160.
+
+**SWR Pipe is the one to look at hardest.** Its competitor master sheet carries both a `Length` and a `Length (Mtr)` column, and the range mixes 3-metre and 6-metre products. A category with two lengths cannot be checked with a single ratio.
+
+## 2.3 What to report
+
+For **each** of CPVC Pipe, UPVC Pipe, AGRI Pipe and SWR Pipe, in **production**:
+
+1. The count of products and the count of `mrp_price_history` rows.
+2. **For five products in each, spread across the size range:** the stored MRP, and the product's length if the name or size field states one.
+3. Whether the stored value is per metre or per pipe. Evidence it: state the length, the stored value, and what the other basis would be.
+4. **The same five against the competitor master**, which quotes per pipe for these categories — its sheets carry a single dated price column, unlike Casing, UGD and PPR which carry both.
+
+If the stored value equals the competitor master's Prayag column, the basis agrees. If it is that value divided by 3 or 6, it does not.
+
+5. For SWR Pipe specifically: report the 3-metre and 6-metre products **separately**. A single ratio across a mixed-length range proves nothing.
+
+Then do the same five-product check in **development**, and say whether the two environments agree.
+
+## 2.4 One more comparison worth making
+
+For any category where the basis is **per metre** in the application:
+
+- How many competitor comparisons does that category currently carry?
+- What is the reported median gap today?
+
+That is the size of the error, stated as the thing people are actually reading off the screen.
+
+---
+
+## What not to do
+
+- Do not run P033r3, in either environment.
+- Do not correct any price. This prompt finds out; it does not fix.
+- Do not load master v3 anywhere yet.
+- Do not touch the 231 HDPE products, the 36 synthetic development rows, or the 243 unprovenanced rows — P039 covers those.
+
+## Report
+
+1. Confirmation that P033r3 will not be run.
+2. For each of the four categories: the basis, with the evidence set out.
+3. SWR Pipe split by 3-metre and 6-metre.
+4. Whether development and production agree on each.
+5. For any category found on the wrong basis: the number of competitor comparisons affected and the median gap currently displayed.
+6. Your reading in one sentence per category: correct, or wrong by 3×, or wrong by 6×.
+
+Name what you find. **Do not propose a fix** — if something is wrong the correction needs Prayag's authoritative values, exactly as PPR did.
