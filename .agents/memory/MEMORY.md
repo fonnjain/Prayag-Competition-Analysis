@@ -34,3 +34,4 @@
 - [Workbook content identity](workbook-content-identity.md) — authorize trusted spreadsheet loads by canonical content fingerprint; retain byte SHA only as received-file provenance.
 - [Public Price Finder history boundary](public-price-history.md) — current prices stay anonymous; full MRP history requires sign-in and reuses the protected Analysis contract.
 - [PPR pipe unit restatement](ppr-pipe-unit-restatement.md) — PPR pipe history keeps Feb and Aug per-pipe periods; the spurious May period is deleted, not restated.
+- [Prince duplicate-code decisions](prince-duplicate-code-decisions.md) — exclusions are pair-keyed and confirmations suppress duplicate anomalies; P034r2 keeps A-414, never A-464.

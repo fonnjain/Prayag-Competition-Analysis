@@ -9,6 +9,7 @@ import {
   PRINCE_MASTER_SHA256,
   PRINCE_CONTENT_FINGERPRINT,
   normalizePrinceCode,
+  classifyPrinceDuplicateAnomalies,
 } from "./princeMaster.js";
 
 const workbookPath = fileURLToPath(new URL(
@@ -137,6 +138,31 @@ describe("trusted Prince workbook parser", () => {
       ["5111S", 155, 206],
       ["5112S", 155, 212],
     ]);
+  });
+
+  it("classifies duplicate anomalies and clears only confirmed codes", () => {
+    const { buffer, workbook } = source();
+    const rows = parsePrinceCompetitorMaster(buffer, workbook, canonicalMap(workbook)).rows;
+    const unconfirmed = classifyPrinceDuplicateAnomalies(rows);
+    expect(unconfirmed.get("SIM103500|5711S")).toMatchObject({ status: "needs_review", confirmedByDecision: false });
+    expect(unconfirmed.get("SIM103500|5712S")).toMatchObject({ status: "needs_review", confirmedByDecision: false });
+    const confirmed = classifyPrinceDuplicateAnomalies(rows, new Set(["SIM103500", "SIM103501"]));
+    expect(confirmed.get("SIM103500|5711S")).toMatchObject({ status: "ok", confirmedByDecision: true });
+    expect(confirmed.get("SIM103500|5712S")).toMatchObject({ status: "ok", confirmedByDecision: true });
+    expect(confirmed.get("SIM103501|5111S")).toMatchObject({ status: "ok", confirmedByDecision: true });
+    expect(confirmed.get("SIM103501|5112S")).toMatchObject({ status: "ok", confirmedByDecision: true });
+    expect(confirmed.get("SIM100150|A414")).toMatchObject({ status: "needs_review", confirmedByDecision: false });
+  });
+
+  it("keys anomaly state by normalized pair, not repeated source row numbers across sheets", () => {
+    const { buffer, workbook } = source();
+    const rows = parsePrinceCompetitorMaster(buffer, workbook, canonicalMap(workbook)).rows;
+    const swr = rows.filter((row) => row.princeCode === "SIM103500");
+    const repeatedRow = { ...swr[0]!, sheet: "OTHER SHEET", sourceRow: swr[1]!.sourceRow, princeCode: "SIM-UNRELATED", prayagCode: "UNRELATED", canonicalPrayagCode: "UNRELATED" };
+    const classified = classifyPrinceDuplicateAnomalies([...rows, repeatedRow]);
+    expect(classified.get("SIM103500|5711S")?.status).toBe("needs_review");
+    expect(classified.get("SIM103500|5712S")?.status).toBe("needs_review");
+    expect(classified.has("SIMUNRELATED|UNRELATED")).toBe(false);
   });
 
   it("retains content identity when source bytes differ", () => {

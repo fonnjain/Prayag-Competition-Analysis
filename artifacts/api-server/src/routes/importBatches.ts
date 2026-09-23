@@ -22,6 +22,7 @@ import {
   importBatchesTable,
   competitorPriceStagingTable,
   competitorPricesTable,
+  competitorMappingDecisionsTable,
   competitorCodeAliasesTable,
   catalogProductsTable,
   mrpPriceHistoryTable,
@@ -1298,6 +1299,8 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
   let inserted = 0;
   let updated = 0;
   let unchanged = 0;
+  let excludedByDecision: Array<{ competitorCode: string | null; prayagCode: string | null; reason: string }> = [];
+  let confirmedByDecision: Array<{ competitorCode: string | null; prayagCode: string | null }> = [];
   let beforeSnapshot: unknown;
   let afterSnapshot: unknown;
   let comparableBefore = 0;
@@ -1333,6 +1336,9 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
   };
 
   await db.transaction(async (tx) => {
+    // Serialize trusted Prince writes with P034r2 decision application.  This
+    // closes the gap between staging an old workbook and approving it.
+    if (trustedPrince) await tx.execute(sql`SELECT pg_advisory_xact_lock(340342)`);
     beforeSnapshot = await snapshot(tx);
     comparableBefore = await comparable(tx);
     if (trustedPrince && process.env.NODE_ENV === "test" &&
@@ -1346,11 +1352,31 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
     }
 
     if (trustedPrince) {
+      const activeDecisions = await tx.select().from(competitorMappingDecisionsTable).where(and(
+        eq(competitorMappingDecisionsTable.competitor, "Prince"),
+        sql`${competitorMappingDecisionsTable.undoneAt} IS NULL`,
+      ));
+      const exclusionMap = new Map(activeDecisions.filter((d) => d.decision === "exclusion")
+        .map((d) => [`${normCode(d.competitorCode)}|${normCode(d.prayagCode)}`, d]));
+      const confirmationCodes = new Set(activeDecisions.filter((d) => d.decision === "confirmation")
+        .map((d) => normCode(d.competitorCode)));
+      const guardedTrustedRows = trustedToCommit.filter((r) => {
+        const code = r.competitorCodeCatalogue ?? r.competitorCodeMaster;
+        const decision = exclusionMap.get(`${normCode(code)}|${normCode(r.matchedPrayagCode)}`);
+        if (decision) {
+          excludedByDecision.push({ competitorCode: code, prayagCode: r.matchedPrayagCode, reason: decision.reason });
+          return false;
+        }
+        if (confirmationCodes.has(normCode(code))) {
+          confirmedByDecision.push({ competitorCode: code, prayagCode: r.matchedPrayagCode });
+        }
+        return true;
+      });
       const existing = await tx.select().from(competitorPricesTable).where(and(
         eq(competitorPricesTable.competitor, batch.competitor),
       ));
       const byCode = new Map(existing.map((row) => [`${row.effectiveDate}|${row.matchedPrayagCode}`, row]));
-      for (const r of trustedToCommit) {
+      for (const r of guardedTrustedRows) {
         const rowDate = r.effectiveDate ?? batch.effectiveDate;
         const prior = byCode.get(`${rowDate}|${r.matchedPrayagCode}`);
         if (!prior) {
@@ -1414,7 +1440,16 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
         .onConflictDoNothing();
     }
 
-    await tx.update(importBatchesTable).set({ status: "approved" }).where(eq(importBatchesTable.id, batchId));
+    await tx.update(importBatchesTable).set({
+      status: "approved",
+      rowCounts: trustedPrince
+        ? JSON.stringify({
+          ...(() => { try { return JSON.parse(batch.rowCounts ?? "{}"); } catch { return {}; } })(),
+          excluded_by_decision: excludedByDecision,
+          confirmed_by_decision: confirmedByDecision,
+        })
+        : batch.rowCounts,
+    }).where(eq(importBatchesTable.id, batchId));
     comparableAfter = await comparable(tx);
     afterSnapshot = await snapshot(tx);
     if (JSON.stringify(beforeSnapshot) !== JSON.stringify(afterSnapshot)) {
@@ -1424,10 +1459,10 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
 
   await recomputeCurrentFlags(batch.competitor);
 
-  res.json({ ok: true, committed: trustedPrince ? trustedToCommit.length : toCommit.length,
+  res.json({ ok: true, committed: trustedPrince ? trustedToCommit.length - excludedByDecision.length : toCommit.length,
     inserted: trustedPrince ? inserted : undefined, updated: trustedPrince ? updated : undefined,
     unchanged: trustedPrince ? unchanged : undefined,
-    beforeSnapshot, afterSnapshot,
+    beforeSnapshot, afterSnapshot, excludedByDecision, confirmedByDecision,
     comparableBefore, comparableAfter });
 });
 

@@ -276,6 +276,42 @@ export const competitorPricesTable = pgTable(
   ],
 );
 
+// Durable Prayag adjudications for competitor mappings.  Decisions are keyed
+// by the stable competitor/code/product identity, never by workbook row.
+export const competitorMappingDecisionsTable = pgTable(
+  "competitor_mapping_decisions",
+  {
+    id: serial("id").primaryKey(),
+    competitor: text("competitor").notNull(),
+    competitorCode: text("competitor_code").notNull(),
+    prayagCode: text("prayag_code").notNull(),
+    decision: text("decision").notNull(), // exclusion | confirmation
+    reason: text("reason").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    actor: text("actor"),
+    batchId: integer("batch_id"),
+    previousRowSnapshot: text("previous_row_snapshot"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    undoneBy: text("undone_by"),
+  },
+  (t) => [
+    uniqueIndex("competitor_mapping_decision_identity_idx").on(
+      t.competitor, t.competitorCode, t.prayagCode,
+    ),
+    index("competitor_mapping_decision_lookup_idx").on(
+      t.competitor, t.competitorCode, t.decision,
+    ),
+    check("competitor_mapping_decision_type_check", sql`${t.decision} in ('exclusion','confirmation')`),
+    check("competitor_mapping_decision_reason_check", sql`length(trim(${t.reason})) > 0`),
+    check("competitor_mapping_decision_batch_check", sql`${t.batchId} is null or ${t.batchId} > 0`),
+    check(
+      "competitor_mapping_decision_undo_audit_check",
+      sql`(${t.undoneAt} is null and ${t.undoneBy} is null) or (${t.undoneAt} is not null and ${t.undoneBy} is not null)`,
+    ),
+  ],
+);
+
 // A revision batch is a durable preview/apply record. Unlike an import batch,
 // it never owns price rows: it only authorizes changes to rows that already
 // exist. Revision rows retain the preview and before/after values so apply and
@@ -744,6 +780,7 @@ export type MrpHistoryProvenanceEvent =
   typeof mrpHistoryProvenanceEventsTable.$inferSelect;
 export type CodeConflict = typeof codeConflictsTable.$inferSelect;
 export type CompetitorPrice = typeof competitorPricesTable.$inferSelect;
+export type CompetitorMappingDecision = typeof competitorMappingDecisionsTable.$inferSelect;
 export type AcceptBatch = typeof acceptBatchesTable.$inferSelect;
 export type DiscountSetting = typeof discountSettingsTable.$inferSelect;
 export type ImportBatch = typeof importBatchesTable.$inferSelect;

@@ -1,0 +1,164 @@
+# P034r2 — COMPETITION — Prayag's decisions on the four duplicate Prince codes
+
+> **P034r2** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES DATA, INCLUDING DELETING ONE MAPPING.**
+> Quote `P034r2` when reporting back — not P034.
+> **This replaces P034 in full.** If you hold P034, discard it. Part 2 is reversed between the two versions and P034 would delete the wrong row.
+
+Prayag has ruled on the four Prince codes that mapped to two Prayag products each. Three different outcomes.
+
+```
+SIM200032    delete both mappings, permanently
+SIM100150    keep A-414, delete A-464            <- REVERSED from P034
+SIM103500    correct as they are - confirm and clear the flag
+SIM103501    correct as they are - confirm and clear the flag
+```
+
+**Section 4 is the part that is easy to miss and matters most.** These decisions must survive the next load of the same competitor master, or every one of them reverts.
+
+---
+
+# PART 1 — SIM200032: delete both mappings
+
+```
+AGRI PIPE   row  79   A-86B   Prayag 1,486   Prince 1,265
+AGRI PIPE   row 122   A-86A   Prayag   892   Prince   759
+```
+
+One Prince code carrying two different prices. Prayag's decision: **both mappings go.**
+
+These two rows were **rejected at load** under P027r2, so nothing should exist in `competitor_prices` for either. Verify that:
+
+1. Confirm no `competitor_prices` row exists for `SIM200032` against `A-86B` or `A-86A`. Report the result. If a row does exist, remove it and say so — the P027r2 rejection did not hold.
+2. Record `SIM200032` as a **permanently excluded mapping** for both codes, with the reason: *one Prince code quoted at two prices; both mappings withdrawn by Prayag, 23 September 2026*.
+
+**Consequence:** `A-86B` and `A-86A` have no Prince comparison. They join the products with no Prince price. That is intended.
+
+# PART 2 — SIM100150: keep row 20, delete row 51
+
+**Read this carefully. It is the reverse of what P034 said.**
+
+```
+AGRI FITTINGS   row 20   A-414   Prayag 36.5   Prince 30    <- KEEP
+AGRI FITTINGS   row 51   A-464   Prayag 29.4   Prince 30    <- DELETE this mapping
+```
+
+**Both are currently loaded.** This is a real deletion from `competitor_prices`, not a rejection — it is different from Part 1 and must be handled differently.
+
+1. Delete exactly **one** row: `SIM100150` → **`A-464`**.
+2. Leave `SIM100150` → **`A-414`** untouched, with its price and provenance intact.
+3. Record `SIM100150` → `A-464` as a **permanently excluded mapping**, reason: *Prince SKU mapped to two Prayag codes; Prayag retained A-414 only, 23 September 2026*.
+4. The deleted row is preserved in the audit trail and restorable by undo.
+
+**Before deleting, echo back which code you are about to remove.** If your preview says `A-414`, you are working from the superseded P034 — stop and re-read this section.
+
+**Consequence:** `A-464` loses its Prince comparison and joins the products with no Prince price. Comparable pairs fall by exactly one.
+
+**Note the effect on the surviving comparison**, so nobody is surprised by it later. The retained pair reads differently from the deleted one:
+
+```
+kept      A-414   Prayag 36.5   Prince 30    Prince 17.8% cheaper
+deleted   A-464   Prayag 29.4   Prince 30    Prince  2.0% dearer
+```
+
+This is Prayag's decision on which Prayag product the Prince SKU actually corresponds to. It is recorded here as a consequence, not as a question.
+
+# PART 3 — SIM103500 and SIM103501: confirmed correct
+
+```
+SWR FITTINGS   row 204   5711S   Prayag  80.0   Prince  83
+SWR FITTINGS   row 210   5712S   Prayag  89.0   Prince  83
+SWR FITTINGS   row 206   5111S   Prayag 158.0   Prince 155
+SWR FITTINGS   row 212   5112S   Prayag 180.3   Prince 155
+```
+
+**Prayag has confirmed these are correct as they stand.** One Prince SKU genuinely serves two Prayag variants, and the prices are right.
+
+1. **Change nothing.** All four mappings stay exactly as loaded.
+2. **Clear whatever flag marked them as anomalies.** P027r2 reported them as *"retained and flagged"*. They are now a decided, correct mapping — not an open question — and they must stop surfacing as one on every load.
+3. Record the confirmation: *one Prince SKU serving two Prayag variants; confirmed correct by Prayag, 23 September 2026*.
+
+Report how that flag is stored and what clearing it involved.
+
+---
+
+# PART 4 — The decisions must survive the next load
+
+**The competitor master still contains every one of these rows.** Nothing has been removed at source.
+
+So unless these decisions are recorded as persistent state, the next load of that file will:
+
+- hit the `SIM200032` conflict again and re-reject it, with nobody knowing it was already decided
+- **re-create the `SIM100150` → `A-464` mapping that was just deleted**
+- re-flag `SIM103500` and `SIM103501` as anomalies needing review
+
+That last one is noise. The middle one silently undoes Part 2.
+
+**Build the exclusions as durable records that the loader consults**, keyed on **the Prince code and the Prayag code together** — never on a row number. Row 20 and row 51 move the moment Prayag edits the workbook, and a decision keyed to a row number will then apply to the wrong product.
+
+On a future load, a mapping on the exclusion list is **skipped and reported as "excluded by decision"**, never silently, and never re-created.
+
+Report how you stored this and where the loader reads it.
+
+**Also report:** whether these rows should be removed from the competitor master at source. That is Prayag's call, not yours — but a decision recorded in two places that can disagree is worth naming now rather than discovering later.
+
+---
+
+# What must not change
+
+1. **No price is written.** `mrp_price_history` count and checksum identical before and after. This prompt touches competitor mappings only.
+2. No Prayag product created, deactivated or renamed.
+3. **No other competitor mapping is touched.** Exactly one row is deleted.
+4. Sparsh Pearl, Ashirvad and Apollo rows unchanged.
+5. Preview, then Apply. Admin only. One-action undo.
+6. No direct SQL against production. Development first, then publish, then the same flow in production.
+
+# Expected counts
+
+```
+competitor_prices                 -1      (SIM100150 -> A-464)
+comparable pairs                  -1      report the before and after figure
+mrp_price_history                  0      unchanged, count and checksum
+permanent exclusions created       3      SIM200032 x2, SIM100150 -> A-464
+confirmations recorded             2      SIM103500, SIM103501
+```
+
+If P028 has already loaded, the pair count starts from 946 rather than 810 — report the actual before and after rather than assuming either.
+
+# Tests
+
+```
+ 1. The run quotes P034r2, and deletes A-464 -- NOT A-414
+ 2. No competitor_prices row exists for SIM200032 against A-86B or A-86A
+ 3. Exactly one row is deleted: SIM100150 -> A-464
+ 4. SIM100150 -> A-414 is untouched, price and provenance intact
+ 5. All four SIM103500 / SIM103501 rows are untouched
+ 6. The anomaly flag on SIM103500 and SIM103501 is cleared
+ 7. Three permanent exclusions exist and are readable by the loader
+ 8. Re-running the same competitor master does NOT re-create
+    SIM100150 -> A-464
+ 9. Re-running does NOT re-flag SIM103500 or SIM103501
+10. Re-running reports SIM200032 as "excluded by decision", not as a
+    new conflict
+11. mrp_price_history unchanged -- count AND checksum
+12. No other competitor's rows are affected
+13. The deleted mapping is restorable by undo
+14. Non-admin receives 403
+```
+
+**Test 1 is new and it exists because P034 said the opposite.** If the report names `A-414` as deleted, the wrong row went.
+
+**Tests 8, 9 and 10 are the ones that matter most.** Everything else can pass while the decisions quietly revert on the next upload. Run the load twice and prove they hold.
+
+# Report
+
+- Confirmation that you are working from **P034r2**, and that the code deleted is `A-464`.
+- `SIM200032`: what existed, what you found, what you recorded.
+- The one deleted row, in full, with before and after `competitor_prices` counts.
+- Confirmation that `A-414` and all four SWR rows are untouched.
+- How the anomaly flag is stored and what clearing it involved.
+- **How the exclusions are stored, and where the loader reads them.**
+- The second-run result — tests 8, 9 and 10 proven, not asserted.
+- Comparable pairs before and after.
+- `mrp_price_history` count and checksum, before and after.
+- Whether these rows should also be removed from the competitor master at source.

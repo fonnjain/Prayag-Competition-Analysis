@@ -67,6 +67,46 @@ export type PrinceMasterParseResult = {
   effectiveDates: Array<{ sheet: string; effectiveDate: string }>;
 };
 
+export type PrinceDuplicateAnomaly = {
+  competitorCode: string;
+  prayagCodes: string[];
+  sourceRows: number[];
+};
+
+/**
+ * Trusted workbooks can contain a legitimate one-code/many-variant mapping,
+ * but it must be adjudicated explicitly.  Keep this classifier independent
+ * from workbook row numbers so reloads can apply durable decisions.
+ */
+export function classifyPrinceDuplicateAnomalies(
+  rows: PrinceMasterRow[],
+  confirmedCompetitorCodes: ReadonlySet<string> = new Set(),
+): Map<string, { status: "ok" | "needs_review"; reason: string | null; confirmedByDecision: boolean }> {
+  const groups = new Map<string, PrinceMasterRow[]>();
+  for (const row of rows) {
+    const code = normalizePrinceCode(row.princeCode);
+    const group = groups.get(code) ?? [];
+    group.push(row);
+    groups.set(code, group);
+  }
+  const result = new Map<string, { status: "ok" | "needs_review"; reason: string | null; confirmedByDecision: boolean }>();
+  for (const [code, group] of groups) {
+    const prayagCodes = [...new Set(group.map((row) => row.canonicalPrayagCode ?? row.prayagCode))];
+    if (prayagCodes.length < 2) continue;
+    const confirmed = confirmedCompetitorCodes.has(code);
+    for (const row of group) {
+      result.set(`${code}|${normalizePrinceCode(row.canonicalPrayagCode ?? row.prayagCode)}`, {
+        status: confirmed ? "ok" : "needs_review",
+        reason: confirmed
+          ? "Duplicate anomaly adjudicated: confirmed_by_decision; staging anomaly flag cleared."
+          : `Duplicate anomaly: ${code} maps to multiple Prayag codes (${prayagCodes.join(", ")}).`,
+        confirmedByDecision: confirmed,
+      });
+    }
+  }
+  return result;
+}
+
 const clean = (value: unknown): string => String(value ?? "").trim();
 export const normalizePrinceCode = (value: unknown): string =>
   clean(value).toUpperCase().replace(/[^A-Z0-9]/g, "");

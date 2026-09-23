@@ -305,3 +305,17 @@ mtime_ms = 1790163534293
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/2ffc856e-664c-42b3-b8f7-80c50133df39/6497e66a-e758-4764-b4f7-d29106c4472d"
 storage_version_token = "1790163558350663"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "gWP7QmQf4bufabJpdbyYA"
+uri = "file://reports/P034r2_development_completion_report.xlsx"
+type = "table"
+title = "P034r2 development completion report"
+description = "Full audit of the three reversible deletions, five durable decisions, preserved mappings, two reload proofs, invariant checks, and source-master recommendation."
+logical_id = "219d59e2-e47a-4afa-81b1-d4bfe990e14e"
+content_hash = "sha256:ae3d30936acfaef9d1eec8db08fb8de5ee2a72ae58281f301ec221873ac549a9"
+size = 11948
+mtime_ms = 1790166353766
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/219d59e2-e47a-4afa-81b1-d4bfe990e14e/d6a53aaf-1ffb-4de5-8262-20b9fd972a07"
+storage_version_token = "1790166416380488"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

@@ -15,6 +15,7 @@ import {
   mrpHistoryProvenanceEventsTable,
   importBatchesTable,
   competitorPriceStagingTable,
+  competitorMappingDecisionsTable,
   catalogProductClassificationCorrectionsTable,
 } from "@workspace/db";
 import {
@@ -45,6 +46,7 @@ import {
   isPrinceCompetitorMasterWorkbook,
   normalizePrinceCode,
   parsePrinceCompetitorMaster,
+  classifyPrinceDuplicateAnomalies,
   PRINCE_COMPETITOR,
   PRINCE_EFFECTIVE_DATE,
 } from "../lib/princeMaster";
@@ -3229,14 +3231,83 @@ router.post(
         const existingPrinceBatch = await db.select().from(importBatchesTable)
           .where(and(eq(importBatchesTable.competitor, PRINCE_COMPETITOR), eq(importBatchesTable.effectiveDate, PRINCE_EFFECTIVE_DATE)))
           .orderBy(desc(importBatchesTable.id));
-        const existingContent = existingPrinceBatch.find((batch) => {
+        const existingContent = existingPrinceBatch.find((batch) => batch.status === "approved" && (() => {
           try { return JSON.parse(batch.rowCounts ?? "{}").content_fingerprint === princeMaster.contentFingerprint; } catch { return false; }
-        });
+        })());
         if (existingContent) {
-          res.status(200).json({ batchId: existingContent.id, batchIds: [existingContent.id], status: existingContent.status, idempotent: true });
+          const activeDecisions = await db.select({
+            competitorCode: competitorMappingDecisionsTable.competitorCode,
+            prayagCode: competitorMappingDecisionsTable.prayagCode,
+            decision: competitorMappingDecisionsTable.decision,
+            reason: competitorMappingDecisionsTable.reason,
+          }).from(competitorMappingDecisionsTable).where(and(
+            eq(competitorMappingDecisionsTable.competitor, PRINCE_COMPETITOR),
+            sql`${competitorMappingDecisionsTable.undoneAt} IS NULL`,
+          ));
+          const excluded = activeDecisions.filter((decision) => decision.decision === "exclusion");
+          const confirmed = activeDecisions.filter((decision) => decision.decision === "confirmation");
+          const currentPrinceRows = await db.select().from(competitorPricesTable)
+            .where(eq(competitorPricesTable.competitor, PRINCE_COMPETITOR));
+          const sourceMappings = (() => {
+            try {
+              return (JSON.parse(existingContent.rowCounts ?? "{}").source_mappings ?? []) as Array<{ competitorCode?: string; princeCode?: string; prayagCode?: string; catalogMatched?: boolean }>;
+            } catch { return []; }
+          })();
+          const observedMappings = [
+            ...sourceMappings,
+            ...princeMaster.rows.map((row) => ({ princeCode: row.princeCode, prayagCode: row.canonicalPrayagCode ?? row.prayagCode })),
+            ...princeMaster.rejectedRows.map((row) => ({ princeCode: row.princeCode, prayagCode: row.prayagCode })),
+          ];
+          const excludedRows = observedMappings.filter((mapping) => excluded.some((decision) =>
+            normalizePrinceCode(decision.competitorCode) === normalizePrinceCode(mapping.princeCode ?? ("competitorCode" in mapping ? mapping.competitorCode : undefined)) &&
+            normCode(decision.prayagCode) === normCode(mapping.prayagCode ?? ""),
+          ));
+          const confirmedRows = currentPrinceRows.filter((mapping) => confirmed.some((decision) =>
+            normalizePrinceCode(decision.competitorCode) === normalizePrinceCode(mapping.competitorCode),
+          )).map((mapping) => ({
+            competitorCode: mapping.competitorCode,
+            prayagCode: mapping.matchedPrayagCode,
+            decision: "confirmation",
+          }));
+          res.status(200).json({
+            batchId: existingContent.id, batchIds: [existingContent.id], status: existingContent.status, idempotent: true,
+            excluded_by_decision: excludedRows,
+            excluded_by_decision_count: excludedRows.length,
+            active_excluded_decisions: excludedRows.length ? [] : excluded,
+            active_excluded_decision_count: excludedRows.length ? 0 : excluded.length,
+            confirmed_by_decision: confirmedRows.length ? confirmedRows : confirmed,
+            confirmed_by_decision_count: confirmedRows.length || confirmed.length,
+            decisions: activeDecisions,
+          });
           return;
         }
-        const stagedRows = [
+        const decisions = await db.select().from(competitorMappingDecisionsTable).where(and(
+          eq(competitorMappingDecisionsTable.competitor, PRINCE_COMPETITOR),
+          sql`${competitorMappingDecisionsTable.undoneAt} IS NULL`,
+        ));
+        const excludedPairs = new Set(
+          decisions.filter((d) => d.decision === "exclusion")
+            .map((d) => `${normalizePrinceCode(d.competitorCode)}|${normCode(d.prayagCode)}`),
+        );
+        const confirmedCodes = new Set(
+          decisions.filter((d) => d.decision === "confirmation")
+            .map((d) => normalizePrinceCode(d.competitorCode)),
+        );
+        const excludedByDecision: Array<{ competitorCode: string; prayagCode: string | null; reason: string }> = [];
+        const shouldExclude = (competitorCode: string | null, prayagCode: string | null) => {
+          const key = `${normalizePrinceCode(competitorCode)}|${normCode(prayagCode ?? "")}`;
+          const excluded = excludedPairs.has(key);
+          if (excluded) {
+            const decision = decisions.find((d) =>
+              d.decision === "exclusion" &&
+              normalizePrinceCode(d.competitorCode) === normalizePrinceCode(competitorCode) &&
+              normCode(d.prayagCode) === normCode(prayagCode ?? ""),
+            );
+            excludedByDecision.push({ competitorCode: competitorCode ?? "", prayagCode, reason: decision?.reason ?? "Excluded by decision." });
+          }
+          return excluded;
+        };
+        const stagedRowsBeforeAnomalyClassification = [
           ...princeMaster.rows.map((row) => ({
             prayagCode: row.canonicalPrayagCode,
             description: null,
@@ -3248,7 +3319,7 @@ router.post(
             effectiveDate: row.effectiveDate,
           })),
           ...princeMaster.rejectedRows.map((row) => ({
-            prayagCode: null,
+            prayagCode: row.prayagCode,
             description: null,
             variant: null,
             price: row.price,
@@ -3257,7 +3328,33 @@ router.post(
             reviewReason: row.reason,
             effectiveDate: PRINCE_EFFECTIVE_DATE,
           })),
-        ];
+        ].filter((row) => !shouldExclude(row.competitorCode, row.prayagCode));
+        const retainedPrinceRows = princeMaster.rows.filter((row) => !excludedPairs.has(
+          `${normalizePrinceCode(row.princeCode)}|${normCode(row.canonicalPrayagCode ?? row.prayagCode)}`,
+        ));
+        const duplicateAnomalies = classifyPrinceDuplicateAnomalies(retainedPrinceRows, confirmedCodes);
+        const stagedRows = stagedRowsBeforeAnomalyClassification.map((staged) => {
+          const anomaly = duplicateAnomalies.get(
+            `${normalizePrinceCode(staged.competitorCode)}|${normCode(staged.prayagCode ?? "")}`,
+          );
+          return anomaly ? { ...staged, status: anomaly.status, reviewReason: anomaly.reason } : staged;
+        });
+        const confirmedByDecision = princeMaster.rows
+          .filter((row) => confirmedCodes.has(normalizePrinceCode(row.princeCode)))
+          .map((row) => ({
+            competitorCode: row.princeCode,
+            prayagCode: row.canonicalPrayagCode ?? row.prayagCode,
+            decision: "confirmation",
+            reason: decisions.find((d) => d.decision === "confirmation" && normalizePrinceCode(d.competitorCode) === normalizePrinceCode(row.princeCode))?.reason ?? "Confirmed by decision.",
+          }));
+        const excludedRejectedRows = new Set(excludedByDecision.map((row) =>
+          `${normalizePrinceCode(row.competitorCode)}|${normCode(row.prayagCode ?? "")}`,
+        ));
+        const rejectedRowsForReport = princeMaster.rejectedRows.filter((row) =>
+          !excludedRejectedRows.has(`${normalizePrinceCode(row.princeCode)}|${normCode(row.prayagCode)}`),
+        );
+        const stagedOkCount = stagedRows.filter((row) => row.status === "ok").length;
+        const stagedReviewCount = stagedRows.filter((row) => row.status === "needs_review").length;
         const actor = req.user?.email ?? req.user?.id ?? null;
         let provenanceLoadBatchId: number | null = null;
         const [source] = await db.insert(mrpSourcesTable).values({
@@ -3288,13 +3385,19 @@ router.post(
           PRINCE_EFFECTIVE_DATE,
           stagedRows,
           {
-            total: princeMaster.rows.length + princeMaster.rejectedRows.filter((row) => row.princeCode && row.price != null).length,
-            ok: princeMaster.catalogMatchedRows.length,
-            needs_review: princeMaster.unmatchedRows.length + princeMaster.rejectedRows.length,
-            not_found: princeMaster.unmatchedRows.length + princeMaster.rejectedRows.length,
+            total: stagedRows.length,
+            ok: stagedOkCount,
+            needs_review: stagedReviewCount,
+            not_found: stagedReviewCount,
             new_products: 0,
             unmatched_prayag_codes: princeMaster.unmatchedCodes,
-            rejected_rows: princeMaster.rejectedRows,
+            rejected_rows: rejectedRowsForReport,
+            excluded_by_decision: excludedByDecision,
+            excluded_by_decision_count: excludedByDecision.length,
+            confirmed_by_decision: confirmedByDecision,
+            confirmed_by_decision_count: confirmedByDecision.length,
+            duplicate_anomalies: [...duplicateAnomalies.values()].filter((value) => value.status === "needs_review").length,
+            duplicate_anomalies_cleared_by_decision: [...duplicateAnomalies.values()].filter((value) => value.confirmedByDecision).length,
             content_fingerprint: princeMaster.contentFingerprint,
             price_sum: princeMaster.priceSum,
             exact_matches: princeMaster.exactMatches,
@@ -3306,16 +3409,41 @@ router.post(
           },
           provenanceLoadBatchId,
         );
+        // Re-check under the same advisory lock used by P034r2 apply and by
+        // approval. A decision committed while parsing cannot leave an
+        // excluded pair in a newly-created staging batch.
+        await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(340342)`);
+          const activeExclusions = await tx.select().from(competitorMappingDecisionsTable).where(and(
+            eq(competitorMappingDecisionsTable.competitor, PRINCE_COMPETITOR),
+            eq(competitorMappingDecisionsTable.decision, "exclusion"),
+            sql`${competitorMappingDecisionsTable.undoneAt} IS NULL`,
+          ));
+          for (const decision of activeExclusions) {
+            await tx.execute(sql`
+              DELETE FROM competitor_price_staging
+              WHERE batch_id = ${batchId}
+                AND competitor_code_master = ${decision.competitorCode}
+                AND matched_prayag_code = ${decision.prayagCode}
+            `);
+          }
+        });
         res.status(201).json({
           batchId, batchIds: [batchId], status: "pending",
           summary: {
-            total: princeMaster.rows.length + princeMaster.rejectedRows.filter((row) => row.princeCode && row.price != null).length,
-            matched: princeMaster.catalogMatchedRows.length,
-            unmatched: princeMaster.unmatchedRows.length,
+            total: stagedRows.length,
+            matched: stagedOkCount,
+            unmatched: stagedReviewCount,
             unmatchedCodes: princeMaster.unmatchedCodes,
             effectiveDate: PRINCE_EFFECTIVE_DATE,
             contentFingerprint: princeMaster.contentFingerprint,
-            rejectedRows: princeMaster.rejectedRows,
+            rejectedRows: rejectedRowsForReport,
+            excludedByDecision,
+            excludedByDecisionCount: excludedByDecision.length,
+            confirmedByDecision,
+            confirmedByDecisionCount: confirmedByDecision.length,
+            duplicateAnomalies: [...duplicateAnomalies.values()].filter((value) => value.status === "needs_review").length,
+            duplicateAnomaliesClearedByDecision: [...duplicateAnomalies.values()].filter((value) => value.confirmedByDecision).length,
           },
         });
         return;

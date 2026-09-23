@@ -746,6 +746,9 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
       const batch = (await tx.select().from(mrpRevisionBatchesTable)
         .where(eq(mrpRevisionBatchesTable.id, batchId)).limit(1))[0];
       if (!batch) throw Object.assign(new Error("Revision batch not found."), { httpStatus: 404 });
+      if (batch.targetType === "p034r2") {
+        throw Object.assign(new Error("P034r2 batches must use the dedicated decision apply endpoint."), { httpStatus: 409 });
+      }
       if (batch.status !== "preview") throw Object.assign(new Error(`Revision batch is already ${batch.status}.`), { httpStatus: 409 });
       if (batch.warningCount > 0 && !acknowledgeWarnings) {
         throw Object.assign(new Error("Explicit acknowledgement is required for revision warnings."), { httpStatus: 409 });
@@ -864,6 +867,9 @@ router.post("/catalog/mrp-revisions/:batchId/discard", requireAdmin, async (req,
       const batch = (await tx.select().from(mrpRevisionBatchesTable)
         .where(eq(mrpRevisionBatchesTable.id, batchId)).limit(1))[0];
       if (!batch) throw Object.assign(new Error("Revision batch not found."), { httpStatus: 404 });
+      if (batch.targetType === "p034r2") {
+        throw Object.assign(new Error("P034r2 batches must use the dedicated decision rollback endpoint."), { httpStatus: 409 });
+      }
       if (batch.status !== "preview") {
         throw Object.assign(new Error(`Revision batch is already ${batch.status}.`), { httpStatus: 409 });
       }
