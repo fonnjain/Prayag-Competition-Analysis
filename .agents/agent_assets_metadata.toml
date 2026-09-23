@@ -277,3 +277,17 @@ mtime_ms = 1790153343760
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8e39fdf1-e65e-4692-bf3c-59260d88f658/c6ea13fa-24ab-459c-9034-02fee8c17023"
 storage_version_token = "1790153571012133"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "swC2IaRsBqZ2tfaiFDv-q"
+uri = "file://reports/P033_preflight_BLOCKED_missing_2026-05-01_values.xlsx"
+type = "table"
+title = "P033 blocked preflight report"
+description = "All 270 affected history rows, the 90 missing 01 May 2026 source values, tolerance checks, basis audit, baselines, and affected historical records."
+logical_id = "938deca6-c824-437a-a1f4-003be21f5235"
+content_hash = "sha256:9e4b225143b824373c85d784becd815f2f1215a08eb89685b3fae714df96a652"
+size = 26904
+mtime_ms = 1790155315159
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/938deca6-c824-437a-a1f4-003be21f5235/13d4103f-f205-452f-8b3e-d07168e6281a"
+storage_version_token = "1790155327501346"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

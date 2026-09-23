@@ -1,0 +1,152 @@
+# P033 — COMPETITION — Restate 90 PPR pipe prices from per-metre to per-pipe
+
+> **P033** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES DATA.**
+> Quote `P033` when reporting back.
+> **Run this before, or in the same session as, P028's PPR load.** See §7.
+
+The 90 PPR pipe prices in this application are **per metre**. The product is a **3-metre pipe**. The MRP Prayag publishes is the per-pipe figure.
+
+Prayag has confirmed the cause: the MRP originally supplied was for one metre, while the pipe length is three metres.
+
+**This is a unit restatement. It is not a price change.** Not one product changes price in real terms, and nothing in this prompt may record it as an increase.
+
+---
+
+## 1. The evidence
+
+Every one of the 90 codes in the correction file is exactly **3×** the stored value:
+
+```
+code       app (per metre)   file (per 3 MTR pipe)
+P10A03               108                    324
+P10A05               268                    804
+P10A10             1,722                  5,166
+P10G02                68                    204
+```
+
+72 of 90 are exactly 3×. The remaining 18 differ by **exactly ±1 rupee**, because the app stores a *rounded* per-metre value and multiplying by three cannot recover the lost rupee — `P10A02` is ₹235 per pipe, ₹78.33 per metre, stored as ₹78, and 78 × 3 = 234.
+
+**Every other pipe category is already per-pipe.** PPR is the only one that is not:
+
+```
+Casing Pipe   PMC-1    app 682     per-metre 227.33    per-pipe 682     correct
+UGD Pipe      U-11C    app 2,987   per-metre 497.83    per-pipe 2,987   correct
+PPR Pipe      P20G02   app 108     per-metre 108       per-pipe 324     WRONG
+```
+
+The competitor master's own PPR section header reads *"Green Triple Layer … 3 Mtr"*, and the 155 name changes append `" Pipe (3 MTR)"` to these same 90 products. Name and unit are one correction arriving in two files.
+
+## 2. Use the file's values. Never compute 3×.
+
+**File:** `Master - MRP PPR.xlsx`
+**SHA-256** `f27fa5f40e9428fe8d953ad13803d5d46d667f4f399ff1ba46e63449cb603288`
+Sheet1, 90 rows, columns: `Cat No. · Division · Series / Range · Product Name · MRP w.e.f. 10 Aug 2026 · Previous MRP 01 Feb 2026`
+
+Record the hash before reading a row.
+
+**Do not multiply the stored price by three.** Eighteen codes would land a rupee out. The file carries the true per-pipe values; take them.
+
+Verify before writing: for each code, the stored value × 3 should be within ±1 of the file value. **If any code is further out than ±1, stop and report it** — that would be a real price change hiding inside a unit correction, and it must not pass silently.
+
+## 3. Restate in place. Do not add a period.
+
+```
+correct       the existing rows, at their existing effective dates
+never         insert a new row, a new period, or a new effective date
+```
+
+If this loads as a revision, every PPR product reads as a **200% increase**. That flows into margins, the MRP generator, every saved scenario, the historical comparison, and the Sales application. A unit restatement recorded as a price rise is worse than no correction at all.
+
+Each corrected row carries an audit note saying **unit restatement, per metre to per 3-metre pipe — not a price change**, so that anyone reading the history later sees why the number moved.
+
+## 4. Find every affected row yourself
+
+I know of two dates: `2026-08-10` (current, 90 rows) and `2026-02-01` (history, 90 rows). **Do not treat that as the list.**
+
+Enumerate **every row in `mrp_price_history` for all 90 codes**, at every effective date, and report them before writing. Then restate every one.
+
+A correction that fixes the current price and leaves the history per-metre produces a price series that appears to triple — which is exactly the false increase this prompt exists to prevent.
+
+For the history rows, the file's `Previous MRP 01 Feb 2026` column gives the per-pipe value at `2026-02-01`. For any other date you find, report it and stop; I will supply the values rather than have you derive them.
+
+## 5. Check whether anything else has the same problem
+
+Read-only, reported alongside the correction:
+
+For **every product whose name, series or category implies a length** — SWR Pipe, AGRI Pipe, CPVC Pipe, UPVC Pipe, Casing, UGD, PPR — report the stored MRP against the competitor master's per-metre and per-pipe columns where both exist, and state which basis the application holds.
+
+PPR is the one I found. It is not proof it is the only one.
+
+## 6. What this has already affected
+
+Report, do not repair:
+
+1. Any **MRP generator run or saved scenario** that included a PPR pipe. Those were computed on a price one third of the truth. They are historical records — **do not retro-edit them** — but list them so nobody acts on one.
+2. Any **margin figure** involving PPR pipes.
+3. **The Sales application.** `prayag-sales.com` consumes MRP from this application by API. PPR margins there have been computed against one third of the true MRP. Flag it; a separate SALES prompt will follow.
+4. Any **export or report** already sent out carrying PPR pipe prices.
+
+## 7. Order of work with P028
+
+P028 loads 31 Prince PPR PIPE prices from the dated **per-pipe** column. Against a Prayag **per-metre** price, the application would show Prince roughly 3× dearer on every PPR pipe — a real gap of +2.9% rendered as +208%.
+
+**Run P033 first, or both in the same session.** If P028 has already loaded, run P033 immediately and report the PPR gaps before and after.
+
+After both, PPR against Prince should read approximately:
+
+```
+PPR PIPE       30 pairs    Prince cheaper on 0    median +2.9%
+PPR FITTINGS  106 pairs    Prince cheaper on 1    median +3.1%
+```
+
+If it does not, stop and report — that is the check that the units now agree on both sides.
+
+**PPR Fittings are unaffected.** They are priced per piece and have no per-metre concept.
+
+---
+
+## 8. Rules
+
+1. **No new price period, no new effective date, no inserted row.** Row count in `mrp_price_history` identical before and after — only values change.
+2. No name changed. The name correction is a separate batch.
+3. No competitor mapping changed. Snapshot and diff; must be empty.
+4. No product created, none deactivated.
+5. Preview, then Apply. Admin only.
+6. Provenance: load batch with the SHA-256, actor, timestamp, `load_batch_id` on every row changed, previous value retained, one-action undo.
+7. No direct SQL against production. Development first, then publish, then the same flow in production.
+
+## 9. Tests
+
+```
+ 1. Every mrp_price_history row for the 90 codes is enumerated and
+    reported BEFORE any write
+ 2. mrp_price_history ROW COUNT is identical before and after
+ 3. The checksum changes -- values moved, rows did not
+ 4. P10A02 reads 235, not 234
+ 5. P10A03 reads 324
+ 6. P10G02 reads 204
+ 7. Every corrected value comes from the file, never from a x3 calculation
+ 8. Any code more than +/- Rs 1 from 3x its stored value halts the run
+ 9. The 2026-02-01 history rows are restated too
+10. No new effective date exists after the run
+11. Each corrected row carries the unit-restatement audit note
+12. Competitor mappings and Needs Review unchanged
+13. Undo restores all rows in one action
+14. After P028: PPR PIPE median gap is about +2.9%, not about +208%
+15. PPR Fittings values are untouched
+16. Non-admin receives 403
+```
+
+Test 2 and test 3 together are the proof this was a restatement: **same rows, different values**. Test 14 is the proof the two sides now speak the same unit.
+
+## 10. Report
+
+- The hash recorded, and the row count read.
+- **Every affected row, by code and date, before and after.**
+- The ±1 verification: how many at exactly 3×, how many at ±1, how many halted.
+- `mrp_price_history` row count and checksum, before and after.
+- Any other category found to be on the wrong basis (§5).
+- Generator runs, scenarios and margins affected (§6), listed and unrepaired.
+- PPR gaps against Prince before and after, if P028 has run.
+- Confirmation that no new period was created.
