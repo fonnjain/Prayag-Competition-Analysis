@@ -1,0 +1,126 @@
+# P036 — COMPETITION — Apply P029's classification to production
+
+> **P036** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES PRODUCTION DATA.**
+> Quote `P036` when reporting back.
+
+P035 established the cause. P029 applied to **development only**; the later publication deployed code without copying the data.
+
+```
+                                    DEV          PROD
+Active Uncategorized                  3            13
+U-11CS category               "UGD Pipe"          NULL
+U-11CS division         Pipes & Fittings   Pipes & Fittings
+U-11CS series                  UGD Pipe      UGD Pipe
+Ten Self Fit with NULL category       0            10
+Correction batch 1495           present        absent
+```
+
+**Only `category` is wrong in production.** Division and series are already correct there — P019r2 created the products with those two fields and no category, and P029's repair never reached production.
+
+The exact value, confirmed from development: **`UGD Pipe`** — 8 characters, no leading or trailing whitespace, that case.
+
+---
+
+## 1. Check the siblings first
+
+**Before applying anything**, report the **production** `category` value for `U-11C` and `U-11B`.
+
+P029 works by copying classification from the Ring Fit sibling. **If those siblings also hold `NULL` in production, the copy would copy `NULL`** — every test would pass, the batch would record ten corrections, and nothing would change.
+
+I expect them to be populated, because they do not appear in production's Uncategorized list. Confirm it rather than assume it.
+
+**If either sibling is `NULL` in production:** stop the copy approach and set `category = 'UGD Pipe'` explicitly on all ten instead. Report which route you took.
+
+## 2. Apply through the application's own path
+
+Use the **same validated Product Database path P029 used in development**. Preview, then Apply, admin signed in.
+
+**No direct SQL against production.** That rule has held all week and holds here.
+
+## 3. What the preview must show
+
+```
+products to update                      10
+category changes                        10
+division changes                         0
+series changes                           0
+price rows to write                      0
+products to create                       0
+competitor rows to touch                 0
+```
+
+Division and series are already correct in production, so those two lines are **zero**. If either is non-zero, the production values differ from what P035 reported and you should stop and report rather than apply.
+
+## 4. The ten codes
+
+```
+U-11CS  U-12CS  U-13CS  U-14CS  U-15CS  U-16CS
+U-11BS  U-12BS  U-13BS  U-14BS
+```
+
+Nothing else. **Codes `20`, `25` and `32` are not touched** — they are awaiting a Prayag decision and are expected to remain in Uncategorized. The target is **3**, not 0.
+
+## 5. Verify after
+
+```
+Active Uncategorized in production        13 -> 3
+Uncategorized codes remaining             20, 25, 32
+U-11CS category                           "UGD Pipe"
+Ten Self Fit codes with NULL category     0
+The production API for U-11CS returns     "category": "UGD Pipe"
+```
+
+That last line is the one that matters — P035 quoted the live production endpoint returning `"category": null`. Quote it again after the apply.
+
+The production **UGD Pipe filter already returns 20** and did so before this change, because it filters on `series`. So the products were findable by that filter; they were simply also sitting in Uncategorized. Confirm it still returns 20 afterwards.
+
+## 6. What must not change
+
+1. No price is written. `mrp_price_history` count and checksum identical before and after, **in production**.
+2. No name changed.
+3. No competitor mapping changed. The seven Prince prices on these products stay.
+4. No product created, none deactivated.
+5. Nothing outside the ten codes is touched.
+6. Provenance: a production batch record, actor, timestamp, previous values retained, one-action undo.
+
+## 7. Tests
+
+```
+ 1. Production category for U-11C and U-11B is reported BEFORE applying
+ 2. Preview shows 10 category changes, 0 division, 0 series
+ 3. Production Uncategorized goes 13 -> 3
+ 4. Codes 20, 25, 32 remain, untouched
+ 5. Production API for U-11CS returns "category": "UGD Pipe"
+ 6. The stored string is exactly 8 characters, no whitespace
+ 7. All ten have a non-null category
+ 8. mrp_price_history unchanged in production -- count AND checksum
+ 9. The seven Prince prices on these products are still present
+10. Undo restores all ten prior values in one action
+11. Non-admin receives 403
+```
+
+---
+
+## 8. The wider question — report, do not act
+
+**P029 is one dev-only change. Find out whether there are others.**
+
+List every load batch, correction batch and data-changing operation **present in development and absent in production**, with its id, date, actor and row count.
+
+This is the fourth dev/production divergence on this project. If the list has one entry, this was an isolated miss. If it has several, there is a systematic gap between applying in development and applying in production, and the fix is a process change rather than another catch-up prompt.
+
+**Also report:** does anything in the application show, for a given change, whether it has been applied in production? If an administrator cannot tell the two environments apart from inside the app, this recurs indefinitely.
+
+Do not build anything for that in this prompt. Report it.
+
+## 9. Report
+
+- Production `category` for `U-11C` and `U-11B`, before applying.
+- Which route you took — sibling copy, or explicit value.
+- The preview counts against §3.
+- Production Uncategorized before and after, with the codes listed.
+- The live production API response for `U-11CS`, quoted.
+- `mrp_price_history` count and checksum in production, before and after.
+- Confirmation that the seven Prince prices survive.
+- **The full list of development-only batches from §8.**
