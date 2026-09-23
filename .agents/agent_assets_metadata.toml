@@ -291,3 +291,17 @@ mtime_ms = 1790155315159
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/938deca6-c824-437a-a1f4-003be21f5235/13d4103f-f205-452f-8b3e-d07168e6281a"
 storage_version_token = "1790155327501346"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "CX_Qat_oUTm1wssh6cn9s"
+uri = "file://reports/P033r3_completion_report.xlsx"
+type = "table"
+title = "P033r3 completion report"
+description = "Complete development audit with all 270 before/after rows, the nine exceptional May values, tolerance checks, basis audit, downstream records, isolation checks, and undo details."
+logical_id = "2ffc856e-664c-42b3-b8f7-80c50133df39"
+content_hash = "sha256:3c98a5502b0657a2a208fff853e202a87ccdf2abb540b8f5ecce607142fd47cf"
+size = 25742
+mtime_ms = 1790161590032
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/2ffc856e-664c-42b3-b8f7-80c50133df39/5f04dc0b-1400-49e4-a16b-0d5824623393"
+storage_version_token = "1790161961058208"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

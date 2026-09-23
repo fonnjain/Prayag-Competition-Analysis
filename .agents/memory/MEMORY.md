@@ -33,3 +33,4 @@
 - [Names-only catalogue corrections](names-only-catalogue-corrections.md) — bulk and single rename paths accept names only; protect prices and matching evidence transactionally.
 - [Workbook content identity](workbook-content-identity.md) — authorize trusted spreadsheet loads by canonical content fingerprint; retain byte SHA only as received-file provenance.
 - [Public Price Finder history boundary](public-price-history.md) — current prices stay anonymous; full MRP history requires sign-in and reuses the protected Analysis contract.
+- [PPR pipe unit restatement](ppr-pipe-unit-restatement.md) — PPR pipe history keeps Feb and Aug per-pipe periods; the spurious May period is deleted, not restated.

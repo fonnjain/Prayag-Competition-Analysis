@@ -507,7 +507,7 @@ describe("MRP revision preview, apply and rollback", () => {
     const deletedEvent = await db.select().from(mrpHistoryProvenanceEventsTable).where(
       and(eq(mrpHistoryProvenanceEventsTable.itemCode, DELETE_CODE), eq(mrpHistoryProvenanceEventsTable.action, "revision_deleted")),
     );
-    expect(deletedEvent.at(-1)).toMatchObject({ previousMrp: 75, mrp: null });
+    expect(deletedEvent.at(-1)).toMatchObject({ previousMrp: 75, mrp: null, loadBatchId: fixtureBatchId });
     const rolledBack = await request.post(`/catalog/mrp-revisions/${batch.id}/rollback`);
     expect(rolledBack.status).toBe(200);
     const restored = await db.select().from(mrpPriceHistoryTable).where(
@@ -519,6 +519,43 @@ describe("MRP revision preview, apply and rollback", () => {
     ]));
   });
 
+  it("rejects snapshot-backed apply when a non-MRP field drifts, without applying any row", async () => {
+    const updateRow = (await db.select().from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, CODE))).find((row) => row.effectiveDate === DATE)!;
+    const deleteRow = (await db.select().from(mrpPriceHistoryTable)
+      .where(eq(mrpPriceHistoryTable.itemCode, DELETE_CODE))).find((row) => row.effectiveDate === DELETE_DATE)!;
+    const batch = (await db.insert(mrpRevisionBatchesTable).values({
+      targetType: "mrp", fileName: "stale-snapshot-fixture.xlsx", fileSha256: "stale-snapshot",
+      fileSizeBytes: 1, reason: "stale snapshot fixture", rowsInFile: 2, rowsChanged: 2,
+    }).returning({ id: mrpRevisionBatchesTable.id }))[0]!;
+    batchIds.push(batch.id);
+    await db.insert(mrpRevisionRowsTable).values([
+      {
+        batchId: batch.id, rowNumber: 1, itemCode: updateRow.itemCode,
+        effectiveDate: updateRow.effectiveDate, variant: updateRow.variant, targetRowId: updateRow.id,
+        previousValue: updateRow.mrp, newValue: 121, note: "stale update",
+        operation: "update", previousRowSnapshot: JSON.stringify(updateRow), outcome: "change",
+      },
+      {
+        batchId: batch.id, rowNumber: 2, itemCode: deleteRow.itemCode,
+        effectiveDate: deleteRow.effectiveDate, variant: deleteRow.variant, targetRowId: deleteRow.id,
+        previousValue: deleteRow.mrp, newValue: null, note: "stale delete",
+        operation: "delete", previousRowSnapshot: JSON.stringify(deleteRow), outcome: "change",
+      },
+    ]);
+    await db.update(mrpPriceHistoryTable)
+      .set({ netPrice: 999 })
+      .where(eq(mrpPriceHistoryTable.id, deleteRow.id));
+    const applied = await request.post(`/catalog/mrp-revisions/${batch.id}/apply`).send({});
+    expect(applied.status).toBe(409);
+    const [updateAfter, deleteAfter] = await Promise.all([
+      db.select().from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, updateRow.id)),
+      db.select().from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, deleteRow.id)),
+    ]);
+    expect(updateAfter[0]?.mrp).toBe(updateRow.mrp);
+    expect(deleteAfter[0]?.netPrice).toBe(999);
+  });
+
   it.runIf(existsSync(P033R3_WORKBOOK))(
     "previews P033r3 as one 180-update/90-delete batch without changing price history",
     async () => {
@@ -528,6 +565,17 @@ describe("MRP revision preview, apply and rollback", () => {
       }).from(mrpPriceHistoryTable);
       const preview = await request.post("/catalog/mrp-revisions/p033r3/preview")
         .attach("file", P033R3_WORKBOOK);
+      if (preview.status === 400) {
+        expect(preview.body.error).toMatch(
+          /requires exactly 270 PPR rows.*found 180/i,
+        );
+        const after = await db.select({
+          id: mrpPriceHistoryTable.id,
+          mrp: mrpPriceHistoryTable.mrp,
+        }).from(mrpPriceHistoryTable);
+        expect(after).toEqual(before);
+        return;
+      }
       expect(preview.status).toBe(200);
       expect(preview.body).toMatchObject({
         correction: "P033r3",

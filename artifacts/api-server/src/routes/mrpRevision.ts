@@ -36,6 +36,31 @@ function parseHistorySnapshot(value: string): Record<string, unknown> {
   return snapshot;
 }
 
+const historySnapshotFields = [
+  "id", "itemCode", "mrp", "netPrice", "discountPct", "priceBasis",
+  "effectiveDate", "loadDate", "sourceFile", "isCurrent", "notes",
+  "reviewStatus", "reviewReasons", "importBatchId", "loadBatchId",
+  "lastRevisionBatchId", "reviewedAt", "variant",
+] as const;
+
+function sameHistoryValue(current: unknown, snapshot: unknown): boolean {
+  if (current instanceof Date || snapshot instanceof Date) {
+    const currentTime = current instanceof Date ? current.getTime() : null;
+    const snapshotTime = snapshot instanceof Date ? snapshot.getTime() : null;
+    return currentTime === snapshotTime;
+  }
+  return current === snapshot;
+}
+
+function matchesHistorySnapshot(
+  current: Record<string, unknown>,
+  snapshot: Record<string, unknown>,
+): boolean {
+  return historySnapshotFields.every((field) =>
+    sameHistoryValue(current[field], snapshot[field] ?? null),
+  );
+}
+
 function withAuditNote(previous: unknown, note: string): string {
   const existing = typeof previous === "string" ? previous.trim() : "";
   return existing ? `${existing}\n${note}` : note;
@@ -751,36 +776,20 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
             WHERE id = ${row.targetRowId}
             FOR UPDATE
           `);
-          const current = (await tx.select({ id: mrpPriceHistoryTable.id, mrp: mrpPriceHistoryTable.mrp })
-            .from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
-          const identity = (await tx.select({
-            id: mrpPriceHistoryTable.id,
-            itemCode: mrpPriceHistoryTable.itemCode,
-            effectiveDate: mrpPriceHistoryTable.effectiveDate,
-            variant: mrpPriceHistoryTable.variant,
-            reviewStatus: mrpPriceHistoryTable.reviewStatus,
-            mrp: mrpPriceHistoryTable.mrp,
-            notes: mrpPriceHistoryTable.notes,
-            lastRevisionBatchId: mrpPriceHistoryTable.lastRevisionBatchId,
-            reviewedAt: mrpPriceHistoryTable.reviewedAt,
-          }).from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
+          const current = (await tx.select().from(mrpPriceHistoryTable)
+            .where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
           const previousSnapshot = row.previousRowSnapshot
             ? parseHistorySnapshot(row.previousRowSnapshot)
             : null;
           if (
             !current ||
-            !identity ||
-            identity.itemCode !== row.itemCode ||
-            identity.effectiveDate !== row.effectiveDate ||
-            (batch.lockedEffectiveDate != null && identity.effectiveDate !== batch.lockedEffectiveDate) ||
-            identity.variant !== "Standard" ||
-            identity.reviewStatus !== "approved" ||
+            current.itemCode !== row.itemCode ||
+            current.effectiveDate !== row.effectiveDate ||
+            (batch.lockedEffectiveDate != null && current.effectiveDate !== batch.lockedEffectiveDate) ||
+            current.variant !== "Standard" ||
+            current.reviewStatus !== "approved" ||
             current.mrp !== row.previousValue ||
-            (previousSnapshot &&
-              (identity.notes !== (previousSnapshot.notes ?? null) ||
-                identity.lastRevisionBatchId !== (previousSnapshot.lastRevisionBatchId ?? null) ||
-                (identity.reviewedAt?.getTime() ?? null) !==
-                  ((previousSnapshot.reviewedAt as Date | null)?.getTime?.() ?? null)))
+            (previousSnapshot && !matchesHistorySnapshot(current, previousSnapshot))
           ) {
             throw Object.assign(new Error(`MRP row ${row.rowNumber} identity or value changed after preview; create a fresh preview.`), { httpStatus: 409 });
           }
@@ -802,6 +811,7 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
             sourceFile: batch.fileName,
             previousMrp: row.previousValue,
             mrp: row.newValue,
+            ...(previousSnapshot ? { loadBatchId: (previousSnapshot.loadBatchId ?? null) as number | null } : {}),
           });
         } else {
           await tx.execute(sql`
