@@ -263,3 +263,17 @@ mtime_ms = 1790152514484
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4a823ec5-4fe5-41db-953b-3bffcf84f653/c10c74d4-971b-450a-a113-41dfcf977958"
 storage_version_token = "1790152521657485"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "d3Rb1WdvY-QYVHExE_JYt"
+uri = "file://screenshots/P032-public-price-finder.jpg"
+type = "image"
+title = "P032 public Price Finder access check"
+description = "Anonymous Price Finder remains available while protected price history is not disclosed."
+logical_id = "8e39fdf1-e65e-4692-bf3c-59260d88f658"
+content_hash = "sha256:949288b3fe9d2f56a2977872af21454dbac28310be2bc234869503927bca1595"
+size = 106810
+mtime_ms = 1790153343760
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8e39fdf1-e65e-4692-bf3c-59260d88f658/c6ea13fa-24ab-459c-9034-02fee8c17023"
+storage_version_token = "1790153571012133"
+content_type = "image/jpeg"

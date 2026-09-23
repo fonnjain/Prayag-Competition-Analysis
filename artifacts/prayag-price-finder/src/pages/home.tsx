@@ -38,11 +38,13 @@ import {
 } from "@/lib/priceFinderRouteState";
 import {
   useGetPriceFinderBrowse,
+  useGetPriceHistory,
   useGetPriceFinderProduct,
   useGetPriceFinderSearch,
   type PriceFinderCompetitor,
   type PriceFinderSearchResult,
 } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
 
 /** Compact one-line competitor price indicator for list rows */
 function CompetitorLine({
@@ -1074,6 +1076,95 @@ export default function PriceFinderPage() {
   );
 }
 
+function formatHistoryDate(value: string): string {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00.000Z`));
+}
+
+function formatHistoryChange(
+  amount: number | null,
+  percent: number | null | undefined,
+): string {
+  if (amount == null || percent == null || amount === 0) return "—";
+  const sign = amount > 0 ? "+" : amount < 0 ? "−" : "";
+  const signedPercent = `${percent > 0 ? "+" : percent < 0 ? "−" : ""}${Math.abs(percent).toFixed(1)}%`;
+  return `${sign}${formatMoney(Math.abs(amount))}  ${signedPercent}`;
+}
+
+function ProductPriceHistory({ itemCode }: { itemCode: string }) {
+  const { isAuthenticated } = useAuth();
+  const { data, isLoading, isError } = useGetPriceHistory(
+    { itemCode },
+    {
+      query: {
+        queryKey: ["price-history", itemCode],
+        enabled: isAuthenticated && !!itemCode,
+        staleTime: 1000 * 60,
+      },
+    },
+  );
+
+  if (!isAuthenticated) return null;
+
+  const rows = (data?.prayagHistory ?? [])
+    .map((row, index, history) => ({
+      ...row,
+      changeAmount:
+        index > 0 && row.mrp != null && history[index - 1]?.mrp != null
+          ? row.mrp - history[index - 1]!.mrp!
+          : null,
+    }))
+    .reverse();
+
+  return (
+    <details className="group border-t pt-4" data-testid="price-history">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-1 py-2 text-sm font-bold text-foreground hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <span>Price history</span>
+        <ChevronRight
+          aria-hidden="true"
+          className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90"
+        />
+      </summary>
+      <div className="mt-2 overflow-x-auto rounded-lg border">
+        {isLoading ? (
+          <p className="p-4 text-sm text-muted-foreground">Loading price history…</p>
+        ) : isError ? (
+          <p className="p-4 text-sm text-destructive">Price history could not be loaded.</p>
+        ) : (
+          <table className="w-full min-w-[680px] text-sm">
+            <thead className="bg-muted/40">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Effective from</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">MRP</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Change</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-muted/20">
+                  <td className="whitespace-nowrap px-3 py-2">{formatHistoryDate(row.effectiveDate)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-mono font-semibold">{formatMoney(row.mrp)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-mono">
+                    {formatHistoryChange(row.changeAmount, row.changePct)}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{row.source}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function ProductView({
   itemCode,
   speechEnabled,
@@ -1305,6 +1396,7 @@ function ProductView({
             </div>
           </div>
         )}
+        <ProductPriceHistory itemCode={product.itemCode} />
       </div>
     </div>
   );

@@ -167,6 +167,8 @@ import type {
   NewProductUndoResponse,
   NewProductUndoStatusResponse,
   OkResponse,
+  P029UgdClassificationPreview,
+  P029UgdClassificationResult,
   PasswordChangeInput,
   PatchCatalogProductMrp200,
   PatchCatalogProductMrpBody,
@@ -9442,4 +9444,214 @@ export const useUploadCataloguePdf = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUploadCataloguePdfMutationOptions(options));
+    }
+
+export const getPreviewP029UgdClassificationUrl = () => {
+
+
+
+
+  return `/api/catalog/ugd-classification/preview`
+}
+
+/**
+ * @summary Preview the fixed P029 UGD Self Fit sibling classification repair
+ */
+export const previewP029UgdClassification = async ( options?: RequestInit): Promise<P029UgdClassificationPreview> => {
+
+  return customFetch<P029UgdClassificationPreview>(getPreviewP029UgdClassificationUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPreviewP029UgdClassificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewP029UgdClassification>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewP029UgdClassification>>, TError,void, TContext> => {
+
+const mutationKey = ['previewP029UgdClassification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewP029UgdClassification>>, void> = () => {
+
+
+          return  previewP029UgdClassification(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewP029UgdClassificationMutationResult = NonNullable<Awaited<ReturnType<typeof previewP029UgdClassification>>>
+
+    export type PreviewP029UgdClassificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Preview the fixed P029 UGD Self Fit sibling classification repair
+ */
+export const usePreviewP029UgdClassification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewP029UgdClassification>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewP029UgdClassification>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPreviewP029UgdClassificationMutationOptions(options));
+    }
+
+export const getApplyP029UgdClassificationUrl = (correctionKey: string,) => {
+
+
+
+
+  return `/api/catalog/ugd-classification/${correctionKey}/apply`
+}
+
+/**
+ * @summary Apply a reviewed P029 UGD classification repair
+ */
+export const applyP029UgdClassification = async (correctionKey: string, options?: RequestInit): Promise<P029UgdClassificationResult> => {
+
+  return customFetch<P029UgdClassificationResult>(getApplyP029UgdClassificationUrl(correctionKey),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getApplyP029UgdClassificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyP029UgdClassification>>, TError,{correctionKey: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyP029UgdClassification>>, TError,{correctionKey: string}, TContext> => {
+
+const mutationKey = ['applyP029UgdClassification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyP029UgdClassification>>, {correctionKey: string}> = (props) => {
+          const {correctionKey} = props ?? {};
+
+          return  applyP029UgdClassification(correctionKey,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyP029UgdClassificationMutationResult = NonNullable<Awaited<ReturnType<typeof applyP029UgdClassification>>>
+
+    export type ApplyP029UgdClassificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Apply a reviewed P029 UGD classification repair
+ */
+export const useApplyP029UgdClassification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyP029UgdClassification>>, TError,{correctionKey: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyP029UgdClassification>>,
+        TError,
+        {correctionKey: string},
+        TContext
+      > => {
+      return useMutation(getApplyP029UgdClassificationMutationOptions(options));
+    }
+
+export const getUndoP029UgdClassificationUrl = (correctionKey: string,) => {
+
+
+
+
+  return `/api/catalog/ugd-classification/${correctionKey}/undo`
+}
+
+/**
+ * @summary Undo one applied P029 UGD classification repair
+ */
+export const undoP029UgdClassification = async (correctionKey: string, options?: RequestInit): Promise<P029UgdClassificationResult> => {
+
+  return customFetch<P029UgdClassificationResult>(getUndoP029UgdClassificationUrl(correctionKey),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUndoP029UgdClassificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoP029UgdClassification>>, TError,{correctionKey: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof undoP029UgdClassification>>, TError,{correctionKey: string}, TContext> => {
+
+const mutationKey = ['undoP029UgdClassification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof undoP029UgdClassification>>, {correctionKey: string}> = (props) => {
+          const {correctionKey} = props ?? {};
+
+          return  undoP029UgdClassification(correctionKey,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UndoP029UgdClassificationMutationResult = NonNullable<Awaited<ReturnType<typeof undoP029UgdClassification>>>
+
+    export type UndoP029UgdClassificationMutationError = ErrorType<void>
+
+    /**
+ * @summary Undo one applied P029 UGD classification repair
+ */
+export const useUndoP029UgdClassification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoP029UgdClassification>>, TError,{correctionKey: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof undoP029UgdClassification>>,
+        TError,
+        {correctionKey: string},
+        TContext
+      > => {
+      return useMutation(getUndoP029UgdClassificationMutationOptions(options));
     }

@@ -6428,7 +6428,7 @@ components:
             type: boolean
     PriceHistoryPeriod:
       type: object
-      required: [id, effectiveDate, status, isCurrent]
+      required: [id, effectiveDate, status, isCurrent, source]
       properties:
         id:
           type: integer
@@ -6447,6 +6447,9 @@ components:
           type: ["string", "null"]
         changePct:
           type: ["number", "null"]
+        source:
+          type: string
+          description: Exact load-batch file name, or unknown when the history row has no linked load batch.
     CompetitorPriceHistoryPeriod:
       type: object
       required: [id, effectiveDate, effectivePrice, status, isCurrent]

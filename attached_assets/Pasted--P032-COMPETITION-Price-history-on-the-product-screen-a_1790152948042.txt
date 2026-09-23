@@ -1,0 +1,196 @@
+# P032 — COMPETITION — Price history on the product screen, and the gap after the next change
+
+> **P032** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.**
+> Quote `P032` when reporting back.
+> This supersedes **P004**, which is folded in as Part 2 with its examples corrected. Do not issue P004 separately.
+
+P031 established that the history is complete — 14,102 rows across 16 periods — and that the public product screen deliberately shows only the current price and the next one. Two `LIMIT 1` queries, no history.
+
+That is a reasonable default and it stays. What is missing is a way to see the rest **on the screen people actually use**.
+
+Two additions, and they are the same idea from opposite sides of today:
+
+```
+Part 1   what the price has been      <- looking back
+Part 2   what the gap becomes next    <- looking forward
+```
+
+---
+
+# PART 1 — Price history on the product screen
+
+## 1.1 Reuse the endpoint that already works
+
+The Analysis price-history endpoint already returns every approved Standard MRP row for a product, ordered by effective date and id, with no date floor, no `LIMIT` and no `is_current` filter:
+
+```
+artifacts/api-server/src/routes/analysis.ts:836-843
+```
+
+**Reuse it. Do not write a second query.** Two queries answering the same question drift apart, and the one nobody is watching drifts first. If it needs a public-facing wrapper for auth or shaping, wrap it — do not reimplement it.
+
+Report what you did: reused directly, wrapped, or duplicated and why.
+
+## 1.2 What it looks like
+
+A **Price history** section on the product detail, **collapsed by default**. The screen's job today is to answer "what is the price" in one glance, and that must not change.
+
+Expanded, one row per period, newest first:
+
+```
+Effective from    MRP          Change        Source
+01 Sep 2026       Rs 36.00     +Rs 2.00  +5.9%   authoritative master v2
+01 Aug 2026       Rs 36.00           —          authoritative master v2
+01 May 2026       Rs 36.00     +Rs 2.00  +5.9%   all-periods rebuild
+05 Mar 2026       Rs 34.00           —          all-periods rebuild
+...
+```
+
+- **Change** is against the previous row for that product. The oldest row has no change — render a dash, never `0%` and never `+100%`.
+- **Source** comes from the load batch. If a row has no `load_batch_id`, say `unknown` rather than guessing. `nullLoadBatchCount` was 0 at last check, so this should never appear — if it does, report it.
+- Rows are never recomputed on the fly. Display what is stored.
+
+## 1.3 Two rows is normal, not an error
+
+**81% of products have exactly two price rows** — 5,117 of 6,303 in the source. A product showing two periods is correct and complete.
+
+Do not add a warning, an empty-state message, or a "limited history" notice for short histories. Do not pad. A product with one row shows one row.
+
+Three products have nine periods (`TTS-01`, `TTS-02`, `TTS-03`); 246 have five. Those are the exceptions.
+
+## 1.4 Indian digit grouping
+
+Every figure in this section groups the Indian way — thousand, lakh, crore. `Rs 1,00,000.00`, not `Rs 100,000.00`.
+
+**P024 Job B has not been delivered yet.** If the shared `Intl.NumberFormat("en-IN")` formatter does not exist, build this section against it anyway and say in your report that the formatter is still outstanding. Do not write a local one-off formatter that P024 will later have to unpick.
+
+## 1.5 Who can see it
+
+State plainly in your report **who reaches this screen** — signed-in users only, or anyone with the URL.
+
+If the Price Finder is public, full MRP history is a commercial disclosure and the section must be behind a sign-in. **If you are not certain, put it behind a sign-in and say so.** That is a reversible decision; publishing three years of pricing is not.
+
+---
+
+# PART 2 — The gap after the next change
+
+## 2.1 What P004 asked for, and what has changed since
+
+P004 described product `151` showing a current gap of +3.8% and becoming −1.8% on 01 September. **That date is now in the past.** The September revision took effect on 01 September and those 31 reversals have already happened — they are history now, not forecast. They are visible only through Part 1.
+
+So build the feature, but **do not use P004's examples as acceptance tests.** They will fail, correctly.
+
+**Check this before building:** the latest effective date in `mrp_price_history` is `2026-09-01`. Today is later than that. **There may be no future-dated price anywhere in the database**, which means this feature will render nothing on every product.
+
+Report the count of future-dated rows first. If it is zero, that is expected — the feature is for the next revision, and you must test it against a seeded future date in development rather than concluding it does not work.
+
+## 2.2 The rule
+
+Wherever a current gap appears, also show the gap at the **next date on which either side changes**, when such a date exists.
+
+Compute it exactly as the current gap is computed, but resolve **both** prices at that future date.
+
+**Never one side's future price against the other's current price.** That mismatch produced a false +10.8% reading earlier in this project and took a week to unwind. It is the single most important line in this prompt.
+
+The next change date is the **earliest future effective date across both sides**. Resolve each side at that date — often one side is unchanged, which is correct. If several future dates exist, use the nearest; one is enough for a product page.
+
+If neither side has a future price, **render nothing**. No empty slot, no placeholder, no repetition of the current gap.
+
+## 2.3 State the direction in words
+
+`−1.8%` beside the word "gap" is ambiguous without knowing the convention:
+
+```
+From 01 Dec 2026:   −1.8%   ·   Prayag becomes more expensive
+```
+
+## 2.4 Mark reversals distinctly
+
+A gap changing **sign** is a different event from a gap narrowing. `+7.7%` → `−0.3%` is a reversal. `+20%` → `+12%` is not.
+
+Reuse the existing "changes soon" visual language rather than inventing new treatment.
+
+## 2.5 Where else it belongs
+
+The **Comparison** page. A chosen set of products is exactly where "what happens at the next revision" gets asked. Add the upcoming gap there too, or make the page filterable by an as-of date. If a date selector already exists, ensure it drives **both** sides consistently.
+
+---
+
+# PART 3 — One read-only question
+
+`mrp_price_history` holds a period `2026-08-19` containing **exactly one row**.
+
+A period with a single row is usually a manual edit that created a phantom period rather than a real revision. Report:
+
+- which product, which price, which load batch, which actor
+- whether that batch wrote anything else
+- whether the row is correct, or an artefact of a single-product edit
+
+**Change nothing.** This is a question, not a fix.
+
+---
+
+# What must not change
+
+1. **The current price shown on the product screen must not move.** Current gaps have been verified against source repeatedly. This prompt adds figures; it must not alter one that exists.
+2. No price is written. `mrp_price_history` count and checksum identical before and after.
+3. No competitor mapping changes.
+4. No product created, none deactivated.
+5. No direct SQL against production. Development first, then publish.
+
+---
+
+# Tests
+
+```
+PART 1
+ 1. TTS-01 shows all 9 periods in the history section
+ 2. Product 451 shows 5, product 453 shows 5
+ 3. Product 1179 shows 2 -- and no "limited history" warning anywhere
+ 4. The oldest row shows a dash for change, not 0% and not +100%
+ 5. The section is collapsed by default; the glance view is unchanged
+ 6. The current price displayed is identical to before this change
+ 7. Figures use Indian grouping -- Rs 1,00,000.00
+ 8. The history section uses the existing analysis endpoint, not a new query
+
+PART 2
+ 9. Count of future-dated rows in mrp_price_history is reported FIRST
+10. With a seeded future price on one side only, both sides resolve at
+    that date and the unchanged side keeps its current price
+11. With no future price on either side, nothing renders -- no empty slot
+12. A sign change is marked a reversal; a narrowing gap is not
+13. The direction is stated in words, not only as a signed percentage
+14. Current gaps are unchanged everywhere
+
+BOTH
+15. mrp_price_history count and checksum unchanged
+16. Non-admin access behaves as stated in 1.5
+```
+
+Test 6 and test 14 are the guards. Test 3 is the one that catches the instinct to treat a short history as a problem — two rows is the normal case for four products in five.
+
+Test 10 is where the false-gap bug would reappear. Seed it deliberately and prove it does not.
+
+---
+
+# Report
+
+**Part 1**
+- Whether the analysis endpoint was reused, wrapped or duplicated, and why.
+- Screenshots of `TTS-01`, `451` and `1179` with the section expanded.
+- Confirmation that the collapsed view is unchanged from today.
+- Whether the shared Indian formatter existed, or P024 Job B is still outstanding.
+- **Who can reach this screen, and where you put the history section as a result.**
+
+**Part 2**
+- The count of future-dated rows in `mrp_price_history`.
+- How the next change date is determined when the two sides change on different dates.
+- The seeded test: which product, which date, what rendered.
+- Confirmation that current gaps are unchanged.
+
+**Part 3**
+- The `2026-08-19` row in full, and your reading of it.
+
+**Both**
+- `mrp_price_history` count and checksum, before and after.

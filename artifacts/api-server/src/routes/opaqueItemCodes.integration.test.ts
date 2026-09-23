@@ -89,6 +89,12 @@ describe("opaque item-code query routes", () => {
       .query({ itemCode, asOf: DATE });
     expect(history.status).toBe(200);
     expect(history.body.itemCode).toBe(itemCode);
+    expect(history.body.prayagHistory).toHaveLength(1);
+    expect(history.body.prayagHistory[0]).toMatchObject({
+      effectiveDate: DATE,
+      changePct: null,
+      source: `fixture-opaque-codes-${RUN}.xlsx`,
+    });
   });
 
   it("keeps the legacy path route for path-safe bookmarks", async () => {

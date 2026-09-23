@@ -825,7 +825,16 @@ async function getAnalysisPriceHistory(req: Request, res: Response) {
       ? req.query.asOf
       : todayString();
 
-  type MrpRow = { id: number; effective_date: string; mrp: number | null; price_basis: string; variant: string; notes: string | null };
+  type MrpRow = {
+    id: number;
+    effective_date: string;
+    mrp: number | null;
+    price_basis: string;
+    variant: string;
+    notes: string | null;
+    load_batch_id: number | null;
+    batch_file_name: string | null;
+  };
   type CompRow = { id: number; competitor: string; price: number | null; unit: string | null; effective_date: string; matched_prayag_code: string | null };
 
   const [productRows, mrpRows, compRows] = await Promise.all([
@@ -834,12 +843,21 @@ async function getAnalysisPriceHistory(req: Request, res: Response) {
       .from(catalogProductsTable)
       .where(eq(catalogProductsTable.itemCode, itemCode)),
     db.execute<MrpRow>(sql`
-      SELECT id, effective_date, mrp, price_basis, variant, notes
-      FROM mrp_price_history
-      WHERE item_code = ${itemCode}
-        AND review_status = 'approved'
-        AND variant = 'Standard'
-      ORDER BY effective_date ASC, id ASC
+      SELECT
+        h.id,
+        h.effective_date,
+        h.mrp,
+        h.price_basis,
+        h.variant,
+        h.notes,
+        h.load_batch_id,
+        b.file_name AS batch_file_name
+      FROM mrp_price_history h
+      LEFT JOIN mrp_load_batches b ON b.id = h.load_batch_id
+      WHERE h.item_code = ${itemCode}
+        AND h.review_status = 'approved'
+        AND h.variant = 'Standard'
+      ORDER BY h.effective_date ASC, h.id ASC
     `),
     db.execute<CompRow>(sql`
       SELECT id, competitor, price, unit, effective_date, matched_prayag_code
@@ -885,7 +903,17 @@ async function getAnalysisPriceHistory(req: Request, res: Response) {
         ? round1(((r.mrp - prev.mrp) / prev.mrp) * 100)
         : null;
     const status = mrpStatuses.get(r.id) ?? "Superseded";
-    return { id: r.id, effectiveDate: r.effective_date, mrp: r.mrp, priceBasis: r.price_basis, status, isCurrent: status === "Current", notes: r.notes, changePct };
+    return {
+      id: r.id,
+      effectiveDate: r.effective_date,
+      mrp: r.mrp,
+      priceBasis: r.price_basis,
+      status,
+      isCurrent: status === "Current",
+      notes: r.notes,
+      changePct,
+      source: r.load_batch_id == null ? "unknown" : (r.batch_file_name ?? "unknown"),
+    };
   });
 
   // Group competitor rows by brand and compute period-to-period % change

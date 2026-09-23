@@ -1538,7 +1538,8 @@ export const GetPriceHistoryResponse = zod.object({
   "isCurrent": zod.boolean().describe('Backward-compatible derived boolean; true only when status is Current.'),
   "status": zod.enum(['Current', 'Upcoming', 'Superseded']),
   "notes": zod.string().nullish(),
-  "changePct": zod.number().nullish()
+  "changePct": zod.number().nullish(),
+  "source": zod.string().describe('Exact load-batch file name, or unknown when the history row has no linked load batch.')
 })),
   "competitorHistory": zod.array(zod.object({
   "competitor": zod.string(),
@@ -12754,6 +12755,52 @@ export const UploadCataloguePdfResponse = zod.object({
   "message": zod.string().optional()
 })]).optional(),
   "rowCounts": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+/**
+ * @summary Preview the fixed P029 UGD Self Fit sibling classification repair
+ */
+export const PreviewP029UgdClassificationResponse = zod.object({
+  "correctionKey": zod.string().uuid(),
+  "status": zod.enum(['preview']),
+  "rows": zod.array(zod.record(zod.string(), zod.unknown())),
+  "priceChecks": zod.array(zod.record(zod.string(), zod.unknown())),
+  "copiedFields": zod.array(zod.string()),
+  "sizeAction": zod.string(),
+  "canApply": zod.boolean()
+})
+
+
+/**
+ * @summary Apply a reviewed P029 UGD classification repair
+ */
+export const ApplyP029UgdClassificationParams = zod.object({
+  "correctionKey": zod.coerce.string().uuid()
+})
+
+export const ApplyP029UgdClassificationResponse = zod.object({
+  "correctionKey": zod.string().uuid(),
+  "status": zod.enum(['applied', 'undone']),
+  "loadBatchId": zod.number().optional(),
+  "changed": zod.number().optional(),
+  "restored": zod.number().optional()
+})
+
+
+/**
+ * @summary Undo one applied P029 UGD classification repair
+ */
+export const UndoP029UgdClassificationParams = zod.object({
+  "correctionKey": zod.coerce.string().uuid()
+})
+
+export const UndoP029UgdClassificationResponse = zod.object({
+  "correctionKey": zod.string().uuid(),
+  "status": zod.enum(['applied', 'undone']),
+  "loadBatchId": zod.number().optional(),
+  "changed": zod.number().optional(),
+  "restored": zod.number().optional()
 })
 
 

@@ -5,6 +5,43 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export type P029UgdClassificationPreviewStatus = typeof P029UgdClassificationPreviewStatus[keyof typeof P029UgdClassificationPreviewStatus];
+
+
+export const P029UgdClassificationPreviewStatus = {
+  preview: 'preview',
+} as const;
+
+export type P029UgdClassificationPreviewRowsItem = { [key: string]: unknown };
+
+export type P029UgdClassificationPreviewPriceChecksItem = { [key: string]: unknown };
+
+export interface P029UgdClassificationPreview {
+  correctionKey: string;
+  status: P029UgdClassificationPreviewStatus;
+  rows: P029UgdClassificationPreviewRowsItem[];
+  priceChecks: P029UgdClassificationPreviewPriceChecksItem[];
+  copiedFields: string[];
+  sizeAction: string;
+  canApply: boolean;
+}
+
+export type P029UgdClassificationResultStatus = typeof P029UgdClassificationResultStatus[keyof typeof P029UgdClassificationResultStatus];
+
+
+export const P029UgdClassificationResultStatus = {
+  applied: 'applied',
+  undone: 'undone',
+} as const;
+
+export interface P029UgdClassificationResult {
+  correctionKey: string;
+  status: P029UgdClassificationResultStatus;
+  loadBatchId?: number;
+  changed?: number;
+  restored?: number;
+}
+
 export type PdfCatalogueUploadPriceBasis = typeof PdfCatalogueUploadPriceBasis[keyof typeof PdfCatalogueUploadPriceBasis];
 
 
@@ -3955,6 +3992,8 @@ export interface PriceHistoryPeriod {
   notes?: string | null;
   /** @nullable */
   changePct?: number | null;
+  /** Exact load-batch file name, or unknown when the history row has no linked load batch. */
+  source: string;
 }
 
 export interface CompetitorPriceHistoryPeriod {
