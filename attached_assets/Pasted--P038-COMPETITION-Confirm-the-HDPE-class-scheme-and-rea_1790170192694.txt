@@ -1,0 +1,126 @@
+# P038 — COMPETITION — Confirm the HDPE class scheme, and read production's PPR state
+
+> **P038** · app: **COMPETITION** (`prayag-price.com`)
+> **READ-ONLY. Change nothing.** No commits. No data changes. No loads.
+> Quote `P038` when reporting back.
+> **P033r3 must not run against production until Part 2 of this is answered.**
+
+Two unrelated questions, both answerable in one pass, both blocking something.
+
+---
+
+# PART 1 — The HDPE class scheme
+
+P037 found 231 HDPE products in production that exist in neither the authoritative master nor development. They decompose exactly:
+
+```
+152   the existing 14 classes  x  11 new sizes    355, 400, 450, 500, 560, 630, 710, 800, 900, 1000, 1200 mm
+ 54   3 new classes (P, X, R)  x  18 existing sizes 20-315 mm
+ 25   the 3 new classes at the new sizes
+  0   an existing class at an existing size
+```
+
+The class suffix encodes grade and pressure class. Read off the master's own product names:
+
+```
+D F G          PE-63     SDR 26 / 17 / 13.6
+J L M N O      PE-80     SDR 26 / 17 / 13.6 / 11 / 9
+Q S T U V W    PE-100    SDR 33 / 21 / 17 / 13.6 / 11 / 9
+```
+
+`P`, `X` and `R` appear nowhere in the master.
+
+## 1.1 What to report
+
+1. **The full `product_name` of one production code from each of `P`, `X` and `R`** — for example `HD110P`, `HD110X`, `HD110R`.
+
+My inference, from alphabetical position and the pressure arithmetic, is:
+
+```
+P   PE-80  SDR 7.4    2.000 MPa    probably labelled PN 16
+X   PE-100 SDR 7.4    2.500 MPa    probably labelled PN 20
+R   PE-100 SDR 26     0.640 MPa    probably labelled PN 5
+```
+
+**Confirm or correct it from the stored names. Do not assume I am right.**
+
+2. **The `product_name`, `size`, `mrp` and `effective_date` of all 33 production PE-63 codes** — the `D`, `F` and `G` suffixes at sizes 355 mm to 1200 mm.
+
+These matter because of §1.2.
+
+3. Whether any of the 231 carries a `load_batch_id`, or whether all were created through the single-product editor without one.
+
+## 1.2 Why the 33 matter — do not act on this, just report
+
+The 155-product name change corrects PE-63 naming:
+
+```
+SDR-26 -> SDR-21      PN-4 unchanged
+SDR-17 -> SDR-13.6    PN-6 unchanged
+SDR-13.6 -> SDR-11    PN-8 unchanged
+```
+
+That correction is right. Measured against the catalogue's own convention — read off PE-80 and PE-100 independently, where PN 4 = 0.50-0.51 MPa, PN 6 = 0.80, PN 8 = 1.00-1.02 — the **old** PE-63 names fall short of their stated class by exactly **21.3%**, which is precisely the PE-63 to PE-80 material ratio. The old rows are the PE-80 rows with the grade swapped and the wall never re-derated.
+
+**The 33 production PE-63 codes carry that same old naming and are not in the name-change batch.**
+
+If the name change runs as it stands, the catalogue holds 50 PE-63 codes correctly named at 20-315 mm and 33 wrongly named at 355-1200 mm. One family, two contradictory schemes, split by diameter.
+
+Report their current names so the question can go to Prayag. **Do not rename them.** A 1200 mm water main's pressure class is stated by Prayag, not derived by an agent or by me.
+
+---
+
+# PART 2 — Production's PPR state, before P033r3 runs there
+
+P033r3 was written from development figures and **its production expectations are wrong**.
+
+```
+mrp_price_history    development  14,012     production  14,252
+P033r3 states                     14,102 -> 14,012
+```
+
+Development has already run the correction. Production has not, and production is a different database — P037 found 243 rows production has and development does not, and 343 rows holding different values.
+
+Critically: **no `2026-05-01` PPR rows appear in P037's production-only list.** That suggests production may never have had the May period at all — it came from authoritative master v1, which may have been loaded only to development.
+
+## 2.1 What to report
+
+For the 90 PPR pipe codes, **in production**:
+
+1. Every `mrp_price_history` row — item code, effective date, MRP, `load_batch_id`. All of them, at every date.
+2. The count of rows at `2026-05-01`. **If it is zero, P033r3's deletion step is a no-op in production and its test "drops by exactly 90" will fail correctly.**
+3. The count and the values at `2026-08-10` and `2026-02-01`.
+4. **Whether production's PPR values are per-metre or per-pipe.** Check `P20G02`: per-metre is 108, per-pipe is 324. Development was per-metre. Do not assume production matches.
+5. `mrp_price_history` total count and checksum in production, as of this read.
+
+## 2.2 What this decides
+
+- If production has **no May rows**: P033r3 in production restates only, deletes nothing, and its expected counts need rewriting before it is sent.
+- If production **has May rows**: how many, and are they the same 90? Report the codes.
+- If production's PPR is **already per-pipe**: the restatement is a no-op there too, and P033r3 should not run against production at all.
+
+Report the facts. **Do not propose a revised prompt** — I will rewrite P033r3 once these are known.
+
+---
+
+# What not to do
+
+- Do not run P033r3, in either environment.
+- Do not rename, reclassify or reprice any HDPE product.
+- Do not load the 231 into the authoritative master.
+- Do not delete the 36 synthetic development products — they are a separate matter.
+- Change nothing. This is a read.
+
+# Report
+
+**Part 1**
+- `product_name` for one `P`, one `X` and one `R` code, quoted in full.
+- Whether my inferred grade and SDR for each is right.
+- The 33 PE-63 production codes with name, size, MRP and effective date.
+- Whether any of the 231 carries a `load_batch_id`.
+
+**Part 2**
+- Every production PPR row, by code and date.
+- The `2026-05-01` count in production.
+- Whether production's PPR is per-metre or per-pipe, evidenced by `P20G02`.
+- Production `mrp_price_history` count and checksum.

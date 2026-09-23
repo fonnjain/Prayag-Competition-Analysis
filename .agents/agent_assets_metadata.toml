@@ -347,3 +347,31 @@ mtime_ms = 1790169150903
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/7eb66d9a-1da1-43fd-8fc4-eaaaf3f4b6e0/5a885753-7e7d-4a06-b520-8a7bea13de91"
 storage_version_token = "1790169152704308"
 content_type = "text/csv"
+
+[[outputs]]
+id = "CwNneTrEwP0h32T-jCqyd"
+uri = "file://reports/P038-production-HDPE-PE63-355-1200.csv"
+type = "table"
+title = "P038 production PE-63 HDPE rows"
+description = "All 33 production PE-63 codes at 355–1200 mm with stored names, sizes, MRPs, dates, and load-batch state."
+logical_id = "da49fb62-dd78-4756-b391-ba30a6907a32"
+content_hash = "sha256:efd9222661e414586d4966fdfc8fab3e7e60b6be2a49792230aca0529f2e03bc"
+size = 2323
+mtime_ms = 1790170322803
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/da49fb62-dd78-4756-b391-ba30a6907a32/19d92bf9-4153-4165-bab0-c845673633d6"
+storage_version_token = "1790170324075841"
+content_type = "text/csv"
+
+[[outputs]]
+id = "picQYxBafCSoj-d1vTuDa"
+uri = "file://reports/P038-production-PPR-history.csv"
+type = "table"
+title = "P038 production PPR history"
+description = "Every production MRP-history row for the exact 90 PPR pipe codes, across all stored dates."
+logical_id = "1f091a6e-d48b-43b8-a035-948b1154373c"
+content_hash = "sha256:3d0c4309eee6e248415e745c3514d0f266f0be2978d54be4e5496442fa0c5bcc"
+size = 4581
+mtime_ms = 1790170284903
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1f091a6e-d48b-43b8-a035-948b1154373c/0fb14a0f-bcc1-415a-aa97-31850943606b"
+storage_version_token = "1790170325491187"
+content_type = "text/csv"
