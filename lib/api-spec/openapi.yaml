@@ -2655,6 +2655,44 @@ paths:
         "422":
           description: "The requested positional profile is unsupported for this competitor"
 
+  /catalog/ugd-classification/preview:
+    post:
+      operationId: previewP029UgdClassification
+      tags: [catalog]
+      summary: Preview the fixed P029 UGD Self Fit sibling classification repair
+      responses:
+        "200":
+          description: Classification preview
+          content: { application/json: { schema: { $ref: "#/components/schemas/P029UgdClassificationPreview" } } }
+        "400": { description: Invalid or incomplete UGD product pair }
+        "403": { description: Administrator access required }
+  /catalog/ugd-classification/{correctionKey}/apply:
+    post:
+      operationId: applyP029UgdClassification
+      tags: [catalog]
+      summary: Apply a reviewed P029 UGD classification repair
+      parameters:
+        - { name: correctionKey, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Applied classification repair
+          content: { application/json: { schema: { $ref: "#/components/schemas/P029UgdClassificationResult" } } }
+        "409": { description: Preview stale or already applied }
+        "403": { description: Administrator access required }
+  /catalog/ugd-classification/{correctionKey}/undo:
+    post:
+      operationId: undoP029UgdClassification
+      tags: [catalog]
+      summary: Undo one applied P029 UGD classification repair
+      parameters:
+        - { name: correctionKey, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Restored previous classifications
+          content: { application/json: { schema: { $ref: "#/components/schemas/P029UgdClassificationResult" } } }
+        "409": { description: Current classification changed or already undone }
+        "403": { description: Administrator access required }
+
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -2731,6 +2769,26 @@ components:
         type: string
         format: date
   schemas:
+    P029UgdClassificationPreview:
+      type: object
+      required: [correctionKey, status, rows, priceChecks, copiedFields, sizeAction, canApply]
+      properties:
+        correctionKey: { type: string, format: uuid }
+        status: { type: string, enum: [preview] }
+        rows: { type: array, items: { type: object, additionalProperties: true } }
+        priceChecks: { type: array, items: { type: object, additionalProperties: true } }
+        copiedFields: { type: array, items: { type: string } }
+        sizeAction: { type: string }
+        canApply: { type: boolean }
+    P029UgdClassificationResult:
+      type: object
+      required: [correctionKey, status]
+      properties:
+        correctionKey: { type: string, format: uuid }
+        status: { type: string, enum: [applied, undone] }
+        loadBatchId: { type: integer }
+        changed: { type: integer }
+        restored: { type: integer }
     PdfCatalogueUpload:
       type: object
       required: [file, competitor, effectiveDate, extractionPath, preflightSha256]

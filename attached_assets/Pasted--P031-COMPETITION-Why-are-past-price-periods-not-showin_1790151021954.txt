@@ -1,0 +1,145 @@
+# P031 — COMPETITION — Why are past price periods not showing?
+
+> **P031** · app: **COMPETITION** (`prayag-price.com`)
+> **READ-ONLY. Change nothing.** No commits. No data changes. No count adjustments. No reloads.
+> Quote `P031` when reporting back.
+
+Past periods are not displaying correctly after a price revision upload. This prompt establishes whether the rows are missing from the database or present but not being shown. Those are different problems with different fixes, and guessing between them is how rows get deleted.
+
+---
+
+## 1. The fork — answer this first
+
+```
+mrp_price_history row count      last reported as 14,102
+```
+
+The source rebuild that built this history holds **12,750 rows across 16 distinct periods**.
+
+- If the table holds **~14,000 rows**, the history is there and something in the **display** is filtering it. Go to §3.
+- If it holds **~6,100 rows** — roughly one per product — then only the current-price snapshot was ever loaded and the history is genuinely absent. Go to §4.
+
+Report the count first. Everything else follows from it.
+
+## 2. What the source actually contains
+
+So you can diff against it rather than against an impression.
+
+**16 periods:**
+
+```
+2017-12-01      49        2026-01-15     555
+2022-01-01     106        2026-02-01   2,244
+2024-02-15     161        2026-03-01     277
+2024-05-01   1,284        2026-03-05   2,167
+2024-06-01     277        2026-05-01   1,704
+2025-01-15     292        2026-08-01   1,071
+2025-04-01      67        2026-09-01   2,148
+2025-07-01      56
+2026-01-01     292        TOTAL       12,750 rows / 6,303 products
+```
+
+**Periods per product — this is the part people misread:**
+
+```
+1 period       802 products
+2 periods    5,117 products     <- 81% of the catalogue
+3 periods       83
+4 periods       52
+5 periods      246
+9 periods        3
+```
+
+**Most products genuinely have only two price rows.** A product showing two periods is not a bug. This matches the P014 finding that only 12 of 333 series were usable for the historical model.
+
+**One thing to be clear about:** the authoritative master v2 `products` sheet is a **snapshot, not a history** — one row per product carrying its current price. It shows six distinct dates only because that is the spread of current-price dates. Loading that sheet alone yields 6,106 rows and no history at all. The history came from the separate all-periods rebuild.
+
+## 3. If the rows are present — find the filter
+
+Report each of these:
+
+1. **Every distinct `effective_date` in `mrp_price_history`, with its row count.** Diff against the 16 above. Name any period present in one and not the other.
+2. **How the application builds its list of periods.** Read from `SELECT DISTINCT effective_date`, or from a periods table, a config entry, a constant, or a date range? **Quote the code.**
+3. Whether any query filters by `is_current`, a date floor, a "live periods" list, or a row limit. `is_current` was retired as a source of truth — report anywhere it is still read.
+4. Whether the product detail view, the price history table and the Historical MRP view each derive periods independently or share one source.
+
+**A fixed or configured period list is the most likely cause.** The application has been described as holding "6 live periods", and the source has 16. If the six are hardcoded or held in config, the other ten are invisible however many rows exist — and the row count will look healthy while the screen looks empty.
+
+This is the same class of fault as the recent 11-of-13 worksheet read: something conformed to an expected list instead of reading what was actually there.
+
+## 4. If the rows are absent — find what was loaded
+
+Report:
+
+1. Every `mrp_load_batches` row: id, source filename, SHA-256, row count, loaded at, actor — oldest first.
+2. Which batch carried multi-period history, if any.
+3. Whether any batch loaded 12,750 rows or close to it.
+4. Whether a later batch replaced rather than added to earlier rows.
+
+**Do not reload anything.** Establish what happened first.
+
+## 5. Test with known products
+
+These have deep history in the source. Report, for each, **every row in `mrp_price_history`** and **what the screen shows**, side by side.
+
+**`TTS-01` — Teflon Tape, 9 periods:**
+
+```
+2024-05-01   34        2026-03-05   34
+2025-01-15   34        2026-05-01   36
+2026-01-01   34        2026-08-01   36
+2026-01-15   34        2026-09-01   34
+2026-02-01   34
+```
+
+**`451` — ABS Health Faucet 1 Mtr, 5 periods:**
+
+```
+2025-01-15   690       2026-01-15   790.40
+2026-01-01   690       2026-05-01   730
+                       2026-08-01   730
+```
+
+**`453` — ABS Health Faucet with Hook, 5 periods:**
+
+```
+2025-01-15   340       2026-01-15   380
+2026-01-01   370       2026-05-01   430
+                       2026-08-01   430
+```
+
+Also report **`1179`**, which has exactly one period in the source — it should show one, and that is correct.
+
+`TTS-01` is the sharpest test. If the database holds nine rows and the screen shows fewer, §3 is the answer and the missing periods tell you what the filter is.
+
+## 6. The revision upload itself
+
+The report began with a price revision upload, so:
+
+1. The most recent load batch — id, source, hash, row count, timestamp, actor.
+2. Exactly which rows it wrote: how many inserted, how many updated, and at what effective dates.
+3. Whether those rows are visible on screen.
+4. **Whether any effective date in that batch equals the upload date rather than a date from the file.** Batch 154 wrote 1,828 rows dated the day they were loaded and overrode correct March prices — that signature must be checked on every load.
+5. Whether the upload replaced existing rows for the same product and period, or added alongside them.
+
+---
+
+## What not to do
+
+- Do not reload, re-import or re-run any batch.
+- Do not delete a row to make a count match. An unexplained row that gets deleted is an unexplained row you can no longer investigate.
+- Do not "repair" the history by regenerating it.
+- Do not change any code in this prompt.
+
+---
+
+## Report
+
+1. `mrp_price_history` row count, and which branch of §1 applies.
+2. Every distinct effective date with its row count, diffed against the 16.
+3. The per-product period-count distribution, diffed against §2.
+4. **How the period list is built — with the code quoted.**
+5. Anywhere `is_current` is still read.
+6. `TTS-01`, `451`, `453`, `1179` — database rows against what the screen shows.
+7. The revision upload's batch details and what it wrote.
+8. Your reading: rows missing, or rows present and filtered? Name the specific cause.

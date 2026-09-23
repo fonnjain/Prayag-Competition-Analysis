@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import AdmZip from "adm-zip";
@@ -15,6 +15,7 @@ import {
   mrpHistoryProvenanceEventsTable,
   importBatchesTable,
   competitorPriceStagingTable,
+  catalogProductClassificationCorrectionsTable,
 } from "@workspace/db";
 import {
   recomputeCurrentFlags,
@@ -72,6 +73,35 @@ const NEW_PRODUCTS_SOURCE = {
   notes: "Prayag-only product creation uploads. Existing codes are rejected.",
   sourceKind: "new_products",
 } as const;
+
+const P029_CLASSIFICATION_SOURCE = {
+  division: "P029 UGD Classification",
+  sheetId: "__p029_ugd_classification__",
+  sheetUrl: "internal://p029-ugd-classification",
+  expectedFileName: "P029 UGD Self Fit classification repair",
+  notes: "P029 classification-only sibling copy; never writes price, name, or mappings.",
+  sourceKind: "manual_correction",
+} as const;
+const P029_CLASSIFICATION_FILE_HASH = createHash("sha256")
+  .update("P029|UGD Self Fit classification sibling-copy contract|v1")
+  .digest("hex");
+
+const P029_PAIRS = [
+  ["U-11C", "U-11CS"], ["U-12C", "U-12CS"], ["U-13C", "U-13CS"],
+  ["U-14C", "U-14CS"], ["U-15C", "U-15CS"], ["U-16C", "U-16CS"],
+  ["U-11B", "U-11BS"], ["U-12B", "U-12BS"], ["U-13B", "U-13BS"],
+  ["U-14B", "U-14BS"],
+] as const;
+const P029_EXPECTED_MRPS: Record<string, number> = {
+  "U-11C": 2987, "U-12C": 4582, "U-13C": 6322, "U-14C": 10005, "U-15C": 15805, "U-16C": 25230,
+  "U-11B": 2196, "U-12B": 2896, "U-13B": 4790, "U-14B": 7368,
+  "U-11CS": 2987, "U-12CS": 4582, "U-13CS": 6322, "U-14CS": 10005, "U-15CS": 15805, "U-16CS": 25230,
+  "U-11BS": 2196, "U-12BS": 2896, "U-13BS": 4790, "U-14BS": 7368,
+};
+const P029_CLASSIFICATION_FIELDS = [
+  "division", "category", "seriesRange", "size", "uom", "kgCost",
+] as const;
+type P029Classification = Pick<typeof catalogProductsTable.$inferSelect, typeof P029_CLASSIFICATION_FIELDS[number]>;
 
 export interface NewProductRow {
   itemCode: string;
@@ -4162,6 +4192,187 @@ router.patch("/catalog/competitor-period-date", requireAdmin, async (req, res) =
       req.log.error({ err, competitor, currentEffectiveDate, newEffectiveDate }, "competitor period date update failed");
       res.status(500).json({ error: "Failed to change competitor period date" });
     }
+  }
+});
+
+// P029: the fixed, sibling-driven UGD classification repair. This deliberately
+// does not accept arbitrary codes or values: the preview is the only source of
+// truth used by apply, and both operations are administrator-only.
+router.post("/catalog/ugd-classification/preview", requireAdmin, async (req, res) => {
+  try {
+    const products = await db.select().from(catalogProductsTable)
+      .where(inArray(catalogProductsTable.itemCode, P029_PAIRS.flat()));
+    const byCode = new Map(products.map((row) => [row.itemCode, row]));
+    const rows = P029_PAIRS.map(([siblingCode, itemCode]) => {
+      const sibling = byCode.get(siblingCode);
+      const target = byCode.get(itemCode);
+      if (!sibling || !target) throw new Error(`P029 product pair is incomplete: ${siblingCode} -> ${itemCode}`);
+      if (sibling.size !== null || target.size !== null || sibling.size !== target.size) {
+        throw new Error(`P029 preview stopped: size must be null on both ${siblingCode} and ${itemCode}.`);
+      }
+      const previousValues = Object.fromEntries(P029_CLASSIFICATION_FIELDS.map((field) => [field, target[field]]));
+      const correctedValues = Object.fromEntries(P029_CLASSIFICATION_FIELDS.map((field) => [field, sibling[field]]));
+      return {
+        siblingCode, itemCode, previousValues, correctedValues,
+        name: target.productName,
+        siblingName: sibling.productName,
+      };
+    });
+    const prices = await db.select({
+      itemCode: mrpPriceHistoryTable.itemCode,
+      mrp: mrpPriceHistoryTable.mrp,
+    }).from(mrpPriceHistoryTable).where(and(
+      inArray(mrpPriceHistoryTable.itemCode, P029_PAIRS.flat()),
+      eq(mrpPriceHistoryTable.variant, "Standard"),
+      eq(mrpPriceHistoryTable.reviewStatus, "approved"),
+    )).orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id));
+    const latest = new Map<string, number | null>();
+    for (const row of prices) if (!latest.has(row.itemCode)) latest.set(row.itemCode, row.mrp);
+    const priceChecks = P029_PAIRS.map(([siblingCode, itemCode]) => ({
+      siblingCode, itemCode, siblingMrp: latest.get(siblingCode) ?? null, targetMrp: latest.get(itemCode) ?? null,
+      expectedMrp: P029_EXPECTED_MRPS[siblingCode],
+      matches: latest.get(siblingCode) === latest.get(itemCode) &&
+        latest.get(siblingCode) === P029_EXPECTED_MRPS[siblingCode],
+    }));
+    if (priceChecks.some((row) => !row.matches)) {
+      throw new Error("P029 preview stopped: every sibling and Self Fit MRP must match the exact P029 expected MRP.");
+    }
+    const correctionKey = randomUUID();
+    const actor = req.user?.email ?? req.user?.id ?? null;
+    await db.insert(catalogProductClassificationCorrectionsTable).values(rows.map((row) => ({
+      correctionKey, itemCode: row.itemCode, siblingCode: row.siblingCode,
+      previousValues: JSON.stringify(row.previousValues), correctedValues: JSON.stringify(row.correctedValues), actor,
+    })));
+    res.json({
+      correctionKey, status: "preview", rows, priceChecks,
+      copiedFields: P029_CLASSIFICATION_FIELDS,
+      sizeAction: "unchanged: all siblings and targets verified null",
+      canApply: true,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not create P029 preview." });
+  }
+});
+
+router.post("/catalog/ugd-classification/:correctionKey/apply", requireAdmin, async (req, res) => {
+  const correctionKey = String(req.params.correctionKey ?? "").trim();
+  if (!correctionKey) { res.status(400).json({ error: "correctionKey is required." }); return; }
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(929007)`);
+      const rows = await tx.select().from(catalogProductClassificationCorrectionsTable)
+        .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.appliedAt} IS NULL`));
+      if (rows.length !== P029_PAIRS.length) throw new Error("P029 preview not found, already applied, or incomplete.");
+      const products = await tx.select().from(catalogProductsTable)
+        .where(inArray(catalogProductsTable.itemCode, P029_PAIRS.flat())).for("update");
+      if (products.length !== P029_PAIRS.length * 2) throw new Error("P029 apply stopped: one or more locked products is missing.");
+      const byCode = new Map(products.map((row) => [row.itemCode, row]));
+      for (const row of rows) {
+        const current = byCode.get(row.itemCode);
+        if (!current || JSON.stringify(Object.fromEntries(P029_CLASSIFICATION_FIELDS.map((field) => [field, current[field]]))) !== row.previousValues) {
+          throw new Error(`P029 preview is stale for ${row.itemCode}; create a new preview.`);
+        }
+      }
+      // Re-read every sibling and target MRP while holding the transaction
+      // lock. A price may have changed after Preview; never classify against a
+      // stale price verification.
+      const mrpRows = await tx.select({
+        itemCode: mrpPriceHistoryTable.itemCode,
+        mrp: mrpPriceHistoryTable.mrp,
+      }).from(mrpPriceHistoryTable).where(and(
+        inArray(mrpPriceHistoryTable.itemCode, P029_PAIRS.flat()),
+        eq(mrpPriceHistoryTable.variant, "Standard"),
+        eq(mrpPriceHistoryTable.reviewStatus, "approved"),
+      )).orderBy(desc(mrpPriceHistoryTable.effectiveDate), desc(mrpPriceHistoryTable.id));
+      const latestMrp = new Map<string, number | null>();
+      for (const row of mrpRows) if (!latestMrp.has(row.itemCode)) latestMrp.set(row.itemCode, row.mrp);
+      for (const [siblingCode, itemCode] of P029_PAIRS) {
+        if (!latestMrp.has(siblingCode) || !latestMrp.has(itemCode) ||
+            latestMrp.get(siblingCode) !== latestMrp.get(itemCode) ||
+            latestMrp.get(siblingCode) !== P029_EXPECTED_MRPS[siblingCode]) {
+          throw new Error(`P029 apply stopped: MRP mismatch for ${siblingCode} -> ${itemCode}; create a new preview.`);
+        }
+      }
+      await tx.insert(mrpSourcesTable).values(P029_CLASSIFICATION_SOURCE).onConflictDoNothing();
+      const [source] = await tx.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable).where(eq(mrpSourcesTable.sheetId, P029_CLASSIFICATION_SOURCE.sheetId)).limit(1);
+      if (!source) throw new Error("P029 provenance source could not be created.");
+      const actor = req.user?.email ?? req.user?.id ?? null;
+      const [load] = await tx.insert(mrpLoadBatchesTable).values({
+        sourceId: source.id, fileName: P029_CLASSIFICATION_SOURCE.expectedFileName!,
+        fileSha256: P029_CLASSIFICATION_FILE_HASH, fileSizeBytes: Buffer.byteLength("P029|UGD Self Fit classification sibling-copy contract|v1"),
+        downloadedAt: new Date().toISOString().slice(0, 10), loadedBy: actor, rowCount: rows.length,
+        notes: "P029 classification-only correction; no price rows written.",
+      }).returning({ id: mrpLoadBatchesTable.id });
+      if (!load) throw new Error("P029 provenance batch could not be created.");
+      for (const row of rows) {
+        const updated = await tx.update(catalogProductsTable).set({
+          ...JSON.parse(row.correctedValues),
+          updatedAt: new Date(),
+        }).where(eq(catalogProductsTable.itemCode, row.itemCode)).returning({ id: catalogProductsTable.id });
+        if (updated.length !== 1) throw new Error(`P029 apply stopped: compare-and-swap failed for ${row.itemCode}.`);
+      }
+      const audited = await tx.update(catalogProductClassificationCorrectionsTable).set({ loadBatchId: load.id, actor, appliedAt: new Date() })
+        .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.appliedAt} IS NULL`));
+      if (audited.rowCount !== P029_PAIRS.length) throw new Error("P029 apply stopped: audit rows changed concurrently.");
+      return { correctionKey, loadBatchId: load.id, changed: rows.length, status: "applied" };
+    }, { isolationLevel: "serializable" });
+    res.json(result);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Could not apply P029 correction." });
+  }
+});
+
+router.post("/catalog/ugd-classification/:correctionKey/undo", requireAdmin, async (req, res) => {
+  const correctionKey = String(req.params.correctionKey ?? "").trim();
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(929007)`);
+      const rows = await tx.select().from(catalogProductClassificationCorrectionsTable)
+        .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.appliedAt} IS NOT NULL AND ${catalogProductClassificationCorrectionsTable.undoneAt} IS NULL`));
+      if (rows.length !== P029_PAIRS.length) throw new Error("P029 correction is not applied, already undone, or incomplete.");
+      const products = await tx.select().from(catalogProductsTable)
+        .where(inArray(catalogProductsTable.itemCode, rows.map((row) => row.itemCode))).for("update");
+      if (products.length !== P029_PAIRS.length) {
+        throw new Error("P029 undo stopped: one or more locked products is missing.");
+      }
+      const byCode = new Map(products.map((row) => [row.itemCode, row]));
+      const currentValues = (row: typeof rows[number]) => {
+        const current = byCode.get(row.itemCode);
+        return current
+          ? JSON.stringify(Object.fromEntries(P029_CLASSIFICATION_FIELDS.map((field) => [field, current[field]])))
+          : null;
+      };
+      const alreadyRestored = rows.every((row) => currentValues(row) === row.previousValues);
+      const stillApplied = rows.every((row) => currentValues(row) === row.correctedValues);
+      if (!alreadyRestored && !stillApplied) {
+        throw new Error("P029 undo stopped: one or more products changed after apply.");
+      }
+      if (!alreadyRestored) {
+        for (const row of rows) {
+          const restored = await tx.update(catalogProductsTable)
+            .set({ ...JSON.parse(row.previousValues), updatedAt: new Date() })
+            .where(eq(catalogProductsTable.itemCode, row.itemCode))
+            .returning({ id: catalogProductsTable.id });
+          if (restored.length !== 1) {
+            throw new Error(`P029 undo stopped: compare-and-swap failed for ${row.itemCode}.`);
+          }
+        }
+      }
+      const audited = await tx.update(catalogProductClassificationCorrectionsTable).set({ undoneAt: new Date(), undoneBy: req.user?.email ?? req.user?.id ?? null })
+        .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.undoneAt} IS NULL`));
+      if (audited.rowCount !== P029_PAIRS.length) {
+        throw new Error("P029 undo stopped: audit rows changed concurrently.");
+      }
+      return {
+        correctionKey,
+        restored: alreadyRestored ? 0 : rows.length,
+        alreadyRestored,
+        status: "undone",
+      };
+    }, { isolationLevel: "serializable" });
+    res.json(result);
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : "Could not undo P029 correction." });
   }
 });
 

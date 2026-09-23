@@ -652,6 +652,31 @@ export const catalogProductNameCorrectionsTable = pgTable(
   ],
 );
 
+// Durable audit for the P029 UGD Self Fit classification repair.  Each preview
+// creates ten immutable before/after rows; apply attaches one provenance batch
+// and undo restores the exact previous values only when the current values
+// still equal the applied values.
+export const catalogProductClassificationCorrectionsTable = pgTable(
+  "catalog_product_classification_corrections",
+  {
+    id: serial("id").primaryKey(),
+    correctionKey: text("correction_key").notNull(),
+    itemCode: text("item_code").notNull(),
+    siblingCode: text("sibling_code").notNull(),
+    previousValues: text("previous_values").notNull(),
+    correctedValues: text("corrected_values").notNull(),
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
+    actor: text("actor"),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    undoneBy: text("undone_by"),
+  },
+  (t) => [
+    uniqueIndex("catalog_product_classification_correction_key_idx").on(t.correctionKey, t.itemCode),
+    index("catalog_product_classification_correction_batch_idx").on(t.loadBatchId),
+  ],
+);
+
 // Immutable audit entries for the single-product price editor.  Price rows are
 // deliberately not embedded here: this table remains useful when a first
 // competitor mapping is added (there is no previous row/value) and when an
