@@ -249,3 +249,17 @@ mtime_ms = 1789714832503
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c2ceb502-6c11-4f19-a7ad-bbf4130ccccd/e01bdd4b-31d6-41eb-871b-be7d983d889f"
 storage_version_token = "1789714846179668"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "Av_F7JO_u_CIwdoulsesG"
+uri = "file://reports/P030-P031-COMPETITION-Results.docx"
+type = "word_document"
+title = "P030 and P031 COMPETITION Results"
+description = "Combined Word report containing the complete P030 classification verification and P031 historical-price-period investigation."
+logical_id = "4a823ec5-4fe5-41db-953b-3bffcf84f653"
+content_hash = "sha256:f5cdc1542f4fd86ed09fe5b70522c54676d86b90e7f1ab5cb4cd09c79bbe3631"
+size = 7293
+mtime_ms = 1790152514484
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4a823ec5-4fe5-41db-953b-3bffcf84f653/c10c74d4-971b-450a-a113-41dfcf977958"
+storage_version_token = "1790152521657485"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
