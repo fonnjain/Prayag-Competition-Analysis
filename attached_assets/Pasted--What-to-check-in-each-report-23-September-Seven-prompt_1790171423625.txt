@@ -1,0 +1,115 @@
+# What to check in each report — 23 September
+
+Seven prompts are with the agent. This is what proves each one, and how each can look right while being wrong.
+
+**Three failures today were reports that looked right:** P029 was true of development and false of production; P028 was answered as "already reviewed" when nothing had run; P038 read a state two hours after a batch changed it and I called it "always". All three would have been caught by one habit.
+
+> **Every report must say which environment, and when.**
+> A state without a timestamp cannot tell "always" from "since this morning".
+> If a report gives a number without naming the database and the clock time, ask before believing it.
+
+---
+
+## P039 — provenance and write paths
+
+**The number that proves it:** production `nullLoadBatchCount` goes **243 → 0**.
+
+```
+production row count      14,252 before and after
+value-only checksum       identical before and after
+```
+
+**How it looks right and is wrong**
+
+- Reported for development. Development already has **0** — it has always had 0. A report saying "nullLoadBatchCount is 0" is meaningless unless it names production.
+- The backfill invents a source. Check that no backfill batch claims a file or a hash, and that each uses the row's **own `created_at`**, not today's date. An admitted gap beats a fabricated provenance.
+- The generator "no longer creates products" but the 36 existing placeholders were deleted. They were to be **listed, not deleted** — three of them carry price rows.
+
+---
+
+## P034r2 — Prince mapping rulings
+
+**The number that proves it:** exactly **one** row deleted, and it is `SIM100150 → A-464`.
+
+**How it looks right and is wrong**
+
+- The report names **`A-414`** as deleted. That is P034, the superseded version, and it is the wrong row.
+- Tests 8, 9 and 10 asserted rather than run. The competitor master still contains all these rows, so the exclusions must be proven by **loading the file twice**. A single clean run proves nothing about whether the decisions survive.
+- Exclusions keyed on a row number. Rows 20 and 51 just swapped meaning once already.
+
+---
+
+## P028 — PPR Prince load
+
+**The number that proves it:** the agent **enumerates 13 worksheet names from the file** before anything else.
+
+```
+fingerprint    2b5b79da...02beb7ff at 950 rows
+PPR effective date   2026-08-18   NOT 2026-03-01
+```
+
+**How it looks right and is wrong**
+
+- It reads 11 sheets again. That is the original failure, and the prompt now requires the list to come from the file rather than from the brief.
+- Every row dated `2026-03-01`. The two PPR sheets are dated **2026-08-18** — five and a half months fresher. One global date silently backdates 137 prices.
+- **The pair count.** P028 expects **810 → 946**. If P034r2 ran first the correct figures are **809 → 945**. Tell the agent which order you used, or a correct result will read as a failure.
+
+---
+
+## P026r2 — name-only path and single-name editor
+
+**The number that proves it:** `PMC-1` renames **and still shows MRP 752**.
+
+**How it looks right and is wrong**
+
+- The single-name editor was added to the **Single Price Editor**. It belongs on the Product Name Changes page. One form that writes either a name or a price rebuilds the coupling this separates.
+- Guard B weakened along with Guard A. The `mrp_price_history` transaction guard **stays**; only the workbook-versus-catalogue price comparison goes.
+- Duplicate names blocked instead of warned. Thirty PPR products legitimately share a name.
+
+---
+
+## P024 — 155 names and Indian digit grouping
+
+**Needs P026r2 delivered first.**
+
+**The number that proves it:** `HD110D` reads `PE-63 SDR-21 PN-4 HDPE Pipe 110mm`, and `WT-3LH-50` reads **₹1,00,000.00**.
+
+**How it looks right and is wrong**
+
+- **Job B goes unreported again.** The Indian digit grouping has now gone unmentioned through five agent replies. It needs no Apply and no admin gate — it is checkable the moment anyone signs in.
+- Job B "verified" on the 155 products. They run ₹44.50 to ₹9,890.60 — **none reaches ₹1,00,000**, so the two grouping systems are identical across the whole batch. It will look unchanged, correctly.
+- Excel export written as formatted text. The cell must stay numeric with an Indian format code, or `SUM` returns zero.
+
+**Worth knowing:** P038 confirmed Prayag already use the corrected naming on their large-diameter range. The catalogue currently disagrees with itself by diameter, so this is overdue rather than optional.
+
+---
+
+## P032 — product history and upcoming gap
+
+**The number that proves it:** the count of **future-dated rows** in `mrp_price_history`, reported **first**.
+
+**How it looks right and is wrong**
+
+- The upcoming-gap feature renders nothing and is declared broken. The latest effective date is `2026-09-01`; **zero future-dated rows is the expected answer**, and it must be tested against a seeded date in development.
+- A second history query written instead of reusing the analysis endpoint. Two queries answering one question drift apart.
+- A "limited history" warning added. **Two periods is normal** — 81% of products have exactly two.
+
+---
+
+## P023 — push to GitHub
+
+**The number that proves it:** `git rev-parse HEAD` and `git rev-parse <github-remote>/main` print the **same hash**.
+
+**How it looks right and is wrong**
+
+- Pushed to `origin`. The GitHub remote is named `subrepl-3cv9mk78`; resolve it by **URL**, not by name.
+- A failure "resolved" by rebasing, squashing or force-pushing. The prompt requires the **verbatim error** and a stop.
+- Commit `89c7f6c` still absent. It has been stranded on `gitsafe-backup` since an expired credential.
+
+---
+
+## The two that are not prompts
+
+**The 231 HDPE products** need Prayag to confirm they belong before anyone decides whether they enter the master. A business answer, not an agent task.
+
+**What development is for** is a decision. It sits 231 products, 343 values and one never-performed reseed away from production. Until it is ruled on, "verified in development" means less than it reads — which is precisely what cost today.
