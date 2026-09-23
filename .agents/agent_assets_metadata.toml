@@ -319,3 +319,17 @@ mtime_ms = 1790166353766
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/219d59e2-e47a-4afa-81b1-d4bfe990e14e/d6a53aaf-1ffb-4de5-8262-20b9fd972a07"
 storage_version_token = "1790166416380488"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "rChtqeHs73Hmfm8ZkN4fV"
+uri = "file://reports/P034r2_production_completion_report.xlsx"
+type = "table"
+title = "P034r2 production completion report"
+description = "Production Preview/Apply evidence for batch 6, three deletions, five durable decisions, preserved mappings, two reload proofs, invariant audit, and source-master recommendation."
+logical_id = "e4fe4753-d1ba-49fc-a6f6-a826452824cf"
+content_hash = "sha256:ae3465fd4b9891bcd31d053ca543c6e61dfaf050027cfaafdea67640a8a491a0"
+size = 11256
+mtime_ms = 1790167385179
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e4fe4753-d1ba-49fc-a6f6-a826452824cf/b13b9bed-9fc7-4b39-b940-fdfb80678c59"
+storage_version_token = "1790167419759806"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
