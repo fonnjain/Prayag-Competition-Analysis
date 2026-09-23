@@ -1,0 +1,238 @@
+# P033r3 — COMPETITION — PPR pipes: restate to per-pipe, and delete the May period
+
+> **P033r3** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES DATA, INCLUDING DELETING ROWS.**
+> Quote `P033r3` when reporting back — not P033, not P033r2.
+> This replaces P033 and P033r2 in full. If either is mid-run, stop it.
+> **Run before, or in the same session as, P028's PPR load.**
+
+---
+
+# 0. READ THIS FIRST — the 01 May question is closed
+
+**Do not ask for 01 May 2026 values. There is no 01 May 2026 source workbook. None will be supplied.**
+
+This has now been asked twice. The answer will not change, so here is the full reasoning, so you can verify it yourself rather than asking a third time.
+
+**There was no May price revision.** The Prayag PPR file covers exactly two periods, and neither is May:
+
+```
+"Previous MRP 01 Feb 2026"
+"MRP w.e.f. 10 Aug 2026"
+```
+
+**Where the May rows came from.** Authoritative master **v1** held all 90 PPR codes at `effective_date = 2026-05-01`. Master **v2** superseded v1 and moved the same 90 codes to `2026-08-10` with corrected values — 88 of 90 differ.
+
+**What the May rows actually contain.** For **81 of 90** codes, the stored May value equals v2's `previous_mrp`, and multiplying it by 3 lands within ±₹1 of the February per-pipe figure in the file. It is **the February price recorded under a May date**.
+
+You can confirm this yourself before you touch anything:
+
+```
+for each of the 90 codes:
+    stored value at 2026-05-01  x 3   vs   the file's "Previous MRP 01 Feb 2026"
+expected: within +/- Rs 1 on 81 of 90
+```
+
+**Prayag's decision: delete the May period.** Keep February and the current period only.
+
+So:
+
+- **Do not** request 01 May values.
+- **Do not** derive them by multiplying by 3, or by any other means.
+- **Do not** restate the May rows.
+- **Delete them**, as set out in §5.
+
+If you believe you cannot proceed without May values, you have misread this prompt. Re-read §0 and continue.
+
+---
+
+# 1. What this prompt does
+
+Two corrections to the same 90 PPR pipe products, as **one operation** — one preview, one apply, one undo.
+
+```
+1.  restate 2026-02-01 and 2026-08-10 from per-metre to per-pipe
+2.  delete 2026-05-01 entirely
+```
+
+End state: **90 codes × 2 periods = 180 rows**, all per-pipe.
+
+## Why the unit is wrong
+
+The MRP originally supplied was for **one metre**. The product is a **3-metre pipe**. Prayag has confirmed this.
+
+Every other pipe category is already per-pipe:
+
+```
+Casing Pipe   PMC-1    app 682     per-metre 227.33    per-pipe 682     correct
+UGD Pipe      U-11C    app 2,987   per-metre 497.83    per-pipe 2,987   correct
+PPR Pipe      P20G02   app 108     per-metre 108       per-pipe 324     WRONG
+```
+
+PPR is the only category on the wrong basis.
+
+## The dates — one wording correction
+
+```
+2026-02-01     surviving, restated
+2026-08-10     surviving, restated       <- this is the CURRENT period
+2026-05-01     deleted
+```
+
+This was described verbally as "Feb and Sept". **The current PPR period is dated 10 August 2026, not September.** It sits inside the 01 September master but carries a 10 August effective date, and all 90 codes are on it.
+
+If you find a PPR row at `2026-09-01`, **stop and report it**. I do not believe one exists; if it does, this prompt's end state is wrong.
+
+---
+
+# 2. The file
+
+**`Master - MRP PPR.xlsx`**
+SHA-256 `f27fa5f40e9428fe8d953ad13803d5d46d667f4f399ff1ba46e63449cb603288`
+
+Sheet1, 90 rows: `Cat No. · Division · Series / Range · Product Name · MRP w.e.f. 10 Aug 2026 · Previous MRP 01 Feb 2026`
+
+Record the hash before reading a row.
+
+**Take the file's values. Never compute 3×.** Eighteen codes would land a rupee out, because the app stores a *rounded* per-metre value — `P10A02` is ₹235 per pipe, ₹78.33 per metre, stored as ₹78, and 78 × 3 = 234.
+
+**Verify before writing:** stored value × 3 should be within ±₹1 of the file value. **Anything further out halts the run** — that would be a real price change hiding inside a unit correction.
+
+---
+
+# 3. Enumerate before you act
+
+Report **every row in `mrp_price_history` for all 90 codes, at every effective date**, before writing anything.
+
+Expected: `2026-02-01`, `2026-05-01`, `2026-08-10`. **Do not treat that as the list.** If any other date appears, report it and stop. You will not derive a value for it.
+
+---
+
+# 4. Restate the two survivors
+
+```
+2026-02-01   <- the file's "Previous MRP 01 Feb 2026" column
+2026-08-10   <- the file's "MRP w.e.f. 10 Aug 2026" column
+```
+
+Correct the values **in place, at their existing effective dates**. Never insert a row, never create a period.
+
+If this loads as a revision rather than a correction, every PPR product reads as a **200% increase**, and that number flows into margins, the MRP generator, every saved scenario, the historical comparison and the Sales application.
+
+Each corrected row carries an audit note: **unit restatement, per metre to per 3-metre pipe — not a price change**.
+
+---
+
+# 5. Delete the May period
+
+90 rows, one date, 90 codes. Nothing else.
+
+**Confirm all of this before deleting, and report it:**
+
+1. Exactly **90** rows match `effective_date = 2026-05-01` AND one of the 90 PPR codes.
+2. **No row at that date belongs to any other product.** If the date is shared with non-PPR products, only the PPR rows go.
+3. Every one of the 90 products still has a price at `2026-08-10` after deletion — **none is left unpriced**.
+4. Nothing references the deleted rows — no generator run, scenario, saved comparison or competitor row.
+
+The deleted values are **preserved in the audit trail**, with the reason *"spurious period — February price recorded under a May date; deleted on Prayag's instruction"*. Undo restores them.
+
+## The nine codes that are not the February price
+
+These nine do **not** reconcile to February. Their stored May values are already **per-pipe**, not per-metre — master v1 was itself inconsistent, 81 codes per metre and 9 per pipe:
+
+```
+code        Feb per-pipe    May (stored)    Aug per-pipe
+P20A04            778            918             821
+P20A05          1,154          1,343           1,314
+P20A06          2,098          2,018           2,136
+P20G04            576            680             714
+P20G05            855            995           1,146
+P20G06          1,554          1,495           1,854
+P20W04            622            734             714
+P20W05            923          1,075           1,146
+P20W06          1,678          1,615           1,854
+```
+
+They are deleted with the rest, on Prayag's instruction. **List all nine explicitly in your report, with the values being discarded.** These are distinct numbers, not restatements of February — the decision to drop them belongs on the record, not folded inside a count of 90.
+
+---
+
+# 6. What must not happen
+
+1. **No new period, no new effective date, no inserted row.** The only row-count change is the 90 deletions.
+2. **Nothing outside these 90 codes is touched.** Not one other product loses a row.
+3. No name changed. No competitor mapping changed — snapshot and diff, must be empty.
+4. No product created, none deactivated.
+5. **No PPR Fittings row is touched.** They are priced per piece and are not part of this.
+6. Preview, then Apply. Admin only. One-action undo restoring both the restated values and the deleted rows.
+7. No direct SQL against production. Development first, then publish, then the same flow in production.
+
+---
+
+# 7. Expected counts
+
+```
+mrp_price_history before        14,102
+rows deleted                       -90
+mrp_price_history after         14,012
+
+PPR rows before                    270    (90 x 3 periods)
+PPR rows after                     180    (90 x 2 periods)
+values restated                    180
+checksum                        changes
+```
+
+---
+
+# 8. Tests
+
+```
+ 1. The run quotes P033r3 and does not request 01 May values
+ 2. Every PPR history row is enumerated and reported BEFORE any write
+ 3. No PPR row exists at 2026-09-01 -- if one does, the run halts
+ 4. mrp_price_history drops by exactly 90 rows, no more, no fewer
+ 5. No non-PPR product loses a row
+ 6. P10A02 reads 235 at 2026-08-10, not 234
+ 7. P10A03 reads 324, P10G02 reads 204
+ 8. The 2026-02-01 rows are restated to per-pipe too
+ 9. Every value comes from the file, never from a x3 calculation
+10. Any code more than +/- Rs 1 from 3x its stored value halts the run
+11. All 90 products have exactly 2 periods afterwards
+12. Every product still has a current price -- none left unpriced
+13. The nine P20* codes are listed individually with discarded values
+14. Deleted rows are recoverable through undo
+15. PPR Fittings are untouched
+16. Competitor mappings and Needs Review unchanged
+17. After P028: PPR PIPE median gap about +2.9%, not about +208%
+18. Non-admin receives 403
+```
+
+Test 4 is the guard on the deletion — **exactly 90**.
+Test 12 is the guard that matters most: a deletion must never leave a product without a price.
+Test 17 is the proof both sides now speak the same unit.
+
+---
+
+# 9. Report
+
+- The hash recorded and the row count read.
+- **Every PPR history row, by code and date, before and after.**
+- Any date found beyond the three expected.
+- The ±₹1 verification: how many exactly 3×, how many at ±1, how many halted.
+- The 90 deleted rows, with the nine `P20*` values listed individually.
+- `mrp_price_history` count and checksum, before and after.
+- Confirmation that no non-PPR row was deleted and no product is unpriced.
+- Whether any generator run, scenario or comparison referenced a deleted row.
+- PPR gaps against Prince before and after, if P028 has run.
+
+---
+
+# 10. Also report, read-only — do not act
+
+**Other categories on the wrong basis.** For every product whose name, series or category implies a length — SWR, AGRI, CPVC, UPVC, Casing, UGD, PPR — report the stored MRP against the competitor master's per-metre and per-pipe columns where both exist, and state which basis the application holds.
+
+PPR is the one that was found. That is not evidence it is the only one.
+
+**Downstream records.** List any generator run, saved scenario or margin figure involving a PPR pipe. Those were computed on a third of the true price. **Do not retro-edit them** — they are historical records — but list them so nobody acts on one.
+
+**The Sales application.** `prayag-sales.com` consumes MRP from here by API, so every PPR margin there has been computed against one third of the true MRP. Flag it. A SALES prompt follows once this side is correct; there is no point fixing Sales while it reads a wrong upstream.

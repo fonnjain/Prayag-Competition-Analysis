@@ -2,7 +2,7 @@ import { formatMoney } from "@workspace/formatting";
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   db,
   catalogProductsTable,
@@ -11,6 +11,7 @@ import {
   mrpHistoryProvenanceEventsTable,
   mrpRevisionBatchesTable,
   mrpRevisionRowsTable,
+  mrpGeneratorResultsTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import { isIsoDate, sha256ForBuffer } from "../lib/mrpProvenance";
@@ -21,6 +22,24 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
 });
+
+const P033R3_SHA256 = "f27fa5f40e9428fe8d953ad13803d5d46d667f4f399ff1ba46e63449cb603288";
+const P033R3_DATES = ["2026-02-01", "2026-05-01", "2026-08-10"] as const;
+const P033R3_NOTE = "unit restatement, per metre to per 3-metre pipe — not a price change";
+const P033R3_DELETE_NOTE = "spurious period — February price recorded under a May date; deleted on Prayag's instruction";
+
+function parseHistorySnapshot(value: string): Record<string, unknown> {
+  const snapshot = JSON.parse(value) as Record<string, unknown>;
+  for (const field of ["reviewedAt"]) {
+    if (typeof snapshot[field] === "string") snapshot[field] = new Date(snapshot[field] as string);
+  }
+  return snapshot;
+}
+
+function withAuditNote(previous: unknown, note: string): string {
+  const existing = typeof previous === "string" ? previous.trim() : "";
+  return existing ? `${existing}\n${note}` : note;
+}
 
 type TargetType = "mrp" | "competitor";
 type ParsedRevision = {
@@ -273,6 +292,113 @@ router.get("/catalog/mrp-revisions/scopes", requireAdmin, async (_req, res) => {
 
   res.json({ mrpPeriods, competitorPeriods });
 });
+
+// P033r3 is intentionally separate from the generic one-period spreadsheet
+// editor: it is a two-date restatement plus a controlled period deletion.
+router.post(
+  "/catalog/mrp-revisions/p033r3/preview",
+  requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ error: "Attach the authoritative P033r3 workbook." });
+      return;
+    }
+    try {
+      const hash = sha256ForBuffer(req.file.buffer);
+      if (hash !== P033R3_SHA256) {
+        throw Object.assign(new Error(`P033r3 source checksum mismatch; expected ${P033R3_SHA256}.`), { httpStatus: 400 });
+      }
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
+      const sheet = workbook.Sheets.Sheet1;
+      if (!sheet) throw Object.assign(new Error("P033r3 workbook must contain Sheet1."), { httpStatus: 400 });
+      const raw = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, blankrows: false });
+      if (raw.length !== 91) throw Object.assign(new Error(`P033r3 workbook must contain exactly 90 data rows; found ${Math.max(0, raw.length - 1)}.`), { httpStatus: 400 });
+      const headers = (raw[0] ?? []).map(headerName);
+      const codeCol = headers.indexOf("cat_no.");
+      const augCol = headers.findIndex((value) => value.includes("mrp_w.e.f.") && value.includes("10_aug_2026"));
+      const febCol = headers.findIndex((value) => value.includes("previous_mrp") && value.includes("01_feb_2026"));
+      if (codeCol < 0 || augCol < 0 || febCol < 0) throw Object.assign(new Error("P033r3 workbook headers are not the expected Cat No., August MRP, Previous February MRP columns."), { httpStatus: 400 });
+      const source = raw.slice(1).map((row, index) => ({
+        rowNumber: index + 2,
+        itemCode: normCode(textValue(row[codeCol]) ?? ""),
+        august: numberValue(row[augCol]),
+        february: numberValue(row[febCol]),
+      }));
+      const sourceCodes = new Set(source.map((row) => row.itemCode));
+      if (sourceCodes.size !== 90 || source.some((row) => !row.itemCode || row.august == null || row.february == null)) {
+        throw Object.assign(new Error("P033r3 workbook must contain 90 unique codes with numeric February and August values."), { httpStatus: 400 });
+      }
+      const products = await db.select().from(catalogProductsTable);
+      const productByCode = new Map(products.map((product) => [normCode(product.itemCode), product]));
+      for (const code of sourceCodes) {
+        const product = productByCode.get(code);
+        if (!product || !/PPR\s*Pipe/i.test(`${product.seriesRange ?? ""} ${product.category ?? ""} ${product.productName ?? ""}`) ||
+            /PPR\s*Fitting/i.test(`${product.seriesRange ?? ""} ${product.category ?? ""} ${product.productName ?? ""}`)) {
+          throw Object.assign(new Error(`P033r3 code ${code} is not an approved PPR Pipe product.`), { httpStatus: 400 });
+        }
+      }
+      const allRows = await db.select().from(mrpPriceHistoryTable);
+      const affectedRows = allRows.filter((row) => sourceCodes.has(normCode(row.itemCode)));
+      const dates = new Set(affectedRows.map((row) => row.effectiveDate));
+      const unexpectedDates = [...dates].filter((date) => !(P033R3_DATES as readonly string[]).includes(date)).sort();
+      if (unexpectedDates.length) throw Object.assign(new Error(`P033r3 halted: unexpected PPR effective date(s): ${unexpectedDates.join(", ")}.`), { httpStatus: 400 });
+      if (affectedRows.length !== 270 || P033R3_DATES.some((date) => affectedRows.filter((row) => row.effectiveDate === date).length !== 90)) {
+        throw Object.assign(new Error(`P033r3 requires exactly 270 PPR rows: 90 each at February, May, and August; found ${affectedRows.length}.`), { httpStatus: 400 });
+      }
+      if (affectedRows.some((row) => row.variant !== "Standard" || row.reviewStatus !== "approved")) {
+        throw Object.assign(new Error("P033r3 requires all affected rows to be Standard and approved."), { httpStatus: 400 });
+      }
+      const sourceByCode = new Map(source.map((row) => [row.itemCode, row]));
+      let exact3x = 0;
+      let withinOne = 0;
+      const verification = [...affectedRows].filter((row) => row.effectiveDate !== "2026-05-01").map((row) => {
+        const expected = sourceByCode.get(normCode(row.itemCode))![row.effectiveDate === "2026-02-01" ? "february" : "august"]!;
+        const delta = expected - (row.mrp ?? 0) * 3;
+        if (Math.abs(delta) > 1) throw Object.assign(new Error(`P033r3 halted: ${row.itemCode} ${row.effectiveDate} is ${delta} rupees outside the ±1 tolerance.`), { httpStatus: 400 });
+        if (delta === 0) exact3x++; else withinOne++;
+        return { id: row.id, code: row.itemCode, date: row.effectiveDate, stored: row.mrp, authoritative: expected, delta };
+      });
+      const augCodes = new Set(affectedRows.filter((row) => row.effectiveDate === "2026-08-10").map((row) => normCode(row.itemCode)));
+      if (augCodes.size !== 90) throw Object.assign(new Error("P033r3 halted: not every code has an August current price."), { httpStatus: 400 });
+      const mayRows = affectedRows.filter((row) => row.effectiveDate === "2026-05-01");
+      const mayIds = mayRows.map((row) => row.id);
+      if (mayIds.length !== 90) throw Object.assign(new Error("P033r3 halted: exactly 90 May rows are required."), { httpStatus: 400 });
+      const references = mayIds.length
+        ? await db.select({ id: mrpGeneratorResultsTable.id }).from(mrpGeneratorResultsTable).where(inArray(mrpGeneratorResultsTable.currentRowId, mayIds))
+        : [];
+      if (references.length) throw Object.assign(new Error(`P033r3 halted: ${references.length} generator result(s) reference May rows.`), { httpStatus: 400 });
+      const note = P033R3_NOTE;
+      const revisionRows: Omit<typeof mrpRevisionRowsTable.$inferInsert, "batchId">[] = [];
+      let rowNumber = 1;
+      for (const date of ["2026-02-01", "2026-08-10"] as const) {
+        for (const row of affectedRows.filter((candidate) => candidate.effectiveDate === date)) {
+          const expected = sourceByCode.get(normCode(row.itemCode))![date === "2026-02-01" ? "february" : "august"]!;
+          revisionRows.push({ rowNumber: rowNumber++, itemCode: row.itemCode, effectiveDate: date, variant: row.variant, targetRowId: row.id, previousValue: row.mrp, newValue: expected, note, operation: "update", previousRowSnapshot: JSON.stringify(row), outcome: "change" });
+        }
+      }
+      for (const row of mayRows) {
+        revisionRows.push({ rowNumber: rowNumber++, itemCode: row.itemCode, effectiveDate: row.effectiveDate, variant: row.variant, targetRowId: row.id, previousValue: row.mrp, newValue: null, note: P033R3_DELETE_NOTE, operation: "delete", previousRowSnapshot: JSON.stringify(row), outcome: "change" });
+      }
+      const reason = "P033r3 — unit restatement to per-pipe and delete spurious May period";
+      const batch = await db.transaction(async (tx) => {
+        const inserted = await tx.insert(mrpRevisionBatchesTable).values({
+          targetType: "mrp", lockedEffectiveDate: null, fileName: req.file!.originalname, fileSha256: hash,
+          fileSizeBytes: req.file!.size, uploadedBy: userLabel(req), reason, rowsInFile: 270,
+          rowsChanged: 270, rowsNoop: 0, rowsRejected: 0, warningCount: 0,
+        }).returning({ id: mrpRevisionBatchesTable.id });
+        if (!inserted[0]) throw new Error("Could not create P033r3 preview batch.");
+        await tx.insert(mrpRevisionRowsTable).values(revisionRows.map((row) => ({ ...row, batchId: inserted[0]!.id })));
+        return inserted[0].id;
+      });
+      const storedRows = await db.select().from(mrpRevisionRowsTable).where(eq(mrpRevisionRowsTable.batchId, batch));
+      res.json({ batchId: batch, status: "preview", correction: "P033r3", fileSha256: hash, rowsInFile: 270, rowsChanged: 270, rowsNoop: 0, rowsRejected: 0, updateRows: 180, deleteRows: 90, exact3x, withinOne, halted: 0, enumeratedRows: affectedRows, verification, rows: storedRows });
+    } catch (error: any) {
+      req.log?.error({ err: error }, "P033r3 preview failed");
+      res.status(error.httpStatus ?? 400).json({ error: error instanceof Error ? error.message : "Could not preview P033r3." });
+    }
+  },
+);
 
 router.post(
   "/catalog/mrp-revisions/preview",
@@ -613,7 +739,7 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
         );
       }
       for (const row of rows) {
-        if (!row.targetRowId || row.previousValue == null || row.newValue == null) {
+        if (!row.targetRowId || row.previousValue == null || (row.operation !== "delete" && row.newValue == null)) {
           throw new Error(`Revision row ${row.rowNumber} is missing its target or values.`);
         }
         if (batch.targetType === "mrp") {
@@ -634,29 +760,44 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
             variant: mrpPriceHistoryTable.variant,
             reviewStatus: mrpPriceHistoryTable.reviewStatus,
             mrp: mrpPriceHistoryTable.mrp,
+            notes: mrpPriceHistoryTable.notes,
+            lastRevisionBatchId: mrpPriceHistoryTable.lastRevisionBatchId,
+            reviewedAt: mrpPriceHistoryTable.reviewedAt,
           }).from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
+          const previousSnapshot = row.previousRowSnapshot
+            ? parseHistorySnapshot(row.previousRowSnapshot)
+            : null;
           if (
             !current ||
             !identity ||
             identity.itemCode !== row.itemCode ||
             identity.effectiveDate !== row.effectiveDate ||
-            identity.effectiveDate !== batch.lockedEffectiveDate ||
+            (batch.lockedEffectiveDate != null && identity.effectiveDate !== batch.lockedEffectiveDate) ||
             identity.variant !== "Standard" ||
             identity.reviewStatus !== "approved" ||
-            current.mrp !== row.previousValue
+            current.mrp !== row.previousValue ||
+            (previousSnapshot &&
+              (identity.notes !== (previousSnapshot.notes ?? null) ||
+                identity.lastRevisionBatchId !== (previousSnapshot.lastRevisionBatchId ?? null) ||
+                (identity.reviewedAt?.getTime() ?? null) !==
+                  ((previousSnapshot.reviewedAt as Date | null)?.getTime?.() ?? null)))
           ) {
             throw Object.assign(new Error(`MRP row ${row.rowNumber} identity or value changed after preview; create a fresh preview.`), { httpStatus: 409 });
           }
-          await tx.update(mrpPriceHistoryTable).set({
-            mrp: row.newValue,
-            lastRevisionBatchId: batchId,
-          })
-            .where(eq(mrpPriceHistoryTable.id, row.targetRowId));
+          if (row.operation === "delete") {
+            await tx.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId));
+          } else {
+            await tx.update(mrpPriceHistoryTable).set({
+              mrp: row.newValue,
+              ...(previousSnapshot ? { notes: withAuditNote(previousSnapshot.notes, row.note ?? batch.reason ?? "") } : {}),
+              lastRevisionBatchId: batchId,
+            }).where(eq(mrpPriceHistoryTable.id, row.targetRowId));
+          }
           await tx.insert(mrpHistoryProvenanceEventsTable).values({
             historyRowId: row.targetRowId,
             itemCode: row.itemCode!,
             effectiveDate: row.effectiveDate!,
-            action: "revision_applied",
+            action: row.operation === "delete" ? "revision_deleted" : "revision_applied",
             reason: row.note ?? batch.reason,
             sourceFile: batch.fileName,
             previousMrp: row.previousValue,
@@ -752,21 +893,59 @@ router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req
         .where(and(eq(mrpRevisionRowsTable.batchId, batchId), eq(mrpRevisionRowsTable.outcome, "change")))
         .orderBy(asc(mrpRevisionRowsTable.id));
       for (const row of rows) {
-        if (!row.targetRowId || row.previousValue == null || row.newValue == null) throw new Error(`Revision row ${row.rowNumber} is incomplete.`);
+        if (!row.targetRowId || row.previousValue == null || (row.operation !== "delete" && row.newValue == null)) throw new Error(`Revision row ${row.rowNumber} is incomplete.`);
         if (batch.targetType === "mrp") {
+          if (row.operation === "delete") {
+            if (!row.previousRowSnapshot) throw new Error(`Deleted revision row ${row.rowNumber} has no restoration snapshot.`);
+            await tx.execute(sql`SELECT id FROM mrp_price_history WHERE item_code = ${row.itemCode!} AND effective_date = ${row.effectiveDate!} AND variant = ${row.variant} FOR UPDATE`);
+            const existing = (await tx.select({ id: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
+              .where(and(eq(mrpPriceHistoryTable.itemCode, row.itemCode!), eq(mrpPriceHistoryTable.effectiveDate, row.effectiveDate!), eq(mrpPriceHistoryTable.variant, row.variant))).limit(1))[0];
+            if (existing) throw Object.assign(new Error(`Deleted MRP row ${row.rowNumber} was recreated after apply; rollback was not performed.`), { httpStatus: 409 });
+            const restored = parseHistorySnapshot(row.previousRowSnapshot);
+            await tx.insert(mrpPriceHistoryTable).values(restored as typeof mrpPriceHistoryTable.$inferInsert);
+            await tx.insert(mrpHistoryProvenanceEventsTable).values({
+              historyRowId: Number(restored.id ?? row.targetRowId),
+              itemCode: row.itemCode!,
+              effectiveDate: row.effectiveDate!,
+              action: "revision_rollback",
+              reason: `Rollback of revision batch ${batchId}`,
+              sourceFile: batch.fileName,
+              previousMrp: null,
+              mrp: row.previousValue,
+            });
+            continue;
+          }
           await tx.execute(sql`
             SELECT id FROM mrp_price_history
             WHERE id = ${row.targetRowId}
             FOR UPDATE
           `);
-          const current = (await tx.select({ mrp: mrpPriceHistoryTable.mrp })
+          const current = (await tx.select({
+            mrp: mrpPriceHistoryTable.mrp,
+            notes: mrpPriceHistoryTable.notes,
+            lastRevisionBatchId: mrpPriceHistoryTable.lastRevisionBatchId,
+          })
             .from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, row.targetRowId)).limit(1))[0];
           if (!current || current.mrp !== row.newValue) {
             throw Object.assign(new Error(`MRP row ${row.rowNumber} changed after apply; rollback was not performed.`), { httpStatus: 409 });
           }
+          const previousSnapshot = row.previousRowSnapshot
+            ? parseHistorySnapshot(row.previousRowSnapshot)
+            : null;
+          if (previousSnapshot && (
+            current.notes !== withAuditNote(previousSnapshot.notes, row.note ?? batch.reason ?? "") ||
+            current.lastRevisionBatchId !== batchId
+          )) {
+            throw Object.assign(new Error(`MRP row ${row.rowNumber} audit state changed after apply; rollback was not performed.`), { httpStatus: 409 });
+          }
           await tx.update(mrpPriceHistoryTable).set({
             mrp: row.previousValue,
-            lastRevisionBatchId: batchId,
+            ...(previousSnapshot
+              ? {
+                  notes: (previousSnapshot.notes ?? null) as string | null,
+                  lastRevisionBatchId: (previousSnapshot.lastRevisionBatchId ?? null) as number | null,
+                }
+              : { lastRevisionBatchId: batchId }),
           })
             .where(eq(mrpPriceHistoryTable.id, row.targetRowId));
           await tx.insert(mrpHistoryProvenanceEventsTable).values({

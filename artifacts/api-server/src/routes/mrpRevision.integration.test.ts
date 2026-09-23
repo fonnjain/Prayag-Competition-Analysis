@@ -4,7 +4,7 @@ import supertest from "supertest";
 import * as XLSX from "xlsx";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   catalogProductsTable,
   competitorPricesTable,
@@ -21,7 +21,9 @@ import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture.j
 const RUN = Date.now();
 const CODE = `__MRP_REVISION_${RUN}__`;
 const UNTOUCHED_CODE = `__MRP_REVISION_UNTOUCHED_${RUN}__`;
+const DELETE_CODE = `__MRP_REVISION_DELETE_${RUN}__`;
 const DATE = "2040-03-05";
+const DELETE_DATE = "2040-03-07";
 const COMPETITOR = `Revision Competitor ${RUN}`;
 const OTHER_COMPETITOR = `Other Revision Competitor ${RUN}`;
 const COMPETITOR_CODE = `REV-COMP-${RUN}`;
@@ -30,6 +32,12 @@ const COMPETITOR_LATER_DATE = "2040-09-01";
 const SUPPLIED_WORKBOOK = fileURLToPath(
   new URL(
     "../../../../attached_assets/MRP_Revision_Upload_Template_1787838250278.xlsx",
+    import.meta.url,
+  ),
+);
+const P033R3_WORKBOOK = fileURLToPath(
+  new URL(
+    "../../../../attached_assets/Master_-_MRP_PPR_1790154936634.xlsx",
     import.meta.url,
   ),
 );
@@ -116,11 +124,13 @@ beforeAll(async () => {
   await db.insert(catalogProductsTable).values([
     { itemCode: CODE, productName: "Revision fixture", division: "PTMT & Plastic Fittings / CP Fittings", category: "Test" },
     { itemCode: UNTOUCHED_CODE, productName: "Untouched fixture", division: "PTMT & Plastic Fittings", category: "Test" },
+    { itemCode: DELETE_CODE, productName: "Delete fixture", division: "Pipes & Fittings", category: "Test" },
   ]);
   await db.insert(mrpPriceHistoryTable).values([
     { itemCode: CODE, mrp: 100, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
     { itemCode: CODE, mrp: 90, priceBasis: "MRP", effectiveDate: "2040-03-06", loadDate: "2040-03-06", variant: "Standard" },
     { itemCode: UNTOUCHED_CODE, mrp: 200, priceBasis: "MRP", effectiveDate: DATE, loadDate: DATE, variant: "Standard" },
+    { itemCode: DELETE_CODE, mrp: 75, priceBasis: "MRP", effectiveDate: DELETE_DATE, loadDate: DELETE_DATE, variant: "Standard", notes: "before delete", reviewedAt: new Date("2040-03-07T12:00:00.000Z") },
   ].map((row) => ({ ...row, loadBatchId: fixtureBatchId })));
   await db.insert(competitorPricesTable).values([
     { competitor: COMPETITOR, competitorCode: COMPETITOR_CODE, price: 100, effectiveDate: COMPETITOR_DATE, matchStatus: "matched" },
@@ -135,14 +145,14 @@ afterAll(async () => {
     await db.delete(mrpRevisionBatchesTable).where(inArray(mrpRevisionBatchesTable.id, batchIds));
   }
   await db.delete(mrpHistoryProvenanceEventsTable)
-    .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, UNTOUCHED_CODE]));
+    .where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, UNTOUCHED_CODE, DELETE_CODE]));
   await db.delete(competitorPricesTable)
     .where(inArray(competitorPricesTable.competitor, [COMPETITOR, OTHER_COMPETITOR]));
   await db.delete(mrpPriceHistoryTable)
-    .where(inArray(mrpPriceHistoryTable.itemCode, [CODE, UNTOUCHED_CODE]));
+    .where(inArray(mrpPriceHistoryTable.itemCode, [CODE, UNTOUCHED_CODE, DELETE_CODE]));
   await deleteMrpFixtureBatch(fixtureBatchId);
   await db.delete(catalogProductsTable)
-    .where(inArray(catalogProductsTable.itemCode, [CODE, UNTOUCHED_CODE]));
+    .where(inArray(catalogProductsTable.itemCode, [CODE, UNTOUCHED_CODE, DELETE_CODE]));
 });
 
 describe("MRP revision preview, apply and rollback", () => {
@@ -448,6 +458,93 @@ describe("MRP revision preview, apply and rollback", () => {
         rejectionReason: "Row date 2026-03-05 does not match the selected period 2026-09-01.",
       });
       expect(mismatchPreview.body.rows[0].previousValue).not.toBeNull();
+    },
+  );
+
+  it("atomically applies and exactly rolls back a snapshot-backed update and delete", async () => {
+    const [updateBefore, deleteBefore] = await Promise.all([
+      db.select().from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, CODE)),
+      db.select().from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, DELETE_CODE)),
+    ]);
+    const updateRow = updateBefore.find((row) => row.effectiveDate === DATE)!;
+    const deleteRow = deleteBefore.find((row) => row.effectiveDate === DELETE_DATE)!;
+    const note = "unit restatement, per metre to per 3-metre pipe — not a price change";
+    const batch = (await db.insert(mrpRevisionBatchesTable).values({
+      targetType: "mrp",
+      fileName: "p033r3-fixture.xlsx",
+      fileSha256: "fixture-p033r3",
+      fileSizeBytes: 1,
+      reason: "P033r3 fixture",
+      rowsInFile: 2,
+      rowsChanged: 2,
+    }).returning({ id: mrpRevisionBatchesTable.id }))[0]!;
+    batchIds.push(batch.id);
+    await db.insert(mrpRevisionRowsTable).values([
+      {
+        batchId: batch.id, rowNumber: 1, itemCode: updateRow.itemCode,
+        effectiveDate: updateRow.effectiveDate, variant: updateRow.variant,
+        targetRowId: updateRow.id, previousValue: updateRow.mrp, newValue: 120,
+        note, operation: "update", previousRowSnapshot: JSON.stringify(updateRow), outcome: "change",
+      },
+      {
+        batchId: batch.id, rowNumber: 2, itemCode: deleteRow.itemCode,
+        effectiveDate: deleteRow.effectiveDate, variant: deleteRow.variant,
+        targetRowId: deleteRow.id, previousValue: deleteRow.mrp, newValue: null,
+        note: "spurious period — February price recorded under a May date; deleted on Prayag's instruction",
+        operation: "delete", previousRowSnapshot: JSON.stringify(deleteRow), outcome: "change",
+      },
+    ]);
+    const applied = await request.post(`/catalog/mrp-revisions/${batch.id}/apply`).send({});
+    expect(applied.status).toBe(200);
+    const afterApply = await db.select().from(mrpPriceHistoryTable).where(
+      inArray(mrpPriceHistoryTable.itemCode, [CODE, DELETE_CODE]),
+    );
+    expect(afterApply.find((row) => row.itemCode === DELETE_CODE)).toBeUndefined();
+    const changed = afterApply.find((row) => row.itemCode === CODE && row.effectiveDate === DATE)!;
+    expect(changed.mrp).toBe(120);
+    expect(changed.notes).toContain(note);
+    expect(changed.lastRevisionBatchId).toBe(batch.id);
+    const deletedEvent = await db.select().from(mrpHistoryProvenanceEventsTable).where(
+      and(eq(mrpHistoryProvenanceEventsTable.itemCode, DELETE_CODE), eq(mrpHistoryProvenanceEventsTable.action, "revision_deleted")),
+    );
+    expect(deletedEvent.at(-1)).toMatchObject({ previousMrp: 75, mrp: null });
+    const rolledBack = await request.post(`/catalog/mrp-revisions/${batch.id}/rollback`);
+    expect(rolledBack.status).toBe(200);
+    const restored = await db.select().from(mrpPriceHistoryTable).where(
+      inArray(mrpPriceHistoryTable.itemCode, [CODE, DELETE_CODE]),
+    );
+    expect(restored).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: updateRow.id, mrp: updateRow.mrp, notes: updateRow.notes, lastRevisionBatchId: updateRow.lastRevisionBatchId }),
+      expect.objectContaining({ id: deleteRow.id, mrp: deleteRow.mrp, notes: deleteRow.notes, reviewedAt: deleteRow.reviewedAt, lastRevisionBatchId: deleteRow.lastRevisionBatchId }),
+    ]));
+  });
+
+  it.runIf(existsSync(P033R3_WORKBOOK))(
+    "previews P033r3 as one 180-update/90-delete batch without changing price history",
+    async () => {
+      const before = await db.select({
+        id: mrpPriceHistoryTable.id,
+        mrp: mrpPriceHistoryTable.mrp,
+      }).from(mrpPriceHistoryTable);
+      const preview = await request.post("/catalog/mrp-revisions/p033r3/preview")
+        .attach("file", P033R3_WORKBOOK);
+      expect(preview.status).toBe(200);
+      expect(preview.body).toMatchObject({
+        correction: "P033r3",
+        rowsChanged: 270,
+        updateRows: 180,
+        deleteRows: 90,
+        rowsRejected: 0,
+      });
+      expect(preview.body.exact3x + preview.body.withinOne).toBe(180);
+      expect(preview.body.rows).toHaveLength(270);
+      batchIds.push(preview.body.batchId);
+      const after = await db.select({
+        id: mrpPriceHistoryTable.id,
+        mrp: mrpPriceHistoryTable.mrp,
+      }).from(mrpPriceHistoryTable);
+      expect(after).toEqual(before);
+      expect((await request.post(`/catalog/mrp-revisions/${preview.body.batchId}/discard`)).status).toBe(200);
     },
   );
 });

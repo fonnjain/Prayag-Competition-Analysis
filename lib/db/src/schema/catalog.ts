@@ -417,6 +417,10 @@ export const mrpRevisionRowsTable = pgTable(
     previousValue: doublePrecision("previous_value"),
     newValue: doublePrecision("new_value"),
     note: text("note"),
+    // update changes an existing value; delete removes it and uses the snapshot
+    // below so rollback can restore the exact row, including provenance fields.
+    operation: text("operation").notNull().default("update"), // update | delete
+    previousRowSnapshot: text("previous_row_snapshot"),
     outcome: text("outcome").notNull(), // change | noop | rejected
     rejectionReason: text("rejection_reason"),
     warningReasons: text("warning_reasons"),
