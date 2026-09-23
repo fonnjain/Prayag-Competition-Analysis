@@ -1,0 +1,89 @@
+# P035 — COMPETITION — P029 reported Uncategorized fixed; the user still sees 13
+
+> **P035** · app: **COMPETITION** (`prayag-price.com`)
+> **READ-ONLY. Change nothing.** No commits. No data changes. No re-runs. No re-applies.
+> Quote `P035` when reporting back.
+
+P029 was reported delivered and P030 verified it:
+
+```
+Active Pipes & Fittings Uncategorized     3
+Division on all ten Self Fit products     Pipes & Fittings - 10/10
+Series on all ten Self Fit products       UGD Pipe - 10/10
+UGD Pipe filter result                    20 active products
+```
+
+**The user is looking at the application and sees 13 — the three unnamed codes plus all ten UGD Self Fit products, still uncategorised.**
+
+Both statements cannot be true of the same database. Establish which database each describes before changing anything.
+
+---
+
+## 1. First, the thing that is not a fault
+
+Codes `20`, `25` and `32` are **expected to still be in Uncategorized.** P029 Part 2 was read-only by design — they are marked "Invalid Input" by Prayag, sit on the master's `excluded_do_not_load` list, and await a Prayag decision. The target end state was Uncategorized = **3**, not 0.
+
+So this prompt is about **the ten UGD products only**.
+
+## 2. The likely cause — check it first
+
+**Development and production are separate databases, and publishing code does not copy data.** That has caused three separate incidents on this project: Prince showed 0 Ready in production while batch 1946 existed only in development; the Prince PPR load; the authoritative master load.
+
+P030's report described a database. It did not say which one.
+
+Report, plainly:
+
+1. **Which environment did P029's Apply run against — development or production?**
+2. `mrp_load_batches` / correction batch **1495** — the P029 classification audit — **which database does it exist in?** Report whether a row with that id exists in development, in production, or both.
+3. Was the project published after P029 was applied? When?
+
+## 3. The same five readings, in both environments, side by side
+
+Report each figure twice — once for development, once for production. Do not report a single number.
+
+```
+                                              DEV      PROD
+Uncategorized count (active)                   ?         ?
+Uncategorized item codes, listed               ?         ?
+category value on U-11CS                       ?         ?
+division value on U-11CS                       ?         ?
+series value on U-11CS                         ?         ?
+count of the 10 Self Fit codes with
+  category IS NULL                             ?         ?
+UGD Pipe filter result                         ?         ?
+```
+
+The ten codes are `U-11CS`, `U-12CS`, `U-13CS`, `U-14CS`, `U-15CS`, `U-16CS`, `U-11BS`, `U-12BS`, `U-13BS`, `U-14BS`.
+
+**If production shows `category IS NULL` on all ten and development does not, that is the answer** and everything below is secondary.
+
+## 4. If both environments already show the category set
+
+Then the data is right and the screen is not. Report:
+
+1. **How the Uncategorized grouping is built.** Does it read `category`, or `series`, or something else? **Quote the code.**
+2. Whether the grouping reads a cached, materialised or denormalised table rather than `catalog_products` directly — and if so, when that cache was last rebuilt.
+3. Whether the value written by P029 is the exact string the grouping matches. A category of `"UGD Pipe "` with a trailing space, or `"UGD PIPE"` in different case, would set the field and still group as uncategorised.
+4. What the API returns for `U-11CS` on the endpoint the category screen actually calls.
+
+Point 3 is worth checking properly. P029 copied the value from `U-11C`, so it should match exactly — but "should" is why this prompt exists.
+
+## 5. What not to do
+
+- **Do not re-run P029.** Not in either environment. Not to "make sure".
+- Do not re-apply, re-import or re-classify.
+- Do not edit a category by hand to see if it sticks.
+- Do not delete anything from Uncategorized.
+- Do not touch codes `20`, `25` or `32`.
+
+A second apply on top of an unexplained state produces a state nobody can explain. Establish the facts first; the fix is one line once the cause is known.
+
+## 6. Report
+
+1. Which environment P029 applied to, and where batch 1495 exists.
+2. Whether the project was published after P029, and when.
+3. The full dev-versus-production table from §3.
+4. If the data is correct in both: the grouping code, quoted, and the exact stored category string for `U-11CS`.
+5. **Your reading in one sentence:** production was never updated, or the data is right and the display is wrong.
+
+Do not propose a fix in this report. Name the cause and stop.
