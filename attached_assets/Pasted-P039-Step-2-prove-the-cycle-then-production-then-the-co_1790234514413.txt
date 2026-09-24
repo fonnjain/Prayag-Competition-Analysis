@@ -1,0 +1,35 @@
+P039 — Step 2: prove the cycle, then production, then the constraint
+
+Your report is accepted and your stop was correct. Two things before production.
+
+1. State whether the pending publish contains a NOT NULL constraint on mrp_price_history.load_batch_id.
+
+If it does, remove it from this publish. Production holds 243 null rows; that migration cannot succeed and must not be forced. The order is:
+
+1. publish the code and any schema change that is NOT the constraint
+2. production preview  -> report -> WAIT
+3. production apply    -> 243 null rows go to 0
+4. verify the count is 0
+5. add NOT NULL as a separate, later step
+
+A constraint added before the data is clean either fails or forces. Added after, it is a guarantee. Same line of SQL, opposite meaning.
+
+2. Prove apply-and-undo in development first, on seeded rows.
+
+Development cannot exercise the positive path because it has no unlinked rows. Create some, temporarily and traceably:
+
+Insert a small number of mrp_price_history rows — five is enough — with load_batch_id null, on codes that exist, carrying values you record beforehand. If the development schema already blocks nulls, that confirms question 1 and the constraint must come out before you can test at all.
+Run preview. Confirm it reports exactly five.
+Run apply. Confirm five become linked, no price value moves, and the row count does not change.
+Run undo. Confirm it returns to five unlinked, and the same values.
+Remove the seeded rows and confirm development returns to 14,012 rows with 0 missing links — the figure you read at 2026-09-24 07:10 UTC.
+
+Report all five counts and the value checksum at each stage. Development must end exactly where it started. Do not leave seed rows behind — development already carries 36 synthetic products from the generator, and that is the mess this prompt exists to stop, not to add to.
+
+3. Then production.
+
+Preview only. Report the preview and stop. The Apply needs explicit approval naming the 243 figure, and it happens in a message of its own.
+
+Do not choose any option that overwrites production data. The backfill adds a batch id to existing rows. It writes no price, changes no value, creates and deletes no product. If any path offers to replace production data with development data, that is the wrong path — say so and stop.
+
+State the environment and the clock time against every figure.
