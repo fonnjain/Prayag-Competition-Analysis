@@ -567,7 +567,7 @@ async function patchCatalogProductMrp(req: Request, res: Response) {
   }
 
   const manualSourceId = await ensureManualMrpSource();
-  const manualChecksum = sha256ForManualCorrection({
+  const manualContentHash = sha256ForManualCorrection({
     itemCode,
     effectiveDate,
     mrp,
@@ -589,12 +589,12 @@ async function patchCatalogProductMrp(req: Request, res: Response) {
       .values({
         sourceId: manualSourceId,
         fileName: `manual-correction:${itemCode}:${effectiveDate}`,
-        fileSha256: manualChecksum,
-        fileSizeBytes: 0,
-        downloadedAt: today,
+         fileSha256: null,
+         fileSizeBytes: null,
+         downloadedAt: null,
         loadedBy: req.user?.email ?? req.user?.id ?? null,
         rowCount: 1,
-        notes: reason,
+         notes: `${reason}; content hash: ${manualContentHash}`,
       })
       .returning({ id: mrpLoadBatchesTable.id });
     const [row] = await tx

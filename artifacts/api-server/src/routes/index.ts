@@ -21,6 +21,7 @@ import activityRouter from "./activity";
 import priceEditorRouter from "./priceEditor";
 import mrpGeneratorRouter from "./mrpGenerator";
 import catalogNameChangesRouter from "./catalogNameChanges";
+import mrpProvenanceBackfillRouter from "./mrpProvenanceBackfill";
 
 const router: IRouter = Router();
 
@@ -52,5 +53,6 @@ router.use(analysisRouter);
 router.use(priceEditorRouter);
 router.use(catalogNameChangesRouter);
 router.use(mrpGeneratorRouter);
+router.use(mrpProvenanceBackfillRouter);
 
 export default router;

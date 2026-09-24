@@ -6,6 +6,7 @@ import {
   catalogProductsTable,
   catalogPriceEditAuditsTable,
   mrpPriceHistoryTable,
+  mrpLoadBatchesTable,
   competitorPricesTable,
   competitorPriceStagingTable,
   mrpHistoryProvenanceEventsTable,
@@ -16,6 +17,7 @@ import {
   mrpRevisionRowsTable,
   mrpGeneratorRunsTable,
   mrpGeneratorResultsTable,
+  mrpSourcesTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import {
@@ -23,6 +25,7 @@ import {
   recomputeCompetitorCurrentFlagsInTransaction,
 } from "../lib/catalog";
 import { warningFor } from "./mrpRevision";
+import { sha256ForManualCorrection } from "../lib/mrpProvenance";
 
 const router: IRouter = Router();
 const iso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -215,11 +218,41 @@ router.post("/catalog/price-editor/save", requireAdmin, async (req, res): Promis
           : (priorResolved as typeof competitorPricesTable.$inferSelect).price)
         : null;
       let old: number | null = null; let rowId: number; let mutation = 0; let targetWasExisting = false;
+      let previousLoadBatchId: number | null = null;
+      let provenanceBatchId: number | null = null;
       if (series === "Prayag MRP") {
+        const [manualSource] = await tx.insert(mrpSourcesTable).values({
+          division: "Manual MRP corrections", sheetId: "manual-mrp-corrections",
+          sheetUrl: "about:blank", expectedFileName: null,
+          notes: "Internal audit source for reviewed corrections without an official workbook.",
+          sourceKind: "manual",
+        }).onConflictDoNothing({ target: mrpSourcesTable.sheetId }).returning({ id: mrpSourcesTable.id });
+        const manualSourceId = manualSource?.id ?? (await tx.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+          .where(eq(mrpSourcesTable.sheetId, "manual-mrp-corrections")).limit(1))[0]?.id;
+        if (!manualSourceId) throw new Error("Manual MRP provenance source could not be created.");
         const existing = (await tx.select().from(mrpPriceHistoryTable).where(and(eq(mrpPriceHistoryTable.itemCode, code), eq(mrpPriceHistoryTable.effectiveDate, effectiveDate), eq(mrpPriceHistoryTable.variant, "Standard"), eq(mrpPriceHistoryTable.reviewStatus, "approved"))).limit(1).for("update"))[0];
-        old = existing?.mrp ?? null; targetWasExisting = !!existing;
+        old = existing?.mrp ?? null; targetWasExisting = !!existing; previousLoadBatchId = existing?.loadBatchId ?? null;
+        // The MRP provenance batch is deliberately separate from competitor
+        // import batches; source metadata is an internal correction record.
+        const [provenance] = await tx.insert(mrpLoadBatchesTable).values({
+          sourceId: manualSourceId!,
+          fileName: `manual-correction:${code}:${effectiveDate}`,
+          fileSha256: null,
+          fileSizeBytes: null,
+          downloadedAt: null,
+          loadedBy: actor(req),
+          rowCount: 1,
+          notes: `Single-product editor correction: ${remarks}; content hash: ${sha256ForManualCorrection({ itemCode: code, effectiveDate, mrp: value, reason: remarks })}`,
+        }).returning({ id: mrpLoadBatchesTable.id });
+        provenanceBatchId = provenance.id;
         if (existing) { const rows = await tx.update(mrpPriceHistoryTable).set({ mrp: value, notes: remarks }).where(eq(mrpPriceHistoryTable.id, existing.id)).returning({ id: mrpPriceHistoryTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
-        else { const rows = await tx.insert(mrpPriceHistoryTable).values({ itemCode: code, mrp: value, netPrice: null, discountPct: null, priceBasis: "MRP", effectiveDate, loadDate: today(), sourceFile: "single-product-editor", reviewStatus: "approved", variant: "Standard", notes: remarks }).returning({ id: mrpPriceHistoryTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
+        else { const rows = await tx.insert(mrpPriceHistoryTable).values({ itemCode: code, mrp: value, netPrice: null, discountPct: null, priceBasis: "MRP", effectiveDate, loadDate: today(), sourceFile: "single-product-editor", loadBatchId: provenanceBatchId, reviewStatus: "approved", variant: "Standard", notes: remarks }).returning({ id: mrpPriceHistoryTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
+        if (existing) await tx.update(mrpPriceHistoryTable).set({ loadBatchId: provenanceBatchId }).where(eq(mrpPriceHistoryTable.id, existing.id));
+        await tx.insert(mrpHistoryProvenanceEventsTable).values({
+          historyRowId: rowId, itemCode: code, effectiveDate, action: "manual_correction",
+          reason: remarks, sourceFile: "single-product-editor", loadBatchId: provenanceBatchId,
+          previousMrp: old, mrp: value,
+        });
       } else {
         const existing = (await tx.select().from(competitorPricesTable).where(and(eq(competitorPricesTable.matchedPrayagCode, code), eq(competitorPricesTable.competitor, series), eq(competitorPricesTable.effectiveDate, effectiveDate))).limit(1).for("update"))[0];
         old = existing?.price ?? null; targetWasExisting = !!existing;
@@ -230,7 +263,7 @@ router.post("/catalog/price-editor/save", requireAdmin, async (req, res): Promis
       if (!targetWasExisting) previousResolvedValue = resolvedValue;
       if (series === "Prayag MRP") await recomputeCurrentFlagsInTransaction(tx);
       else await recomputeCompetitorCurrentFlagsInTransaction(series, tx);
-      return (await tx.insert(catalogPriceEditAuditsTable).values({ actor: actor(req), itemCode: code, series, operationType: "save", oldValue: old, previousResolvedValue, newValue: value, effectiveDate, remarks, targetRowId: rowId }).returning())[0]!;
+       return (await tx.insert(catalogPriceEditAuditsTable).values({ actor: actor(req), itemCode: code, series, operationType: "save", oldValue: old, previousResolvedValue, newValue: value, effectiveDate, remarks, targetRowId: rowId, creationMetadata: series === "Prayag MRP" ? JSON.stringify({ provenanceBatchId, previousLoadBatchId }) : null }).returning())[0]!;
     });
     res.json({ ok: true, audit, firstCompetitorMapping: series !== "Prayag MRP" && !hadCompetitorMapping });
   } catch (e) { req.log.error({ err: e }, "single price save failed"); res.status(409).json({ error: e instanceof Error ? e.message : "Could not save price." }); }
@@ -248,6 +281,10 @@ router.post("/catalog/price-editor/undo/:auditId", requireAdmin, async (req, res
       if (!original.targetRowId) throw Object.assign(new Error("Original edit has no target row."), { status: 409 });
       if (original.newValue == null) throw Object.assign(new Error("Original edit has no value; undo rejected."), { status: 409 });
       if (original.series === "Prayag MRP") {
+        const metadata = original.creationMetadata ? JSON.parse(original.creationMetadata) as { previousLoadBatchId?: number | null } : {};
+        if (original.oldValue != null && !original.creationMetadata) {
+          throw Object.assign(new Error("Legacy edit lacks prior provenance metadata; undo rejected to protect the existing batch."), { status: 409 });
+        }
         const target = (await tx.select().from(mrpPriceHistoryTable).where(and(
           eq(mrpPriceHistoryTable.id, original.targetRowId),
           eq(mrpPriceHistoryTable.itemCode, original.itemCode),
@@ -259,7 +296,7 @@ router.post("/catalog/price-editor/undo/:auditId", requireAdmin, async (req, res
           const deleted = await tx.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, target.id)).returning({ id: mrpPriceHistoryTable.id });
           if (deleted.length !== 1) throw Object.assign(new Error("Undo changed an unexpected number of MRP rows."), { status: 409 });
         } else {
-          const updated = await tx.update(mrpPriceHistoryTable).set({ mrp: original.oldValue }).where(and(eq(mrpPriceHistoryTable.id, target.id), eq(mrpPriceHistoryTable.mrp, original.newValue))).returning({ id: mrpPriceHistoryTable.id });
+          const updated = await tx.update(mrpPriceHistoryTable).set({ mrp: original.oldValue, loadBatchId: metadata.previousLoadBatchId ?? null }).where(and(eq(mrpPriceHistoryTable.id, target.id), eq(mrpPriceHistoryTable.mrp, original.newValue))).returning({ id: mrpPriceHistoryTable.id });
           if (updated.length !== 1) throw Object.assign(new Error("Undo changed an unexpected number of MRP rows."), { status: 409 });
         }
       } else {
@@ -437,6 +474,26 @@ router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req,
       const allProducts = await tx.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable).for("update");
       const existing = allProducts.filter((p) => normalizeNewCode(p.itemCode) === input.itemCode);
       if (existing[0]) throw new Error(`Code ${input.itemCode} already exists.`);
+      const [manualSource] = await tx.insert(mrpSourcesTable).values({
+        division: "Manual MRP corrections", sheetId: "manual-mrp-corrections",
+        sheetUrl: "about:blank", expectedFileName: null,
+        notes: "Internal audit source for reviewed corrections without an official workbook.",
+        sourceKind: "manual",
+      }).onConflictDoNothing({ target: mrpSourcesTable.sheetId }).returning({ id: mrpSourcesTable.id });
+      const manualSourceId = manualSource?.id ?? (await tx.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+        .where(eq(mrpSourcesTable.sheetId, "manual-mrp-corrections")).limit(1))[0]?.id;
+      if (!manualSourceId) throw new Error("Manual MRP provenance source could not be created.");
+      const [provenanceBatch] = await tx.insert(mrpLoadBatchesTable).values({
+        sourceId: manualSourceId,
+        fileName: `manual-creation:${input.itemCode}:${input.effectiveDate}`,
+        fileSha256: null, fileSizeBytes: null, downloadedAt: null,
+        loadedBy: actor(req),
+        rowCount: 1,
+        notes: `Single-product editor creation: ${input.reason}; content hash: ${sha256ForManualCorrection({
+          itemCode: input.itemCode, effectiveDate: input.effectiveDate,
+          mrp: input.mrp, reason: input.reason,
+        })}`,
+      }).returning({ id: mrpLoadBatchesTable.id });
       const productRows = await tx.insert(catalogProductsTable).values({
         itemCode: input.itemCode, productName: input.productName, division: input.division,
         seriesRange: input.series, category: input.category, size: input.size,
@@ -445,19 +502,20 @@ router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req,
       const historyRows = await tx.insert(mrpPriceHistoryTable).values({
         itemCode: input.itemCode, mrp: input.mrp, netPrice: null, discountPct: null,
         priceBasis: "MRP", effectiveDate: input.effectiveDate, loadDate: today(),
-        sourceFile: "single-product-editor", reviewStatus: "approved", variant: "Standard",
+        sourceFile: "single-product-editor", loadBatchId: provenanceBatch.id,
+        reviewStatus: "approved", variant: "Standard",
         notes: input.reason,
       }).returning();
       await tx.insert(mrpHistoryProvenanceEventsTable).values({
         historyRowId: historyRows[0]!.id, itemCode: input.itemCode, effectiveDate: input.effectiveDate,
         action: "new_product_manual", reason: input.reason, sourceFile: "single-product-editor",
-        mrp: input.mrp,
+        loadBatchId: provenanceBatch.id, mrp: input.mrp,
       });
       const audit = (await tx.insert(catalogPriceEditAuditsTable).values({
         actor: actor(req), itemCode: input.itemCode, series: "Product creation", operationType: "save",
         oldValue: null, newValue: input.mrp,
         effectiveDate: input.effectiveDate, remarks: input.reason, targetRowId: historyRows[0]!.id,
-        creationMetadata: JSON.stringify({ product: productRows[0], history: historyRows[0] }),
+         creationMetadata: JSON.stringify({ product: productRows[0], history: historyRows[0], provenanceBatchId: provenanceBatch.id }),
       }).returning())[0]!;
       await recomputeCurrentFlagsInTransaction(tx);
       const candidates = await tx.select().from(competitorPriceStagingTable).where(and(

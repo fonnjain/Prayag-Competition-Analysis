@@ -78,12 +78,12 @@ export const mrpLoadBatchesTable = pgTable(
     sourceId: integer("source_id")
       .notNull()
       .references(() => mrpSourcesTable.id),
-    fileName: text("file_name").notNull(),
-    fileSha256: text("file_sha256").notNull(),
-    fileSizeBytes: integer("file_size_bytes").notNull(),
+    fileName: text("file_name"),
+    fileSha256: text("file_sha256"),
+    fileSizeBytes: integer("file_size_bytes"),
     // This comes from the person who exported the sheet; it is never inferred
     // from filesystem metadata.
-    downloadedAt: date("downloaded_at", { mode: "string" }).notNull(),
+    downloadedAt: date("downloaded_at", { mode: "string" }),
     loadedAt: timestamp("loaded_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -204,6 +204,19 @@ export const mrpHistoryProvenanceEventsTable = pgTable(
     index("mrp_history_provenance_action_idx").on(t.action),
   ],
 );
+
+// Development/admin reconciliation runs retain the exact pre-apply linkage so
+// one-action undo can restore legacy NULLs without touching prices.
+export const mrpProvenanceBackfillRunsTable = pgTable("mrp_provenance_backfill_runs", {
+  id: serial("id").primaryKey(),
+  status: text("status").notNull().default("preview"), // preview | applied | undone
+  actor: text("actor").notNull(),
+  preview: text("preview").notNull(),
+  snapshot: text("snapshot").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
+});
 export const codeConflictsTable = pgTable("code_conflicts", {
   itemCode: text("item_code").primaryKey(),
   conflictingNames: text("conflicting_names"),
