@@ -55,10 +55,7 @@ import {
   type PdfPreflight,
 } from "../lib/pdfPreflight.js";
 import { mergeHybridItems, princeItemsToExtracted } from "../lib/pdfHybrid.js";
-import {
-  apolloPipeIdentity,
-  assertApolloCodeAvailable,
-} from "../lib/apolloPipeIdentity.js";
+import { assertApolloCodeAvailable } from "../lib/apolloPipeIdentity.js";
 import type { ExtractedItem } from "../lib/pdfExtractor.js";
 
 const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
@@ -197,18 +194,23 @@ function matchApolloPdf(
   const rows: Array<Record<string, unknown>> = [];
   const gaps: Array<Record<string, unknown>> = [];
   const claimed = new Set<ExtractedItem>();
-  const targetIdentityCounts = new Map<string, number>();
-  for (const target of targets) {
-    if (target.codeSource !== "locally_assigned") continue;
-    const key = apolloPipeIdentity(target.description, target.size);
-    if (key) targetIdentityCounts.set(key, (targetIdentityCounts.get(key) ?? 0) + 1);
-  }
   const effectivePrice = (mrp: number) =>
     priceBasis === "Ex-GST" ? mrp * (1 + (gstPct ?? 18) / 100) : mrp;
 
   for (const target of targets) {
     const local = target.codeSource === "locally_assigned";
     const unverifiable = target.codeSource !== "supplier" && !local;
+    if (local) {
+      rows.push({
+        ...target, competitorCodeMaster: target.competitorCode, competitorCodeCatalogue: null, newMrp: null,
+        status: "needs_review", matchMethod: null,
+        reviewReason: "Apollo PDF has no authoritative Prayag code; local pipe identity cannot be verified automatically.",
+        catalogueDescription: null, variant: null, page: null, discoveryEvidence: null,
+        adjudicated: false, increasePct: null, gapPct: null,
+      });
+      gaps.push({ category: target.category, description: target.description, size: target.size, reason: "missing-authoritative-identity" });
+      continue;
+    }
     if (unverifiable) {
       rows.push({
         ...target, competitorCodeMaster: null, competitorCodeCatalogue: null, newMrp: null,
@@ -220,23 +222,18 @@ function matchApolloPdf(
       gaps.push({ category: target.category, description: target.description, size: target.size, reason: "unknown-code-source" });
       continue;
     }
-    const targetIdentity = local ? apolloPipeIdentity(target.description, target.size) : null;
-    const duplicateTarget = targetIdentity != null && (targetIdentityCounts.get(targetIdentity) ?? 0) > 1;
     const candidates = extracted.filter((item) => {
       if (claimed.has(item)) return false;
-      if (local) {
-        return targetIdentity != null && apolloPipeIdentity(item.product_name, item.variant) === targetIdentity;
-      }
       return Boolean(item.cat_no && target.competitorCode) &&
         normCode(item.cat_no) === normCode(target.competitorCode);
     });
     const item = candidates[0];
-    const ambiguous = duplicateTarget || (local && candidates.length > 1);
-    if (ambiguous || (local && !item) || (!local && candidates.length === 0)) {
+    const ambiguous = candidates.length > 1;
+    if (ambiguous || (!local && candidates.length === 0)) {
       rows.push({
         ...target, competitorCodeMaster: target.competitorCode, competitorCodeCatalogue: null,
-        newMrp: null, status: "needs_review", matchMethod: "identity",
-        reviewReason: ambiguous ? "Apollo pipe identity is ambiguous; no row was selected."
+         newMrp: null, status: "needs_review", matchMethod: "code+desc",
+         reviewReason: ambiguous ? "Apollo supplier-code match is ambiguous; no row was selected."
           : "Apollo catalogue row was not found; review as a new coverage row.",
         catalogueDescription: null, variant: null, page: null, discoveryEvidence: null,
         adjudicated: false, increasePct: null, gapPct: null,
@@ -272,7 +269,7 @@ function matchApolloPdf(
         ? ((newMrp - target.existingPrice) / target.existingPrice) * 100 : null,
       gapPct: target.prayagMrpCurrent ? ((effectivePrice(newMrp) - target.prayagMrpCurrent) / target.prayagMrpCurrent) * 100 : null,
       page: item!.page, discoveryEvidence: JSON.stringify({ source: "Apollo PDF", passes: item!.discoveryPasses }),
-      adjudicated: item!.adjudicated, matchMethod: local ? "desc+size" : "code+desc",
+       adjudicated: item!.adjudicated, matchMethod: "code+desc",
       status: differsFromReviewedPrice ? "needs_review" : "ok",
       reviewReason: differsFromReviewedPrice
         ? "Apollo PDF price differs from the reviewed workbook price; verify product identity and supplier quote before importing."
@@ -1679,7 +1676,7 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
       }
     }
 
-    // Write newly discovered aliases (desc+size matches)
+    // Write newly discovered aliases from matcher-confirmed catalogue matches.
     const aliasRows = stagingRows.filter(
       (r) => r.matchMethod === "desc+size" && r.competitorCodeMaster && r.competitorCodeCatalogue,
     );

@@ -14,6 +14,8 @@ export interface ApolloPipeRow {
   codeSource: CodeSource | null;
   description: string | null;
   size: string | null;
+  category?: string | null;
+  prayagCode?: string | null;
 }
 
 export interface ApolloPipeInput {
@@ -21,6 +23,8 @@ export interface ApolloPipeInput {
   competitorCode?: string | null;
   description: string | null;
   size: string | null;
+  category?: string | null;
+  prayagCode?: string | null;
 }
 
 /** The only reserved locally-assigned code in the P045 Apollo pipe master. */
@@ -117,22 +121,40 @@ export function apolloPipeIdentity(
   return `${descriptionKey}|${sizeKey}`;
 }
 
+/** Active V2 identity for local Apollo pipe rows.
+ * Category is the sheet classification (not a rolling heading), and the
+ * canonical Prayag code is row-owned.  The generated competitor code is
+ * intentionally not part of this identity.
+ */
+export function apolloPipeIdentityV2(
+  category: string | null | undefined,
+  prayagCode: string | null | undefined,
+  size: string | null | undefined,
+): string | null {
+  const categoryKey = normalizeApolloDescription(category);
+  const prayagKey = normalizeCode(prayagCode);
+  const sizeKey = normalizeApolloSize(size);
+  if (!categoryKey || !prayagKey || !sizeKey) return null;
+  return `v2|${categoryKey}|${prayagKey}|${sizeKey}`;
+}
+
 /** Create the durable, database-independent owner of a reserved code. */
 export function reserveApolloCode(
   code: string,
-  description: string | null | undefined,
+  category: string | null | undefined,
+  prayagCode: string | null | undefined,
   size: string | null | undefined,
   source?: { prayagCode?: string | null; sheet?: string; sourceRow?: number },
 ): ApolloCodeReservation {
-  const owner = apolloPipeIdentity(description, size);
-  if (!owner) throw new Error(`Cannot reserve ${code}: description and size are required`);
-  if (!source?.prayagCode) throw new Error(`Cannot reserve ${code}: Prayag code is required`);
+  const owner = apolloPipeIdentityV2(category, prayagCode, size);
+  if (!owner) throw new Error(`Cannot reserve ${code}: category, Prayag code, and size are required`);
+  if (!prayagCode) throw new Error(`Cannot reserve ${code}: Prayag code is required`);
   return {
     code: normalizeCode(code) === "APUGD007" ? "APUGD007" : code,
     owner,
-    description: normalizeApolloDescription(description),
+    description: normalizeApolloDescription(category),
     size: normalizeApolloSize(size),
-    prayagCode: source.prayagCode,
+    prayagCode,
     sourceSheet: source?.sheet,
     sourceRow: source?.sourceRow,
   };
@@ -145,12 +167,13 @@ export function reserveApolloCode(
  */
 export function assertApolloReservationOwner(
   code: string,
-  description: string | null | undefined,
+  category: string | null | undefined,
+  prayagCode: string | null | undefined,
   size: string | null | undefined,
   reservation: ApolloCodeReservation,
 ): void {
   if (normalizeCode(code) !== normalizeCode(reservation.code)) return;
-  const owner = apolloPipeIdentity(description, size);
+  const owner = apolloPipeIdentityV2(category, prayagCode, size);
   if (owner !== reservation.owner) {
     throw new Error(
       `${reservation.code} is reserved for ${reservation.owner}; cannot assign it to ${owner || "an unidentifiable product"}`,
@@ -160,17 +183,20 @@ export function assertApolloReservationOwner(
 
 /** Narrow integration API for the P045 reservation specifically. */
 export const reserveAPUGD007 = (
-  description: string | null | undefined,
+  category: string | null | undefined,
+  prayagCode: string | null | undefined,
   size: string | null | undefined,
   source?: { prayagCode?: string | null; sheet?: string; sourceRow?: number },
-) => reserveApolloCode("APUGD007", description, size, source);
+): ApolloCodeReservation => reserveApolloCode("APUGD007", category, prayagCode, size, source);
+
 export const assertAPUGD007Owner = (
-  description: string | null | undefined,
+  category: string | null | undefined,
+  prayagCode: string | null | undefined,
   size: string | null | undefined,
   reservation: ApolloCodeReservation,
-) => assertApolloReservationOwner("APUGD007", description, size, reservation);
+): void => assertApolloReservationOwner("APUGD007", category, prayagCode, size, reservation);
 
-/** Alias with a descriptive name for importers and tests. */
+/** Historical evidence only; new imports must use the V2 identity. */
 export const normalizeApolloPipeIdentity = apolloPipeIdentity;
 
 function normalizeCode(value: string | null | undefined): string {
@@ -203,12 +229,12 @@ export function matchApolloPipe(
     return { kind: "new", reason: "no-match" };
   }
 
-  const identity = apolloPipeIdentity(input.description, input.size);
+  const identity = apolloPipeIdentityV2(input.category, input.prayagCode, input.size);
   if (!identity) return { kind: "new", reason: "no-match" };
   const identityMatches = existing.filter(
     (row) =>
       row.codeSource === "locally_assigned" &&
-      apolloPipeIdentity(row.description, row.size) === identity,
+      apolloPipeIdentityV2(row.category, row.prayagCode, row.size) === identity,
   );
   if (identityMatches.length === 1) return { kind: "matched", row: identityMatches[0], by: "identity" };
   if (identityMatches.length > 1) return { kind: "ambiguous", rows: identityMatches, by: "identity" };

@@ -231,6 +231,61 @@ interface PendingRevision {
   reviewStatus: string;
 }
 
+interface LiveDispute {
+  reason: string;
+}
+
+function disputeKey(
+  competitor: string,
+  competitorCode: string | null,
+  prayagCode: string | null,
+  effectiveDate: string | null,
+): string | null {
+  if (!competitorCode || !prayagCode || !effectiveDate) return null;
+  return `${competitor}\u0000${competitorCode}\u0000${normCode(prayagCode)}\u0000${effectiveDate}`;
+}
+
+// A PDF review discrepancy is deliberately joined to the live row's exact
+// competitor code, mapping, and period. This keeps an unrelated PDF anomaly
+// from contaminating the confirmed workbook price or its gap calculations.
+async function getLivePriceDisputes(): Promise<Map<string, LiveDispute>> {
+  type DisputeRow = {
+    competitor: string;
+    competitor_code_master: string | null;
+    matched_prayag_code: string | null;
+    effective_date: string | null;
+    old_mrp: number | null;
+    new_mrp: number | null;
+  };
+  const result = await db.execute<DisputeRow>(sql`
+    SELECT s.competitor, s.competitor_code_master, s.matched_prayag_code,
+           s.effective_date, s.old_mrp, s.new_mrp
+    FROM competitor_price_staging s
+    INNER JOIN import_batches b ON b.id = s.batch_id
+    WHERE b.status = 'approved'
+      AND b.extraction_model IS NOT NULL
+      AND s.competitor = 'Apollo'
+      AND s.status = 'needs_review'
+      AND s.old_mrp IS NOT NULL
+      AND s.new_mrp IS NOT NULL
+      AND s.old_mrp IS DISTINCT FROM s.new_mrp
+  `);
+  const disputes = new Map<string, LiveDispute>();
+  for (const row of result.rows) {
+    const key = disputeKey(
+      row.competitor,
+      row.competitor_code_master,
+      row.matched_prayag_code,
+      row.effective_date,
+    );
+    if (!key) continue;
+    disputes.set(key, {
+      reason: `Approved PDF quote differs: ${row.new_mrp == null ? "no value" : row.new_mrp} (confirmed workbook value still shown)`,
+    });
+  }
+  return disputes;
+}
+
 function competitorWindowKey(row: CompRow): string {
   return competitorRevisionGroupKey(row);
 }
@@ -368,6 +423,7 @@ function buildComparisonRow(
   window?: CompetitorWindow,
   matchedWindow?: CompetitorWindow,
   pendingRevision?: PendingRevision,
+  liveDispute?: LiveDispute,
 ) {
   const key = c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
@@ -470,6 +526,8 @@ function buildComparisonRow(
     competitorCode: c.competitorCode,
     codeSource: c.codeSource ?? "unverified",
     competitorPrice: c.price,
+    disputed: liveDispute != null,
+    disputeReason: liveDispute?.reason ?? null,
     unit: c.unit,
     effectiveDate: c.effectiveDate,
     competitorValidTo: window?.validTo ?? null,
@@ -561,7 +619,7 @@ router.get("/catalog/comparison", async (req, res) => {
 
   let q = db.select().from(competitorPricesTable).$dynamic();
   if (conditions.length > 0) q = q.where(and(...conditions));
-  const [maps, all, revisionRows] = await Promise.all([
+  const [maps, all, revisionRows, liveDisputes] = await Promise.all([
     getPrayagMaps(),
     q.orderBy(
       asc(competitorPricesTable.category),
@@ -569,6 +627,7 @@ router.get("/catalog/comparison", async (req, res) => {
       asc(competitorPricesTable.id),
     ),
     db.select().from(competitorPricesTable),
+    getLivePriceDisputes(),
   ]);
   const windows = getCompetitorWindows(revisionRows);
   const matchedWindows = getCompetitorWindows(
@@ -584,6 +643,7 @@ router.get("/catalog/comparison", async (req, res) => {
         windows.get(c.id),
         matchedWindows.get(c.id),
         pendingRevisions.get(c.id),
+        liveDisputes.get(disputeKey(c.competitor, c.competitorCode, c.matchedPrayagCode, c.effectiveDate) ?? ""),
       ),
     );
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
@@ -1163,10 +1223,11 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     );
   }
 
-  const [maps, allRows, revisionRows] = await Promise.all([
+  const [maps, allRows, revisionRows, liveDisputes] = await Promise.all([
     getPrayagMaps(),
     db.select().from(competitorPricesTable).where(and(...conditions)),
     db.select().from(competitorPricesTable),
+    getLivePriceDisputes(),
   ]);
   const matchedRows = allRows.filter((row) => row.matchStatus === "matched");
   const competitorWindows = getCompetitorWindows(
@@ -1199,6 +1260,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     newerRevisionAwaitingReview: boolean;
     newerRevisionEffectiveDate: string | null;
     newerRevisionReviewStatus: string | null;
+    disputed: boolean;
+    disputeReason: string | null;
   }
   interface Group {
     itemCode: string;
@@ -1241,6 +1304,14 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       newerRevisionAwaitingReview: pendingRevisions.has(c.id),
       newerRevisionEffectiveDate: pendingRevisions.get(c.id)?.effectiveDate ?? null,
       newerRevisionReviewStatus: pendingRevisions.get(c.id)?.reviewStatus ?? null,
+      disputed:
+        liveDisputes.get(
+          disputeKey(c.competitor, c.competitorCode, c.matchedPrayagCode, c.effectiveDate) ?? "",
+        ) != null,
+      disputeReason:
+        liveDisputes.get(
+          disputeKey(c.competitor, c.competitorCode, c.matchedPrayagCode, c.effectiveDate) ?? "",
+        )?.reason ?? null,
     });
     g.byCompetitor.set(c.competitor, list);
   }
@@ -1282,6 +1353,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       newerRevisionAwaitingReview: boolean;
       newerRevisionEffectiveDate: string | null;
       newerRevisionReviewStatus: string | null;
+      disputed: boolean;
+      disputeReason: string | null;
     }
     const picks: Picked[] = [];
     for (const [competitor, candidates] of g.byCompetitor) {
@@ -1353,6 +1426,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           newerRevisionAwaitingReview: cand.newerRevisionAwaitingReview,
           newerRevisionEffectiveDate: cand.newerRevisionEffectiveDate,
           newerRevisionReviewStatus: cand.newerRevisionReviewStatus,
+          disputed: cand.disputed,
+          disputeReason: cand.disputeReason,
         };
         // Prefer rows that can be placed on the basis; among those, the cheapest.
         if (!best) best = candPick;
@@ -1428,6 +1503,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           newerRevisionAwaitingReview: p.newerRevisionAwaitingReview,
           newerRevisionEffectiveDate: p.newerRevisionEffectiveDate,
           newerRevisionReviewStatus: p.newerRevisionReviewStatus,
+           disputed: p.disputed,
+           disputeReason: p.disputeReason,
         };
       })
       .sort((a, b) => a.competitor.localeCompare(b.competitor));

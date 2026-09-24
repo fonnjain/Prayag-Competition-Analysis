@@ -52,7 +52,7 @@ import {
   PRINCE_EFFECTIVE_DATE,
 } from "../lib/princeMaster";
 import { parseApolloMaster, type ApolloMasterParse } from "../lib/apolloMaster";
-import { apolloPipeIdentity } from "../lib/apolloPipeIdentity";
+import { apolloPipeIdentityV2 } from "../lib/apolloPipeIdentity";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -4014,7 +4014,7 @@ router.post(
             );
             for (const row of parsedApollo.rows) {
               if (row.codeSource === "locally_assigned") {
-                const owner = apolloPipeIdentity(row.description, row.size);
+                const owner = apolloPipeIdentityV2(row.category, row.prayagCode, row.size);
                 if (owner) incomingReservations.set(row.competitorCode.toUpperCase(), owner);
               }
             }
@@ -4032,8 +4032,8 @@ router.post(
             }
             const existingApollo = await db.execute<{
               id: number; competitor_code: string | null; code_source: string | null;
-              description: string | null; size: string | null; matched_prayag_code: string | null;
-            }>(sql`SELECT id, competitor_code, code_source, description, size, matched_prayag_code
+              description: string | null; size: string | null; matched_prayag_code: string | null; category: string | null;
+            }>(sql`SELECT id, competitor_code, code_source, description, size, matched_prayag_code, category
                    FROM competitor_prices WHERE competitor = ${APOLLO_COMPETITOR}`);
             const allCompetitorCodes = await db.execute<{
               competitor: string; competitor_code: string | null; code_source: string | null;
@@ -4049,6 +4049,7 @@ router.post(
               description: row.description,
               size: row.size,
               matchedPrayagCode: row.matched_prayag_code,
+              category: row.category,
             }));
             const conflictCodes = new Set(parsedApollo.conflicts.map((conflict) => normCode(conflict.competitorCode)));
             const accepted: typeof parsedApollo.rows = [];
@@ -4062,12 +4063,12 @@ router.post(
               }
               let prayagCode = row.prayagCode ? canonical.get(normCode(row.prayagCode)) ?? null : null;
               const identity = row.codeSource === "locally_assigned"
-                ? apolloPipeIdentity(row.description, row.size)
+                ? apolloPipeIdentityV2(row.category, row.prayagCode, row.size)
                 : null;
               const matches = identity
                 ? existingByIdentity.filter((candidate) =>
                     candidate.codeSource === "locally_assigned" &&
-                    apolloPipeIdentity(candidate.description, candidate.size) === identity)
+                    apolloPipeIdentityV2(candidate.category, candidate.matchedPrayagCode, candidate.size) === identity)
                 : existingByIdentity.filter((candidate) =>
                     candidate.codeSource === "supplier" &&
                     normCode(candidate.competitorCode) === codeKey);
@@ -4259,7 +4260,7 @@ router.post(
                 if (current) {
                   const localIdentityMatches = value.codeSource === "locally_assigned" &&
                     current.codeSource === "locally_assigned" &&
-                    apolloPipeIdentity(current.description, current.size) === apolloPipeIdentity(value.description, value.size);
+                    apolloPipeIdentityV2(current.category, current.matchedPrayagCode, current.size) === apolloPipeIdentityV2(value.category, value.matchedPrayagCode, value.size);
                   const supplierCodeMatches = value.codeSource === "supplier" &&
                     current.codeSource === "supplier" &&
                     normCode(current.competitorCode) === normCode(value.competitorCode);

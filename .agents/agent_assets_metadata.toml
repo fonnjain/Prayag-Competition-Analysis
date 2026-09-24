@@ -389,3 +389,45 @@ mtime_ms = 1790254858460
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c92b39bd-3487-4222-b0c1-407941d9867d/72015efd-3ca7-4aa0-9523-afceb4df3f38"
 storage_version_token = "1790255321660936"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "tpK7IqqR-ixfjaqa6ipXo"
+uri = "file://reports/p045-apollo-step4-all-272-mappings.csv"
+type = "table"
+title = "P045 Step 4 — all 272 Apollo identity mappings"
+description = "Complete old-to-new keys, original and cleaned descriptions, source rows, Prayag mapping and price reconciliation (development only)."
+logical_id = "a251fe37-8f2f-44d5-ad3b-35690e535fd9"
+content_hash = "sha256:0419587e5fd8b923eb348988fd486ce3c9c2f88e03bac09052a3009f91d04efd"
+size = 74995
+mtime_ms = 1790261040861
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/a251fe37-8f2f-44d5-ad3b-35690e535fd9/2518666a-5331-491e-9bc9-ef741a6ced1e"
+storage_version_token = "1790261336131941"
+content_type = "text/csv"
+
+[[outputs]]
+id = "c_rsXazlbMbvCb0ShrJOM"
+uri = "file://reports/p045-apollo-step4-24-collision-rows.csv"
+type = "table"
+title = "P045 Step 4 — 24 formerly colliding rows"
+description = "The eight old shared keys and all 24 rows separated by row-owned Prayag codes in the new keys."
+logical_id = "4b108393-266c-4d73-b950-bf381abe34fa"
+content_hash = "sha256:31f184e8de16e94e1b0c87df68d1a551fef5184817217f8d757370dd40326414"
+size = 7179
+mtime_ms = 1790261040861
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4b108393-266c-4d73-b950-bf381abe34fa/0cc06d78-ab82-45d5-a245-e1907de213ba"
+storage_version_token = "1790261337574078"
+content_type = "text/csv"
+
+[[outputs]]
+id = "swhz1mNEY387ZBLwjM8QR"
+uri = "file://reports/p045-step4-audit.html"
+type = "html"
+title = "P045 Step 4 — development audit report"
+description = "Full identity reconciliation, PDF description/size audit, ten printed-page checks, dispute findings, safeguards and verification times."
+logical_id = "198a60da-ae61-4324-9d43-0e832512cf8a"
+content_hash = "sha256:202b07c1660c4615ce016cd21d956da2e716ed54cacd50774c307089f2ed62c0"
+size = 8950
+mtime_ms = 1790261826249
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/198a60da-ae61-4324-9d43-0e832512cf8a/f541f81b-363b-471c-a0d6-b85680a03e27"
+storage_version_token = "1790261835182357"
+content_type = "text/html"

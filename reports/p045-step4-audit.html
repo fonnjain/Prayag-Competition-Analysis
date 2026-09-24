@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P045 Step 4 — Apollo development audit</title>
+  <style>
+    body{font:15px/1.55 system-ui,-apple-system,sans-serif;color:#1d2531;max-width:980px;margin:3rem auto;padding:0 1.25rem;background:#fff}
+    h1,h2{line-height:1.2}h1{font-size:2rem}h2{margin-top:2.5rem;border-bottom:1px solid #d7dde6;padding-bottom:.4rem}
+    .note{padding:1rem;border-left:4px solid #9a6012;background:#fff9e9}.danger{border-left-color:#b73333;background:#fff1f1}
+    table{border-collapse:collapse;width:100%;font-size:.9rem;margin:1rem 0 1.5rem}th,td{padding:.55rem .65rem;text-align:left;vertical-align:top;border-bottom:1px solid #e1e6ec}th{background:#f3f6fa}
+    code{background:#f2f4f7;padding:.1rem .25rem;border-radius:.2rem}small{color:#5c6674}.nowrap{white-space:nowrap}
+  </style>
+</head>
+<body>
+  <h1>P045 Step 4 — COMPETITION / Apollo</h1>
+  <p class="note"><strong>Development only.</strong> No production load or publish. Figures below identify their observation time in Asia/Kolkata (IST), 24 September 2026. Prices and Prayag catalogue records were not changed.</p>
+
+  <h2>A. Match-key repair and reconciliation</h2>
+  <p><small>Development database and source workbook, 24 Sep 2026, 20:26 IST; original fingerprint captured at 20:08 IST.</small></p>
+  <table>
+    <tr><th>Measure</th><th>Before</th><th>After</th></tr>
+    <tr><td>Locally assigned pipe rows / distinct identities</td><td>272 / 256</td><td>272 / 272</td></tr>
+    <tr><td>Colliding old identities / affected rows</td><td>8 / 24</td><td>0 / 0</td></tr>
+    <tr><td>Rows with changed identity</td><td>—</td><td>272 / 272</td></tr>
+    <tr><td>Existing Apollo rows / mappings still matched</td><td>691</td><td>691 / 691; 0 changed, 0 held from this reconciliation</td></tr>
+    <tr><td>Descriptions cleaned without repricing or remapping</td><td>—</td><td>610: 203 local pipes, 407 supplier fittings</td></tr>
+  </table>
+  <p>The new identity uses the stable pipe-sheet classification, the row's Prayag item code and its normalized size. It does not use accumulated heading text or the locally minted Apollo handle. In the 24 old collisions, distinct row-owned Prayag codes distinguish all 24; some SWR rows omit a repeated diameter, so a physical-size-only key would not be unique. This is a code-anchored reconciliation, not independent proof that every physical product description is correct. The complete 272-row mapping is in <code>p045-apollo-step4-all-272-mappings.csv</code>; the separate 24-row collision list is in <code>p045-apollo-step4-24-collision-rows.csv</code>. Each line shows the old and new keys, row provenance, price, and unchanged Prayag mapping.</p>
+  <p>An in-memory copy of the workbook with its UGD section heading renamed moved <strong>0 / 272</strong> identities (development test, 20:16 IST). APUGD007 is now reserved for <code>v2|ugd pipe|U11B|110</code>. An authenticated development upload of a workbook copy assigning it to <code>v2|ugd pipe|U12B|110</code> returned <strong>HTTP 409</strong>, <code>APOLLO_RESERVATION_OWNER_MISMATCH</code>, and <code>noWrites: true</code> (20:25 IST); the 691 Apollo rows and reservation remained unchanged afterward.</p>
+
+  <h2>B. PDF cross-check</h2>
+  <p><small>Development batch 2237 and supplied 68-page Apollo PDF, 24 Sep 2026, 20:19 IST; printed-page sample inspected at 20:05 IST. All comparisons are for the same code, Prayag mapping and period.</small></p>
+  <table>
+    <tr><th>Price-agreeing supplier rows</th><th>Count</th></tr>
+    <tr><td>PDF and workbook prices equal</td><td>418 / 418</td></tr>
+    <tr><td>Whole old rolling workbook description equals PDF label after normalization</td><td>0 / 418</td></tr>
+    <tr><td>Clean single-active-heading description equals PDF label after normalization</td><td>162 / 418</td></tr>
+    <tr><td>Workbook and extracted PDF sizes agree after numeric-mm normalization</td><td>244 / 418; 174 PDF size fields blank</td></tr>
+    <tr><td>Price, normalized description, and normalized size all agree</td><td>65 / 418</td></tr>
+    <tr><td>Price agrees but complete description-and-size corroboration is absent</td><td><strong>353 / 418</strong> (unverified remainder)</td></tr>
+    <tr><td>Strictly price alone: neither description nor size agrees</td><td>77 / 418</td></tr>
+  </table>
+  <p>Descriptions were compared after Unicode, case, degree-symbol, punctuation, spacing and obvious lexical normalization (for example, reducing/reducer and adapter/adaptor). Size comparison uses ordered millimetre dimensions and tolerates a repeated terminal diameter in six threaded-tee labels; blank PDF fields never count as agreement. Of the 353 without full corroboration, 97 agree on description only, 179 on size only, and 77 on neither.</p>
+  <h3>Ten printed-page checks from the 174 blank extracted sizes</h3>
+  <p><small>Development PDF render, 24 Sep 2026, 20:05 IST. Page numbers are PDF page indices, not printed footer numbers.</small></p>
+  <table>
+    <tr><th>Staging row / Apollo code</th><th>PDF page</th><th>Size visible on printed page</th></tr>
+    <tr><td>108384 / CMN02032V</td><td>8</td><td>65 mm</td></tr>
+    <tr><td>108447 / CMN02061U0W</td><td>6</td><td>40 × 40 mm</td></tr>
+    <tr><td>108466 / CM02082V</td><td>8</td><td>65 mm</td></tr>
+    <tr><td>108500 / CMN02260W</td><td>6</td><td>15 mm</td></tr>
+    <tr><td>108842 / PMNN03432V</td><td>22</td><td>75 mm</td></tr>
+    <tr><td>108861 / PMN03450604</td><td>21</td><td>160 × 110 mm</td></tr>
+    <tr><td>108880 / PMN03142V</td><td>23</td><td>75 mm</td></tr>
+    <tr><td>108900 / PMN032404</td><td>24</td><td>110 mm</td></tr>
+    <tr><td>108919 / PMN036404</td><td>22</td><td>110 mm</td></tr>
+    <tr><td>108940 / PMN036706</td><td>23</td><td>160 mm</td></tr>
+  </table>
+  <p><strong>Sample finding:</strong> 10 / 10 printed sizes were present but not extracted; 0 / 10 were genuinely absent (development PDF, 20:05 IST). Do not extrapolate that observation as a visual inspection of all 174.</p>
+  <p>Among the 418 price agreements, the clean-label assessment found <strong>162 exact normalized, 246 wording-only differences, 1 likely product/row misalignment, and 9 indeterminate</strong> (development, 20:19 IST). The likely misalignment is PMN032404: workbook “Multi Floor Trap with Jali” versus PDF page 24 “WITHOUT JALI” for the same code and ₹187.50. The nine unresolved codes are CM02350W0V, CM0235010V, PM0389042V, PM03890403, PM03890404, PM03890402, PPRMB021225MM0V, PPRMB021720MM0V and PPRMB021725MM0V. Their codes/prices land in the PDF tables but the labels cannot safely be equated from available evidence.</p>
+
+  <h2>C. Standing price dispute</h2>
+  <p><small>Development database and authenticated API, 24 Sep 2026, 20:26 IST.</small></p>
+  <p class="note danger"><strong>PMN03122V / Prayag 5762:</strong> confirmed workbook price <strong>₹27</strong> remains loaded. The Apollo PDF quotes <strong>₹60</strong> against a different fitting. The approved PDF staging row remains <code>needs_review</code>; the live comparison now derives a visible “Disputed” badge and reason from that held evidence, without substituting ₹60 or changing the price-gap calculation. Authenticated comparison and by-product API responses returned <code>disputed: true</code> and the ₹60 reason.</p>
+  <p>The approved PDF batch has <strong>275 held</strong> rows: <strong>1</strong> comparable workbook/PDF price disagreement (PMN03122V) and <strong>274</strong> with no comparable PDF quote; there are <strong>0</strong> other comparable price disagreements (development, 20:21 IST). Rows without a PDF quote are not flagged as price disputes.</p>
+
+  <h2>Safety and verification</h2>
+  <p><small>Development, 24 Sep 2026, 20:26 IST.</small></p>
+  <p>Apollo price rows remained <strong>691</strong> (including 272 local pipes); every one of the 691 retained its code, category, size, Prayag mapping, price and code-origin value. The Prayag catalogue remained <strong>6,946</strong> with the same full-row fingerprint <code>f927316a60c39d418e6d0754de08c555</code> as at 20:08 IST; <strong>1,912</strong> existing <code>unverified</code> origins remained unchanged. <code>PPRMB0204XX20MM</code> remains unpriced. Targeted tests: <strong>15 passed</strong>; API and Product Database typechecks passed; both services restarted cleanly (development, 20:22 IST). No production load or publish occurred.</p>
+  <p><strong>Visibility limit:</strong> the anonymous browser screenshot reaches the sign-in gate. An authenticated API check confirms both comparison response paths carry the dispute, and the UI renders the badge, but a browser screenshot of the signed-in badge was not obtained because the browser tester did not have the login secrets. This limitation does not change the underlying price or flag data.</p>
+</body>
+</html>

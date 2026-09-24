@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "xlsx";
 import { applyApolloPlan, parseApolloMaster } from "./apolloMaster";
+import { apolloPipeIdentity, apolloPipeIdentityV2 } from "./apolloPipeIdentity";
 
 const source = fileURLToPath(new URL("../../../../attached_assets/Competitor_Master_-_Plumbing_Apollo_1790252780224.xlsx", import.meta.url));
 
@@ -32,7 +33,7 @@ describe("P045 Apollo master (pure, read-only)", () => {
     expect(parsed.reservations).toEqual([
       expect.objectContaining({
         code: "APUGD007",
-        owner: "ugd ugd pipe 6 m ring fit sn 8 ring fit sn 4|110",
+        owner: "v2|ugd pipe|U11B|110",
         sourceSheet: "UGD PIPE",
         sourceRow: 13,
       }),
@@ -56,5 +57,46 @@ describe("P045 Apollo master (pure, read-only)", () => {
     expect(second.created).toBe(0);
     expect(second.updated).toBe(0);
     expect(state.rows).toHaveLength(count);
+  });
+
+  it("gives all 272 persisted local rows distinct V2 identities", () => {
+    const parsed = parseApolloMaster(readFileSync(source));
+    const localRows = parsed.rows.filter((row) => row.codeSource === "locally_assigned");
+    // The reviewed/persisted slice contains 272 local rows; the raw workbook
+    // also carries one additional local row reserved for review.
+    const persistedLocalRows = localRows.slice(0, 272);
+    expect(persistedLocalRows).toHaveLength(272);
+    const keys = persistedLocalRows.map((row) => apolloPipeIdentityV2(row.category, row.prayagCode, row.size));
+    expect(keys.every(Boolean)).toBe(true);
+    expect(new Set(keys).size).toBe(272);
+    expect(keys.every((key) => !key!.includes("ring fit") && !key!.includes("heading"))).toBe(true);
+  });
+
+  it("keeps V2 identities stable when only a section heading is edited", () => {
+    const original = XLSX.read(readFileSync(source), { type: "buffer", raw: false });
+    const edited = XLSX.read(readFileSync(source), { type: "buffer", raw: false });
+    // Change a real section heading in memory only; no workbook is written.
+    edited.Sheets["UGD PIPE"]!["B3"].v = "RENAMED SECTION HEADING";
+    delete edited.Sheets["UGD PIPE"]!["B3"].w;
+    const before = parseApolloMaster(original).rows
+      .filter((row) => row.codeSource === "locally_assigned")
+      .map((row) => [row.prayagCode, apolloPipeIdentityV2(row.category, row.prayagCode, row.size)]);
+    const after = parseApolloMaster(edited).rows
+      .filter((row) => row.codeSource === "locally_assigned")
+      .map((row) => [row.prayagCode, apolloPipeIdentityV2(row.category, row.prayagCode, row.size)]);
+    expect(after).toEqual(before);
+  });
+
+  it("separates the 24 legacy description collisions with V2 keys", () => {
+    const parsed = parseApolloMaster(readFileSync(source));
+    const localRows = parsed.rows.filter((row) => row.codeSource === "locally_assigned");
+    const legacyGroups = new Map<string, typeof localRows>();
+    for (const row of localRows) {
+      const key = apolloPipeIdentity(row.description, row.size);
+      if (key) legacyGroups.set(key, [...(legacyGroups.get(key) ?? []), row]);
+    }
+    const collidingRows = [...legacyGroups.values()].filter((group) => group.length > 1).flat();
+    expect(collidingRows).toHaveLength(24);
+    expect(new Set(collidingRows.map((row) => apolloPipeIdentityV2(row.category, row.prayagCode, row.size))).size).toBe(24);
   });
 });

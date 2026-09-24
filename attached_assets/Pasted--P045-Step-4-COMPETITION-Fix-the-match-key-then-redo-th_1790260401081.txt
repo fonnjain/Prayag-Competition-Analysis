@@ -1,0 +1,130 @@
+# P045 — Step 4 — COMPETITION — Fix the match key, then redo the cross-check
+
+> **P045 Step 4** · app: **COMPETITION** (`prayag-price.com`)
+> **Development only. Production is not loaded and not published.**
+> Quote `P045 Step 4` when reporting back.
+
+Step 3 settled three things and exposed one defect.
+
+**Settled.** The workbook load is idempotent, proven across four runs with two reporting bugs found and fixed. The PDF detector now refuses rather than recommending an unsupported path. The 1,912 unverified rows cannot be resolved from database evidence — a hash identifies an import, not who originated each code — so that becomes a document review for people, not a code task.
+
+**The defect.** The locally assigned match key is **already broken**:
+
+```
+272 locally assigned rows  ->  256 distinct keys
+8 keys collide across 24 rows
+all 272 contain heading-derived text
+```
+
+That is not a risk on the next file. Matching on that key is ambiguous for 24 products **today**, and one of them is the identity `APUGD007` is reserved against.
+
+**A correction to the previous step's framing, which was mine.** I called the 418 agreeing PDF rows "real corroboration". Your check shows the agreement is **price only** — 0 of 418 agree on description and size, 22 on size alone, 174 PDF sizes blank. Same code, same price, nothing else established. It does not exclude a same-price row misalignment.
+
+**These two are one problem.** Description comparison is useless precisely because workbook descriptions carry accumulated headings. Fix the key and the cross-check becomes possible.
+
+---
+
+# PART A — Rebuild the identity, with a full before-and-after
+
+Apply the fix you proposed: identity derived from the row's **own product attributes** plus **one explicitly active section classification** — never a rolling list of headings.
+
+## A.1 What to report
+
+```
+distinct keys / rows        expect 272 / 272
+collisions remaining        expect 0
+rows whose key changed      expect 272
+```
+
+**A.2** The complete old-key to new-key mapping for all 272 rows. Not a sample.
+
+**A.3** The **24 colliding rows** individually: the shared old key, and what in the new key distinguishes them. If any pair is genuinely the same product twice, say so — that is a different finding and it must not be hidden by a better key.
+
+**A.4** Reconcile against what already exists:
+
+- every existing Prayag mapping — which still match, which no longer do
+- the `APUGD007` reservation — its identity changes, so restate the binding and prove the mismatch test still returns 409
+- any row whose mapping would change
+
+**Do not silently remap anything.** A row whose mapping changes is listed, with old and new, and is held rather than applied if the change is not obviously correct.
+
+**A.5** Stability check: does the new key survive a heading change? Alter a section heading in a copy of the workbook, re-derive, and report how many of the 272 identities move. **The answer should be zero.**
+
+---
+
+# PART B — Redo the cross-check, now that descriptions are clean
+
+**B.1** Of the 418 price-agreeing PDF rows, how many now agree on **description** under normalisation? Report the figure before and after the key fix.
+
+**B.2** The **174 blank PDF size fields**: is size genuinely absent from the printed page, or present and not extracted? Check a sample of ten against the PDF and say which.
+
+**B.3** Report the count agreeing on **all three** — price, description, size — and the count agreeing on price alone. That second number is the size of the unverified remainder.
+
+**B.4** For any row agreeing on price but disagreeing on description, check whether the disagreement looks like **wording** or like **row misalignment**, as `PMN03122V` did. Report how many fall in each.
+
+This is the number that decides whether Apollo is fit for production. Price agreement alone is not evidence that the right price is against the right product.
+
+---
+
+# PART C — `PMN03122V` is loaded, disputed, and not marked as such
+
+The workbook's **₹27** is loaded. The PDF — **the actual Apollo source document** — says **₹60**, against a different fitting.
+
+Not removing it during a no-change load was correct. But the standing position is now the wrong way round: **the workbook is a derived artefact and the PDF is the source.** What is loaded is the derived value, and the source disagrees with it.
+
+**C.1** Is the ₹27 row flagged as disputed anywhere a user would see it? If not, someone reading the app sees a price with no indication that the source document contradicts it. That is the failure this project keeps returning to — a record that looks settled and is not.
+
+**C.2** Mark it as disputed. Do not change the value, do not apply ₹60, do not remove ₹27. **Flag it.**
+
+**C.3** Report every other row where the PDF and the workbook disagree on price, whether or not it was approved. If there are more than the one, that changes the shape of Part B.
+
+---
+
+# Rules
+
+1. Development only. Nothing reaches production; nothing is published.
+2. No Prayag product created, changed or deleted. The catalogue stays at **6,946**.
+3. No price value changes. Part C flags; it does not reprice.
+4. No row is relabelled from `unverified`.
+5. No mapping is changed without being listed; anything not obviously correct is held.
+6. `PPRMB0204XX20MM` stays unpriced.
+
+# Tests
+
+```
+1. 272 rows yield 272 distinct keys
+2. No identity contains heading-derived text
+3. Changing a section heading moves zero identities
+4. APUGD007's restated binding still returns 409 on a mismatched product
+5. Every changed mapping is listed; none is applied silently
+6. The disputed flag on PMN03122V is visible in the UI
+7. Apollo price rows remain 691; full-row fingerprint unchanged except for identity fields
+8. Prayag catalogue remains 6,946 with its fingerprint unchanged
+```
+
+**Test 3 is the one that proves the key is fixed rather than merely different.**
+
+# Report
+
+1. Distinct keys, collisions, rows changed.
+2. The full 272-row old-to-new mapping.
+3. The 24 collision rows, with what now distinguishes them.
+4. Mapping reconciliation: still matching, no longer matching, held.
+5. The heading-change stability result.
+6. Description agreement among the 418, before and after.
+7. The blank-size finding from the ten-row sample.
+8. Three-field agreement count, and price-only count.
+9. Wording versus misalignment, for the disagreeing rows.
+10. The disputed flag, and every other PDF-versus-workbook price disagreement.
+
+State the environment and the clock time against every figure.
+
+---
+
+## After this
+
+If three-field agreement is high, Apollo is ready for a production load prompt of its own.
+
+If it is low, the vision extraction is not yet good enough to trust and that is better known now than after 691 rows are live.
+
+**Still with Prayag:** `PPRMB0204XX20MM`, one supplier code with two prices; and `PMN03122V`, where the printed page needs checking to settle ₹27 against ₹60.

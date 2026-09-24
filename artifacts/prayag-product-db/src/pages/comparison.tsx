@@ -117,6 +117,22 @@ function PendingRevisionNote({
   );
 }
 
+function DisputedBadge({ reason }: { reason?: string | null }) {
+  return (
+    <div
+      role="status"
+      title={reason || "An approved PDF quote differs from the confirmed workbook price."}
+      className="mt-1 inline-flex max-w-[260px] items-start gap-1 rounded border border-red-300 bg-red-100 px-2 py-1 text-left text-[11px] font-semibold leading-tight text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+    >
+      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+      <span>
+        <span className="block">Disputed</span>
+        <span className="font-normal">Confirmed workbook value still shown; PDF quote unverified.</span>
+      </span>
+    </div>
+  );
+}
+
 export default function ComparisonPage() {
   const [view, setView] = useState<ViewMode>("byProduct");
   const [search, setSearch] = useState("");
@@ -596,6 +612,10 @@ export default function ComparisonPage() {
                         </td>
                         {(productData?.competitors ?? []).map((comp) => {
                           const cell = cellByComp.get(comp);
+                           const dispute = cell as (typeof cell) & {
+                             disputed?: boolean;
+                             disputeReason?: string | null;
+                           };
                           if (!cell || cell.price == null) {
                             return <td key={comp} className="px-4 py-3 text-right text-muted-foreground italic text-xs">No data</td>;
                           }
@@ -615,6 +635,7 @@ export default function ComparisonPage() {
                                   {cell.isCheapest && <Trophy className="w-3 h-3" />}
                                   {formatMoney(cell.price)}
                                 </span>
+                                 {dispute?.disputed && <DisputedBadge reason={dispute.disputeReason} />}
                               </div>
                               {cell.perMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -735,6 +756,10 @@ export default function ComparisonPage() {
                 ) : (
                   comparisonData?.rows.map((row) => {
                     const isMapped = row.matchedPrayagCode && row.matchStatus === "matched";
+                    const dispute = row as typeof row & {
+                      disputed?: boolean;
+                      disputeReason?: string | null;
+                    };
                     
                     return (
                       <tr key={row.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
@@ -757,6 +782,7 @@ export default function ComparisonPage() {
                         <td className="px-4 py-3 text-right font-mono">
                           {formatMoney(row.competitorPrice)}
                           {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
+                           {dispute.disputed && <DisputedBadge reason={dispute.disputeReason} />}
                           {row.compPerMetre != null && (
                             <div className="mt-0.5 text-[11px] text-muted-foreground">
                               {formatMoney(row.compPerMetre)}/m

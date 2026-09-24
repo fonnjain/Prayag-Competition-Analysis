@@ -3,7 +3,7 @@
  * it never imports the database or mutates application state.
  */
 import * as XLSX from "xlsx";
-import { apolloPipeIdentity, reserveAPUGD007, assertApolloReservationOwner, type ApolloCodeReservation } from "./apolloPipeIdentity";
+import { apolloPipeIdentityV2, reserveAPUGD007, assertApolloReservationOwner, type ApolloCodeReservation } from "./apolloPipeIdentity";
 
 export type ApolloMasterRow = {
   category: string; description: string; size: string | null; prayagCode: string | null;
@@ -87,8 +87,7 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
     const pCode = pCodeOffset < 0 ? -1 : pStart + pCodeOffset;
     const sizeCols = headers.map((h, i) => /size\s*\(mm\)|size|length|socket|variant/i.test(h) && i < aStart ? i : -1).filter(i => i >= 0);
     const coverageStatusCol = headers.findIndex(h => /^coverage status$/i.test(h));
-    let headings: string[] = [];
-    let lastCategory = category.replace(/\s+(PIPE|FITTINGS)$/i, "").trim();
+    let activeHeading = "";
     for (let r = 2; r < values.length; r++) {
       const row = values[r] ?? [], ac = clean(row[aCode]), pc = pCode >= 0 ? clean(row[pCode]) : "";
       const price = number(row[aPrice]);
@@ -96,20 +95,20 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       // Heading rows have text but no item code and no Apollo code.
       if (!ac && !pc && row.some(v => clean(v)) && !row.some(v => number(v) !== null)) {
         const text = row.slice(0, aStart).map(clean).filter(Boolean).join(" ");
-        if (text) { headings = [...headings.slice(-2), text]; lastCategory = text; }
+        if (text) activeHeading = text;
         continue;
       }
       const pipe = PIPE.has(category);
       // In a reviewed workbook the generated code has already been cleared.
       // Only the explicit coverage marker distinguishes those rows from other
       // ordinary blank comparison rows in the original sheet.
-      const finalDescription = [category.replace(/\s+PIPE$/i, ""), ...headings].filter(Boolean).join(" - ");
+      const finalDescription = [category.replace(/\s+PIPE$/i, ""), activeHeading].filter(Boolean).join(" - ");
       const size = sizeCols.map(i => clean(row[i])).filter(Boolean).join(" x ") || null;
       const summaryMapping = summaryReservations.get(`${sheet}:${r + 1}`);
       if (pipe && coverageStatusCol >= 0 &&
           /coverage gap/i.test(clean(row[coverageStatusCol])) && price === null) {
         const mappedCode = summaryMapping?.newCode && /^APUGD007$/i.test(summaryMapping.newCode) ? "APUGD007" : null;
-        unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode: mappedCode, description: finalDescription || null, size, owner: apolloPipeIdentity(finalDescription, size) });
+        unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode: mappedCode, description: finalDescription || null, size, owner: apolloPipeIdentityV2(category, pc, size) });
         coverageGaps[category] = (coverageGaps[category] ?? 0) + 1;
         continue;
       }
@@ -124,7 +123,7 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       if (price === null) {
         if (generated) {
           const generatedCode = renamed || ac;
-          unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode, description: finalDescription || null, size, owner: apolloPipeIdentity(finalDescription, size) });
+          unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode, description: finalDescription || null, size, owner: apolloPipeIdentityV2(category, pc, size) });
           coverageGaps[category] = (coverageGaps[category] ?? 0) + 1;
         }
         continue;
@@ -150,7 +149,7 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
   const gap = unpriced.find(g => g.generatedCode === "APUGD007");
   if (gap?.owner) {
     if (!gap.prayagCode) throw new Error("APUGD007 reservation requires a Prayag code (U-11B)");
-    reservations.push(reserveAPUGD007(gap.description, gap.size, {
+    reservations.push(reserveAPUGD007(gap.category, gap.prayagCode, gap.size, {
       prayagCode: gap.prayagCode, sheet: gap.sheet, sourceRow: gap.sourceRow,
     }));
   }
@@ -169,15 +168,15 @@ export function applyApolloPlan(state: ApolloPlanState, parsed: ApolloMasterPars
   let created = 0, updated = 0;
   const existingRows = state.rows.slice();
   for (const incoming of parsed.rows) {
-    const identity = incoming.codeSource === "supplier" ? incoming.competitorCode.toUpperCase() : apolloPipeIdentity(incoming.description, incoming.size);
+    const identity = incoming.codeSource === "supplier" ? incoming.competitorCode.toUpperCase() : apolloPipeIdentityV2(incoming.category, incoming.prayagCode, incoming.size);
     if (!identity) throw new Error(`Apollo row has no usable identity: ${incoming.sheet}:${incoming.sourceRow}`);
     // Prefer the source code when re-applying the same file.  Locally
-    // assigned rows still match by description+size for revised Apollo files,
-    // but this prevents duplicate identities within one master from causing
-    // a later identical application to rewrite the first matching row.
+    // assigned rows match by V2 category/code/size for revised Apollo files;
+    // this prevents duplicate identities within one master from causing a
+    // later identical application to rewrite the first matching row.
     const found = existingRows.find(r => r.competitorCode.toUpperCase() === incoming.competitorCode.toUpperCase() && r.price === incoming.price)
       ?? existingRows.find(r => r.competitorCode.toUpperCase() === incoming.competitorCode.toUpperCase())
-      ?? existingRows.find(r => (incoming.codeSource === "supplier" ? r.competitorCode.toUpperCase() : apolloPipeIdentity(r.description, r.size)) === identity);
+      ?? existingRows.find(r => (incoming.codeSource === "supplier" ? r.competitorCode.toUpperCase() : apolloPipeIdentityV2(r.category, r.prayagCode, r.size)) === identity);
     if (found) {
       const unchanged = (Object.keys(incoming) as Array<keyof ApolloMasterRow>).every(key => found[key] === incoming[key]);
       if (!unchanged) { Object.assign(found, incoming); updated++; }
@@ -196,10 +195,11 @@ export const parseApolloWorkbook = parseApolloMaster;
  */
 export function assertApolloReservedAssignment(
   code: string,
-  description: string | null | undefined,
+  category: string | null | undefined,
+  prayagCode: string | null | undefined,
   size: string | null | undefined,
   reservations: readonly ApolloCodeReservation[],
 ): void {
   const reservation = reservations.find(r => r.code.toUpperCase() === code.toUpperCase());
-  if (reservation) assertApolloReservationOwner(code, description, size, reservation);
+  if (reservation) assertApolloReservationOwner(code, category, prayagCode, size, reservation);
 }

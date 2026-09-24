@@ -38,4 +38,4 @@
 - [PPR pipe unit restatement](ppr-pipe-unit-restatement.md) — PPR pipe history keeps Feb and Aug per-pipe periods; the spurious May period is deleted, not restated.
 - [Prince duplicate-code decisions](prince-duplicate-code-decisions.md) — exclusions are pair-keyed and confirmations suppress duplicate anomalies; P034r2 keeps A-414, never A-464.
 - [P042 Sales deletion proof](p042-sales-deletion-proof.md) — a fiscal-year sales snapshot cannot prove a product was never sold; keep delete unavailable without verified all-time sales and catalogue absence.
-- [Apollo pipe provenance](apollo-pipe-provenance.md) — Apollo's pipe identifiers are internal handles; the PDF has no pipe SKUs, and first import needs reviewed mappings before a real double-load claim.
+- [Apollo pipe provenance](apollo-pipe-provenance.md) — internal Apollo handles are not supplier SKUs; workbook identity uses sheet category, Prayag code, and size; hold PDF pipe matches without codes.
