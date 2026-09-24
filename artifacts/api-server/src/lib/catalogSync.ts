@@ -119,7 +119,7 @@ export function createCatalogSyncBundleFromData(data: CatalogSyncData): CatalogS
     ...data,
     competitorPrices: data.competitorPrices.map((row) => ({
       ...row,
-      codeSource: row.codeSource ?? null,
+      codeSource: row.codeSource ?? "unverified",
     })),
   };
   data = bundleData;
@@ -728,8 +728,8 @@ function reviveDates(data: CatalogSyncData): CatalogSyncData {
       revive(row, ["createdAt"]),
     ),
     codeConflicts: data.codeConflicts,
-    competitorPrices: data.competitorPrices.map((row) =>
-      revive(row, ["createdAt", "updatedAt"]),
+     competitorPrices: data.competitorPrices.map((row) =>
+       ({ ...revive(row, ["createdAt", "updatedAt"]), codeSource: row.codeSource ?? "unverified" }),
     ),
     competitorCodeAliases: data.competitorCodeAliases.map((row) =>
       revive(row, ["createdAt"]),

@@ -5,6 +5,8 @@ import {
   matchApolloPipe,
   normalizeApolloDescription,
   normalizeApolloSize,
+  reserveAPUGD007,
+  assertAPUGD007Owner,
   type ApolloPipeRow,
 } from "./apolloPipeIdentity.js";
 
@@ -47,5 +49,15 @@ describe("P045 Apollo pipe identity", () => {
     expect(matchApolloPipe({ codeSource: "locally_assigned", competitorCode: null, description: "new pipe", size: "1 m" }, []).kind).toBe("new");
     expect(() => assertApolloCodeAvailable("APC-001", ["APC001", "OTHER"])).toThrow(/already exists/);
     expect(() => assertApolloCodeAvailable("NEW-1", ["APC001"])).not.toThrow();
+  });
+
+  it("binds APUGD007 to one normalized owner and permits that owner when priced", () => {
+    const reservation = reserveAPUGD007("UGD Pipe - Ring Fit", "110 millimetres", {
+      prayagCode: "U-11B",
+      sheet: "UGD PIPE", sourceRow: 14,
+    });
+    expect(reservation.owner).toBe("ugd pipe ring fit|110mm");
+    expect(() => assertAPUGD007Owner("ugd-pipe ring fit", "110 mm", reservation)).not.toThrow();
+    expect(() => assertAPUGD007Owner("different pipe", "110 mm", reservation)).toThrow(/reserved for/);
   });
 });

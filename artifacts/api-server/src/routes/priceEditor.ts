@@ -257,7 +257,7 @@ router.post("/catalog/price-editor/save", requireAdmin, async (req, res): Promis
         const existing = (await tx.select().from(competitorPricesTable).where(and(eq(competitorPricesTable.matchedPrayagCode, code), eq(competitorPricesTable.competitor, series), eq(competitorPricesTable.effectiveDate, effectiveDate))).limit(1).for("update"))[0];
         old = existing?.price ?? null; targetWasExisting = !!existing;
         if (existing) { const rows = await tx.update(competitorPricesTable).set({ price: value, updatedAt: new Date() }).where(eq(competitorPricesTable.id, existing.id)).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
-        else { const rows = await tx.insert(competitorPricesTable).values({ competitor: series, price: value, effectiveDate, matchedPrayagCode: code, matchStatus: "matched", description: p.productName, category: p.category, size: p.size }).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
+        else { const rows = await tx.insert(competitorPricesTable).values({ competitor: series, price: value, effectiveDate, matchedPrayagCode: code, matchStatus: "matched", codeSource: "unverified", description: p.productName, category: p.category, size: p.size }).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
       }
       if (mutation !== 1) throw new Error("Price edit changed an unexpected number of rows.");
       if (!targetWasExisting) previousResolvedValue = resolvedValue;

@@ -17,6 +17,7 @@ import {
   competitorPriceStagingTable,
   competitorMappingDecisionsTable,
   catalogProductClassificationCorrectionsTable,
+  apolloReservationsTable,
 } from "@workspace/db";
 import {
   recomputeCurrentFlags,
@@ -3099,7 +3100,7 @@ router.post(
          canonical,
        );
       const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
-       const princeMaster = (() => {
+      const princeMaster = (() => {
          if (!isPrinceCompetitorMasterWorkbook(workbook)) return null;
          try {
             return parsePrinceCompetitorMaster(file.buffer, workbook, princeCanonical);
@@ -3601,7 +3602,9 @@ router.post(
          canonical,
        );
       const sparshMaster = parseSparshCompetitorMaster(wb, canonical);
-       const princeMaster = (() => {
+       // Apollo pipe sheets share names with Prince's trusted workbook. Never
+       // run the Prince date/position parser on an Apollo upload.
+       const princeMaster = competitor.trim().toLowerCase() === "apollo" ? null : (() => {
          try {
            return parsePrinceCompetitorMaster(file.buffer, wb, canonical);
          } catch (error) {
@@ -3994,6 +3997,39 @@ router.post(
               });
               return;
             }
+            // Reservations are product identities, not merely historical
+            // codes. Validate them before reading/writing any import state so
+            // a mistaken re-use cannot create a batch or price rows.
+            const storedReservations = await db.select({
+              competitorCode: apolloReservationsTable.competitorCode,
+              ownerIdentity: apolloReservationsTable.ownerIdentity,
+            }).from(apolloReservationsTable).where(
+              eq(apolloReservationsTable.competitor, APOLLO_COMPETITOR),
+            );
+            const incomingReservations = new Map(
+              parsedApollo.reservations.map((reservation) => [
+                reservation.code.toUpperCase(),
+                reservation.owner,
+              ]),
+            );
+            for (const row of parsedApollo.rows) {
+              if (row.codeSource === "locally_assigned") {
+                const owner = apolloPipeIdentity(row.description, row.size);
+                if (owner) incomingReservations.set(row.competitorCode.toUpperCase(), owner);
+              }
+            }
+            for (const stored of storedReservations) {
+              const incomingOwner = incomingReservations.get(stored.competitorCode.toUpperCase());
+              if (incomingOwner && incomingOwner !== stored.ownerIdentity) {
+                res.status(409).json({
+                  error: `Apollo reserved code ${stored.competitorCode} belongs to ${stored.ownerIdentity}, not ${incomingOwner}`,
+                  code: "APOLLO_RESERVATION_OWNER_MISMATCH",
+                  competitorCode: stored.competitorCode,
+                  noWrites: true,
+                });
+                return;
+              }
+            }
             const existingApollo = await db.execute<{
               id: number; competitor_code: string | null; code_source: string | null;
               description: string | null; size: string | null; matched_prayag_code: string | null;
@@ -4100,6 +4136,12 @@ router.post(
             let insertedCount = 0;
             let updatedCount = 0;
             let unchangedCount = 0;
+             const idempotentInfo: { counts: {
+               matched?: number;
+               skipped?: typeof skipped;
+               coverage_gaps?: typeof parsedApollo.coverageGaps;
+               conflicts?: typeof parsedApollo.conflicts;
+             } | null } = { counts: null };
             await db.transaction(async (tx) => {
               await tx.execute(sql`SELECT pg_advisory_xact_lock(917045)`);
               const prior = await tx.select({ id: importBatchesTable.id, rowCounts: importBatchesTable.rowCounts })
@@ -4112,7 +4154,46 @@ router.post(
               if (prior.length) {
                 batchId = prior[0]!.id;
                 idempotent = true;
+                 idempotentInfo.counts = prior[0]!.rowCounts
+                   ? JSON.parse(prior[0]!.rowCounts) as typeof idempotentInfo.counts
+                   : null;
                 return;
+              }
+              const lockedReservations = await tx.select({
+                competitorCode: apolloReservationsTable.competitorCode,
+                ownerIdentity: apolloReservationsTable.ownerIdentity,
+              }).from(apolloReservationsTable).where(
+                eq(apolloReservationsTable.competitor, APOLLO_COMPETITOR),
+              );
+              for (const existing of lockedReservations) {
+                const incomingOwner = incomingReservations.get(existing.competitorCode.toUpperCase());
+                if (incomingOwner && incomingOwner !== existing.ownerIdentity) {
+                  throw Object.assign(
+                    new Error(`Apollo reserved code ${existing.competitorCode} belongs to ${existing.ownerIdentity}, not ${incomingOwner}`),
+                    { httpStatus: 409 },
+                  );
+                }
+              }
+              for (const reservation of parsedApollo.reservations) {
+                const existing = lockedReservations.find((row) =>
+                  row.competitorCode.toUpperCase() === reservation.code.toUpperCase());
+                if (existing && existing.ownerIdentity !== reservation.owner) {
+                  throw Object.assign(
+                    new Error(`Apollo reserved code ${reservation.code} belongs to ${existing.ownerIdentity}, not ${reservation.owner}`),
+                    { httpStatus: 409 },
+                  );
+                }
+                await tx.insert(apolloReservationsTable).values({
+                  competitor: APOLLO_COMPETITOR,
+                  competitorCode: reservation.code,
+                  ownerIdentity: reservation.owner,
+                  prayagCode: reservation.prayagCode,
+                  sourceSheet: reservation.sourceSheet ?? "UGD PIPE",
+                  sourceRow: reservation.sourceRow ?? 0,
+                  sourceFileName: name,
+                }).onConflictDoNothing({
+                  target: [apolloReservationsTable.competitor, apolloReservationsTable.competitorCode],
+                });
               }
               // Recheck against the locked, current competitor set.  The
               // preflight snapshot above is only for user feedback; this is
@@ -4220,7 +4301,9 @@ router.post(
                   }).where(eq(competitorPricesTable.id, current.id));
                   updatedCount++;
                 } else {
-                  await tx.insert(competitorPricesTable).values({ ...value, loadBatchId: batchId });
+                   // This FK belongs to MRP load batches, not competitor import
+                   // batches. The Apollo import is recorded in import_batches.
+                   await tx.insert(competitorPricesTable).values(value);
                   insertedCount++;
                 }
               }
@@ -4241,9 +4324,12 @@ router.post(
             res.json({ results: {
               competitor: APOLLO_COMPETITOR, file: name, effectiveDate, fileSha256: sourceHash,
               batchId, totalRows: parsedApollo.rows.length, inserted: idempotent ? 0 : insertedCount,
-              updated: idempotent ? 0 : updatedCount, unchanged: idempotent ? values.length : unchangedCount,
+               updated: idempotent ? 0 : updatedCount,
+               unchanged: idempotent ? (idempotentInfo.counts?.matched ?? values.length) : unchangedCount,
               matched: idempotent ? 0 : insertedCount + updatedCount + unchangedCount,
-              skipped, coverageGaps: parsedApollo.coverageGaps, conflicts: parsedApollo.conflicts,
+               skipped: idempotent ? (idempotentInfo.counts?.skipped ?? skipped) : skipped,
+               coverageGaps: idempotent ? (idempotentInfo.counts?.coverage_gaps ?? parsedApollo.coverageGaps) : parsedApollo.coverageGaps,
+               conflicts: idempotent ? (idempotentInfo.counts?.conflicts ?? parsedApollo.conflicts) : parsedApollo.conflicts,
               idempotent, noPrayagWrites: true,
             } });
             return;

@@ -23,6 +23,17 @@ export interface ApolloPipeInput {
   size: string | null;
 }
 
+/** The only reserved locally-assigned code in the P045 Apollo pipe master. */
+export interface ApolloCodeReservation {
+  code: string;
+  owner: string;
+  description: string;
+  size: string;
+  prayagCode: string;
+  sourceSheet?: string;
+  sourceRow?: number;
+}
+
 export type ApolloPipeMatch =
   | { kind: "matched"; row: ApolloPipeRow; by: "code" | "identity" }
   | { kind: "ambiguous"; rows: ApolloPipeRow[]; by: "code" | "identity" }
@@ -105,6 +116,59 @@ export function apolloPipeIdentity(
   if (!descriptionKey || !sizeKey) return null;
   return `${descriptionKey}|${sizeKey}`;
 }
+
+/** Create the durable, database-independent owner of a reserved code. */
+export function reserveApolloCode(
+  code: string,
+  description: string | null | undefined,
+  size: string | null | undefined,
+  source?: { prayagCode?: string | null; sheet?: string; sourceRow?: number },
+): ApolloCodeReservation {
+  const owner = apolloPipeIdentity(description, size);
+  if (!owner) throw new Error(`Cannot reserve ${code}: description and size are required`);
+  if (!source?.prayagCode) throw new Error(`Cannot reserve ${code}: Prayag code is required`);
+  return {
+    code: normalizeCode(code) === "APUGD007" ? "APUGD007" : code,
+    owner,
+    description: normalizeApolloDescription(description),
+    size: normalizeApolloSize(size),
+    prayagCode: source.prayagCode,
+    sourceSheet: source?.sheet,
+    sourceRow: source?.sourceRow,
+  };
+}
+
+/**
+ * Validate a proposed assignment before persistence.  A reserved code may
+ * return to its owner once it has a positive price, but can never be minted
+ * for another product.
+ */
+export function assertApolloReservationOwner(
+  code: string,
+  description: string | null | undefined,
+  size: string | null | undefined,
+  reservation: ApolloCodeReservation,
+): void {
+  if (normalizeCode(code) !== normalizeCode(reservation.code)) return;
+  const owner = apolloPipeIdentity(description, size);
+  if (owner !== reservation.owner) {
+    throw new Error(
+      `${reservation.code} is reserved for ${reservation.owner}; cannot assign it to ${owner || "an unidentifiable product"}`,
+    );
+  }
+}
+
+/** Narrow integration API for the P045 reservation specifically. */
+export const reserveAPUGD007 = (
+  description: string | null | undefined,
+  size: string | null | undefined,
+  source?: { prayagCode?: string | null; sheet?: string; sourceRow?: number },
+) => reserveApolloCode("APUGD007", description, size, source);
+export const assertAPUGD007Owner = (
+  description: string | null | undefined,
+  size: string | null | undefined,
+  reservation: ApolloCodeReservation,
+) => assertApolloReservationOwner("APUGD007", description, size, reservation);
 
 /** Alias with a descriptive name for importers and tests. */
 export const normalizeApolloPipeIdentity = apolloPipeIdentity;

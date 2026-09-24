@@ -468,7 +468,7 @@ function buildComparisonRow(
     description: c.description,
     size: c.size,
     competitorCode: c.competitorCode,
-    codeSource: c.codeSource,
+    codeSource: c.codeSource ?? "unverified",
     competitorPrice: c.price,
     unit: c.unit,
     effectiveDate: c.effectiveDate,

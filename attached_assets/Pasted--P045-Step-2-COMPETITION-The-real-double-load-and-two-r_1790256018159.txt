@@ -1,0 +1,116 @@
+# P045 — Step 2 — COMPETITION — The real double-load, and two rules
+
+> **P045 Step 2** · app: **COMPETITION** (`prayag-price.com`)
+> **Loading Apollo into DEVELOPMENT is permitted and required. Production is untouched.**
+> Quote `P045 Step 2` when reporting back.
+
+Step 1 is verified against the workbook you sent:
+
+```
+supplier 425  ·  locally_assigned 273  ·  273 priced + 81 gaps = 354
+gaps: SWR 56, PPR 16, CPVC 4, CASING 4, UGD 1
+codes appearing in more than one sheet: none
+UGD renumbered APUGD001-010, with 007 absent; no APU### left in UGD
+```
+
+The ₹0.00 reclassification was correct and was **not** in the prompt. You applied the rule from the original Apollo analysis — zero is a missing price, not a price — which is why the gap count is 81 rather than 77.
+
+---
+
+## Rule 1 of P045 is corrected
+
+P045 said **load no Apollo data**, while Test 8 required proof from **loading the file twice**. Those cannot both be satisfied, and you were right to stop at an in-memory run and name it as short of the real thing.
+
+The intent was: *this is not the Apollo load, and nothing reaches production.* **Loading into development is permitted.**
+
+---
+
+# 1. The real double-load, in development
+
+Load the Apollo file into **development**, twice.
+
+```
+                        before    after 1st    after 2nd
+Apollo price rows
+Apollo import batches
+Prayag catalogue         6,946      6,946        6,946
+```
+
+The second load must create nothing and change nothing.
+
+**Report creations and updates separately for each run.** A second run that reports "0 created" while quietly updating 698 rows is not a no-op, and the distinction is the whole point of the test.
+
+Then exercise the **real PDF path** end to end in development — not the workbook path — and report where the two differ.
+
+**Production is not loaded in this step.** When Apollo goes to production it gets its own prompt and its own approval.
+
+---
+
+# 2. `code_source` needs a third value, and you already found it
+
+You declined to label older Prince and Ashirvad rows as `supplier` without evidence. That is correct, and it is the same discipline as recording an unknown creation time under P039.
+
+But my specification was a binary, so those rows are now *unclassified* — which in practice means NULL, and a NULL gets filled in by whoever comes next.
+
+**Make it explicit and stored:**
+
+```
+supplier           read from the competitor's own document
+locally_assigned   minted here because the document had none
+unverified         origin not established; not evidence of either
+```
+
+`unverified` is a real answer with the same standing as the other two, **not an absence**.
+
+Report how many rows carry it, by competitor.
+
+---
+
+# 3. `APUGD007` is reserved — but reserved for what?
+
+Dropping it was right: no price, no row. But **a reserved number with no owner is an identity waiting to be reused.**
+
+**Bind the reservation to the product, not to the number.** `APUGD007` belongs to that specific UGD item — identified by normalised description and size — and to nothing else.
+
+- If Apollo later prices that product, it takes `APUGD007` back.
+- If a different product would be assigned `APUGD007`, that must **fail**.
+
+Report how the binding is stored, and prove it: attempt to mint `APUGD007` for a different product and confirm it is refused.
+
+---
+
+# 4. The two untested items
+
+**4.1** Test 12 — non-admin receives 403 on the Apollo upload routes. Exercise it and report the response.
+
+**4.2** Confirm again that no Apollo path can create a Prayag product — this time with the loader actually running, not by inspection.
+
+---
+
+# Rules
+
+1. Development only. **No Apollo data reaches production in this step.**
+2. No Prayag product is created, changed or deleted. The catalogue stays at 6,946.
+3. No existing Prince or Ashirvad mapping changes.
+4. `PPRMB0204XX20MM` stays held. Do not price it.
+5. No price value is invented. A blank stays blank; a zero is a gap.
+
+# Report
+
+1. Development double-load: rows and batches before, after first, after second — **with creations and updates stated separately for each run**.
+2. The real PDF path result, and any difference from the workbook path.
+3. `unverified` counts, by competitor.
+4. How the `APUGD007` reservation is bound, and the refused re-mint.
+5. The non-admin 403 response.
+6. Prayag catalogue count, unchanged at 6,946.
+7. Confirmation that production holds no Apollo data.
+
+State the environment and the clock time against every figure.
+
+---
+
+## After this
+
+Apollo is ready for a **production load prompt of its own**, with its own approval.
+
+One item stays open for Prayag: **`PPRMB0204XX20MM` is quoted at two different prices.** That is a real supplier code with a real conflict, and it needs a ruling rather than a default.

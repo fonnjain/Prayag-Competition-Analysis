@@ -88,7 +88,7 @@ function competitorCodeLabel(
     <span className="flex flex-col">
       <span className="font-mono">{code}</span>
       <span className={cn("text-[10px] font-medium", isInternal ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
-        {isInternal ? "Internal code / NOT supplier SKU" : source === "supplier" ? "Supplier code" : "Code source unknown"}
+        {isInternal ? "Internal code / NOT supplier SKU" : source === "supplier" ? "Supplier code" : "Origin unverified"}
       </span>
     </span>
   );

@@ -55,8 +55,8 @@ interface StagingRow {
   status: RowStatus;
   reviewReason: string | null;
   /** Origin recorded by the staging API; local codes are internal handles. */
-  codeSource?: "supplier" | "locally_assigned" | string | null;
-  code_source?: "supplier" | "locally_assigned" | string | null;
+  codeSource?: "supplier" | "locally_assigned" | "unverified" | string | null;
+  code_source?: "supplier" | "locally_assigned" | "unverified" | string | null;
 }
 
 interface BatchData {
@@ -165,25 +165,28 @@ function discoveryLabel(row: StagingRow): string | null {
   }
 }
 
-function codeSource(row: StagingRow): "supplier" | "locally_assigned" | null {
+function codeSource(row: StagingRow): "supplier" | "locally_assigned" | "unverified" {
   const source = row.codeSource ?? row.code_source;
-  if (source === "supplier" || source === "locally_assigned") return source;
-  return null;
+  if (source === "supplier" || source === "locally_assigned" || source === "unverified") return source;
+  return "unverified";
 }
 
 function CodeOriginBadge({ row, competitor }: { row: StagingRow; competitor: string }) {
   const source = codeSource(row);
-  if (!source) return null;
   const isApollo = competitor.trim().toLowerCase() === "apollo";
   const label = source === "locally_assigned"
     ? isApollo ? "Internal code · NOT Apollo SKU" : "Internal code · NOT supplier SKU"
-    : isApollo ? "Apollo SKU" : "Supplier code";
+    : source === "supplier"
+      ? isApollo ? "Apollo SKU" : "Supplier code"
+      : "Origin unverified";
   return (
     <Badge
       variant="outline"
       className={source === "locally_assigned"
         ? "text-xs border-orange-300 bg-orange-50 text-orange-800"
-        : "text-xs border-blue-300 bg-blue-50 text-blue-800"}
+        : source === "unverified"
+          ? "text-xs border-slate-300 bg-slate-50 text-slate-700"
+          : "text-xs border-blue-300 bg-blue-50 text-blue-800"}
     >
       {label}
     </Badge>

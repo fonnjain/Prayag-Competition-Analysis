@@ -29,6 +29,14 @@ describe("P045 Apollo master (pure, read-only)", () => {
       competitorCode: "APUGD001", price: 2022,
     });
     expect(parsed.renames).toHaveLength(10);
+    expect(parsed.reservations).toEqual([
+      expect.objectContaining({
+        code: "APUGD007",
+        owner: "ugd ugd pipe 6 m ring fit sn 8 ring fit sn 4|110",
+        sourceSheet: "UGD PIPE",
+        sourceRow: 13,
+      }),
+    ]);
     expect(parsed.renames).toEqual(expect.arrayContaining([
       expect.objectContaining({ oldCode: "APU001", newCode: "APUGD001" }),
       expect.objectContaining({ oldCode: "APU010", newCode: "APUGD010" }),

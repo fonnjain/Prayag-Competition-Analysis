@@ -3,19 +3,20 @@
  * it never imports the database or mutates application state.
  */
 import * as XLSX from "xlsx";
-import { apolloPipeIdentity, normalizeApolloDescription, normalizeApolloSize } from "./apolloPipeIdentity";
+import { apolloPipeIdentity, reserveAPUGD007, assertApolloReservationOwner, type ApolloCodeReservation } from "./apolloPipeIdentity";
 
 export type ApolloMasterRow = {
   category: string; description: string; size: string | null; prayagCode: string | null;
   competitorCode: string; codeSource: "supplier" | "locally_assigned"; price: number;
   sheet: string; sourceRow: number;
 };
-export type ApolloUnpricedGap = { category: string; sheet: string; sourceRow: number; prayagCode: string | null; generatedCode: string | null };
+export type ApolloUnpricedGap = { category: string; sheet: string; sourceRow: number; prayagCode: string | null; generatedCode: string | null; description: string | null; size: string | null; owner: string | null };
 export type ApolloPriceConflict = { competitorCode: string; prices: number[]; rows: Array<{ sheet: string; sourceRow: number }> };
-export type ApolloRename = { oldCode: string; newCode: string; sheet: string; prayagCode: string | null; status?: "applied" | "reserved_dropped" };
+export type ApolloRename = { oldCode: string; newCode: string; sheet: string; sourceRow?: number; prayagCode: string | null; status?: "applied" | "reserved_dropped" };
 export type ApolloMasterParse = {
   rows: ApolloMasterRow[]; coverageGaps: Record<string, number>; unpriced: ApolloUnpricedGap[];
   renames: ApolloRename[]; conflicts: ApolloPriceConflict[]; pipeCount: number; fittingCount: number;
+  reservations: ApolloCodeReservation[];
 };
 
 export type ApolloInput = string | Uint8Array | ArrayBuffer | XLSX.WorkBook;
@@ -41,6 +42,21 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
   const coverageGaps: Record<string, number> = {};
   const renames: ApolloRename[] = [];
   const seenCodes = new Map<string, ApolloMasterRow[]>();
+  const summaryReservations = new Map<string, { oldCode: string; newCode: string; sheet: string; sourceRow: number }>();
+  const summary = book.Sheets[book.SheetNames.find(s => /^P045 SUMMARY$/i.test(s)) ?? ""];
+  if (summary) {
+    const values = XLSX.utils.sheet_to_json(summary, { header: 1, raw: false, defval: null }) as unknown[][];
+    const headerRow = values.findIndex(row => row.some(v => /old.*code|new.*code|source.*sheet/i.test(clean(v))));
+    const headers = (values[headerRow < 0 ? 0 : headerRow] ?? []).map(clean);
+    const find = (patterns: RegExp[]) => headers.findIndex(h => patterns.some(p => p.test(h)));
+    const oldAt = find([/old.*code/i, /from/i]), newAt = find([/new.*code/i, /to/i]);
+    const sheetAt = find([/source.*sheet/i, /^sheet$/i]), rowAt = find([/source.*row/i, /^row$/i]);
+    if (oldAt >= 0 && newAt >= 0 && sheetAt >= 0 && rowAt >= 0) for (const row of values.slice((headerRow < 0 ? 0 : headerRow) + 1)) {
+      const oldCode = clean(row[oldAt]), newCode = clean(row[newAt]), sheet = clean(row[sheetAt]);
+      const sourceRow = Number(row[rowAt]);
+      if (oldCode && newCode && sheet && Number.isInteger(sourceRow)) summaryReservations.set(`${sheet}:${sourceRow}`, { oldCode, newCode, sheet, sourceRow });
+    }
+  }
   for (const sheet of book.SheetNames) {
     const name = clean(sheet), category = name.toUpperCase();
     // Annotated output workbooks may carry a non-source summary tab.
@@ -87,9 +103,13 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       // In a reviewed workbook the generated code has already been cleared.
       // Only the explicit coverage marker distinguishes those rows from other
       // ordinary blank comparison rows in the original sheet.
+      const finalDescription = [category.replace(/\s+PIPE$/i, ""), ...headings].filter(Boolean).join(" - ");
+      const size = sizeCols.map(i => clean(row[i])).filter(Boolean).join(" x ") || null;
+      const summaryMapping = summaryReservations.get(`${sheet}:${r + 1}`);
       if (pipe && coverageStatusCol >= 0 &&
           /coverage gap/i.test(clean(row[coverageStatusCol])) && price === null) {
-        unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode: null });
+        const mappedCode = summaryMapping?.newCode && /^APUGD007$/i.test(summaryMapping.newCode) ? "APUGD007" : null;
+        unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode: mappedCode, description: finalDescription || null, size, owner: apolloPipeIdentity(finalDescription, size) });
         coverageGaps[category] = (coverageGaps[category] ?? 0) + 1;
         continue;
       }
@@ -100,15 +120,17 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       const renamed = category === "UGD PIPE" && /^APU\d{3}$/i.test(ac) ? `APUGD${ac.slice(3)}` : ac;
       // Include the tenth mapping even when UGD's APU007 is unpriced. It is
       // reserved/dropped, never emitted as a competitor row.
-      if (renamed !== ac && price === null) renames.push({ oldCode: ac, newCode: renamed, sheet, prayagCode: pc || null, status: "reserved_dropped" });
-      const description = [category.replace(/\s+PIPE$/i, ""), ...headings].filter(Boolean).join(" - ");
-      const size = sizeCols.map(i => clean(row[i])).filter(Boolean).join(" x ") || null;
+       if (renamed !== ac && price === null) renames.push({ oldCode: ac, newCode: renamed, sheet, sourceRow: r + 1, prayagCode: pc || null, status: "reserved_dropped" });
       if (price === null) {
-        if (generated) { unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode: ac }); coverageGaps[category] = (coverageGaps[category] ?? 0) + 1; }
+        if (generated) {
+          const generatedCode = renamed || ac;
+          unpriced.push({ category, sheet, sourceRow: r + 1, prayagCode: pc || null, generatedCode, description: finalDescription || null, size, owner: apolloPipeIdentity(finalDescription, size) });
+          coverageGaps[category] = (coverageGaps[category] ?? 0) + 1;
+        }
         continue;
       }
-      if (renamed !== ac) renames.push({ oldCode: ac, newCode: renamed, sheet, prayagCode: pc || null, status: "applied" });
-      const out: ApolloMasterRow = { category, description, size, prayagCode: pc || null, competitorCode: renamed, codeSource: pipe ? "locally_assigned" : "supplier", price, sheet, sourceRow: r + 1 };
+       if (renamed !== ac) renames.push({ oldCode: ac, newCode: renamed, sheet, sourceRow: r + 1, prayagCode: pc || null, status: "applied" });
+       const out: ApolloMasterRow = { category, description: finalDescription, size, prayagCode: pc || null, competitorCode: renamed, codeSource: pipe ? "locally_assigned" : "supplier", price, sheet, sourceRow: r + 1 };
       rows.push(out);
       const key = renamed.toUpperCase();
       seenCodes.set(key, [...(seenCodes.get(key) ?? []), out]);
@@ -124,7 +146,15 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
     const differentPrices = new Set(list.map(r => r.price)).size > 1;
     if (generated || !differentPrices) throw new Error(`Duplicate Apollo competitor code across sheets: ${code}`);
   }
-  return { rows, coverageGaps, unpriced, renames, conflicts, pipeCount: rows.filter(r => r.codeSource === "locally_assigned").length, fittingCount: rows.filter(r => r.codeSource === "supplier").length };
+  const reservations: ApolloCodeReservation[] = [];
+  const gap = unpriced.find(g => g.generatedCode === "APUGD007");
+  if (gap?.owner) {
+    if (!gap.prayagCode) throw new Error("APUGD007 reservation requires a Prayag code (U-11B)");
+    reservations.push(reserveAPUGD007(gap.description, gap.size, {
+      prayagCode: gap.prayagCode, sheet: gap.sheet, sourceRow: gap.sourceRow,
+    }));
+  }
+  return { rows, coverageGaps, unpriced, renames, conflicts, reservations, pipeCount: rows.filter(r => r.codeSource === "locally_assigned").length, fittingCount: rows.filter(r => r.codeSource === "supplier").length };
 }
 
 export type ApolloPlanState = { rows: ApolloMasterRow[] };
@@ -158,3 +188,18 @@ export function applyApolloPlan(state: ApolloPlanState, parsed: ApolloMasterPars
 }
 
 export const parseApolloWorkbook = parseApolloMaster;
+
+/**
+ * Integration boundary for a loader: call this before inserting or updating
+ * an Apollo row.  It intentionally performs no persistence and allows the
+ * reserved owner to become positively priced.
+ */
+export function assertApolloReservedAssignment(
+  code: string,
+  description: string | null | undefined,
+  size: string | null | undefined,
+  reservations: readonly ApolloCodeReservation[],
+): void {
+  const reservation = reservations.find(r => r.code.toUpperCase() === code.toUpperCase());
+  if (reservation) assertApolloReservationOwner(code, description, size, reservation);
+}

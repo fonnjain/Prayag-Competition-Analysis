@@ -183,7 +183,7 @@ function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
     price: r.price ?? null,
     unit: r.unit ?? null,
     competitorCode: r.competitor_code ?? null,
-    codeSource: r.code_source ?? null,
+    codeSource: r.code_source ?? "unverified",
     effectiveDate: r.effective_date ?? null,
     matchedPrayagCode: r.matched_prayag_code ?? null,
     matchStatus: r.match_status ?? "no match (review)",

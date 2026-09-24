@@ -266,10 +266,9 @@ export const competitorPricesTable = pgTable(
     // Competitor's own catalogue number (e.g. Sparsh Pearl "ED-950"), when the
     // source sheet provides one.
     competitorCode: text("competitor_code"),
-    // Provenance of competitorCode. This is intentionally nullable: existing
-    // rows predate this field and must not be retrospectively called supplier
-    // or locally assigned without evidence.
-    codeSource: text("code_source"),
+    // Provenance of competitorCode. Legacy rows are explicitly unverified until
+    // reviewed; never infer supplier or locally assigned from the competitor.
+    codeSource: text("code_source").notNull().default("unverified"),
     effectiveDate: date("effective_date"),
     matchedPrayagCode: text("matched_prayag_code"),
     matchStatus: text("match_status").notNull().default("no match (review)"),
@@ -312,6 +311,10 @@ export const competitorPricesTable = pgTable(
       t.competitor,
       t.matchedPrayagCode,
       t.effectiveDate,
+    ),
+    check(
+      "competitor_prices_code_source_check",
+      sql`${t.codeSource} in ('supplier', 'locally_assigned', 'unverified')`,
     ),
   ],
 );
@@ -616,9 +619,9 @@ export const competitorPriceStagingTable = pgTable(
     competitorCodeMaster: text("competitor_code_master"),
     // The code as it appears in the uploaded catalogue (may differ via alias).
     competitorCodeCatalogue: text("competitor_code_catalogue"),
-    // Nullable for legacy staging rows where the origin of a code cannot be
-    // proved. New imports should use 'supplier' or 'locally_assigned'.
-    codeSource: text("code_source"),
+    // Every row has an explicit provenance classification. Legacy/unknown
+    // origins are unverified; do not infer supplier or locally assigned.
+    codeSource: text("code_source").notNull().default("unverified"),
     matchedPrayagCode: text("matched_prayag_code"),
     // Expected product description from the existing Prayag mapping.
     description: text("description"),
@@ -659,6 +662,10 @@ export const competitorPriceStagingTable = pgTable(
     index("cps_batch_idx").on(t.batchId),
     index("cps_status_idx").on(t.status),
     index("cps_competitor_idx").on(t.competitor),
+    check(
+      "competitor_price_staging_code_source_check",
+      sql`${t.codeSource} in ('supplier', 'locally_assigned', 'unverified')`,
+    ),
   ],
 );
 

@@ -256,6 +256,11 @@ function matchApolloPdf(
       continue;
     }
     const newMrp = item!.mrp;
+    // A matching supplier code alone cannot justify replacing a reviewed
+    // workbook price: PDF OCR can pair a real code with another item's price.
+    // Keep divergent quotes visible for review, but out of Apollo approval.
+    const differsFromReviewedPrice = target.existingPrice != null &&
+      Math.abs(newMrp - target.existingPrice) > 0.005;
     rows.push({
       ...target,
       competitorCodeMaster: target.competitorCode,
@@ -268,7 +273,10 @@ function matchApolloPdf(
       gapPct: target.prayagMrpCurrent ? ((effectivePrice(newMrp) - target.prayagMrpCurrent) / target.prayagMrpCurrent) * 100 : null,
       page: item!.page, discoveryEvidence: JSON.stringify({ source: "Apollo PDF", passes: item!.discoveryPasses }),
       adjudicated: item!.adjudicated, matchMethod: local ? "desc+size" : "code+desc",
-      status: "ok", reviewReason: null,
+      status: differsFromReviewedPrice ? "needs_review" : "ok",
+      reviewReason: differsFromReviewedPrice
+        ? "Apollo PDF price differs from the reviewed workbook price; verify product identity and supplier quote before importing."
+        : null,
     });
   }
   // Apollo PDF rows that have no authoritative target are review-only
@@ -430,12 +438,14 @@ export function duplicateDecision(
   effectiveDate: string,
   extractionPath: ExtractionPath | null,
 ) {
-  const sameDate = existingRows.filter((row) => row.effectiveDate === effectiveDate);
+  // Failed/discarded attempts are audit records, not reusable extraction results.
+  const reusableRows = existingRows.filter((row) => row.status !== "failed" && row.status !== "discarded");
+  const sameDate = reusableRows.filter((row) => row.effectiveDate === effectiveDate);
   const selectedPathRow = sameDate.find((row) => {
     const stored = parseRowCounts(row.rowCounts);
     return isExtractionPath(stored.extractionPath) && stored.extractionPath === extractionPath;
   });
-  const existing = selectedPathRow ?? sameDate[0] ?? existingRows[0];
+  const existing = selectedPathRow ?? sameDate[0] ?? reusableRows[0];
   if (!existing) {
     return {
       action: "new",
@@ -1043,6 +1053,7 @@ router.post(
       if (!res.writableEnded && !res.destroyed) res.end();
     };
 
+    let createdBatchId: number | null = null;
     try {
       await seedAliasesIfNeeded(competitor);
 
@@ -1092,6 +1103,7 @@ router.post(
         return;
       }
       const batchId = batch.id;
+      createdBatchId = batchId;
       // Let the browser recover the import even if an intermediate SSE
       // connection drops while extraction continues safely on the server.
       sendSse("batch", { batchId });
@@ -1220,9 +1232,11 @@ router.post(
       type StagingInsert = typeof competitorPriceStagingTable.$inferInsert;
 
       const allRows: StagingInsert[] = [
-          ...staging.map((s) => ({
-            ...s, batchId,
-            codeSource: apollo ? ((s as any).codeSource ?? null) : null,
+           ...staging.map((s) => ({
+             ...s, batchId, competitor, effectiveDate,
+            // Non-Apollo extraction has no authoritative code-origin signal.
+            // Keep that explicit rather than allowing a null/implicit origin.
+            codeSource: apollo ? ((s as any).codeSource ?? "unverified") : "unverified",
           }) as unknown as StagingInsert),
         ...newProducts.map((item) => ({
           batchId,
@@ -1247,13 +1261,15 @@ router.post(
           matchMethod: null,
           status: "new_product" as const,
            reviewReason: null,
-           ...(apollo ? { codeSource: null } : {}),
+            ...(apollo ? { codeSource: "unverified" } : {}),
         }) as StagingInsert),
       ];
 
-      for (let i = 0; i < allRows.length; i += 200) {
-        await db.insert(competitorPriceStagingTable).values(allRows.slice(i, i + 200));
-      }
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < allRows.length; i += 200) {
+          await tx.insert(competitorPriceStagingTable).values(allRows.slice(i, i + 200));
+        }
+      });
 
        const currentMedianGap = medianNumber(
          allRows.map((row) => row.gapPct ?? NaN),
@@ -1370,6 +1386,14 @@ router.post(
       closeSse();
     } catch (err) {
       req.log.error({ err }, "import-batches POST failed");
+      if (createdBatchId !== null) {
+        try {
+          await db.update(importBatchesTable).set({ status: "failed" })
+            .where(eq(importBatchesTable.id, createdBatchId));
+        } catch (statusError) {
+          req.log.error({ err: statusError, batchId: createdBatchId }, "Could not mark failed PDF batch");
+        }
+      }
       sendSse("error", { error: err instanceof Error ? err.message : "Failed to process file" });
       closeSse();
     }
@@ -1440,7 +1464,7 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
       sql`SELECT id, code_source FROM competitor_price_staging WHERE batch_id = ${batchId}`,
     );
     const sourceById = new Map(sourceRows.rows.map((row) => [row.id, row.code_source]));
-    for (const row of stagingRows) (row as any).codeSource = sourceById.get(row.id) ?? null;
+    for (const row of stagingRows) (row as any).codeSource = sourceById.get(row.id) ?? "unverified";
   }
 
   const toCommit = stagingRows.filter(
@@ -1680,8 +1704,9 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
   await recomputeCurrentFlags(batch.competitor);
 
   res.json({ ok: true, committed: trustedPrince ? trustedToCommit.length - excludedByDecision.length : toCommit.length,
-    inserted: trustedPrince ? inserted : undefined, updated: trustedPrince ? updated : undefined,
-    unchanged: trustedPrince ? unchanged : undefined,
+    inserted: trustedPrince || apolloBatch ? inserted : undefined,
+    updated: trustedPrince || apolloBatch ? updated : undefined,
+    unchanged: trustedPrince || apolloBatch ? unchanged : undefined,
     beforeSnapshot, afterSnapshot, excludedByDecision, confirmedByDecision,
     comparableBefore, comparableAfter });
 });
