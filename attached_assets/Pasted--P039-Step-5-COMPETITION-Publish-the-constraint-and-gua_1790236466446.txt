@@ -1,0 +1,108 @@
+# P039 — Step 5 — COMPETITION — Publish the constraint, and guard the test suite
+
+> **P039 Step 5** · app: **COMPETITION** (`prayag-price.com`)
+> **Part A publishes a schema change to production. Part B changes test infrastructure.**
+> Quote `P039 Step 5` when reporting back.
+
+Step 4 Part B corrected the diagnosis in the original P039, which was wrong. The runtime generator does not create catalogue products. The integration test's `beforeAll` does, and its teardown omitted the uncategorised code from its cleanup lists — thirty test runs, thirty leaked fixtures. Your teardown fix addresses the real cause.
+
+Two things that report also settled:
+
+- **The P031 anomaly is closed.** The single `2026-08-19` row is the `__MRP_MANUAL_PROVENANCE__` fixture. Not a price, not a data fault.
+- **Development's 14,012 contains 3 test-fixture price rows** — MANUAL 125, MAY 654, RECONCILED 321. The real figure is **14,009**. That number has been quoted all week and it was never clean.
+
+---
+
+# PART A — Publish, then verify in production
+
+Part A is prepared in development and absent from production. Production's column was still nullable at 07:49:52 UTC.
+
+## A1. Publish, then re-read production
+
+Report each with its clock time:
+
+```
+total rows        expect 14,252
+unlinked rows     expect 0
+column nullable   expect NO
+value SHA-256     expect 1c2d9ce6d24a01648fee52c20690579aec5841b48ae356b07b8a27c9ffe31787
+```
+
+## A2. Verify the Undo in production
+
+Confirm the updated Undo is live and returns **409** rather than attempting a null update, and that the old Undo is gone.
+
+**Until this is verified, the warning stands: do not invoke the production Undo.**
+
+## A3. Close the gap you correctly identified
+
+You noted that the null-rejection tests establish database-level rejection in development and are not a claim about every application write path in production. That distinction is right, and it is the one that matters.
+
+Exercise **each application write path that reaches `mrp_price_history` in production** against an omitted batch id. Report the path and the rejection for each. **Name any path you could not exercise, and why.**
+
+A database constraint blocks the last inch. What this project needs to know is that no path even tries.
+
+## A4. Synthetic products in production
+
+Confirm production still holds **0** of the synthetic fixture products, with the clock time.
+
+---
+
+# PART B — The test suite must not be able to reach production
+
+This is the real finding of Step 4, and it outranks the teardown fix.
+
+The integration test inserts into `catalog_products` and nothing stops it pointing at production. Production holds none today — but "none today" and "cannot" are different answers, and Step 4 returned *could*.
+
+A leaked fixture in development is untidy. The same test run with production credentials in the environment writes junk into the live catalogue, and it arrives looking like a real product.
+
+## B1. Add a database-target guard
+
+It runs at **suite setup, before any fixture is inserted**, and it must:
+
+- read the target database identity **from PostgreSQL itself** — `SELECT current_database()` — never from an environment variable, a connection string, or `NODE_ENV`
+- refuse to run unless that name matches an explicit development or test allowlist
+- **fail the whole suite loudly** on a non-match, before `beforeAll` executes
+- have **no override** — no force flag, no environment variable that disables it
+
+The sibling application already uses this pattern: it derives its data source from `current_database()` and raises rather than inferring provenance from a URL. Same reasoning, applied one layer earlier.
+
+## B2. Prove it
+
+Point the suite at a database name outside the allowlist and confirm it refuses **before inserting anything**. Report the error.
+
+## B3. Sweep the rest of the suite
+
+The integration test is one file. The question is how many others write to production-shaped tables.
+
+List **every** test that inserts, updates or deletes in `catalog_products`, `mrp_price_history`, `mrp_load_batches`, `competitor_mapping`, or any other live table, and confirm each is covered by the guard.
+
+**A guard on one file is not a guard.**
+
+## B4. Development unchanged
+
+Confirm the synthetic product count in development is still **36** and that none was deleted.
+
+---
+
+# Report
+
+**Part A**
+- The four production figures, each with its clock time.
+- The Undo behaviour verified in production, and confirmation the old Undo is gone.
+- Each write path exercised against an omitted batch id, with its rejection. Any path not exercised, named, with the reason.
+- The synthetic product count in production.
+
+**Part B**
+- The guard, quoted.
+- The refusal proven, with its error text.
+- Every test touching a live table, listed, with its guard status.
+- Confirmation that development still holds 36 and none was deleted.
+
+State the environment and the clock time against every figure.
+
+---
+
+## What this unblocks
+
+After Step 5, **P042 is properly unblocked**. The 30 zero-reference `__MRP_GENERATOR_UNCATEGORISED_*` fixtures are clean candidates for it. The six others carry references — three with price rows — and need P042's checks to account for the count change.
