@@ -1,0 +1,176 @@
+# P042 — COMPETITION — Retire a product, or delete one that never should have existed
+
+> **P042** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** It also deletes data, but only behind a gate, and only rows this prompt proves are safe.
+> Quote `P042` when reporting back.
+> **Run P039 first.** P039 stops the MRP generator creating placeholder products. Deleting them before that is emptying a bin with the tap still running.
+
+There is no way today to remove a product from the catalogue. Two different needs have been building up behind that gap, and they are **not the same action**.
+
+---
+
+# PART 1 — Two actions, never one button
+
+```
+RETIRE     the product was real. Prayag sold it. It is no longer sold.
+           -> keep the row, keep every price, keep the history
+           -> mark it discontinued from a date
+           -> it disappears from current views and stays answerable
+              for any past period
+
+DELETE     the product was never real. A placeholder, a typo, a test row,
+           a duplicate created by an import.
+           -> remove the row and its price history entirely
+           -> it was never a product, so it has no past to answer for
+```
+
+**Build both. Put them behind different buttons with different wording, and make the destructive one the harder of the two to reach.**
+
+The failure this guards against is the ordinary one: somebody wants a product off the screen, the only control available says Delete, and a year of genuine price history goes with it. A retired product must stay queryable at every date it was ever sold, because the whole application is built on `effective_date <= asOf` and nothing else.
+
+**Default to Retire.** Delete is for the exceptions in Part 3.
+
+---
+
+# PART 2 — What must be checked before a delete is allowed
+
+A delete is refused unless **every** one of these is clear. Check them, show the result, and let the user see exactly why something is blocked.
+
+```
+1. sale_line         has this code EVER been sold, in any period?
+2. mrp_price_history how many price rows, at which dates, from which batches?
+3. competitor_mapping is any competitor SKU mapped to it?
+4. scenarios          does any saved scenario or analysis reference it?
+5. mrp_load_batches   was it created by a file load with a hash?
+```
+
+## 2.1 The strongest guard — ask the Sales app
+
+**If it was ever sold, it was never a mistake.**
+
+The Sales application holds the sales register. The Competition app already has a credential for it. Before allowing a delete, call the Sales item endpoint for that code and report what comes back.
+
+- **Any sales in any period → delete is refused.** Offer Retire instead. Show the periods and the value.
+- **No sales, and the code is absent from the Sales catalogue → delete is permitted**, subject to the rest of Part 2.
+- **The Sales call fails or times out → delete is refused.** Not "allowed because we could not check". An unanswered question is not a clear answer.
+
+Use the existing server-side credential. It must not reach the client bundle, an endpoint response, or a log.
+
+## 2.2 Price history is a decision, not a detail
+
+A product with price rows cannot be silently deleted. State the count and the dates and make the user confirm that specific number:
+
+```
+DL-3300 carries 4 price rows at 2026-02-01, 2026-05-01, 2026-08-10, 2026-09-01.
+Deleting removes all 4. mrp_price_history falls from 14,252 to 14,248.
+```
+
+**Print the before and after row count on the confirmation itself.** The count is how every check on this project is verified, so the user should see what they are about to move before they move it.
+
+## 2.3 Provenance survives the row
+
+Every delete writes a `mrp_load_batches` row before the delete happens, recording source `product-delete`, the actor, the timestamp, the item code, the count of price rows removed, **the reason the user typed**, and a JSON snapshot of the deleted row and all its price rows.
+
+That snapshot is what makes the undo in Part 4 possible, and it is what lets anyone answer "what was DL-3300?" six months from now.
+
+A delete with no typed reason is refused. Not a dropdown, not a default — words.
+
+---
+
+# PART 3 — The backlog this exists for
+
+Two groups are waiting. **List both, delete neither in this prompt.** Report them and wait for a ruling.
+
+## 3.1 The 36 synthetic development products
+
+```
+30   __MRP_GENERATOR_UNCATEGORISED_<timestamp>__
+ 1   __MRP_MANUAL_PROVENANCE_1788165681442__
+ 1   __MRP_MAY_PROVENANCE_1788165681442__
+ 1   __MRP_PERIOD_PROVENANCE_1788165681442__
+ 1   __MRP_RECONCILED_PROVENANCE_1788165681442__
+ 1   __MRP_UNTRACED_PROVENANCE_1788165681442__
+ 1   __STATUS_1788157498190__
+```
+
+Development only. **Three carry price rows**, and one of those is the single `2026-08-19` row raised as an anomaly under P031 — it is not a price, it is a placeholder.
+
+These are the clearest Delete candidates on the project: a name wrapped in double underscores with a Unix timestamp in it was never a product Prayag sells. Run them through Part 2 anyway and show the results — if one of them turns out to have been sold, that is a much more interesting finding than the cleanup.
+
+## 3.2 The three unnamed products — 28, 25, 32
+
+Still sitting in Uncategorized in both environments. They have no name and a bare numeric code.
+
+**These are not a Delete decision yet.** P029 Part 2 was read-only by design and they await a ruling from Prayag. Report what Part 2's five checks say about each — particularly whether any has ever been sold — so that the ruling can be made on facts rather than on their appearance.
+
+---
+
+# PART 4 — The flow
+
+Same shape as every other write path on this application.
+
+1. **Admin only.** Non-admin gets 403 on both actions.
+2. **Preview, then Apply.** The preview shows the five checks, the row counts before and after, and any blocking reason. Apply does nothing the preview did not show.
+3. **One-action undo**, for a bounded window, restoring the product and every price row from the snapshot in the batch record. Report the window you chose.
+4. **Bulk is allowed but never silent.** Selecting 30 rows shows 30 line items, each with its own check result, and the count of price rows across all of them. A bulk action where any single item is blocked applies the rest and reports the blocked ones — it does not fail the whole batch and it does not skip them quietly.
+5. **Retire needs a date.** Discontinued from when. It defaults to nothing.
+
+---
+
+# PART 5 — What leaves this application when a product does
+
+`prayag-price.com` is the authoritative catalogue for the Sales application, which pages `/api/v1/products` and stores a snapshot. Deleting a product changes what that endpoint serves.
+
+Report:
+
+1. Does `/api/v1/products` include or exclude a **retired** product? State which, and say whether that is deliberate. A consumer needs to tell "discontinued" from "gone".
+2. Does the endpoint's `total` change on a delete? The Sales app aborts its sync if `total` moves while paging, and refuses a snapshot whose row count does not match. **A delete during a sync will break that sync** — say whether anything prevents the two overlapping.
+3. What a Sales-side lookup of a deleted code returns afterwards.
+
+**Do not change the Sales application.** This is a read and a report.
+
+---
+
+# Rules
+
+1. **No price value is altered by either action.** Retire changes a status and a date. Delete removes rows whole.
+2. **Nothing is deleted that has ever been sold.** No override, no admin bypass, no force flag.
+3. **No product is deleted in this prompt.** Part 3 lists and reports. The ruling comes after.
+4. No competitor mapping is deleted as a side effect — if one points at the product, that is a blocking reason to show, not a row to remove quietly.
+5. No direct SQL against production. Development first, then publish, then the same flow in production — **and confirm the data step ran in production**, which is the failure that has now happened four times on this project.
+6. Every delete carries a batch, an actor, a typed reason and a snapshot.
+
+# Tests
+
+```
+ 1. Retire keeps every mrp_price_history row; the count does not move
+ 2. A retired product still resolves at a past asOf date
+ 3. A retired product no longer appears in current-price views
+ 4. Delete of a code with sales in the Sales app is REFUSED
+ 5. Delete is REFUSED when the Sales check errors or times out
+ 6. Delete with no typed reason is REFUSED
+ 7. Delete removes the product and exactly its own price rows, no others
+ 8. The row count printed on the confirmation equals the count after
+ 9. A mrp_load_batches row exists after every delete, carrying the snapshot
+10. Undo restores the product and every price row, and the count returns
+11. Bulk delete of 30 shows 30 individual check results
+12. Bulk delete where one item is blocked applies the rest and names the blocked
+13. Non-admin receives 403 on retire and on delete
+14. No competitor mapping is removed by a delete
+15. The 36 placeholders are listed with their check results and NONE is deleted
+```
+
+Test 4 is the one that matters. Test 5 is the one that will be tempting to weaken.
+
+# Report
+
+1. The two actions as built, and how the UI distinguishes them.
+2. The five checks, and what each one queries.
+3. The Sales-app check: the endpoint used, what a sold code returns, and what happens on a timeout.
+4. The undo window you chose and why.
+5. **All 36 placeholders listed**, each with its five check results and your recommendation.
+6. **Codes 28, 25 and 32**, with the same check results — especially whether any has ever been sold.
+7. `mrp_price_history` count in **production**, stated with the time you read it.
+8. Answers to Part 5's three questions.
+
+State the environment and the clock time against every figure. A count without a timestamp cannot tell "always" from "since this morning", and that has already cost this project once.
