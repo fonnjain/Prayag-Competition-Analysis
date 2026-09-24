@@ -1,7 +1,7 @@
 import express from "express";
 import supertest from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import {
   db,
   catalogPriceEditAuditsTable,
@@ -9,6 +9,8 @@ import {
   competitorPricesTable,
   mrpPriceHistoryTable,
   mrpHistoryProvenanceEventsTable,
+  mrpLoadBatchesTable,
+  mrpSourcesTable,
 } from "@workspace/db";
 import { dateMeaning } from "./priceEditor";
 import { warningFor } from "./mrpRevision";
@@ -58,16 +60,48 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.itemCode, testCode));
   await db.delete(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.itemCode, testCode2));
-  await db.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, testCode));
-  await deleteMrpFixtureBatch(fixtureBatchId);
+  // Remove competitor rows before the fixture batch: competitor_prices.load_batch_id
+  // references the MRP fixture batch and must not block its cleanup.
   await db.delete(competitorPricesTable).where(
     eq(competitorPricesTable.competitor, testCompetitor),
   );
+  await db.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, testCode));
+  await deleteMrpFixtureBatch(fixtureBatchId);
+  await db.delete(mrpLoadBatchesTable).where(
+    like(mrpLoadBatchesTable.fileName, `manual-competitor-correction:${testCompetitor}:%`),
+  );
+  const source = (await db.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+    .where(eq(mrpSourcesTable.sheetId, "manual-competitor-corrections")).limit(1))[0];
+  if (source && !(await db.select({ id: mrpLoadBatchesTable.id }).from(mrpLoadBatchesTable)
+    .where(eq(mrpLoadBatchesTable.sourceId, source.id)).limit(1)).length) {
+    await db.delete(mrpSourcesTable).where(eq(mrpSourcesTable.id, source.id));
+  }
   await db.delete(catalogProductsTable).where(eq(catalogProductsTable.itemCode, testCode));
   await db.delete(catalogProductsTable).where(eq(catalogProductsTable.itemCode, testCode2));
 });
 
 describe("single-product price editor semantics", () => {
+  it("links competitor edits and restores the prior batch on undo", async () => {
+    const effectiveDate = "2026-09-01";
+    const [seed] = await db.insert(competitorPricesTable).values({
+      competitor: testCompetitor, price: 91, effectiveDate,
+      matchedPrayagCode: testCode, matchStatus: "matched", loadBatchId: fixtureBatchId,
+    }).returning({ id: competitorPricesTable.id });
+    const saved = await request.post("/catalog/price-editor/save").send({
+      itemCode: testCode, series: testCompetitor, value: 99, effectiveDate,
+      remarks: "isolated provenance test",
+    }).expect(200);
+    const changed = (await db.select().from(competitorPricesTable)
+      .where(eq(competitorPricesTable.id, seed!.id)))[0]!;
+    expect(changed.loadBatchId).toEqual(expect.any(Number));
+    expect(changed.loadBatchId).not.toBe(fixtureBatchId);
+    await request.post(`/catalog/price-editor/undo/${saved.body.audit.id}`).expect(200);
+    const restored = (await db.select().from(competitorPricesTable)
+      .where(eq(competitorPricesTable.id, seed!.id)))[0]!;
+    expect(restored.price).toBe(91);
+    expect(restored.loadBatchId).toBe(fixtureBatchId);
+  });
+
   it("distinguishes correction, immediate, and scheduled changes", () => {
     expect(dateMeaning("2099-01-01", true).operation).toBe("correction");
     expect(dateMeaning("2000-01-01", false).operation).toBe("immediate");

@@ -7,6 +7,8 @@ import {
   db,
   catalogProductsTable,
   competitorPricesTable,
+  mrpLoadBatchesTable,
+  mrpSourcesTable,
   mrpPriceHistoryTable,
   mrpHistoryProvenanceEventsTable,
   mrpRevisionBatchesTable,
@@ -59,6 +61,30 @@ function matchesHistorySnapshot(
   return historySnapshotFields.every((field) =>
     sameHistoryValue(current[field], snapshot[field] ?? null),
   );
+}
+
+const competitorSnapshotFields = [
+  "id", "competitor", "category", "description", "size", "price", "unit",
+  "competitorCode", "codeSource", "effectiveDate", "matchedPrayagCode",
+  "matchStatus", "matchConfidence", "prayagMrpAtCompare", "isCurrent",
+  "priceBasis", "gstPct", "loadBatchId", "lastRevisionBatchId", "createdAt",
+  "updatedAt",
+] as const;
+
+function sameCompetitorSnapshot(
+  current: Record<string, unknown>,
+  snapshot: Record<string, unknown>,
+): boolean {
+  return competitorSnapshotFields.every((field) => {
+    const left = current[field];
+    const right = snapshot[field] ?? null;
+    if (field === "createdAt" || field === "updatedAt") {
+      const leftTime = left instanceof Date ? left.getTime() : new Date(String(left)).getTime();
+      const rightTime = right instanceof Date ? right.getTime() : new Date(String(right)).getTime();
+      return leftTime === rightTime;
+    }
+    return left === right;
+  });
 }
 
 function withAuditNote(previous: unknown, note: string): string {
@@ -639,6 +665,7 @@ router.post(
           previousValue: previous,
           newValue: row.newValue,
           note: row.note,
+          previousRowSnapshot: targetType === "competitor" ? JSON.stringify(targetRow) : undefined,
           outcome: isNoop ? "noop" : "change",
           warningReasons: warnings.length ? JSON.stringify(warnings) : null,
         });
@@ -766,6 +793,25 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
           { httpStatus: 409 },
         );
       }
+      let competitorProvenanceBatchId: number | null = null;
+      if (batch.targetType === "competitor") {
+        const [source] = await tx.insert(mrpSourcesTable).values({
+          division: "Manual competitor revisions", sheetId: "manual-competitor-revisions",
+          sheetUrl: "about:blank", expectedFileName: null,
+          notes: "Internal audit source for reviewed competitor revisions.", sourceKind: "manual",
+        }).onConflictDoNothing({ target: mrpSourcesTable.sheetId }).returning({ id: mrpSourcesTable.id });
+        const sourceId = source?.id ?? (await tx.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+          .where(eq(mrpSourcesTable.sheetId, "manual-competitor-revisions")).limit(1))[0]?.id;
+        if (!sourceId) throw new Error("Competitor revision provenance source could not be created.");
+        const [provenance] = await tx.insert(mrpLoadBatchesTable).values({
+          sourceId, fileName: `manual-competitor-revision:${batchId}`,
+          fileSha256: batch.fileSha256, fileSizeBytes: batch.fileSizeBytes,
+          downloadedAt: null, loadedBy: userLabel(req), rowCount: rows.length,
+          notes: `Competitor revision ${batchId}: ${batch.reason ?? "no reason provided"}`,
+        }).returning({ id: mrpLoadBatchesTable.id });
+        if (!provenance) throw new Error("Competitor revision provenance batch could not be created.");
+        competitorProvenanceBatchId = provenance.id;
+      }
       for (const row of rows) {
         if (!row.targetRowId || row.previousValue == null || (row.operation !== "delete" && row.newValue == null)) {
           throw new Error(`Revision row ${row.rowNumber} is missing its target or values.`);
@@ -822,13 +868,19 @@ router.post("/catalog/mrp-revisions/:batchId/apply", requireAdmin, async (req, r
             WHERE id = ${row.targetRowId}
             FOR UPDATE
           `);
-          const current = (await tx.select({ id: competitorPricesTable.id, price: competitorPricesTable.price })
-            .from(competitorPricesTable).where(eq(competitorPricesTable.id, row.targetRowId)).limit(1))[0];
-          if (!current || current.price !== row.previousValue) {
+          const current = (await tx.select().from(competitorPricesTable)
+            .where(eq(competitorPricesTable.id, row.targetRowId)).limit(1))[0];
+          const previousSnapshot = row.previousRowSnapshot
+            ? JSON.parse(row.previousRowSnapshot) as Record<string, unknown>
+            : null;
+          if (!current || current.price !== row.previousValue ||
+              !previousSnapshot ||
+              !sameCompetitorSnapshot(current as unknown as Record<string, unknown>, previousSnapshot)) {
             throw Object.assign(new Error(`Competitor row ${row.rowNumber} changed after preview; create a fresh preview.`), { httpStatus: 409 });
           }
           await tx.update(competitorPricesTable).set({
             price: row.newValue,
+            loadBatchId: competitorProvenanceBatchId,
             lastRevisionBatchId: batchId,
             updatedAt: new Date(),
           })
@@ -988,8 +1040,18 @@ router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req
           if (!current || current.price !== row.newValue) {
             throw Object.assign(new Error(`Competitor row ${row.rowNumber} changed after apply; rollback was not performed.`), { httpStatus: 409 });
           }
+          if (!row.previousRowSnapshot) {
+            throw Object.assign(new Error(`Competitor row ${row.rowNumber} has no provenance snapshot; rollback was not performed.`), { httpStatus: 409 });
+          }
+          const previousSnapshot = JSON.parse(row.previousRowSnapshot) as { loadBatchId?: number | null };
+          if (!Object.prototype.hasOwnProperty.call(previousSnapshot, "loadBatchId")) {
+            throw Object.assign(new Error(`Competitor row ${row.rowNumber} has no prior load batch; rollback was not performed.`), { httpStatus: 409 });
+          }
           await tx.update(competitorPricesTable).set({
             price: row.previousValue,
+            // A rollback restores the row's prior provenance, including legacy
+            // nulls; it must not manufacture an unlinked replacement.
+            loadBatchId: previousSnapshot.loadBatchId ?? null,
             lastRevisionBatchId: batchId,
             updatedAt: new Date(),
           })

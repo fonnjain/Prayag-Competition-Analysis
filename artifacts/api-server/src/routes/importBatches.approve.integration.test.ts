@@ -22,8 +22,10 @@ import {
   competitorPriceStagingTable,
   competitorPricesTable,
   competitorCodeAliasesTable,
+  mrpLoadBatchesTable,
+  mrpSourcesTable,
 } from "@workspace/db";
-import importBatchesRouter from "./importBatches.js";
+import importBatchesRouter, { computeCompetitorContentFingerprint } from "./importBatches.js";
 
 // Minimal Express app: mounts the importBatches router without the session-auth
 // guard that wraps it in the full app. The route handlers themselves do not
@@ -33,6 +35,23 @@ testApp.use(express.json());
 testApp.use(importBatchesRouter);
 
 const request = supertest(testApp);
+
+describe("competitor content fingerprint", () => {
+  it("is stable for row order and refuses incomplete extraction output", () => {
+    const first = {
+      competitor: "Generic",
+      effectiveDate: "2026-01-01",
+      competitorCodeCatalogue: "A-2",
+      matchedPrayagCode: "PRY-2",
+      newMrp: 12,
+      status: "ok",
+    };
+    const second = { ...first, competitorCodeCatalogue: "A-1", matchedPrayagCode: "PRY-1", newMrp: 10 };
+    expect(computeCompetitorContentFingerprint([first, second]))
+      .toBe(computeCompetitorContentFingerprint([second, first]));
+    expect(computeCompetitorContentFingerprint([first], false)).toBeNull();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Per-test helpers
@@ -49,6 +68,19 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  const [createdBatch] = batchId
+    ? await db.select({ loadBatchId: importBatchesTable.loadBatchId })
+      .from(importBatchesTable)
+      .where(eq(importBatchesTable.id, batchId))
+    : [];
+  const provenanceLoadBatchId = createdBatch?.loadBatchId ?? null;
+  let provenanceSourceId: number | null = null;
+  if (provenanceLoadBatchId != null) {
+    const [load] = await db.select({ sourceId: mrpLoadBatchesTable.sourceId })
+      .from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, provenanceLoadBatchId));
+    provenanceSourceId = load?.sourceId ?? null;
+  }
   if (batchId) {
     await db
       .delete(competitorPriceStagingTable)
@@ -63,6 +95,14 @@ afterEach(async () => {
   await db
     .delete(competitorCodeAliasesTable)
     .where(eq(competitorCodeAliasesTable.competitor, competitor));
+  if (provenanceLoadBatchId != null) {
+    await db.delete(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, provenanceLoadBatchId));
+  }
+  if (provenanceSourceId != null) {
+    await db.delete(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.id, provenanceSourceId));
+  }
 });
 
 async function insertBatch(
@@ -230,6 +270,29 @@ describe("approve (MRP basis): price wired correctly", () => {
       .from(importBatchesTable)
       .where(eq(importBatchesTable.id, batchId));
     expect(batch!.status).toBe("approved");
+  });
+});
+
+describe("approve: generic staged batches receive competitor provenance", () => {
+  it("resolves a nonnull load batch for a pending batch with no staged link", async () => {
+    await insertBatch({ loadBatchId: null, sourceFileName: "generic.xlsx", fileSha256: "generic-test-sha" });
+    await insertStaging();
+
+    const res = await approve(batchId);
+
+    expect(res.status).toBe(200);
+    const [batch] = await db.select().from(importBatchesTable)
+      .where(eq(importBatchesTable.id, batchId));
+    const [price] = await getCommitted();
+    expect(batch!.loadBatchId).not.toBeNull();
+    expect(price!.loadBatchId).toBe(batch!.loadBatchId);
+    expect(price!.loadBatchId).not.toBeNull();
+    const [load] = await db.select().from(mrpLoadBatchesTable)
+      .where(eq(mrpLoadBatchesTable.id, batch!.loadBatchId!));
+    expect(load!.rowCount).toBe(1);
+    const [source] = await db.select().from(mrpSourcesTable)
+      .where(eq(mrpSourcesTable.id, load!.sourceId));
+    expect(source!.sourceKind).toBe("competitor");
   });
 });
 

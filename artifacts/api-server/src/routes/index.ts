@@ -23,6 +23,7 @@ import mrpGeneratorRouter from "./mrpGenerator";
 import catalogNameChangesRouter from "./catalogNameChanges";
 import mrpProvenanceBackfillRouter from "./mrpProvenanceBackfill";
 import productRetirementRouter from "./productRetirement";
+import apolloStagedLoadRouter from "./apolloStagedLoad";
 
 const router: IRouter = Router();
 
@@ -45,6 +46,7 @@ router.use(adminUsersRouter);
 router.use(apiKeysRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
+router.use(apolloStagedLoadRouter);
 router.use(catalogSyncRouter);
 router.use(importBatchesRouter);
 router.use(mrpRevisionRouter);

@@ -6,6 +6,7 @@ import {
   CATALOG_ADMIN_EMAIL,
   createCatalogSyncBundleFromData,
   createCatalogSyncPreflightToken,
+  assertCompetitorSyncProvenance,
   type CatalogSyncData,
   parseAndValidateCatalogSyncBundle,
   verifyCatalogSyncPreflightToken,
@@ -111,6 +112,7 @@ function fixtureData(): CatalogSyncData {
         isCurrent: true,
         priceBasis: "MRP",
         gstPct: null,
+        loadBatchId: null,
         createdAt: "2026-08-19T00:00:00.000Z",
         updatedAt: "2026-08-19T00:00:00.000Z",
       },
@@ -137,6 +139,14 @@ beforeAll(() => {
 });
 
 describe("catalog sync bundle validation", () => {
+  it("preserves known legacy null provenance but rejects a new null row", () => {
+    const legacy = { id: 41, loadBatchId: null };
+    expect(() => assertCompetitorSyncProvenance([legacy], new Set([41]))).not.toThrow();
+    expect(() => assertCompetitorSyncProvenance([legacy], new Set())).toThrow(
+      "new row without loadBatchId",
+    );
+  });
+
   it("accepts a signed bundle and binds preflight tokens to its checksum and administrator", () => {
     const bundle = parseAndValidateCatalogSyncBundle(serialize());
     const currentChecksum = "b".repeat(64);

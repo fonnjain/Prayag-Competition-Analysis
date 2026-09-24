@@ -360,6 +360,26 @@ describe("MRP revision preview, apply and rollback", () => {
     expect(crossBrandPeriod.body.error).toContain(`No existing ${COMPETITOR} period found`);
   });
 
+  it("rejects a same-price competitor edit made after preview", async () => {
+    const preview = await request.post("/catalog/mrp-revisions/preview")
+      .field("targetType", "competitor")
+      .field("competitor", COMPETITOR)
+      .field("effectiveDate", COMPETITOR_DATE)
+      .field("reason", "Detect an intervening same-price edit")
+      .attach("file", competitorWorkbook(), { filename: "competitor-stale-same-price.xlsx" });
+    expect(preview.status).toBe(200);
+    batchIds.push(preview.body.batchId);
+    const targetId = preview.body.rows.find((row: { outcome: string }) => row.outcome === "change").targetRowId;
+    const target = (await db.select({ price: competitorPricesTable.price })
+      .from(competitorPricesTable).where(eq(competitorPricesTable.id, targetId)))[0]!;
+    await db.update(competitorPricesTable).set({ price: target.price, updatedAt: new Date() })
+      .where(eq(competitorPricesTable.id, targetId));
+    const applied = await request.post(`/catalog/mrp-revisions/${preview.body.batchId}/apply`)
+      .send({ acknowledgeWarnings: true });
+    expect(applied.status).toBe(409);
+    expect(applied.body.error).toContain("changed after preview");
+  });
+
   it("exempts confirmed low-price codes without suppressing warnings for other codes", () => {
     expect(warningFor("PH-1", "PTMT & Plastic Fittings", 100, 22.44))
       .not.toContain("New value ₹22.44 is below ₹50 for PTMT & Plastic Fittings.");

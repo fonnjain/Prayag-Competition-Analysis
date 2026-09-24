@@ -1,0 +1,173 @@
+# P047 — COMPETITION — Build the competitor load path P046 needs
+
+> **P047** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE. Development only. No production load, no publish.**
+> Quote `P047` when reporting back.
+> **P046's Apply stays blocked until this is done and published.**
+
+Your refusal was correct on all four counts, and one of them corrects me.
+
+**P046 §4.1 was wrong.** I wrote that P039's `NOT NULL` constraint would enforce a batch id on every Apollo row. It will not. **P039 constrained `mrp_price_history.load_batch_id` — Prayag MRP prices.** Competitor price rows are a different table with no such constraint. I cited a safeguard that does not cover the thing being loaded.
+
+The other three blockers stand on their own: a byte-hash retry gate is the exact P027 failure, and a route that writes an approved batch directly, with no staging and no undo, does not meet the preview-then-apply discipline everything else on this project runs on.
+
+**Build the path. Then P046's preview re-runs against it.**
+
+---
+
+# PART 1 — First, read-only: what provenance do competitor rows have today?
+
+Before building anything, establish whether this is a new gap or an existing one.
+
+**1.1** Does each competitor price row carry an import-batch id today? Report, per competitor:
+
+```
+Prince          943 rows    how many carry a batch id
+Ashirvad        669
+Sparsh Pearl    300
+                1,912 total
+```
+
+**1.2** If rows carry no batch id, **this is the same gap P039 closed for MRP prices, in the competitor table.** Report the count. **Do not backfill it in this prompt** — that is its own decision with its own approval, exactly as P039 was.
+
+**1.3** What does the existing route record on a batch — filename, byte hash, actor, timestamp, row count, reason? List what it stores and what it does not.
+
+---
+
+# PART 2 — Replace the byte-hash gate with a content fingerprint
+
+An `.xlsx` is a zip. Re-saving changes every byte while the values stay identical. **A byte-hash gate has already blocked a legitimate load once, under P027.**
+
+**2.1** Gate on a content fingerprint: normalised parsed business rows, sorted, joined by LF with no trailing LF, UTF-8, SHA-256. That is the definition you computed — keep it, and write it down where the next person will find it.
+
+**2.2** **Enumerate worksheets from the file, never from a brief.** The Apollo file has 13 sheets and one is named `" CPVC PIPE"` with a leading space. A brief-driven list would miss or mangle it, which is how P027r2 read 11 sheets of 13 and lost 137 prices.
+
+**2.3** Store the content fingerprint on every batch from now on, so a future load has something to compare against. Report that the Apollo development batch's fingerprint is `6b6c87af32eea3ff21d5f4fadd2af892e3d777ec182c998f54416216d1043181`, or recompute and report what you get.
+
+**2.4** The byte hash stays recorded as metadata. It just stops being the gate.
+
+---
+
+# PART 3 — Staging preview, then apply
+
+**3.1** A competitor load stages first. The preview reports, changing nothing:
+
+```
+rows to create                     by competitor
+rows to update                     with old and new value for each
+rows unchanged
+rows held, and why
+Prayag products to create          must be 0
+Prayag prices to change            must be 0
+other competitors affected         must be 0
+```
+
+**3.2** Apply acts only on what the preview showed. If the underlying data moved between preview and apply, **the apply refuses** and says so.
+
+**3.3** Admin only. Non-admin gets 403 on preview and on apply.
+
+---
+
+# PART 4 — Every competitor price row carries its batch id
+
+**4.1** Each row written by a load carries the id of the batch that wrote it. No nullable path, no exception — same rule P039 established for MRP prices, now in the competitor table.
+
+**4.2** Report every write path that reaches the competitor price table and confirm each attaches a batch.
+
+**4.3** **Do not add `NOT NULL` yet.** If Part 1 found existing rows without a batch id, the constraint cannot be added until those are resolved — and that is a separate decision. Report whether the constraint could be added today, and if not, what stands in the way.
+
+That sequencing is the lesson from P039: **the data first, the constraint second.** A constraint added over unresolved rows either fails or gets forced.
+
+---
+
+# PART 5 — One-action undo
+
+**5.1** An applied competitor batch can be undone in one action, restoring the exact prior state.
+
+**5.2** The undo stores what it needs to restore — a snapshot of the affected rows, in the batch record.
+
+**5.3** Report the window it stays open for.
+
+**5.4** If a constraint or a later batch would make an undo unsafe, it **refuses cleanly with an explicit error** rather than partially applying. That was the ruling on P039's undo and it holds here.
+
+---
+
+# PART 6 — Flags survive a load
+
+Three rows carry review state that must not be lost:
+
+```
+PPRMB0204XX20MM    unpriced, one code with two conflicting quotes
+PMN03122V          price dispute, workbook Rs 27 against PDF Rs 60
+PMN032404          product-identity dispute, "with Jali" against "WITHOUT JALI"
+```
+
+**A flag that does not survive a load is worse than no flag** — it presents a disputed row as settled.
+
+**6.1** Prove it: load, confirm the flags, load again, confirm they are still there.
+
+**6.2** The nine `not verified` markers travel the same way.
+
+---
+
+# PART 7 — Two things to report, not to build
+
+**7.1** Production's catalogue is **7,141**, the product list shows **6,350**, so **791 products are inactive or retired** and invisible in the ordinary view. Report what state those 791 are in, and whether the application already has a retire concept. **This bears directly on P042** — Retire may already partly exist, and building a second one would be worse than using what is there.
+
+**7.2** `/v1/comparison` returns **1,912**, which is Prince 943 + Ashirvad 669 + Sparsh Pearl 300 exactly. The Sales application's client carries the comment *"the total is small (~150 rows at pageSize=200)"* — already wrong by more than twelvefold. Apollo takes it to 2,603.
+
+You also reported that **production rejected the configured key** on a direct `/v1/comparison` call. Report what the rejection was — status and message. If the Sales application cannot currently fetch comparison data from production, that is a live fault and it becomes a SALES prompt. **Change nothing in the Sales application.**
+
+---
+
+# Rules
+
+1. Development only. **No production load, no publish, no production SQL.**
+2. No Prayag product created, changed or deactivated.
+3. No Prayag price changes. `mrp_price_history` stays at 14,252 with its checksum.
+4. No existing competitor row is backfilled, relabelled or repriced.
+5. The three held rows stay held. No price is invented.
+6. `NOT NULL` is not added in this prompt.
+
+# Tests
+
+```
+ 1. A re-saved workbook with identical values passes the content gate
+ 2. A workbook with one changed price fails it
+ 3. Worksheet names are read from the file; " CPVC PIPE" is found
+ 4. Preview changes nothing; apply acts only on what preview showed
+ 5. Apply refuses if the data moved between preview and apply
+ 6. Every row written carries a batch id
+ 7. No write path can leave it null
+ 8. Undo restores the exact prior state in one action
+ 9. Undo refuses cleanly rather than partially applying
+10. All three flags survive two consecutive loads
+11. The nine "not verified" markers survive too
+12. Non-admin receives 403 on preview and apply
+13. A competitor load creates no Prayag product
+```
+
+**Test 1 is the one that proves the P027 failure cannot recur. Test 10 is the one that protects the disputed rows.**
+
+# Report
+
+1. Part 1's three counts, and what the existing batch record stores.
+2. The content fingerprint definition as implemented, and the Apollo file's value.
+3. The 13 worksheet names, read from the file.
+4. The preview and apply flow, and what happens when data moves between them.
+5. Every write path, and confirmation each attaches a batch.
+6. Whether `NOT NULL` could be added today, and what stands in the way.
+7. The undo window, and its refusal behaviour.
+8. The two-load flag proof.
+9. The 791 products: what state, and whether a retire concept exists.
+10. The `/v1/comparison` key rejection: status and message.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Then P046 resumes
+
+Once this is published, **P046's preview re-runs against the new path** and the Apply can be approved against a figure of **691**.
+
+The preview already established what that load should look like: 691 rows, 272 locally assigned and 419 supplier, five rows absent from production as well as development, `mrp_price_history` untouched at 14,252.

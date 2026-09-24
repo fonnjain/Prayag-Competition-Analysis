@@ -3224,11 +3224,43 @@ router.post(
         counts: Record<string, unknown>,
         loadBatchId?: number | null,
       ) => {
+        // Approval copies this provenance onto competitor_prices. Create a
+        // real load batch for every staged workbook rather than leaving the
+        // FK null or inventing a placeholder id.
+        let resolvedLoadBatchId = loadBatchId ?? null;
+        if (resolvedLoadBatchId == null) {
+          const sourceSheetId = `competitor-${batchCompetitor.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+          const [source] = await db.insert(mrpSourcesTable).values({
+            division: `${batchCompetitor} competitor`,
+            sheetId: sourceSheetId,
+            sheetUrl: `internal://${sourceSheetId}`,
+            expectedFileName: file.originalname,
+            notes: "Uploaded competitor workbook staged for review and approval.",
+            sourceKind: "competitor",
+          }).onConflictDoNothing().returning();
+          const sourceRow = source ?? (await db.select({ id: mrpSourcesTable.id })
+            .from(mrpSourcesTable)
+            .where(eq(mrpSourcesTable.sheetId, sourceSheetId))
+            .limit(1))[0];
+          if (!sourceRow) throw new Error("Could not create competitor provenance source.");
+          const [load] = await db.insert(mrpLoadBatchesTable).values({
+            sourceId: sourceRow.id,
+            fileName: file.originalname,
+            fileSha256: sourceHash,
+            fileSizeBytes: file.size,
+            downloadedAt: new Date().toISOString().slice(0, 10),
+            loadedBy: req.user?.email ?? req.user?.id ?? null,
+            rowCount: rows.length,
+            notes: JSON.stringify({ staged: true, competitor: batchCompetitor }),
+          }).returning({ id: mrpLoadBatchesTable.id });
+          resolvedLoadBatchId = load?.id ?? null;
+        }
+        if (resolvedLoadBatchId == null) throw new Error("Could not create competitor provenance load batch.");
         const [batch] = await db.insert(importBatchesTable).values({
           competitor: batchCompetitor, effectiveDate, sourceFileName: file.originalname,
           priceBasis, gstPct, status: "pending", fileSha256: sourceHash,
           fileSizeBytes: file.size, rowCounts: JSON.stringify(counts),
-          loadBatchId: loadBatchId ?? null,
+          loadBatchId: resolvedLoadBatchId,
         }).returning();
         if (!batch) throw new Error("Could not create import batch.");
         if (rows.length) {
@@ -3571,9 +3603,26 @@ router.post(
       return;
     }
     if (competitor === PRINCE_COMPETITOR) {
-      res.status(409).json({
+      res.status(410).json({
         error: "Prince trusted workbooks must use preview → stage → approve; the legacy direct-load route is disabled.",
         code: "TRUSTED_STAGE_REQUIRED",
+        noWrites: true,
+      });
+      return;
+    }
+
+    // This endpoint historically had several authoritative-master branches
+    // (Ashirvad, Sparsh, and Prince) that wrote competitor_prices directly.
+    // Those writes could not attach a real mrp_load_batches row, leaving price
+    // provenance optional.  Keep Apollo's dedicated guard below unchanged, but
+    // fail closed for every other direct loader: the staging endpoint creates
+    // the reviewed import batch and its approve path owns the eventual write.
+    // Do not replace this with a fabricated load batch.
+    if (competitor.trim().toLowerCase() !== APOLLO_COMPETITOR.toLowerCase()) {
+      res.status(410).json({
+        error: "Direct competitor price writes are disabled. Use POST /catalog/stage-competitor-workbook, then approve the staged batch.",
+        code: "COMPETITOR_STAGED_PATH_REQUIRED",
+        noWrites: true,
       });
       return;
     }
@@ -3972,14 +4021,21 @@ router.post(
        // a Prayag reference as an Apollo SKU or silently dropping a sheet.
        if (isApolloRawMaster(wb)) {
           if (competitor.trim().toLowerCase() === APOLLO_COMPETITOR.toLowerCase()) {
-            const effectiveDateBody =
+             res.status(410).json({
+               error: "Legacy direct Apollo writes are disabled. Use POST /catalog/apollo-load/preview, then apply the staged batch.",
+               code: "APOLLO_STAGED_PATH_REQUIRED",
+               noWrites: true,
+             });
+             return;
+           /*
+           const effectiveDateBody =
               typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
                 ? req.body.effectiveDate.trim()
                 : null;
             if (!effectiveDateBody) {
               res.status(400).json({ error: "effectiveDate (YYYY-MM-DD) is required" });
-              return;
-            }
+           return;
+          }
             if (!isIsoDate(effectiveDateBody)) {
               res.status(400).json({ error: "effectiveDate must be a valid calendar date (YYYY-MM-DD)" });
               return;
@@ -4336,7 +4392,9 @@ router.post(
               idempotent, noPrayagWrites: true,
             } });
             return;
-          }
+          /*
+          */
+         }
          res.status(422).json({
            error: "P045 Apollo raw master rejected: grouped two-row headers require explicit column mapping review; no rows were written.",
            code: "APOLLO_RAW_MASTER_MAPPING_REQUIRED",

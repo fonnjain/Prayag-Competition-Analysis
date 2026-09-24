@@ -26,6 +26,8 @@ import {
   competitorCodeAliasesTable,
   catalogProductsTable,
   mrpPriceHistoryTable,
+  mrpSourcesTable,
+  mrpLoadBatchesTable,
 } from "@workspace/db";
 import { normCode } from "../lib/catalog.js";
 import { requireAdmin } from "../middlewares/authMiddleware";
@@ -363,6 +365,34 @@ function parseRowCounts(value: string | null): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+/**
+ * Content identity for a parsed competitor catalogue.  Unlike fileSha256 this
+ * survives harmless workbook/PDF container changes while retaining every
+ * business value that can affect review or approval.
+ */
+export function computeCompetitorContentFingerprint(
+  rows: Array<Record<string, unknown>>,
+  complete = true,
+): string | null {
+  if (!complete) return null;
+  const fields = [
+    "competitor", "effectiveDate", "competitorCodeMaster", "competitorCodeCatalogue",
+    "codeSource", "matchedPrayagCode", "description", "catalogueDescription",
+    "variant", "oldMrp", "newMrp", "increasePct", "prayagMrpCurrent", "gapPct",
+    "page", "matchMethod", "status", "reviewReason",
+  ] as const;
+  const normalized = rows.map((row) =>
+    fields.map((field) => {
+      const value = row[field];
+      if (value == null) return "";
+      if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+      return String(value).trim();
+    }).join("\t"),
+  ).sort();
+  const canonical = normalized.join("\n");
+  return createHash("sha256").update(canonical, "utf8").digest("hex");
 }
 
 function medianNumber(values: number[]): number | null {
@@ -973,6 +1003,9 @@ router.post(
           });
         }
         const allStagingRows = [...uniqueStagingRows.values()];
+        const contentFingerprint = computeCompetitorContentFingerprint(
+          allStagingRows as unknown as Array<Record<string, unknown>>,
+        );
          const currentMedianGap = medianNumber(allStagingRows.map((row) => row.gapPct ?? NaN));
           const previous = await previousComparableBatch(competitor, effectiveDate);
          let previousMedianGap: number | null = null;
@@ -1016,7 +1049,35 @@ router.post(
           pdfOccurrences: items.length,
           pdfUniqueCodes: new Set(items.map((item) => normCode(item.cat_no))).size,
           mappedStagingIdentities: allStagingRows.filter((row) => row.matchedPrayagCode != null).length,
+          contentFingerprint,
         };
+        const semanticDuplicateRows = await db.select({
+          id: importBatchesTable.id,
+          rowCounts: importBatchesTable.rowCounts,
+        }).from(importBatchesTable).where(and(
+          eq(importBatchesTable.competitor, competitor),
+          eq(importBatchesTable.effectiveDate, effectiveDate),
+        ));
+        const semanticDuplicate = semanticDuplicateRows.find((candidate) =>
+          candidate.id !== batch.id &&
+          parseRowCounts(candidate.rowCounts).contentFingerprint === contentFingerprint,
+        );
+        if (semanticDuplicate) {
+          await db.delete(importBatchesTable).where(eq(importBatchesTable.id, batch.id));
+          const stored = parseRowCounts(semanticDuplicate.rowCounts);
+          sendPrinceSse("done", {
+            batchId: semanticDuplicate.id,
+            competitor,
+            effectiveDate,
+            fileSha256,
+            status: "pending",
+            rowCounts: stored,
+            duplicate: { ...duplicate, contentFingerprint },
+            idempotent: true,
+          });
+          res.end();
+          return;
+        }
         await db.update(importBatchesTable)
           .set({ rowCounts: JSON.stringify(rowCounts) })
           .where(eq(importBatchesTable.id, batch.id));
@@ -1289,6 +1350,42 @@ router.post(
             ...(apollo ? { codeSource: "unverified" } : {}),
         }) as StagingInsert),
       ];
+      // A failed/low-coverage extraction is not a stable content identity.
+      // Keep the byte hash for audit, but do not turn incomplete output into
+      // a semantic duplicate key.
+      const contentFingerprint = computeCompetitorContentFingerprint(
+        allRows as unknown as Array<Record<string, unknown>>,
+        failedChunks.length === 0 && coverage >= 0.95,
+      );
+      const semanticDuplicateRows = contentFingerprint
+        ? await db.select({ id: importBatchesTable.id, rowCounts: importBatchesTable.rowCounts })
+          .from(importBatchesTable)
+          .where(and(
+            eq(importBatchesTable.competitor, competitor),
+            eq(importBatchesTable.effectiveDate, effectiveDate),
+          ))
+        : [];
+      const semanticDuplicate = semanticDuplicateRows.find((candidate) =>
+        candidate.id !== batchId &&
+        parseRowCounts(candidate.rowCounts).contentFingerprint === contentFingerprint,
+      );
+      if (semanticDuplicate) {
+        await db.delete(importBatchesTable).where(eq(importBatchesTable.id, batchId));
+        const stored = parseRowCounts(semanticDuplicate.rowCounts);
+        sendSse("done", {
+          batchId: semanticDuplicate.id,
+          competitor,
+          effectiveDate,
+          priceBasis,
+          gstPct,
+          status: "pending",
+          rowCounts: stored,
+          duplicate: { ...duplicate, contentFingerprint },
+          idempotent: true,
+        });
+        closeSse();
+        return;
+      }
 
       await db.transaction(async (tx) => {
         for (let i = 0; i < allRows.length; i += 200) {
@@ -1366,6 +1463,7 @@ router.post(
          passes_run: passesRun,
          model_calls: modelCalls,
          extraction_elapsed_ms: elapsedMs,
+         ...(contentFingerprint ? { contentFingerprint } : {}),
          ...(apollo ? {
            source: "apollo_p045",
            coverageGaps: apolloMatch?.coverageGaps ?? [],
@@ -1545,6 +1643,57 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
     if (trustedPrince) await tx.execute(sql`SELECT pg_advisory_xact_lock(340342)`);
     beforeSnapshot = await snapshot(tx);
     comparableBefore = await comparable(tx);
+    // Every live competitor write must point at a real competitor provenance
+    // load.  Older staged import_batches may have a NULL (or stale) link, so
+    // resolve it inside the approval transaction rather than copying the
+    // staging header's value into price rows.
+    let resolvedLoadBatchId: number | null = null;
+    if (batch.loadBatchId != null) {
+      const [linked] = await tx
+        .select({ id: mrpLoadBatchesTable.id })
+        .from(mrpLoadBatchesTable)
+        .innerJoin(mrpSourcesTable, eq(mrpLoadBatchesTable.sourceId, mrpSourcesTable.id))
+        .where(and(
+          eq(mrpLoadBatchesTable.id, batch.loadBatchId),
+          eq(mrpSourcesTable.sourceKind, "competitor"),
+        ))
+        .limit(1);
+      resolvedLoadBatchId = linked?.id ?? null;
+    }
+    if (resolvedLoadBatchId == null) {
+      const actor = req.user?.email ?? req.user?.id ?? null;
+      const reason = typeof req.body?.reason === "string" && req.body.reason.trim()
+        ? req.body.reason.trim()
+        : "Approved staged competitor import";
+      const [source] = await tx.insert(mrpSourcesTable).values({
+        division: `${batch.competitor} competitor batch ${batchId}`,
+        sheetId: `competitor-import-batch-${batchId}`,
+        sheetUrl: `internal://competitor-import-batch/${batchId}`,
+        expectedFileName: batch.sourceFileName,
+        notes: reason,
+        sourceKind: "competitor",
+      }).returning({ id: mrpSourcesTable.id });
+      if (!source?.id) throw new Error("Cannot create competitor provenance source; approval aborted.");
+      const [load] = await tx.insert(mrpLoadBatchesTable).values({
+        sourceId: source.id,
+        fileName: batch.sourceFileName,
+        fileSha256: batch.fileSha256,
+        fileSizeBytes: batch.fileSizeBytes,
+        downloadedAt: batch.effectiveDate,
+        loadedAt: new Date(),
+        loadedBy: actor,
+        rowCount: stagingRows.length,
+        notes: reason,
+      }).returning({ id: mrpLoadBatchesTable.id });
+      if (!load?.id) throw new Error("Cannot create competitor provenance load; approval aborted.");
+      resolvedLoadBatchId = load.id;
+    }
+    if (resolvedLoadBatchId == null) {
+      throw new Error("Cannot resolve competitor provenance load; approval aborted.");
+    }
+    await tx.update(importBatchesTable)
+      .set({ loadBatchId: resolvedLoadBatchId })
+      .where(eq(importBatchesTable.id, batchId));
     if (trustedPrince && process.env.NODE_ENV === "test" &&
       (req.body?.injectMrpMutation === "true" || req.body?.injectMrpMutation === true)) {
       await tx.execute(sql`UPDATE mrp_price_history SET mrp = mrp + 0.01 WHERE id = (SELECT id FROM mrp_price_history ORDER BY id LIMIT 1)`);
@@ -1590,13 +1739,13 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
             effectiveDate: rowDate, matchedPrayagCode: r.matchedPrayagCode,
             matchStatus: "matched", matchConfidence: r.matchMethod === "code+desc" ? "High" : "Medium",
             prayagMrpAtCompare: r.prayagMrpCurrent, isCurrent: false, priceBasis: batch.priceBasis,
-            gstPct: batch.gstPct, loadBatchId: batch.loadBatchId,
+            gstPct: batch.gstPct, loadBatchId: resolvedLoadBatchId,
           });
           inserted++;
         } else if (prior.price !== r.newMrp) {
           await tx.update(competitorPricesTable).set({
             price: r.newMrp!, competitorCode: r.competitorCodeCatalogue ?? r.competitorCodeMaster,
-            loadBatchId: batch.loadBatchId, updatedAt: new Date(),
+            loadBatchId: resolvedLoadBatchId, updatedAt: new Date(),
           }).where(eq(competitorPricesTable.id, prior.id));
           updated++;
         } else {
@@ -1623,7 +1772,7 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
         isCurrent: false,
         priceBasis: batch.priceBasis,
         gstPct: batch.gstPct,
-        loadBatchId: batch.loadBatchId,
+        loadBatchId: resolvedLoadBatchId,
       }));
       if (apolloBatch) {
         const allCodes = await tx.execute<{
@@ -1667,7 +1816,7 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
           } else if (prior.price !== value.price) {
             await tx.update(competitorPricesTable).set({
               price: value.price, competitorCode: value.competitorCode,
-              loadBatchId: batch.loadBatchId, updatedAt: new Date(),
+              loadBatchId: resolvedLoadBatchId, updatedAt: new Date(),
             }).where(eq(competitorPricesTable.id, prior.id));
             updated++;
           } else {

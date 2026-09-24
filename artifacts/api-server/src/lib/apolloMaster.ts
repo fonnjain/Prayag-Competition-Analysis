@@ -29,6 +29,11 @@ const number = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 const isCode = (v: unknown) => /^[A-Z][A-Z0-9 _-]{2,}$/i.test(clean(v));
+// XLSX.write re-materializes date-formatted headers as their Excel serial
+// number (for example, 01 Aug 2026 becomes 46235).  Keep accepting those
+// headers as dated Apollo price columns without changing column semantics.
+const isDateHeader = (v: string) =>
+  /^\d{1,2}\s+[a-z]{3}/i.test(v) || (/^\d{5}$/.test(v) && Number(v) >= 20000 && Number(v) <= 100000);
 
 function workbook(input: ApolloInput): XLSX.WorkBook {
   if (typeof input === "object" && !(input instanceof Uint8Array) && !(input instanceof ArrayBuffer) && "SheetNames" in input) return input as XLSX.WorkBook;
@@ -76,7 +81,8 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
     // one column farther right.
     const priceOffset = aHeaders[codeOffset + 1] && /mrp\s*\(/i.test(aHeaders[codeOffset + 1])
       ? codeOffset + 2
-      : aHeaders.findIndex((v, i) => i > codeOffset && (/mrp|price|net|date|\d{1,2}\s+[a-z]{3}/i.test(v)) && !/^item code$/i.test(v));
+      : aHeaders.findIndex((v, i) => i > codeOffset &&
+        (/mrp|price|net|date/i.test(v) || isDateHeader(v)) && !/^item code$/i.test(v));
     if (codeOffset < 0 || priceOffset < 0) throw new Error(`Malformed Apollo sheet grouping (Apollo code/price missing): ${sheet}`);
     const aCode = aStart + codeOffset, aPrice = aStart + priceOffset;
     const prayagStart = group.findIndex(v => /^prayag$/i.test(v));

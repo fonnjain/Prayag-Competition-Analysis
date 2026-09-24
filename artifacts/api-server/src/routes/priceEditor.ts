@@ -256,14 +256,31 @@ router.post("/catalog/price-editor/save", requireAdmin, async (req, res): Promis
       } else {
         const existing = (await tx.select().from(competitorPricesTable).where(and(eq(competitorPricesTable.matchedPrayagCode, code), eq(competitorPricesTable.competitor, series), eq(competitorPricesTable.effectiveDate, effectiveDate))).limit(1).for("update"))[0];
         old = existing?.price ?? null; targetWasExisting = !!existing;
-        if (existing) { const rows = await tx.update(competitorPricesTable).set({ price: value, updatedAt: new Date() }).where(eq(competitorPricesTable.id, existing.id)).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
-        else { const rows = await tx.insert(competitorPricesTable).values({ competitor: series, price: value, effectiveDate, matchedPrayagCode: code, matchStatus: "matched", codeSource: "unverified", description: p.productName, category: p.category, size: p.size }).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
+        previousLoadBatchId = existing?.loadBatchId ?? null;
+        const [manualSource] = await tx.insert(mrpSourcesTable).values({
+          division: "Manual competitor corrections", sheetId: "manual-competitor-corrections",
+          sheetUrl: "about:blank", expectedFileName: null,
+          notes: "Internal audit source for reviewed competitor corrections.",
+          sourceKind: "manual",
+        }).onConflictDoNothing({ target: mrpSourcesTable.sheetId }).returning({ id: mrpSourcesTable.id });
+        const manualSourceId = manualSource?.id ?? (await tx.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+          .where(eq(mrpSourcesTable.sheetId, "manual-competitor-corrections")).limit(1))[0]?.id;
+        if (!manualSourceId) throw new Error("Manual competitor provenance source could not be created.");
+        const [provenance] = await tx.insert(mrpLoadBatchesTable).values({
+          sourceId: manualSourceId, fileName: `manual-competitor-correction:${series}:${code}:${effectiveDate}`,
+          fileSha256: null, fileSizeBytes: null, downloadedAt: null, loadedBy: actor(req), rowCount: 1,
+          notes: `Single-product competitor correction: ${remarks}`,
+        }).returning({ id: mrpLoadBatchesTable.id });
+        if (!provenance) throw new Error("Manual competitor provenance batch could not be created.");
+        provenanceBatchId = provenance.id;
+        if (existing) { const rows = await tx.update(competitorPricesTable).set({ price: value, loadBatchId: provenanceBatchId, updatedAt: new Date() }).where(eq(competitorPricesTable.id, existing.id)).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
+        else { const rows = await tx.insert(competitorPricesTable).values({ competitor: series, price: value, effectiveDate, matchedPrayagCode: code, loadBatchId: provenanceBatchId, matchStatus: "matched", codeSource: "unverified", description: p.productName, category: p.category, size: p.size }).returning({ id: competitorPricesTable.id }); rowId = rows[0]!.id; mutation = rows.length; }
       }
       if (mutation !== 1) throw new Error("Price edit changed an unexpected number of rows.");
       if (!targetWasExisting) previousResolvedValue = resolvedValue;
       if (series === "Prayag MRP") await recomputeCurrentFlagsInTransaction(tx);
       else await recomputeCompetitorCurrentFlagsInTransaction(series, tx);
-       return (await tx.insert(catalogPriceEditAuditsTable).values({ actor: actor(req), itemCode: code, series, operationType: "save", oldValue: old, previousResolvedValue, newValue: value, effectiveDate, remarks, targetRowId: rowId, creationMetadata: series === "Prayag MRP" ? JSON.stringify({ provenanceBatchId, previousLoadBatchId }) : null }).returning())[0]!;
+        return (await tx.insert(catalogPriceEditAuditsTable).values({ actor: actor(req), itemCode: code, series, operationType: "save", oldValue: old, previousResolvedValue, newValue: value, effectiveDate, remarks, targetRowId: rowId, creationMetadata: JSON.stringify({ provenanceBatchId, previousLoadBatchId }) }).returning())[0]!;
     });
     res.json({ ok: true, audit, firstCompetitorMapping: series !== "Prayag MRP" && !hadCompetitorMapping });
   } catch (e) { req.log.error({ err: e }, "single price save failed"); res.status(409).json({ error: e instanceof Error ? e.message : "Could not save price." }); }
@@ -314,7 +331,11 @@ router.post("/catalog/price-editor/undo/:auditId", requireAdmin, async (req, res
           const deleted = await tx.delete(competitorPricesTable).where(eq(competitorPricesTable.id, target.id)).returning({ id: competitorPricesTable.id });
           if (deleted.length !== 1) throw Object.assign(new Error("Undo changed an unexpected number of competitor rows."), { status: 409 });
         } else {
-          const updated = await tx.update(competitorPricesTable).set({ price: original.oldValue, updatedAt: new Date() }).where(and(eq(competitorPricesTable.id, target.id), eq(competitorPricesTable.price, original.newValue))).returning({ id: competitorPricesTable.id });
+          const metadata = original.creationMetadata ? JSON.parse(original.creationMetadata) as { previousLoadBatchId?: number | null } : {};
+          if (!original.creationMetadata || !Object.prototype.hasOwnProperty.call(metadata, "previousLoadBatchId")) {
+            throw Object.assign(new Error("Undo rejected: prior competitor provenance is missing; existing batch must be preserved."), { status: 409 });
+          }
+          const updated = await tx.update(competitorPricesTable).set({ price: original.oldValue, loadBatchId: metadata.previousLoadBatchId ?? null, updatedAt: new Date() }).where(and(eq(competitorPricesTable.id, target.id), eq(competitorPricesTable.price, original.newValue))).returning({ id: competitorPricesTable.id });
           if (updated.length !== 1) throw Object.assign(new Error("Undo changed an unexpected number of competitor rows."), { status: 409 });
         }
       }

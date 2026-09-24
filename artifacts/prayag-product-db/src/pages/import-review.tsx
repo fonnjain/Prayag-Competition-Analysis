@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { formatMoney } from "@workspace/formatting";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatDisplayDate } from "@/lib/date-format";
@@ -77,6 +78,7 @@ interface BatchData {
   passesRun: number | null;
   itemsAdjudicated: number | null;
   rowCounts: {
+    source?: string;
     ok: number;
     needs_review: number;
     not_found: number;
@@ -103,7 +105,62 @@ interface BatchData {
     coverageGapsByCategory?: Record<string, number> | null;
     unpricedCoverageGaps?: Record<string, number> | Array<{ category: string; count: number }> | null;
   } | null;
-  rows: StagingRow[];
+  rows?: StagingRow[];
+  /** Apollo staged-load contract (present only for Apollo workbooks). */
+  batchId?: number;
+  contentFingerprint?: string;
+  summary?: Record<string, unknown> | null;
+  undoWindowHours?: number;
+  created?: number;
+  updated?: number;
+  unchanged?: number;
+  restored?: number;
+  deleted?: number;
+  apolloRows?: ApolloLoadRow[];
+}
+
+interface ApolloLoadRow {
+  code?: string;
+  itemCode?: string;
+  oldPrice?: number | null;
+  newPrice?: number | null;
+  oldMrp?: number | null;
+  newMrp?: number | null;
+  status?: string;
+  heldReason?: string | null;
+  reason?: string | null;
+  evidence?: unknown;
+}
+
+function formatApolloEvidence(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value !== "object") return String(value);
+  const record = value as Record<string, unknown>;
+  const nested = record.evidence;
+  if (nested && nested !== value) {
+    const formatted = formatApolloEvidence(nested);
+    if (formatted) return formatted;
+  }
+  const kind = typeof record.kind === "string" ? record.kind : null;
+  const reason = typeof record.reason === "string" ? record.reason : null;
+  const kindLabel = kind === "price-dispute"
+    ? "Price dispute"
+    : kind === "product-identity-dispute"
+      ? "Product identity dispute"
+      : kind === "not-verified"
+        ? "Not verified"
+        : kind;
+  if (kindLabel || reason) return [kindLabel, reason].filter(Boolean).join(": ");
+  try { return JSON.stringify(value); } catch { return "Structured evidence unavailable"; }
+}
+
+function formatApolloUnpriced(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return `${value} unpriced PPR row${value === 1 ? "" : "s"}`;
+  if (Array.isArray(value)) return value.map(formatApolloEvidence).filter(Boolean).join("; ");
+  return formatApolloEvidence(value);
 }
 
 /** Bearer token stored by the auth layer — needed for raw fetch() calls that
@@ -361,6 +418,81 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function isApolloBatch(batch: BatchData): boolean {
+  return Boolean(batch.contentFingerprint || batch.undoWindowHours != null || batch.summary);
+}
+
+function apolloCount(batch: BatchData, key: string): number {
+  const summaryValue = batch.summary?.[key];
+  const batchValue = key === "created"
+    ? batch.created
+    : key === "updated"
+      ? batch.updated
+      : key === "unchanged"
+        ? batch.unchanged
+        : key === "restored"
+          ? batch.restored
+          : key === "deleted"
+            ? batch.deleted
+            : undefined;
+  const value = summaryValue ?? batchValue;
+  return typeof value === "number" ? value : 0;
+}
+
+function ApolloLoadSummary({ batch, isApplying, reason, onReasonChange, onApply, onUndo }: {
+  batch: BatchData; isApplying: boolean; reason: string;
+  onReasonChange: (value: string) => void; onApply: () => void; onUndo: () => void;
+}) {
+  const pending = batch.status === "pending";
+  const applied = batch.status === "approved" || (batch.status !== "pending" && batch.created != null);
+  return (
+    <section className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-4" data-testid="apollo-load-summary">
+      <div>
+        <h2 className="font-semibold text-blue-950">Apollo staged load</h2>
+        <p className="text-sm text-blue-900 mt-1">No Prayag products or prices, and no other brands, change until an administrator applies this reviewed fingerprint.</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          ["Create", apolloCount(batch, "create") || apolloCount(batch, "created")],
+          ["Update", apolloCount(batch, "update") || apolloCount(batch, "updated")],
+          ["Unchanged", apolloCount(batch, "unchanged")],
+          ["Held", apolloCount(batch, "held")],
+        ].map(([label, count]) => (
+          <div key={label} className="rounded border bg-white/70 p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-2xl font-mono font-bold">{count}</div></div>
+        ))}
+      </div>
+      <p className="text-sm text-blue-900">Held rows remain untouched pending review. Reasons: {String(batch.summary?.heldReasons ?? batch.summary?.held_reasons ?? "No held-row reasons were returned by the Apollo preview.")}</p>
+      {formatApolloUnpriced(batch.summary?.unpriced) && (
+        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <strong>Unpriced PPR issue:</strong> {formatApolloUnpriced(batch.summary?.unpriced)}
+        </p>
+      )}
+      <p className="text-xs font-mono break-all text-blue-950">Content fingerprint: {batch.contentFingerprint ?? "unavailable"}</p>
+      {(batch.apolloRows?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-blue-950">Row evidence</h3>
+          {batch.apolloRows!.map((row, index) => (
+            (() => {
+              const evidenceText = formatApolloEvidence(row.heldReason ?? row.reason ?? row.evidence);
+              return (
+                <div key={`${row.code ?? row.itemCode ?? "row"}-${index}`} className="rounded border bg-white/70 p-3 text-sm">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="font-mono">{row.code ?? row.itemCode ?? "—"}</span>
+                    <span>{row.status ?? "—"} · {row.oldPrice ?? row.oldMrp ?? "—"} → {row.newPrice ?? row.newMrp ?? "—"}</span>
+                  </div>
+                  {evidenceText && <p className="mt-1 text-xs text-blue-900">{evidenceText}</p>}
+                </div>
+              );
+            })()
+          ))}
+        </div>
+      )}
+      {pending && <div className="flex items-center gap-3 flex-wrap"><Button onClick={onApply} disabled={isApplying || !batch.contentFingerprint} className="gap-2">{isApplying && <Loader2 className="w-4 h-4 animate-spin" />}Admin Apply Apollo Load</Button><span className="text-xs text-blue-900">Applying requires this exact reviewed fingerprint.</span></div>}
+      {applied && <div className="space-y-3 border-t border-blue-200 pt-3"><p className="text-sm font-medium text-blue-950">Applied. Undo is available for {batch.undoWindowHours ?? 24} hours.</p><div className="flex gap-2"><Input aria-label="Apollo undo reason" placeholder="Reason for undo" value={reason} onChange={(event) => onReasonChange(event.target.value)} /><Button variant="outline" onClick={onUndo} disabled={isApplying}>Undo load</Button></div></div>}
+    </section>
+  );
+}
+
 export default function ImportReviewPage() {
   const params = useParams<{ id: string }>();
   const batchId = params.id;
@@ -374,6 +506,7 @@ export default function ImportReviewPage() {
   const [isApproving, setIsApproving] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [apolloReason, setApolloReason] = useState("");
   const [failedChunks, setFailedChunks] = useState<
     Array<{ chunkIndex: number; startPage: number; endPage: number }>
   >([]);
@@ -402,9 +535,27 @@ export default function ImportReviewPage() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load batch");
-        setBatch(data);
+        // The generic route is the durable discovery point for an import-review
+        // URL. Apollo batches advertise their source there, but the Apollo GET
+        // is authoritative for the fingerprint, staged rows, and undo status.
+        let authoritative = data;
+        if (data.rowCounts?.source === "apollo_staged_load") {
+          const apolloRes = await fetch(`/api/catalog/apollo-load/${batchId}`, {
+            headers: getAuthHeaders(),
+          });
+          const apolloData = await apolloRes.json().catch(() => ({}));
+          if (!apolloRes.ok) throw new Error(apolloData.error || "Could not load the authoritative Apollo preview.");
+          authoritative = {
+            ...apolloData,
+            competitor: "Apollo",
+            status: apolloData.status ?? "pending",
+            rows: apolloData.rows ?? [],
+            apolloRows: Array.isArray(apolloData.rows) ? apolloData.rows : [],
+          };
+        }
+        setBatch(authoritative);
         // Default to needs_review if there are any, otherwise ok
-        if ((data.rowCounts?.needs_review ?? 0) > 0) {
+        if ((authoritative.rowCounts?.needs_review ?? 0) > 0) {
           setActiveTab("needs_review");
         } else {
           setActiveTab("ok");
@@ -421,6 +572,19 @@ export default function ImportReviewPage() {
     if (!batch) return;
     setIsApproving(true);
     try {
+      if (isApolloBatch(batch)) {
+        const res = await fetch(`/api/catalog/apollo-load/${batchId}/apply`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify({ contentFingerprint: batch.contentFingerprint }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409) throw new Error(data.error || "This Apollo preview is stale. Reload the preview; no prices were changed.");
+        if (!res.ok) throw new Error(data.error || "Apollo apply failed. No prices were changed.");
+        setBatch({ ...batch, ...data, status: "approved" });
+        toast({ title: "Apollo Load Applied", description: `${data.created ?? 0} created, ${data.updated ?? 0} updated, ${data.unchanged ?? 0} unchanged.` });
+        return;
+      }
       const res = await fetch(`/api/catalog/import-batches/${batchId}/approve`, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -434,6 +598,29 @@ export default function ImportReviewPage() {
       navigate("/import-competitor");
     } catch (err: any) {
       toast({ title: "Approve Failed", description: err.message, variant: "destructive" });
+      setIsApproving(false);
+    }
+  };
+
+  const handleApolloUndo = async () => {
+    if (!batch || !apolloReason.trim()) {
+      toast({ title: "Undo reason required", description: "Explain why this Apollo load is being undone.", variant: "destructive" });
+      return;
+    }
+    setIsApproving(true);
+    try {
+      const res = await fetch(`/api/catalog/apollo-load/${batchId}/undo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ reason: apolloReason.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Apollo undo refused.");
+      setBatch({ ...batch, ...data, status: "undone" });
+      toast({ title: "Apollo Load Undone", description: `${data.restored ?? 0} restored and ${data.deleted ?? 0} deleted.` });
+    } catch (err: any) {
+      toast({ title: "Undo Refused", description: err.message, variant: "destructive" });
+    } finally {
       setIsApproving(false);
     }
   };
@@ -502,15 +689,16 @@ export default function ImportReviewPage() {
   }
 
   const isAlreadyDone = batch.status !== "pending";
+  const apolloBatch = isApolloBatch(batch);
 
   const rowsByStatus = {
-    needs_review: batch.rows.filter((r) => r.status === "needs_review"),
-    ok: batch.rows.filter((r) => r.status === "ok"),
-    not_found: batch.rows.filter((r) => r.status === "not_found"),
-    new_product: batch.rows.filter((r) => r.status === "new_product"),
+    needs_review: (batch.rows ?? []).filter((r) => r.status === "needs_review"),
+    ok: (batch.rows ?? []).filter((r) => r.status === "ok"),
+    not_found: (batch.rows ?? []).filter((r) => r.status === "not_found"),
+    new_product: (batch.rows ?? []).filter((r) => r.status === "new_product"),
   } satisfies Record<TabKey, StagingRow[]>;
 
-  const isApollo = batch.competitor.trim().toLowerCase() === "apollo";
+  const isApollo = apolloBatch || batch.competitor?.trim().toLowerCase() === "apollo";
   const tabConfig: { key: TabKey; label: string; variant: string }[] = [
     { key: "needs_review", label: "Needs Review", variant: "amber" },
     { key: "ok",           label: "Ready",        variant: "green" },
@@ -533,11 +721,11 @@ export default function ImportReviewPage() {
       <div className="flex items-start">
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">
-            Review Import — {batch.competitor}
+            Review Import — {apolloBatch ? "Apollo" : batch.competitor}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {batch.sourceFileName} · w.e.f. {formatDisplayDate(batch.effectiveDate)} · Price basis:{" "}
-            <span className="font-medium">{batch.priceBasis}{batch.gstPct != null ? ` + ${batch.gstPct}% GST` : ""}</span>
+            {apolloBatch ? "Apollo workbook preview" : <>{batch.sourceFileName} · w.e.f. {formatDisplayDate(batch.effectiveDate)} · Price basis:{" "}
+            <span className="font-medium">{batch.priceBasis}{batch.gstPct != null ? ` + ${batch.gstPct}% GST` : ""}</span></>}
           </p>
           {(batch.fileSha256 || batch.model || batch.extractorVersion) && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -548,6 +736,17 @@ export default function ImportReviewPage() {
           )}
         </div>
       </div>
+
+      {apolloBatch && (
+        <ApolloLoadSummary
+          batch={batch}
+          isApplying={isApproving}
+          reason={apolloReason}
+          onReasonChange={setApolloReason}
+          onApply={handleApprove}
+          onUndo={handleApolloUndo}
+        />
+      )}
 
       {/* Status banner if already done */}
       {isAlreadyDone && (
@@ -561,7 +760,7 @@ export default function ImportReviewPage() {
           {batch.status === "approved" ? " Prices are live in the comparison dashboard." : ""}
         </div>
       )}
-      {!isAlreadyDone && (
+      {!isAlreadyDone && !apolloBatch && (
         <div className="rounded-lg px-4 py-3 border border-amber-300 bg-amber-50 text-sm text-amber-900">
           <strong>Pending review — prices are not live.</strong> Inspect the staged rows below, then use
           {" "}Commit Prices to write the approved rows to the competitor price list.
@@ -640,7 +839,7 @@ export default function ImportReviewPage() {
         )}
 
       {/* Action bar */}
-      {!isAlreadyDone && (
+      {!isAlreadyDone && !apolloBatch && (
         <div className="flex items-center gap-3 flex-wrap">
           <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2" data-activity="competitor_import.approve">
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
@@ -657,7 +856,7 @@ export default function ImportReviewPage() {
         </div>
       )}
 
-      {batch.rowCounts?.needs_review && batch.rowCounts.needs_review > 0 && !isAlreadyDone && (
+      {batch.rowCounts?.needs_review && batch.rowCounts.needs_review > 0 && !isAlreadyDone && !apolloBatch && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex gap-3 items-start text-sm text-amber-800">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
@@ -772,7 +971,7 @@ export default function ImportReviewPage() {
       </div>
 
       {/* Bottom action bar (duplicate for long pages) */}
-      {!isAlreadyDone && batch.rows.length > 6 && (
+      {!isAlreadyDone && !apolloBatch && (batch.rows ?? []).length > 6 && (
         <div className="flex items-center gap-3 flex-wrap pt-2 border-t">
           <Button onClick={handleApprove} disabled={isApproving || isDiscarding || toApprove === 0} className="gap-2" data-activity="competitor_import.approve">
             {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}

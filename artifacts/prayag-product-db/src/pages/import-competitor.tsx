@@ -117,6 +117,7 @@ export default function ImportCompetitorPage() {
   const [priceBasis, setPriceBasis] = useState<"MRP" | "Ex-GST">("MRP");
   const [priceBasisTouched, setPriceBasisTouched] = useState(false);
   const [gstPct, setGstPct] = useState<number>(18);
+  const [apolloReason, setApolloReason] = useState("");
   const [pdfPreflight, setPdfPreflight] = useState<PdfPreflight | null>(null);
   const [pdfExtractionPath, setPdfExtractionPath] = useState<ExtractionPath | null>(null);
   const [pdfOverrideReason, setPdfOverrideReason] = useState("");
@@ -243,7 +244,7 @@ export default function ImportCompetitorPage() {
     invalidatePdfPreflight();
     setPriceBasisTouched(false);
 
-    if (!nextFile || nextFile.name.toLowerCase().endsWith(".pdf")) {
+    if (!nextFile || nextFile.name.toLowerCase().endsWith(".pdf") || competitor.trim().toLowerCase() === "apollo") {
       setIsPreviewingWorkbook(false);
       return;
     }
@@ -434,6 +435,10 @@ export default function ImportCompetitorPage() {
     ) {
       return;
     }
+    if (isApollo && !apolloReason.trim()) {
+      setWorkbookPreviewError("A reason is required for an Apollo staged load.");
+      return;
+    }
 
     // PDF imports are deliberately two-step: Detect is read-only, and this
     // submit is the explicit confirmation that starts extraction.
@@ -589,6 +594,30 @@ export default function ImportCompetitorPage() {
           "The extraction connection closed before the result arrived. The server may still be processing this batch; please try again in a moment.",
         );
       } else {
+        if (isApollo) {
+          const apolloBody = new FormData();
+          apolloBody.append("file", file);
+          apolloBody.append("effectiveDate", effectiveDate);
+          apolloBody.append("reason", apolloReason.trim());
+          const response = await fetch("/api/catalog/apollo-load/preview", {
+            method: "POST",
+            body: apolloBody,
+            headers: getAuthHeaders(),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Apollo workbook preview failed. No prices were changed.");
+          }
+          if (!data.batchId || !data.contentFingerprint) {
+            throw new Error("Apollo preview returned an invalid batch or fingerprint. No prices were changed.");
+          }
+          toast({
+            title: "Apollo Load Staged",
+            description: "Review the fingerprint and held rows before applying any prices.",
+          });
+          navigate(`/import-review/${data.batchId}`);
+          return;
+        }
         // Workbooks follow the same durable staging/review flow as PDFs.  No
         // Excel/CSV price is live until the reviewer explicitly commits it.
         const data = await stageCompetitorWorkbook({
@@ -718,6 +747,22 @@ export default function ImportCompetitorPage() {
               </div>
             )}
           </div>
+
+          {isApollo && !isPdf && (
+            <div className="space-y-2">
+              <Label htmlFor="apolloReason">Admin review reason</Label>
+              <Input
+                id="apolloReason"
+                value={apolloReason}
+                onChange={(event) => setApolloReason(event.target.value)}
+                placeholder="Why is this Apollo workbook being reviewed?"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Apollo workbooks are previewed without writing prices. Apply is a separate administrator action.
+              </p>
+            </div>
+          )}
 
           {/* Price Basis */}
           <div className="space-y-3">

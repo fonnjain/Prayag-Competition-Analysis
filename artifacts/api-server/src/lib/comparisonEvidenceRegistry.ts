@@ -2,7 +2,7 @@
 // by the complete comparison identity so an observation from one period cannot
 // leak into another period.
 export type ComparisonEvidence = {
-  kind: "product-identity-dispute" | "not-verified";
+  kind: "product-identity-dispute" | "price-dispute" | "not-verified";
   reason: string;
 };
 
@@ -15,6 +15,16 @@ type EvidenceEntry = {
 };
 
 const ENTRIES: EvidenceEntry[] = [
+  {
+    competitor: "Apollo",
+    competitorCode: "PMN03122V",
+    prayagCode: "5762",
+    effectiveDate: "2026-08-01",
+    evidence: {
+      kind: "price-dispute",
+      reason: "Workbook records ₹27; PDF records ₹60 against a different fitting (row misalignment).",
+    },
+  },
   {
     competitor: "Apollo",
     competitorCode: "PMN032404",

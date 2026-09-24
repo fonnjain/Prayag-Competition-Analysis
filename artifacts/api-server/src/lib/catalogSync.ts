@@ -317,6 +317,7 @@ const TABLE_SCHEMAS: Record<
     isCurrent: bool,
     priceBasis: nullable(text),
     gstPct: nullable(finiteNumber),
+    loadBatchId: nullable(positiveInteger),
     createdAt: isoTimestamp,
     updatedAt: isoTimestamp,
   },
@@ -407,6 +408,9 @@ function assertBundleRelationships(data: CatalogSyncData): void {
   // documented source corrections retain events after invalid history rows,
   // products, or superseded batches are removed.
   for (const [index, row] of data.competitorPrices.entries()) {
+    if (row.loadBatchId != null && !loadBatchIds.has(row.loadBatchId)) {
+      throw new Error(`competitorPrices[${index}] refers to a missing load batch.`);
+    }
     if (typeof row.competitor === "string" && row.competitor.trim().toLowerCase() === "apollo" &&
         row.competitorCode != null && row.codeSource == null) {
       throw new Error(
@@ -415,6 +419,19 @@ function assertBundleRelationships(data: CatalogSyncData): void {
     }
     if (row.matchedPrayagCode != null && !productCodes.has(row.matchedPrayagCode)) {
       throw new Error(`competitorPrices[${index}] refers to a missing product.`);
+    }
+  }
+}
+
+/** Reject only newly introduced unlinked competitor rows; known legacy IDs may
+ * retain their null provenance during a whole-catalog replacement. */
+export function assertCompetitorSyncProvenance(
+  rows: Record<string, unknown>[],
+  existingIds: ReadonlySet<number>,
+): void {
+  for (const [index, row] of rows.entries()) {
+    if (row.loadBatchId == null && !existingIds.has(Number(row.id))) {
+      throw new Error(`competitorPrices[${index}] is a new row without loadBatchId; catalog sync rejected.`);
     }
   }
 }
@@ -782,6 +799,11 @@ export async function applyCatalogSyncBundle(
           "Production catalog changed after preview. Preview the bundle again before applying it.",
         );
       }
+      // A sync may carry forward known legacy rows whose provenance is null,
+      // but it may not introduce a new unlinked competitor row. Existing
+      // IDs are the only safe way to distinguish legacy nulls from omissions.
+      const existingCompetitorIds = new Set(currentData.competitorPrices.map((row) => Number(row.id)));
+      assertCompetitorSyncProvenance(data.competitorPrices, existingCompetitorIds);
       await tx
         .update(catalogSyncAuditsTable)
         .set({ beforeSummary: JSON.stringify(before) })
