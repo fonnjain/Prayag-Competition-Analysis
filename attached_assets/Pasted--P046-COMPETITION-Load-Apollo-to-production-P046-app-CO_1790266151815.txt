@@ -1,0 +1,192 @@
+# P046 — COMPETITION — Load Apollo to production
+
+> **P046** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES PRODUCTION DATA.** It adds a fourth competitor.
+> Quote `P046` when reporting back.
+> **Preview first. Stop. Apply only on explicit approval naming the row count.**
+
+P045 closed across five steps. Apollo is fit to load:
+
+```
+691 Apollo price rows      272 locally assigned pipes + 419 supplier fittings
+272 distinct pipe identities, zero collisions
+idempotent across four development loads
+10 of 418 cross-checked rows carry an unexplained discrepancy - all flagged
+```
+
+Three rows are **held and flagged**, and stay that way: `PPRMB0204XX20MM` unpriced, `PMN03122V` price-disputed, `PMN032404` product-identity-disputed.
+
+---
+
+# PART 1 — Before anything: development is not production
+
+**This is the trap on this project, and it has caught us four times.**
+
+P037 found production holds **231 products development does not** — the HDPE grid extension. Development's catalogue is 6,946. **Production's is not the same number.**
+
+Apollo rows map to Prayag item codes. So:
+
+**1.1** Report production's catalogue product count, with its clock time. Do not assume 6,946.
+
+**1.2** In development, **5 Apollo rows had no matching Prayag code** and were excluded. **Check those 5 against production.** If production holds those products, Apollo would load **696** rows there, not 691.
+
+**List all five with their Apollo code, their intended Prayag code, and whether production holds that product.** Report the expected production row count explicitly: 691, or 691 plus however many of the five match.
+
+**A count that differs from development is not a failure. An unexplained count is.**
+
+**1.3** Confirm production currently holds **0** Apollo price rows and **0** Apollo import batches, with the clock time.
+
+---
+
+# PART 2 — Gate the file on a content fingerprint, not a byte hash
+
+An `.xlsx` is a zip. Re-saving it changes every byte while the values stay identical. A byte-hash gate stops a legitimate load; it has already done so once, under P027.
+
+**2.1** Compute the content fingerprint over the values — the sorted normalised rows, joined, UTF-8, SHA-256 — and gate on that.
+
+**2.2** **Enumerate the worksheets from the file, not from this prompt.** P027r2 read 11 sheets of a 13-sheet file because the brief listed 11, and 137 prices went missing. Report the sheet names you found and their count, from the file.
+
+**2.3** Report the fingerprint and confirm it matches the file proven in development.
+
+---
+
+# PART 3 — Preview, then stop
+
+Report, and change nothing:
+
+```
+Apollo rows to create              691, or the corrected figure from 1.2
+  of which locally_assigned        272
+  of which supplier                419
+Prayag products to create          0
+Prayag products to change          0
+Prayag prices to change            0
+existing competitor rows affected  0    Prince, Ashirvad, Sparsh Pearl
+rows held and flagged              3
+```
+
+Also report, before and after the intended apply:
+
+- production `mrp_price_history` row count — **expect unchanged at 14,252**
+- production value SHA-256 — **expect unchanged at** `1c2d9ce6d24a01648fee52c20690579aec5841b48ae356b07b8a27c9ffe31787`
+
+**Apollo is a competitor. It touches no Prayag price.** If either figure would move, stop and report — something is wrong with the load, not with the expectation.
+
+**Stop here.** The Apply needs a separate approval naming the row count.
+
+---
+
+# PART 4 — The apply, when approved
+
+**4.1** One import batch, recording source, the content fingerprint, the actor, the timestamp, the row count, and the reason. Every Apollo price row carries its `load_batch_id` — the `NOT NULL` constraint from P039 now enforces this, so a path that cannot attach one will fail rather than write a null.
+
+**4.2** `code_source` travels with every row: 272 `locally_assigned`, 419 `supplier`, 0 `unverified`.
+
+**4.3** The 272 pipe identities load as `v2|<sheet class>|<Prayag code>|<size>`, and the `APUGD007` reservation travels with them.
+
+**4.4** The three flags travel. `PMN03122V` keeps its price dispute, `PMN032404` its product-identity dispute, `PPRMB0204XX20MM` stays unpriced. **A flag that does not survive the load is worse than no flag.**
+
+**4.5** One-action undo. Report the window.
+
+---
+
+# PART 5 — Verify in production, twice
+
+**Read production twice, a minute apart, and report both with clock times.**
+
+```
+Apollo price rows              expect the Part 3 figure
+Apollo import batches          expect 1
+Apollo rows with no batch id   expect 0
+code_source counts             expect 272 / 419 / 0
+distinct pipe identities       expect 272
+the three flags                expect present and visible
+Prayag catalogue count         expect unchanged from 1.1
+mrp_price_history              expect 14,252
+value SHA-256                  expect 1c2d9ce6...ffe31787
+```
+
+**5.2** Load the same file a **second** time in production. It must create nothing and change nothing. Report creations and updates separately — a run reporting "0 created" while updating 691 rows is not a no-op.
+
+**5.3** Confirm the import screen still warns that pipe rows cannot be matched from a PDF.
+
+---
+
+# PART 6 — One downstream consumer you should know about
+
+The **Sales application** fetches `/v1/comparison` from this app with an `external_read`-style key. Its client code carries this assumption:
+
+```
+"paginates automatically; returns all rows in one call
+ since the total is small (~150 rows at pageSize=200)"
+```
+
+**Adding 691 Apollo rows changes that total materially.** The pagination should handle it — but the comment shows the expectation it was written under.
+
+**6.1** Report what `/v1/comparison` returns for `total` before and after the load.
+
+**6.2** Change nothing in the Sales application. This is a heads-up, not a task. If the number is large enough to matter, say so and it becomes a SALES prompt.
+
+---
+
+# Rules
+
+1. **Preview, then stop.** Apply only on an approval that names the row count.
+2. **No Prayag product is created, changed or deactivated.** A competitor upload must never create a Prayag product, and new-product mode must not be offered on one.
+3. No Prayag price value changes. `mrp_price_history` stays at 14,252 with its checksum.
+4. No Prince, Ashirvad or Sparsh Pearl row changes.
+5. No row is relabelled from `unverified`. The 1,912 stay as they are.
+6. **No direct SQL against production.** The load goes through the application's own validated path.
+7. **Do not select any option that overwrites production data with development data.**
+8. The three held rows stay held. No price is invented for any of them.
+
+# Tests
+
+```
+ 1. Production Apollo rows match the Part 3 figure exactly
+ 2. Every Apollo row carries a load_batch_id
+ 3. code_source is 272 locally_assigned, 419 supplier, 0 unverified
+ 4. 272 distinct pipe identities, zero collisions
+ 5. APUGD007 reservation present; a mismatched assignment returns 409
+ 6. All three flags visible in production
+ 7. Prayag catalogue count unchanged
+ 8. mrp_price_history 14,252, value SHA-256 identical
+ 9. A second production load creates 0 and updates 0
+10. No Prince, Ashirvad or Sparsh Pearl row changed
+11. Non-admin receives 403
+12. Undo restores production to zero Apollo rows
+```
+
+**Test 8 is the guard: a competitor load must not touch a Prayag price.**
+**Test 9 is the one that proves the loader, not the first run.**
+
+# Report
+
+**Preview**
+1. Production catalogue count, with clock time.
+2. The five unmatched rows, checked against production, and the expected row count.
+3. Production Apollo rows and batches before — expect 0 / 0.
+4. The content fingerprint, and the worksheet names **read from the file**.
+5. The full preview table.
+
+**After the approved apply**
+6. Two production readings, a minute apart, with clock times.
+7. The second-load result: creations and updates, separately.
+8. `mrp_price_history` count and SHA-256, before and after.
+9. The three flags, as a user sees them.
+10. `/v1/comparison` total, before and after.
+11. The undo window.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Still with Prayag
+
+The load does not wait on these — all three are flagged and none is invented — but they should be answered:
+
+- **`PPRMB0204XX20MM`** — one supplier code, two prices.
+- **`PMN03122V`** — ₹27 loaded, ₹60 on the PDF against a different fitting.
+- **`PMN032404`** — ₹187.50 in both sources, but "with Jali" against "WITHOUT JALI".
+
+Each is settled by looking at the printed page.
