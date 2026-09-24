@@ -1,0 +1,141 @@
+# P044 — COMPETITION — The sold-check interface, and what P043 is
+
+> **P044** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** It defines one interface used by P042's delete gate.
+> Quote `P044` when reporting back.
+> **Pairs with P042. Does not depend on P043.**
+
+---
+
+## First: P043 is not yours
+
+**P043 is a handoff to the SALES project.** It adds `GET /api/external/item-existence` to `prayag-sales.com`.
+
+Do not build it. Do not attempt it. This application's access to Sales is an `external_read` API key, not the codebase.
+
+**Treat P043 as an interface contract, not a task.** Its absence does not block P042.
+
+---
+
+## 1. One function, three values
+
+P042's delete gate asks one question. Put it behind a single function so its data source can change without touching anything else:
+
+```
+hasEverBeenSold(code) -> "sold" | "never_sold" | "unknown"
+```
+
+**Three values, never a boolean.** A boolean forces "I could not check" to be reported as "never sold", and the delete gate would then remove a product on the strength of a failed query.
+
+```
+"sold"        REFUSE the delete. Offer Retire.
+"never_sold"  delete may proceed, subject to P042's other four checks
+"unknown"     REFUSE the delete. Say why.
+```
+
+---
+
+## 2. The interim implementation — today, over `sales-by-item`
+
+```
+GET https://prayag-sales.com/api/external/sales-by-item
+```
+
+**2.1** One call per fiscal year. `fy` is mandatory and must be a complete fiscal year — there is no all-time mode.
+
+**2.2** **Ask Sales which fiscal years its register covers.** Do not hardcode a list. Any year you cannot enumerate is **unanswered**, and a code you could not clear across every year is `unknown`.
+
+**2.3** **A month in `coverage.held` or `coverage.unavailable` is not a month with no sales.** It is a month with no answer. Any code whose search window includes a held or unavailable month is `unknown`.
+
+**2.4** Every one of these makes the code `unknown`:
+
+```
+401  no or invalid credential
+403  wrong scope
+429  rate limited
+503  source or rate limiter unavailable
+409  source_changed - restart the query; do not treat a partial result as complete
+```
+
+**2.5** **Rate limit: 60 requests per minute.** Thirty products across three fiscal years is ninety calls. **Query by period and match codes locally** rather than calling once per product.
+
+**2.6** Do **not** use `margin-by-item` for this. Its data stops at June 2026 and PTMT months are held.
+
+**2.7** Do **not** use `catalogue_status` as the gate. It reflects the Sales app's snapshot of *this* catalogue, taken at its last manual sync, so `absent` means "not in a possibly stale snapshot", not "never existed" — and for a product deleted here it would become `absent` afterwards, making the deletion retroactively justify itself. Report it as context. Never decide on it.
+
+---
+
+## 3. What to expect, and what not to do about it
+
+**H3 holds the whole of FY2024-25.** So in the interim, almost every code returns `unknown`, and the delete gate refuses almost everything — including the 30 zero-reference generator fixtures, which have obviously never been sold but cannot be *proven* not to have been.
+
+**That is correct behaviour, not a defect.**
+
+- Do not weaken the rule to make deletes flow.
+- Do not add an override, a force flag, or an "I'm sure" checkbox.
+- Do not treat a held month as zero.
+
+Report the refusal so a user can see it is a **data-coverage limit**, not a property of their product. Something to the effect of: *this cannot be deleted yet because sales cannot be checked for FY2024-25.*
+
+---
+
+## 4. When P043 lands
+
+Replace the body of `hasEverBeenSold` with a call to `/api/external/item-existence`, which answers all-time in one request and returns the same three values.
+
+**Nothing else changes.** That is the point of putting it behind one function.
+
+---
+
+## 5. This does not hold up P042
+
+Everything else in P042 is independent of both the interim check and P043:
+
+```
+Retire                              build it
+preview / apply / undo              build it
+the provenance batch and snapshot   build it
+the other four checks               build it
+bulk handling                       build it
+the listing of all 36 placeholders  build it
+```
+
+Build them. The delete action will simply refuse more often than it eventually will.
+
+---
+
+# Rules
+
+1. `unknown` is never reported as `never_sold`.
+2. No override on a refusal, in any form.
+3. `catalogue_status` is context, never the decision.
+4. A held or unavailable month is `unknown`, never zero.
+5. The Sales credential stays server-side — never in a client bundle, an endpoint response, a log, a commit or a report.
+
+# Tests
+
+```
+1. A code with sales in any fiscal year returns "sold" and the delete is refused
+2. A code with no sales and full coverage returns "never_sold"
+3. A held month anywhere in the search window returns "unknown"
+4. A 429 returns "unknown", not "never_sold"
+5. A 503 returns "unknown", not "never_sold"
+6. A 409 source_changed restarts the query rather than returning a partial result
+7. A code absent from the Sales catalogue snapshot but present in sales returns "sold"
+8. Thirty products are checked without exceeding 60 requests per minute
+9. Every "unknown" refusal states the coverage reason
+10. No path allows a delete on "unknown"
+```
+
+Tests 4 and 5 are the ones that matter. Test 10 is the one that must have no exception.
+
+# Report
+
+1. The function, quoted, with its three return paths.
+2. How you enumerate the fiscal years, and what you do when you cannot.
+3. The request pattern for thirty products, with the call count.
+4. Each error status and the value it maps to.
+5. The refusal message a user sees on `unknown`.
+6. Confirmation that no override exists.
+
+State the environment and the clock time against every figure.

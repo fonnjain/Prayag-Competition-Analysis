@@ -3,6 +3,7 @@ import { Router } from "express";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { catalogProductsTable, db, mrpPriceHistoryTable, productLifecycleBatchesTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { checkEverSoldForCodes } from "../lib/hasEverBeenSold";
 
 const router = Router();
 const UNDO_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -37,6 +38,28 @@ function parseCodes(value: unknown): string[] | null {
   const codes = value.map((code: string) => code.trim());
   return new Set(codes).size === codes.length ? codes : null;
 }
+
+// Read-only Sales gate. The destructive productLifecycle router is deliberately
+// not mounted. This lets admins see why a deletion cannot yet be justified.
+router.get("/admin/product-retirement/sales-check", requireAdmin, async (req, res): Promise<void> => {
+  const raw = req.query.itemCode;
+  const codes = parseCodes(Array.isArray(raw) ? raw : [raw]);
+  if (!codes) {
+    res.status(400).json({ error: "Provide 1–100 unique itemCode values." });
+    return;
+  }
+  try {
+    const evidence = await checkEverSoldForCodes(codes);
+    res.json({ action: "read-only-sales-check", results: codes.map((itemCode) => ({
+      itemCode, ...evidence.get(itemCode.toUpperCase())!,
+    })) });
+  } catch {
+    res.json({ action: "read-only-sales-check", results: codes.map((itemCode) => ({
+      itemCode, status: "unknown", reason: "Delete blocked: Sales register could not be checked.",
+      periods: [], catalogueStatus: null,
+    })) });
+  }
+});
 
 router.post("/admin/product-retirement/preview", requireAdmin, async (req, res): Promise<void> => {
   const itemCodes = parseCodes(req.body?.itemCodes);

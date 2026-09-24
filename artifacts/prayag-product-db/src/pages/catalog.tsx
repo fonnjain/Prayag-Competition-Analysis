@@ -15,6 +15,7 @@ import { formatDisplayDate } from "@/lib/date-format";
 import { productDetailHref } from "@/lib/product-links";
 import { useAuth } from "@workspace/replit-auth-web";
 import { ProductRetirementDialog, ProductRetirementHistory } from "@/components/product-retirement-dialog";
+import { ProductSalesCheckDialog } from "@/components/product-sales-check-dialog";
 
 const PAGE_SIZE = 50;
 interface InlineEditState {
@@ -170,6 +171,7 @@ export default function CatalogPage() {
   const isAdmin = user?.role === "admin";
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
   const [retirementCodes, setRetirementCodes] = useState<string[] | null>(null);
+  const [salesCheckCodes, setSalesCheckCodes] = useState<string[] | null>(null);
   const [showRetirementHistory, setShowRetirementHistory] = useState(false);
   const [search, setSearch] = useState("");
   const [division, setDivision] = useState<string>("all");
@@ -221,6 +223,9 @@ export default function CatalogPage() {
           {isAdmin && <Button variant="outline" onClick={() => setShowRetirementHistory(true)}>Recent retirements / Undo</Button>}
           {isAdmin && selectedCodes.length > 0 && <Button variant="outline" onClick={() => setRetirementCodes(selectedCodes)}>
             Retire selected ({selectedCodes.length})
+          </Button>}
+          {isAdmin && selectedCodes.length > 0 && <Button variant="outline" onClick={() => setSalesCheckCodes(selectedCodes)}>
+            Check Sales history ({selectedCodes.length})
           </Button>}
           <Button variant="outline" asChild>
             <a href={inForceExportUrl} download>
@@ -414,6 +419,7 @@ export default function CatalogPage() {
       {isAdmin && retirementCodes && <ProductRetirementDialog itemCodes={retirementCodes} onClose={() => {
         setRetirementCodes(null); setSelectedCodes([]);
       }} />}
+      {isAdmin && salesCheckCodes && <ProductSalesCheckDialog itemCodes={salesCheckCodes} onClose={() => setSalesCheckCodes(null)} />}
       {isAdmin && showRetirementHistory && <ProductRetirementHistory onClose={() => setShowRetirementHistory(false)} />}
     </div>
   );

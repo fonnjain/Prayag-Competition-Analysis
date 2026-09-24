@@ -12,33 +12,16 @@ import {
   mrpGeneratorResultsTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { checkEverSoldForCodes, type SoldEvidence } from "../lib/hasEverBeenSold";
 
 const router = Router();
 const UNDO_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-type SalesCheck = {
-  status: "unavailable";
-  periods: Array<{ period: string; value: number }>;
-  reason?: string;
-};
 
 function fingerprint(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-async function salesCheck(itemCode: string): Promise<SalesCheck> {
-  // Intentionally fail closed until Sales provides a verified all-time,
-  // per-code response containing both sales history and catalogue presence.
-  // The existing period endpoint cannot prove either EVER sold or absent.
-  void itemCode;
-  return {
-    status: "unavailable",
-    periods: [],
-    reason: "Delete blocked: an authenticated all-time Sales item and catalogue proof is not yet verifiable.",
-  };
-}
-
-async function inspect(itemCode: string) {
+async function inspect(itemCode: string, sales: SoldEvidence) {
   const [product] = await db.select().from(catalogProductsTable)
     .where(eq(catalogProductsTable.itemCode, itemCode)).limit(1);
   if (!product) throw Object.assign(new Error("Product not found."), { status: 404 });
@@ -52,9 +35,8 @@ async function inspect(itemCode: string) {
     FROM mrp_price_history h JOIN mrp_load_batches b ON b.id = h.load_batch_id
     WHERE h.item_code = ${itemCode} AND b.file_sha256 IS NOT NULL
   `);
-  const sales = await salesCheck(itemCode);
   const checks = {
-    sales: false,
+    sales: sales.status === "never_sold",
     // Price rows are not a safety failure: they are shown in the confirmation
     // and removed only as this product's exact snapshot.
     priceHistory: true,
@@ -63,7 +45,7 @@ async function inspect(itemCode: string) {
     fileLoad: Number(loaded.rows[0]?.count ?? 0) === 0,
   };
   const blockingReasons = [
-    ...(sales.status === "unavailable" ? [sales.reason ?? "Sales check failed or did not prove complete all-period coverage."] : []),
+    ...(sales.status !== "never_sold" ? [sales.reason] : []),
     ...(mapping.length ? ["Competitor SKU mapping exists."] : []),
     ...(scenario.length ? ["Saved scenario or analysis references this product."] : []),
     ...(Number(loaded.rows[0]?.count ?? 0) ? ["Product has file-loaded MRP provenance."] : []),
@@ -80,7 +62,8 @@ router.get("/admin/product-lifecycle/preview", requireAdmin, async (req, res): P
   const itemCodes = codes.filter((v): v is string => typeof v === "string" && !!v.trim()).map((v) => v.trim());
   if (!itemCodes.length || itemCodes.length > 100) return res.status(400).json({ error: "Provide 1–100 itemCode values." });
   try {
-    const results = await Promise.all(itemCodes.map(inspect));
+    const sales = await checkEverSoldForCodes(itemCodes);
+    const results = await Promise.all(itemCodes.map((itemCode) => inspect(itemCode, sales.get(itemCode.trim().toUpperCase())!)));
     const before = await db.select({ count: sql<number>`count(*)::int` }).from(mrpPriceHistoryTable);
     res.json({ action: "delete", beforeCount: before[0]?.count ?? 0, results, fingerprint: fingerprint(results.map((r) => ({ itemCode: r.itemCode, checks: r.checks, priceRowCount: r.priceRowCount }))) });
   } catch (error) {
@@ -108,7 +91,8 @@ router.post("/admin/product-lifecycle/delete", requireAdmin, async (req, res): P
   const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
   const previewFingerprint = typeof req.body?.previewFingerprint === "string" ? req.body.previewFingerprint : "";
   if (!itemCodes.length || !reason || !previewFingerprint) return res.status(400).json({ error: "itemCode(s), a typed reason, and a current preview are required." });
-  const inspected = await Promise.all([...new Set(itemCodes)].map(inspect));
+  const sales = await checkEverSoldForCodes(itemCodes);
+  const inspected = await Promise.all([...new Set(itemCodes)].map((itemCode) => inspect(itemCode, sales.get(itemCode.trim().toUpperCase())!)));
   const expectedFingerprint = fingerprint(inspected.map((r) => ({ itemCode: r.itemCode, checks: r.checks, priceRowCount: r.priceRowCount })));
   if (expectedFingerprint !== previewFingerprint) return res.status(409).json({ error: "Preview is stale; run the five checks again before applying." });
   const results: unknown[] = [];
