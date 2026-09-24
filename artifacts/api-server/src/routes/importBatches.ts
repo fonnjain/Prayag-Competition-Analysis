@@ -32,6 +32,7 @@ import { requireAdmin } from "../middlewares/authMiddleware";
 import {
   extractFromPdf,
   EXTRACTION_MODEL,
+  APOLLO_EXTRACTOR_VERSION,
   buildPdfBatchProvenance,
   type ExtractionProgress,
 } from "../lib/pdfExtractor.js";
@@ -56,6 +57,7 @@ import {
 } from "../lib/pdfPreflight.js";
 import { mergeHybridItems, princeItemsToExtracted } from "../lib/pdfHybrid.js";
 import { assertApolloCodeAvailable } from "../lib/apolloPipeIdentity.js";
+import { enrichApolloSizes } from "../lib/apolloTextPdfExtractor.js";
 import type { ExtractedItem } from "../lib/pdfExtractor.js";
 
 const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
@@ -455,7 +457,16 @@ export function duplicateDecision(
   const storedPath = isExtractionPath(stored.extractionPath) ? stored.extractionPath : null;
   const samePath = Boolean(extractionPath && storedPath && extractionPath === storedPath);
   const exactDateAndPath = existing.effectiveDate === effectiveDate && samePath;
-  const action = exactDateAndPath ? "reuse" : existing.effectiveDate === effectiveDate ? "supersede" : "new_period";
+  // Apollo's size provenance changed in v3. An old Apollo batch with the
+  // same source/date/path must be re-extracted; all other competitors retain
+  // the historical SHA/date/path idempotency semantics.
+  const apolloNeedsReextract =
+    competitor === "Apollo" &&
+    exactDateAndPath &&
+    !existing.extractorVersion?.startsWith(`${APOLLO_EXTRACTOR_VERSION}:`);
+  const action = apolloNeedsReextract || !exactDateAndPath
+    ? existing.effectiveDate === effectiveDate ? "supersede" : "new_period"
+    : "reuse";
   return {
     action,
     message: action === "reuse"
@@ -1085,7 +1096,7 @@ router.post(
             ...provenance,
             extractorVersion: extractionPath === "text"
               ? "pdf-vision-preflight-text_then_ai-v1"
-              : `${provenance.extractorVersion}:${extractionPath}`,
+              : `${competitor === "Apollo" ? APOLLO_EXTRACTOR_VERSION : provenance.extractorVersion}:${extractionPath}`,
             rowCounts: JSON.stringify({
               extractionPath,
               detectedClass: preflight.detectedClass,
@@ -1171,7 +1182,7 @@ router.post(
              catalogueProfile,
              { pages: Array.from({ length: preflight.totalPages }, (_, index) => index + 1) },
            );
-       const extracted = extraction
+       let extracted = extraction
          ? (() => {
              const merged = mergeHybridItems(
                princeItemsToExtracted(extraction.positional.items),
@@ -1181,6 +1192,12 @@ router.post(
              return merged.items;
            })()
          : aiExtraction.items;
+       // Apollo's printed size is a positional table cell. Vision reliably
+       // finds the code and price but historically omitted this column.
+       // Enrichment is read-only and leaves conflicting occurrences blank.
+       if (competitor.toLowerCase() === "apollo" && extracted.length > 0) {
+         extracted = (await enrichApolloSizes(file.buffer, extracted)).items;
+       }
        const {
          failedChunks,
          pagesSent,

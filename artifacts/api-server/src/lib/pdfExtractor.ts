@@ -18,7 +18,11 @@ import {
 
 export const EXTRACTION_MODEL = "claude-opus-5" as const;
 /** Bump when extraction/reconciliation behaviour changes. */
+// Keep the shared extractor provenance stable for every competitor except
+// Apollo. Apollo's positional-size enrichment has its own version so changing
+// it does not invalidate otherwise identical competitor uploads.
 export const EXTRACTOR_VERSION = "pdf-code-discovery-v2" as const;
+export const APOLLO_EXTRACTOR_VERSION = "pdf-code-discovery-v3" as const;
 /** Bump when the model instructions change. */
 export const PROMPT_REVISION = "catalogue-extraction-r2" as const;
 

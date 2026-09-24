@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P045 Step 5 — Apollo PDF size and identity audit</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#18243a;background:#f6f8fb}
+    *{box-sizing:border-box}body{max-width:1050px;margin:0 auto;padding:40px 24px 80px;line-height:1.53}
+    h1{font-size:2rem;margin:.2em 0}h2{margin-top:2.1em;border-bottom:1px solid #dbe2ea;padding-bottom:.25em}
+    h3{margin-top:1.3em}p,li{max-width:90ch}small,.muted{color:#526174}
+    .card{background:#fff;border:1px solid #dbe2ea;border-radius:12px;padding:20px 24px;margin:18px 0}
+    .notice{border-left:5px solid #b65d17;background:#fff9ef;padding:12px 18px}
+    .good{border-left-color:#16835b;background:#ecf9f3}
+    table{width:100%;border-collapse:collapse;background:#fff;font-size:.92rem}
+    th,td{border:1px solid #dbe2ea;padding:9px 10px;text-align:left;vertical-align:top}
+    th{background:#eaf0f6}tr:nth-child(even) td{background:#f8fafc}
+    .scroll{overflow-x:auto}code{background:#eaf0f6;padding:1px 4px;border-radius:3px}
+    .tag{display:inline-block;padding:2px 7px;border-radius:5px;font-weight:700;font-size:.82em}
+    .identity{background:#ffedd5;color:#92400e}.unverified{background:#e2e8f0;color:#334155}
+    .dispute{background:#fee2e2;color:#991b1b}
+  </style>
+</head>
+<body>
+  <small>COMPETITION · Apollo · Development only · 24 September 2026, Asia/Kolkata (IST)</small>
+  <h1>P045 Step 5 — Size extraction and identity disputes</h1>
+  <p class="notice"><strong>No production load or publish.</strong> This comparison re-ran the new positional size extractor against the exact 418 previously price-agreeing PDF rows in development. It did not re-run the entire vision model, change the historical approved staging batch, or update any price, mapping, or product.</p>
+
+  <h2>1. What failed, and what changed</h2>
+  <p>Apollo's text-native PDF prints size in a separate table cell to the left of the item code. The vision extraction found codes and prices but omitted that cell on 174 of these 418 rows. The revised Apollo-only import path reads the <em>same printed code row and page</em> using positional PDF text, filling only previously empty size values. It does not guess across pages or conflicting occurrences and does not overwrite existing nonblank sizes. The positional extractor scanned the PDF's 68 pages; the measured cohort below is the exact 418 rows, not the whole document. Selected printed pages were also checked visually.</p>
+  <p class="muted">Figure scope and time: development historical batch checked 24 Sep 2026 20:34:45 IST; development read-only rerun captured 24 Sep 2026 20:43:47 IST. “Price-only remainder” means price agrees but all three fields do not; “neither” is the stricter description-and-size double failure.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Among 418 price-agreeing rows</th><th>Before (development)</th><th>After read-only size re-extraction (development)</th></tr></thead>
+    <tbody>
+      <tr><td>PDF size blank</td><td>174</td><td>0 (174 filled; 0 populated sizes changed)</td></tr>
+      <tr><td>Size agreement, ordered millimetre dimensions</td><td>244 / 418</td><td>402 / 418 (16 strict disagreements)</td></tr>
+      <tr><td>Price + description + size agreement</td><td>65 / 418</td><td>153 / 418</td></tr>
+      <tr><td>Price agrees, but not all three fields</td><td>353 / 418</td><td>265 / 418</td></tr>
+      <tr><td>Neither description nor size agrees</td><td>77 / 418</td><td>7 / 418</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Important:</strong> the approved historical staging rows still retain their original 174 blank fields (development database check: 24 Sep 2026 20:56:01 IST). The zero-blank result belongs to this fresh, <em>read-only</em> pass on those same 418 code/page pairs. Future Apollo PDF imports run the fixed extractor; re-uploading the same PDF under the updated extraction version offers a superseding <em>review</em> batch rather than reusing the old result. Historical evidence was not silently rewritten.</p>
+
+  <h2>2. The original ten printed-page checks</h2>
+  <p class="muted">Development re-extraction and printed PDF check: 24 Sep 2026 20:43:47 IST. Page numbers are 1-based PDF pages, not the small footer printed on the page.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Code</th><th>PDF page</th><th>Size extracted from printed row</th><th>Compared with the Step 4 observation</th></tr></thead>
+    <tbody>
+      <tr><td>CMN02032V</td><td>8</td><td>65 mm</td><td>Agrees</td></tr>
+      <tr><td>CMN02061U0W</td><td>6</td><td>32×20 mm</td><td><strong>Correction:</strong> the supplied page says 32×20, not the previously reported 40×40.</td></tr>
+      <tr><td>CM02082V</td><td>8</td><td>65 mm</td><td>Agrees</td></tr>
+      <tr><td>CMN02260W</td><td>6</td><td>20 mm</td><td><strong>Correction:</strong> the supplied page says 20, not the previously reported 15.</td></tr>
+      <tr><td>PMNN03432V</td><td>22</td><td>75 mm</td><td>Agrees</td></tr>
+      <tr><td>PMN03450604</td><td>21</td><td>160×110 mm</td><td>Agrees with printed page; workbook orders the two dimensions oppositely.</td></tr>
+      <tr><td>PMN03142V</td><td>23</td><td>75 mm</td><td>Agrees</td></tr>
+      <tr><td>PMN032404</td><td>24</td><td>110 mm</td><td>Agrees; PDF also says <strong>WITHOUT JALI</strong>.</td></tr>
+      <tr><td>PMN036404</td><td>22</td><td>110 mm</td><td>Agrees</td></tr>
+      <tr><td>PMN036706</td><td>23</td><td>160 mm</td><td>Agrees</td></tr>
+    </tbody>
+  </table></div>
+  <p class="notice good"><strong>Fresh sample of ten remaining blanks:</strong> not possible. There are zero blanks left in the 418-row rerun, so there are no remaining-blank rows to sample. No conclusion is extrapolated from this fact to other PDF rows. The two corrected observations above are not forced to match the earlier, mistaken transcription.</p>
+
+  <h2>3. Description and identity classification</h2>
+  <p class="muted">Development 418-row assessment, 24 Sep 2026 20:43:47 IST. These four classifications are a partition of the 418 price-agreeing rows. They describe label/identity evidence; the strict size score above is a separate test.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Classification after size repair</th><th>Rows</th><th>Interpretation</th></tr></thead>
+    <tbody>
+      <tr><td>Exact normalized description</td><td>162</td><td>Nine of these still have strict size disagreement.</td></tr>
+      <tr><td>Wording-only description difference</td><td>246</td><td>No <em>new proven</em> product-identity mismatch from size alone.</td></tr>
+      <tr><td>Likely product misalignment</td><td>1</td><td>PMN032404: workbook “with Jali”; PDF p.24 “WITHOUT JALI”, both ₹187.50.</td></tr>
+      <tr><td>Indeterminate</td><td>9</td><td>Insufficient PDF label evidence; shown as Not verified, not as confirmed disputes.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Of the 174 newly filled blanks, 158 agree with the workbook's ordered millimetre dimensions and 16 do not. Printed-page checks show 11 of those 16 contain the <em>same dimensions in reverse order</em>; five have an incomplete or malformed workbook size relative to the printed row. This is a strict field disagreement, not automatically proof of a different product. Four of the 246 wording-only rows have reverse dimension order; two size-incomplete rows are already among the nine indeterminate cases. No new product-identity dispute is asserted from these differences. PMN032404 remains the independently established with-/without-Jali dispute.</p>
+
+  <h2>4. Markers visible to users</h2>
+  <p class="muted">Authenticated development comparison and import-screen browser checks: 24 Sep 2026 20:55:05–20:55:11 IST. Both comparison views expose the review markers; the browser checked the by-product view. The hover title and accessible badge label convey the reason without spilling into adjacent price columns.</p>
+  <ul>
+    <li><span class="tag identity">Product identity dispute</span> PMN032404 → Prayag 5793, ₹187.50. PDF p.24 says WITHOUT JALI; workbook says “Multi Floor Trap with Jali.” This is <strong>not</strong> a price dispute, and the price is unchanged.</li>
+    <li><span class="tag unverified">Not verified</span> CM02350W0V, CM0235010V, PM0389042V, PM03890403, PM03890404, PM03890402, PPRMB021225MM0V, PPRMB021720MM0V, PPRMB021725MM0V. These nine are not asserted to be disputes.</li>
+    <li><span class="tag dispute">Disputed</span> PMN03122V still shows the separate, existing <strong>price</strong> warning: confirmed workbook ₹27; held PDF quote ₹60.</li>
+  </ul>
+  <p>The Apollo PDF upload screen now warns <em>before import</em>: no Prayag item codes for the 272 pipe rows, zero pipe rows can automatically match from PDF, and a reviewed pairing workbook is required. It does not block uploading supplier-coded fitting rows.</p>
+
+  <h2>5. Pipe identity: explicit limitation and future design</h2>
+  <p class="muted">Development current matching rules and database check: 24 Sep 2026 20:56:01 IST.</p>
+  <p><strong>0 / 272</strong> locally assigned Apollo pipe rows can match directly from this PDF today. The stable V2 key uses sheet class, Prayag code and size. Apollo's PDF does not carry the Prayag code; the code-side PDF adapter holds all 272 as needing review rather than inferring a mapping. A new PDF therefore still needs the reviewed pairing workbook.</p>
+  <p><strong>Design note only — not built:</strong> A second, supplier-side identity could normalize Apollo's own printed section, product description, material/variant qualifiers and ordered size. A reviewed one-time mapping from each such identity to the existing Prayag-anchored V2 identity would then allow later PDFs to propose matches. Before allowing automated approval, verify that each PDF identity is unique on the page and across periods, preserve semantic variants such as <em>with/without Jali</em>, adjudicate renamed labels and OCR uncertainty, and hold duplicate/ambiguous results for human review. Price equality must never resolve identity. Risks include collapsing two distinct products under the same text/size, swapped dimension order, heading drift, OCR mistakes, and a renamed or reformatted supplier catalogue.</p>
+
+  <h2>6. Guardrails and checks</h2>
+  <p class="muted">Development database at 24 Sep 2026 20:56:01 IST; production read-only count at 24 Sep 2026 20:56:06 IST.</p>
+  <ul>
+    <li>Development Prayag catalogue: <strong>6,946</strong>, full-row MD5 fingerprint <code>f927316a60c39d418e6d0754de08c555</code>, unchanged.</li>
+    <li>Development Apollo prices: <strong>691</strong>, full-row MD5 fingerprint <code>0c2956e92531d6f21afe5d8c1f7772bd</code>, unchanged from before this step. No prices or mappings changed.</li>
+    <li>Development locally assigned pipe identities: <strong>272 rows / 272 distinct codes</strong>, unchanged. Rows labelled unverified remain <strong>1,912</strong>. <code>PPRMB0204XX20MM</code> still has <strong>zero priced Apollo rows</strong>.</li>
+    <li>Production Apollo price rows: <strong>0</strong>. No production data or publish operation was performed.</li>
+    <li>Focused tests: <strong>11 passed</strong> (including actual-PDF checks of the ten printed sizes and Apollo-only re-extraction versioning); API and web-app typechecks pass; both development workflows started cleanly. Authenticated browser confirmed all three badge types and the PDF warning.</li>
+  </ul>
+</body>
+</html>

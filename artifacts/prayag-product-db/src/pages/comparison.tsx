@@ -122,13 +122,38 @@ function DisputedBadge({ reason }: { reason?: string | null }) {
     <div
       role="status"
       title={reason || "An approved PDF quote differs from the confirmed workbook price."}
-      className="mt-1 inline-flex max-w-[260px] items-start gap-1 rounded border border-red-300 bg-red-100 px-2 py-1 text-left text-[11px] font-semibold leading-tight text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+      aria-label={`Price disputed: ${reason || "Confirmed workbook value still shown; PDF quote unverified."}`}
+      className="mt-1 inline-flex max-w-[125px] items-start gap-1 whitespace-normal rounded border border-red-300 bg-red-100 px-2 py-1 text-left text-[11px] font-semibold leading-tight text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
     >
       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-      <span>
-        <span className="block">Disputed</span>
-        <span className="font-normal">Confirmed workbook value still shown; PDF quote unverified.</span>
-      </span>
+      <span>Disputed</span>
+    </div>
+  );
+}
+
+function ReviewFlagBadge({
+  kind,
+  reason,
+}: {
+  kind?: string | null;
+  reason?: string | null;
+}) {
+  if (!kind) return null;
+  const identity = kind === "product-identity-dispute";
+  return (
+    <div
+      role="status"
+      title={reason || undefined}
+      aria-label={`${identity ? "Product identity dispute" : "Not verified"}${reason ? `: ${reason}` : ""}`}
+      className={cn(
+        "mt-1 inline-flex max-w-[125px] items-start gap-1 whitespace-normal rounded border px-2 py-1 text-left text-[11px] font-semibold leading-tight",
+        identity
+          ? "border-orange-300 bg-orange-100 text-orange-900 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
+          : "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
+      )}
+    >
+      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+      <span>{identity ? "Product identity dispute" : "Not verified"}</span>
     </div>
   );
 }
@@ -615,6 +640,8 @@ export default function ComparisonPage() {
                            const dispute = cell as (typeof cell) & {
                              disputed?: boolean;
                              disputeReason?: string | null;
+                             reviewFlag?: string | null;
+                             reviewFlagReason?: string | null;
                            };
                           if (!cell || cell.price == null) {
                             return <td key={comp} className="px-4 py-3 text-right text-muted-foreground italic text-xs">No data</td>;
@@ -636,6 +663,7 @@ export default function ComparisonPage() {
                                   {formatMoney(cell.price)}
                                 </span>
                                  {dispute?.disputed && <DisputedBadge reason={dispute.disputeReason} />}
+                                  <ReviewFlagBadge kind={dispute?.reviewFlag} reason={dispute?.reviewFlagReason} />
                               </div>
                               {cell.perMetre != null && (
                                 <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -759,6 +787,8 @@ export default function ComparisonPage() {
                     const dispute = row as typeof row & {
                       disputed?: boolean;
                       disputeReason?: string | null;
+                      reviewFlag?: string | null;
+                      reviewFlagReason?: string | null;
                     };
                     
                     return (
@@ -783,6 +813,7 @@ export default function ComparisonPage() {
                           {formatMoney(row.competitorPrice)}
                           {row.unit && <span className="text-xs text-muted-foreground ml-1">/{row.unit}</span>}
                            {dispute.disputed && <DisputedBadge reason={dispute.disputeReason} />}
+                           <ReviewFlagBadge kind={dispute.reviewFlag} reason={dispute.reviewFlagReason} />
                           {row.compPerMetre != null && (
                             <div className="mt-0.5 text-[11px] text-muted-foreground">
                               {formatMoney(row.compPerMetre)}/m

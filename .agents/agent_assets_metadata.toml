@@ -431,3 +431,17 @@ mtime_ms = 1790261826249
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/198a60da-ae61-4324-9d43-0e832512cf8a/f541f81b-363b-471c-a0d6-b85680a03e27"
 storage_version_token = "1790261835182357"
 content_type = "text/html"
+
+[[outputs]]
+id = "jxEqSw58jTZsT3e8u-oK8"
+uri = "file://reports/p045-step5-audit.html"
+type = "html"
+title = "P045 Step 5 — Apollo audit"
+description = "Development-only before/after size results, corrected printed-page checks, identity markers, PDF matching limitation, and unchanged-data safeguards."
+logical_id = "d1942329-6381-4a98-8c56-a7fb5f522cf3"
+content_hash = "sha256:4bf9d75f997445287cc91ee61a7608ea5d97cec8af9c2c6cef33aa9e39df0f0f"
+size = 11651
+mtime_ms = 1790264037385
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d1942329-6381-4a98-8c56-a7fb5f522cf3/bd7edbe2-f893-4c8e-96d8-0dc5376762c8"
+storage_version_token = "1790264061961575"
+content_type = "text/html"

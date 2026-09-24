@@ -795,6 +795,23 @@ export default function ImportCompetitorPage() {
                 )}
               </div>
             )}
+            {file && isPdf && isApollo && (
+              <div
+                className="rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900"
+                data-testid="apollo-pdf-pairing-warning"
+                role="alert"
+              >
+                <p className="font-semibold">Apollo PDF pairing limitation</p>
+                <p className="mt-1">
+                  This PDF has no Prayag item codes for the 272 pipe rows. Zero pipe rows can be
+                  automatically matched from the PDF. A reviewed pairing workbook is required for
+                  those pipe rows.
+                </p>
+                <p className="mt-1 text-xs">
+                  You can still upload this PDF; the upload is not blocked.
+                </p>
+              </div>
+            )}
             {isPdf && pdfPreflightError && (
               <p className="text-sm text-destructive" data-testid="text-pdf-preflight-error">
                 {pdfPreflightError}

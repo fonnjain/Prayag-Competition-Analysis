@@ -39,3 +39,4 @@
 - [Prince duplicate-code decisions](prince-duplicate-code-decisions.md) — exclusions are pair-keyed and confirmations suppress duplicate anomalies; P034r2 keeps A-414, never A-464.
 - [P042 Sales deletion proof](p042-sales-deletion-proof.md) — a fiscal-year sales snapshot cannot prove a product was never sold; keep delete unavailable without verified all-time sales and catalogue absence.
 - [Apollo pipe provenance](apollo-pipe-provenance.md) — internal Apollo handles are not supplier SKUs; workbook identity uses sheet category, Prayag code, and size; hold PDF pipe matches without codes.
+- [Apollo PDF size evidence](apollo-pdf-size-evidence.md) — recheck the printed code row before trusting an earlier transcribed size; a filled PDF size is not proof of product identity.

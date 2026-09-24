@@ -1,0 +1,137 @@
+# P045 — Step 5 — COMPETITION — Fix size extraction, flag the identity disputes
+
+> **P045 Step 5** · app: **COMPETITION** (`prayag-price.com`)
+> **Development only. Production is not loaded and not published.**
+> Quote `P045 Step 5` when reporting back.
+
+Step 4's arithmetic reconciles throughout — 65 + 97 + 179 + 77 = 418, and 162 = 65 + 97, 244 = 65 + 179.
+
+**The heading-rename test moving 0 of 272 is the strongest single result in this whole sequence.** It proves the key is fixed rather than merely different.
+
+Three things remain before Apollo can be considered for production.
+
+---
+
+# PART A — Size extraction is broken, and it is depressing the headline number
+
+Your ten printed-page checks found **10 of 10 sizes present on the page but not extracted**. That is an extraction defect, not absent data. Blank sizes never count as agreement, so all **174** currently score as non-corroborated.
+
+**65 of 418 is therefore measuring the extractor, not the data.**
+
+**A.1** Fix size extraction for the PDF path. Report what was wrong — a column not read, a layout variant, a merged cell, whatever it turns out to be.
+
+**A.2** Re-run the extraction and report, before and after:
+
+```
+PDF size fields blank          was 174
+size agreement                 was 244 / 418
+three-field agreement          was  65 / 418
+price-only remainder           was 353 / 418
+neither description nor size   was  77 / 418
+```
+
+**A.3** Re-check the same ten rows from the Step 4 sample against the printed pages and confirm each now extracts the size you observed:
+
+```
+CMN02032V 65mm · CMN02061U0W 40x40mm · CM02082V 65mm · CMN02260W 15mm
+PMNN03432V 75mm · PMN03450604 160x110mm · PMN03142V 75mm
+PMN032404 110mm · PMN036404 110mm · PMN036706 160mm
+```
+
+**A.4** Take a **fresh** sample of ten from whatever remains blank after the fix, check them against the printed pages, and report whether those are genuinely absent or still missed.
+
+**Do not extrapolate either sample to the whole.** Report what you checked.
+
+---
+
+# PART B — `PMN032404` is a product-identity dispute and carries no flag
+
+```
+code      PMN032404
+price     Rs 187.50   in BOTH sources
+workbook  "Multi Floor Trap with Jali"
+PDF p.24  "WITHOUT JALI"
+```
+
+Classifying it as a description difference rather than a price disagreement is technically right, and **that is exactly what makes it dangerous**. With-jali and without-jali are different products that do not share a price in reality. One of the two sources has that price against the wrong variant — so Prayag's with-jali product may be being compared against Apollo's without-jali price.
+
+**This is the same-price misalignment that price agreement alone cannot exclude.** The check found one. It has no badge. Only `PMN03122V` does.
+
+**B.1** Flag `PMN032404` as a **product-identity dispute** — a distinct kind from a price dispute. Do not change the price, do not choose a variant, do not remove the row.
+
+**B.2** The **nine indeterminate** codes get a visible **not verified** marker — not asserted as disputes, but not presented as confirmed either:
+
+```
+CM02350W0V · CM0235010V · PM0389042V · PM03890403 · PM03890404
+PM03890402 · PPRMB021225MM0V · PPRMB021720MM0V · PPRMB021725MM0V
+```
+
+**B.3** Re-run the description comparison after Part A and report whether any of the **246 wording-only** differences reclassifies as a likely misalignment once sizes are available. A size disagreement alongside a wording difference is a much stronger signal than either alone.
+
+Report the new counts: exact, wording-only, likely misalignment, indeterminate.
+
+---
+
+# PART C — Record what the new key does not solve
+
+The identity is `v2|<sheet class>|<Prayag code>|<size>`. It is anchored on the **Prayag** item code.
+
+In a workbook that works — every row carries the Prayag code beside the Apollo one. **The PDF does not.** So the identity cannot be derived from Apollo's own document, which is why 248 of the 275 held rows read *"existing Prayag target, but no matching PDF pipe identity found."*
+
+**If Apollo's next price list arrives as a PDF, as this one did, the 272 pipe rows still cannot be matched from it.** Somebody rebuilds the pairing workbook by hand.
+
+That is an acceptable limitation. It is not acceptable for it to be a surprise.
+
+**C.1** Record it where whoever runs the next Apollo load will see it — in the import screen when an Apollo PDF is selected, not only in a report. State plainly: pipe rows cannot be matched from a PDF and require the pairing workbook.
+
+**C.2** Report how many of the 272 pipe rows would match from a PDF today. If the answer is zero, say zero.
+
+**C.3** **Propose, do not build:** what would let a PDF match a pipe row directly? Apollo's own description and size are on the page. If a second identity — supplier-side, derived from Apollo's text — could carry that, say what it would take and what it would risk. This is a design note for later, not work for now.
+
+---
+
+# Rules
+
+1. Development only. Nothing reaches production; nothing is published.
+2. No price value changes. Part B flags; it does not reprice or choose a variant.
+3. No Prayag product created, changed or deleted. Catalogue stays at **6,946**, fingerprint `f927316a60c39d418e6d0754de08c555`.
+4. No row relabelled from `unverified`. The 1,912 stay as they are.
+5. `PPRMB0204XX20MM` stays unpriced.
+6. No mapping changes. The 272 identities stay as Step 4 left them.
+
+# Tests
+
+```
+1. The ten Step 4 sample rows now extract the sizes observed on the page
+2. Three-field agreement is re-measured and reported before and after
+3. PMN032404 carries a product-identity dispute flag, distinct from a price dispute
+4. The nine indeterminate codes carry a visible "not verified" marker
+5. PMN03122V keeps its existing price dispute flag
+6. The PDF import screen warns that pipe rows cannot be matched from a PDF
+7. Apollo price rows remain 691; no price value changes
+8. Prayag catalogue remains 6,946 with fingerprint unchanged
+```
+
+# Report
+
+1. What was wrong with size extraction, and the before-and-after figures.
+2. The ten re-checked rows.
+3. The fresh sample of ten from the remaining blanks.
+4. New description classification: exact, wording-only, likely misalignment, indeterminate.
+5. The two flags and the nine markers, as a user sees them.
+6. How many pipe rows would match from a PDF today.
+7. Your design note on supplier-side pipe identity.
+8. Catalogue count and fingerprint; Apollo row count; production still holding zero.
+
+State the environment and the clock time against every figure.
+
+---
+
+## The decision this sets up
+
+Once three-field agreement is re-measured on working extraction, the number means something. **That is the number to judge Apollo on** — not 65 of 418, which was measuring a bug.
+
+If it is high, Apollo gets a production load prompt of its own.
+If it is low, the vision extraction is not yet trustworthy, and that is better known now than after 691 rows are live.
+
+**Still with Prayag:** `PPRMB0204XX20MM`, one supplier code with two prices. `PMN03122V`, ₹27 against ₹60. And now `PMN032404`, where the printed page settles whether ₹187.50 belongs to the trap with jali or without.

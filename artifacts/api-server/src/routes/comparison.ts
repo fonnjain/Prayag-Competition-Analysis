@@ -30,6 +30,7 @@ import {
   resolveUpcomingCompetitiveGap,
 } from "../lib/analysis.js";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { getComparisonEvidence, type ComparisonEvidence } from "../lib/comparisonEvidenceRegistry";
 
 const router: IRouter = Router();
 
@@ -424,6 +425,7 @@ function buildComparisonRow(
   matchedWindow?: CompetitorWindow,
   pendingRevision?: PendingRevision,
   liveDispute?: LiveDispute,
+  evidence?: ComparisonEvidence | null,
 ) {
   const key = c.matchedPrayagCode ? normCode(c.matchedPrayagCode) : null;
   const prayag = key ? maps.get(key) : undefined;
@@ -528,6 +530,8 @@ function buildComparisonRow(
     competitorPrice: c.price,
     disputed: liveDispute != null,
     disputeReason: liveDispute?.reason ?? null,
+    reviewFlag: evidence?.kind ?? null,
+    reviewFlagReason: evidence?.reason ?? null,
     unit: c.unit,
     effectiveDate: c.effectiveDate,
     competitorValidTo: window?.validTo ?? null,
@@ -644,6 +648,7 @@ router.get("/catalog/comparison", async (req, res) => {
         matchedWindows.get(c.id),
         pendingRevisions.get(c.id),
         liveDisputes.get(disputeKey(c.competitor, c.competitorCode, c.matchedPrayagCode, c.effectiveDate) ?? ""),
+        getComparisonEvidence(c.competitor, c.competitorCode, c.matchedPrayagCode, c.effectiveDate),
       ),
     );
   if (expensiveOnly) rows = rows.filter((r) => r.effectivePrayagCheaper === false);
@@ -1262,6 +1267,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
     newerRevisionReviewStatus: string | null;
     disputed: boolean;
     disputeReason: string | null;
+    reviewFlag: ComparisonEvidence["kind"] | null;
+    reviewFlagReason: string | null;
   }
   interface Group {
     itemCode: string;
@@ -1312,6 +1319,18 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
         liveDisputes.get(
           disputeKey(c.competitor, c.competitorCode, c.matchedPrayagCode, c.effectiveDate) ?? "",
         )?.reason ?? null,
+      reviewFlag: getComparisonEvidence(
+        c.competitor,
+        c.competitorCode,
+        c.matchedPrayagCode,
+        c.effectiveDate,
+      )?.kind ?? null,
+      reviewFlagReason: getComparisonEvidence(
+        c.competitor,
+        c.competitorCode,
+        c.matchedPrayagCode,
+        c.effectiveDate,
+      )?.reason ?? null,
     });
     g.byCompetitor.set(c.competitor, list);
   }
@@ -1355,6 +1374,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
       newerRevisionReviewStatus: string | null;
       disputed: boolean;
       disputeReason: string | null;
+      reviewFlag: ComparisonEvidence["kind"] | null;
+      reviewFlagReason: string | null;
     }
     const picks: Picked[] = [];
     for (const [competitor, candidates] of g.byCompetitor) {
@@ -1428,6 +1449,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           newerRevisionReviewStatus: cand.newerRevisionReviewStatus,
           disputed: cand.disputed,
           disputeReason: cand.disputeReason,
+          reviewFlag: cand.reviewFlag,
+          reviewFlagReason: cand.reviewFlagReason,
         };
         // Prefer rows that can be placed on the basis; among those, the cheapest.
         if (!best) best = candPick;
@@ -1505,6 +1528,8 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
           newerRevisionReviewStatus: p.newerRevisionReviewStatus,
            disputed: p.disputed,
            disputeReason: p.disputeReason,
+           reviewFlag: p.reviewFlag,
+           reviewFlagReason: p.reviewFlagReason,
         };
       })
       .sort((a, b) => a.competitor.localeCompare(b.competitor));
