@@ -1,0 +1,177 @@
+# P043 — SALES — An authoritative all-time item existence endpoint
+
+> **P043** · app: **SALES** (`prayag-sales.com` / `fonnjain/Prayag-Distributor-Ananlysis`)
+> **THIS PROMPT CHANGES CODE.** It adds one read-only endpoint. It changes no data.
+> Quote `P043` when reporting back.
+
+The Competition app needs to answer one question before it will allow a product to be deleted: **has this item code ever been sold?**
+
+The existing external endpoints cannot answer it, for three structural reasons:
+
+1. `fy` is mandatory and must be a single complete fiscal year — there is no all-time mode.
+2. Nothing lists which fiscal years the register holds, so a caller cannot know when to stop asking.
+3. `catalogue_status` reflects `mrp_synced` — the Competition catalogue as Sales last pulled it — so `absent` means "not in a possibly stale snapshot", not "never existed".
+
+**Build `GET /api/external/item-existence`.**
+
+---
+
+# 1. Why the holds do not block this
+
+**H3 `FY2425-MONTHLY-ATTRIBUTION`** withholds FY2024-25 monthly attribution. Its own recorded reason is that the **annual total is correct** and the monthly attribution is not, and its scope is `monthly attribution, quarterly figures`. A reversed day and month moves a row between months. **It does not delete the row.**
+
+**H1 `PTMT-COST-2026`** concerns factory cost and gross margin. It says nothing about whether a sale occurred.
+
+Existence is therefore answerable under both holds, and **this endpoint must record that explicitly rather than inheriting a month-level exclusion it does not need.**
+
+## The one exception, and it matters
+
+The fiscal year begins in April, so a day/month reversal can cross the year boundary — **04 March 2025 reversed reads 03 April 2025**, moving the row from FY2024-25 into FY2025-26.
+
+```
+ever_sold, across all fiscal years    ROBUST    a reversal cannot move a row out of the register
+first_sold_fy / last_sold_fy          NOT SAFE  for codes with rows in the affected set
+per-year or per-month figures         HELD      as today
+```
+
+Report all-time existence as **authoritative**. Report first and last fiscal year as **advisory**, and flag any code with rows in the 28,613 affected set.
+
+---
+
+# 2. The result must be three-valued
+
+```
+"sold"        the code appears in the register, in any period, ever
+"never_sold"  the whole register was searched and the code does not appear
+"unknown"     some part of the register could not be read
+```
+
+**Never collapse this to a boolean.** A boolean forces "unknown" to be reported as "never", and the Competition app would then delete a product on the strength of a failed query.
+
+Any partial read — a table unavailable, a year missing, a timeout — makes the code **`unknown`**, not `never_sold`.
+
+---
+
+# 3. The response
+
+```jsonc
+{
+  "read_at": "2026-09-24T...",
+  "dataSource": "heliumdb",
+  "register_coverage": {
+    "fiscal_years": ["2024-25", "2025-26", "2026-27"],   // FROM THE DATA, not a constant
+    "earliest_row": "2024-04-01",
+    "latest_row":   "2026-08-31",
+    "complete": true
+  },
+  "holds_considered": [
+    { "hold_id": "FY2425-MONTHLY-ATTRIBUTION",
+      "blocks_existence": false,
+      "reason": "Reversed day and month reattributes rows within the register; it does not remove them. Annual total is recorded as correct." },
+    { "hold_id": "PTMT-COST-2026",
+      "blocks_existence": false,
+      "reason": "Cost basis affects margin, not whether a sale occurred." }
+  ],
+  "items": [
+    {
+      "code": "DL-3300",
+      "status": "sold",
+      "row_count": 412,
+      "total_amount": 1840250.00,
+      "first_sold_fy": "2024-25",
+      "last_sold_fy": "2026-27",
+      "fy_boundary_uncertain": true,
+      "catalogue": {
+        "in_active_snapshot": true,
+        "has_active_price": true,
+        "snapshot_fetched_at": "2026-09-12T04:11:07Z",
+        "snapshot_age_hours": 292.8
+      }
+    }
+  ],
+  "reconciliation": { /* the standard P003 block */ }
+}
+```
+
+**`register_coverage.fiscal_years` must be derived from the register itself**, not from a hardcoded list. A constant goes stale silently and the caller cannot tell.
+
+**`catalogue.snapshot_fetched_at` and `snapshot_age_hours` are mandatory.** Catalogue membership is a statement about a snapshot, and the caller must be able to see how old it is. Never return catalogue membership without its age.
+
+---
+
+# 4. Parameters
+
+```
+codes    required, comma-separated, up to 200 per call
+         matched as upper(btrim(code))
+```
+
+Batch, because the rate limit is 60 requests per minute and a bulk delete of 30 products would otherwise need one call each.
+
+**No `fy`, no `from`, no `to`.** This endpoint is all-time by definition; a period parameter would reintroduce the problem it exists to solve.
+
+---
+
+# 5. Where the data comes from
+
+Query the sale register **directly** for existence.
+
+**Do not build this on top of the monthly aggregate path** that `sales-by-item` uses — that path applies month-level hold exclusion, which is exactly what must not happen here. If a code has a row anywhere, it is `sold`.
+
+Include every register the business counts as a sale — primary and secondary. State in the report which tables you consulted, and which you excluded and why.
+
+---
+
+# 6. Auth and limits
+
+Same as the other three: `external_read` scope only, `X-API-Key` or Bearer, the existing rate limiter, the same 401 / 403 / 429 / 503 behaviour.
+
+Add it to `EXTERNAL_READ_ENDPOINTS` and `EXTERNAL_READ_PATHS` so it cannot be reached by a `full_api` or `verification` key.
+
+---
+
+# Rules
+
+1. No data is written or altered. This is a read.
+2. No existing endpoint changes behaviour.
+3. `unknown` is never reported as `never_sold`.
+4. Catalogue membership is never returned without its snapshot age.
+5. `register_coverage.fiscal_years` comes from the data.
+
+# Tests
+
+```
+ 1. A code with sales in any year returns "sold"
+ 2. A code that has never appeared returns "never_sold"
+ 3. A simulated read failure on one fiscal year returns "unknown", not "never_sold"
+ 4. A code with sales only in FY2024-25 - the held year - still returns "sold"
+ 5. register_coverage.fiscal_years matches the register, not a constant
+ 6. A code absent from the catalogue snapshot but present in sales returns
+    status "sold" and in_active_snapshot false
+ 7. catalogue.snapshot_age_hours is present on every item
+ 8. 200 codes in one call succeed; 201 are rejected with a clear error
+ 9. A full_api key receives 403
+10. An unauthenticated call receives 401
+11. No row in any table is created, updated or deleted by this endpoint
+```
+
+**Test 3 is the one that matters.** **Test 4 is the one that proves the hold reasoning was implemented rather than inherited.**
+
+# Report
+
+1. The endpoint, with a sample response for one sold code and one never-sold code.
+2. Which tables you queried for existence, and which you excluded and why.
+3. `register_coverage.fiscal_years` as the register actually reports it.
+4. How many codes in the register fall in the 28,613 affected set, and therefore carry `fy_boundary_uncertain`.
+5. Confirmation that the two holds are recorded as not blocking existence, with the stored reason text.
+6. Confirmation that no data was written.
+
+State the environment and the clock time against every figure.
+
+---
+
+## What this unblocks
+
+P042's delete gate currently has no sound source. With this endpoint it gets one: **"was it ever sold"** answered across the whole register, with `unknown` available as a refusal, and catalogue membership carrying its own staleness so it can never be mistaken for evidence of non-existence.
+
+It also closes the open gap in the Sales API contract: which fiscal years the register covers, answered by the register rather than guessed.
