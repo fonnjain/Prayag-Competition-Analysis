@@ -96,6 +96,8 @@ type PdfPreflight = {
   latestGst?: { batchId: number; effectiveDate: string; priceBasis: "MRP" | "Ex-GST"; gstPct: number | null } | null;
 };
 
+type CoverageGap = { category: string; count: number };
+
 /** Bearer token stored by the auth layer — needed for raw fetch() calls that
  *  bypass the generated API client (which injects Authorization automatically). */
 function getAuthHeaders(): Record<string, string> {
@@ -122,6 +124,7 @@ export default function ImportCompetitorPage() {
   const [sparshPeriods, setSparshPeriods] = useState<SparshMasterPeriodDraft[]>([]);
   const [isPreviewingWorkbook, setIsPreviewingWorkbook] = useState(false);
   const [workbookPreviewError, setWorkbookPreviewError] = useState<string | null>(null);
+  const [workbookCoverageGaps, setWorkbookCoverageGaps] = useState<CoverageGap[] | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
   // SSE extraction progress state
@@ -153,6 +156,7 @@ export default function ImportCompetitorPage() {
   const brandPeriods = brandsData?.brandPeriods ?? [];
 
   const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
+  const isApollo = competitor.trim().toLowerCase() === "apollo";
   const isAuthoritativeSparshMaster = sparshPeriods.length > 0;
   const canUsePositionalText = competitor.trim() === "Prince";
   const hasMixedAssignments = Boolean(
@@ -234,6 +238,7 @@ export default function ImportCompetitorPage() {
     setResult(null);
     setSparshPeriods([]);
     setWorkbookPreviewError(null);
+    setWorkbookCoverageGaps(null);
     invalidatePdfPreflight();
     setPriceBasisTouched(false);
 
@@ -256,6 +261,22 @@ export default function ImportCompetitorPage() {
         );
         setCompetitor("Sparsh Pearl");
         setPriceBasis("MRP");
+      }
+      const rawGaps = (data as any).coverageGaps ?? (data as any).coverage_gaps ??
+        (data as any).unpricedCoverageGaps ?? (data as any).rowCounts?.coverageGaps ??
+        (data as any).rowCounts?.coverage_gaps ?? (data as any).rowCounts?.coverageGapsByCategory;
+      if (Array.isArray(rawGaps)) {
+        setWorkbookCoverageGaps(
+          rawGaps.filter((gap: any) =>
+            gap && typeof gap.category === "string" && Number.isFinite(gap.count),
+          ),
+        );
+      } else if (rawGaps && typeof rawGaps === "object") {
+        setWorkbookCoverageGaps(
+          Object.entries(rawGaps)
+            .filter(([, count]) => Number.isFinite(count))
+            .map(([category, count]) => ({ category, count: count as number })),
+        );
       }
     } catch (error) {
       if (requestSequence !== workbookPreviewSequence.current) return;
@@ -639,6 +660,11 @@ export default function ImportCompetitorPage() {
                   Existing: {existingBrands.join(", ")}
                 </p>
               )}
+              {isApollo && (
+                <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                  Apollo imports are price-only. New Prayag-product mode is not available for Apollo.
+                </p>
+              )}
             </div>
 
             {isAuthoritativeSparshMaster ? (
@@ -853,6 +879,24 @@ export default function ImportCompetitorPage() {
               <p className="text-xs text-destructive" data-testid="text-workbook-preview-error">
                 {workbookPreviewError}
               </p>
+            )}
+            {file && !isPdf && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm" data-testid="workbook-coverage-gaps">
+                <div className="font-medium">Unpriced coverage gaps</div>
+                {workbookCoverageGaps && workbookCoverageGaps.length > 0 ? (
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {workbookCoverageGaps.map((gap) => (
+                      <span key={gap.category} className="rounded border bg-background px-2 py-0.5 text-xs font-mono">
+                        <span className="font-sans">{gap.category}:</span> {gap.count}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Unavailable in this import preview; no counts are inferred.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

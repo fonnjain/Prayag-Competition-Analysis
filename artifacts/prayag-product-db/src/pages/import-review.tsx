@@ -54,6 +54,9 @@ interface StagingRow {
   matchMethod: string | null;
   status: RowStatus;
   reviewReason: string | null;
+  /** Origin recorded by the staging API; local codes are internal handles. */
+  codeSource?: "supplier" | "locally_assigned" | string | null;
+  code_source?: "supplier" | "locally_assigned" | string | null;
 }
 
 interface BatchData {
@@ -95,6 +98,10 @@ interface BatchData {
       message?: string;
     } | null;
     duplicate?: { message?: string; action?: string; existingBatchId?: number | null };
+    coverageGaps?: Record<string, number> | Array<{ category: string; count: number }> | null;
+    coverage_gaps?: Record<string, number> | Array<{ category: string; count: number }> | null;
+    coverageGapsByCategory?: Record<string, number> | null;
+    unpricedCoverageGaps?: Record<string, number> | Array<{ category: string; count: number }> | null;
   } | null;
   rows: StagingRow[];
 }
@@ -158,9 +165,74 @@ function discoveryLabel(row: StagingRow): string | null {
   }
 }
 
+function codeSource(row: StagingRow): "supplier" | "locally_assigned" | null {
+  const source = row.codeSource ?? row.code_source;
+  if (source === "supplier" || source === "locally_assigned") return source;
+  return null;
+}
+
+function CodeOriginBadge({ row, competitor }: { row: StagingRow; competitor: string }) {
+  const source = codeSource(row);
+  if (!source) return null;
+  const isApollo = competitor.trim().toLowerCase() === "apollo";
+  const label = source === "locally_assigned"
+    ? isApollo ? "Internal code · NOT Apollo SKU" : "Internal code · NOT supplier SKU"
+    : isApollo ? "Apollo SKU" : "Supplier code";
+  return (
+    <Badge
+      variant="outline"
+      className={source === "locally_assigned"
+        ? "text-xs border-orange-300 bg-orange-50 text-orange-800"
+        : "text-xs border-blue-300 bg-blue-50 text-blue-800"}
+    >
+      {label}
+    </Badge>
+  );
+}
+
+function CoverageGapSummary({ rowCounts }: { rowCounts: BatchData["rowCounts"] }) {
+  const raw = rowCounts?.coverageGaps ?? rowCounts?.coverage_gaps ??
+    rowCounts?.coverageGapsByCategory ?? rowCounts?.unpricedCoverageGaps;
+  const gaps = Array.isArray(raw)
+    ? [...raw.reduce((acc, gap) => {
+        if (gap && typeof gap.category === "string" && gap.category.trim()) {
+          acc.set(gap.category, (acc.get(gap.category) ?? 0) + (Number.isFinite(gap.count) ? gap.count : 1));
+        }
+        return acc;
+      }, new Map<string, number>())].map(([category, count]) => ({ category, count }))
+    : raw && typeof raw === "object"
+      ? Object.entries(raw)
+        .filter(([, count]) => Number.isFinite(count))
+        .map(([category, count]) => ({ category, count: count as number }))
+      : [];
+  return (
+    <section className="rounded-lg border bg-card p-4" data-testid="coverage-gaps">
+      <h2 className="text-sm font-semibold">Unpriced coverage gaps</h2>
+      {gaps.length > 0 ? (
+        <>
+          <p className="text-xs text-muted-foreground mt-1">
+            Rows without a supplier price, reported by category. They are not imported as products.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {gaps.map(({ category, count }) => (
+              <Badge key={category} variant="outline" className="font-mono">
+                <span className="font-sans mr-1">{category}:</span>{count}
+              </Badge>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground mt-1">
+          Unpriced coverage gap counts unavailable in this import preview.
+        </p>
+      )}
+    </section>
+  );
+}
+
 type TabKey = "needs_review" | "ok" | "not_found" | "new_product";
 
-function RowCard({ row }: { row: StagingRow }) {
+function RowCard({ row, competitor }: { row: StagingRow; competitor: string }) {
   const [expanded, setExpanded] = useState(false);
   const discovery = discoveryLabel(row);
   return (
@@ -172,8 +244,11 @@ function RowCard({ row }: { row: StagingRow }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-sm font-medium">
-              {row.competitorCodeCatalogue ?? row.competitorCodeMaster ?? "—"}
+              {(codeSource(row) === "locally_assigned"
+                ? row.competitorCodeMaster
+                : row.competitorCodeCatalogue ?? row.competitorCodeMaster) ?? "—"}
             </span>
+            <CodeOriginBadge row={row} competitor={competitor} />
             {row.variant && (
               <Badge variant="outline" className="text-xs">{row.variant}</Badge>
             )}
@@ -226,11 +301,15 @@ function RowCard({ row }: { row: StagingRow }) {
         <div className="px-4 pb-4 border-t bg-muted/20">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 text-sm">
             <div>
-              <div className="text-xs text-muted-foreground mb-0.5">Competitor Code (master)</div>
+              <div className="text-xs text-muted-foreground mb-0.5">
+                {codeSource(row) === "locally_assigned" ? "Internal code (master)" : "Competitor code (master)"}
+              </div>
               <code className="font-mono">{row.competitorCodeMaster ?? "—"}</code>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground mb-0.5">Competitor Code (catalogue)</div>
+              <div className="text-xs text-muted-foreground mb-0.5">
+                {codeSource(row) === "locally_assigned" ? "Internal code (catalogue)" : "Competitor code (catalogue)"}
+              </div>
               <code className="font-mono">{row.competitorCodeCatalogue ?? "—"}</code>
             </div>
             <div>
@@ -428,11 +507,12 @@ export default function ImportReviewPage() {
     new_product: batch.rows.filter((r) => r.status === "new_product"),
   } satisfies Record<TabKey, StagingRow[]>;
 
+  const isApollo = batch.competitor.trim().toLowerCase() === "apollo";
   const tabConfig: { key: TabKey; label: string; variant: string }[] = [
     { key: "needs_review", label: "Needs Review", variant: "amber" },
     { key: "ok",           label: "Ready",        variant: "green" },
     { key: "not_found",    label: "Not Found",    variant: "muted" },
-    { key: "new_product",  label: "New Products", variant: "blue" },
+    ...(!isApollo ? [{ key: "new_product" as TabKey, label: "New Products", variant: "blue" }] : []),
   ];
 
   const tabBadgeClass: Record<string, string> = {
@@ -538,6 +618,13 @@ export default function ImportReviewPage() {
         ))}
       </div>
 
+      {isApollo && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          Apollo imports do not create Prayag products. Unmatched catalogue rows remain review-only.
+        </div>
+      )}
+      <CoverageGapSummary rowCounts={batch.rowCounts} />
+
         {((batch.rowCounts?.codes_found_one_pass_only ?? 0) > 0 || (batch.rowCounts?.items_adjudicated ?? 0) > 0) && (
           <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 text-sm text-amber-900">
             <strong>Discovery disagreement detected.</strong>{" "}
@@ -609,14 +696,14 @@ export default function ImportReviewPage() {
           rowsByStatus.needs_review.length === 0 ? (
             <EmptyState message="No rows flagged for review — all code matches were clean." />
           ) : (
-            rowsByStatus.needs_review.map((r) => <RowCard key={r.id} row={r} />)
+            rowsByStatus.needs_review.map((r) => <RowCard key={r.id} row={r} competitor={batch.competitor} />)
           )
         )}
         {activeTab === "ok" && (
           rowsByStatus.ok.length === 0 ? (
             <EmptyState message="No clean matches in this batch." />
           ) : (
-            rowsByStatus.ok.map((r) => <RowCard key={r.id} row={r} />)
+            rowsByStatus.ok.map((r) => <RowCard key={r.id} row={r} competitor={batch.competitor} />)
           )
         )}
         {activeTab === "not_found" && (
@@ -631,7 +718,8 @@ export default function ImportReviewPage() {
                 <div key={r.id} className="border rounded-lg p-4 bg-card flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-sm">{r.competitorCodeMaster ?? "—"}</span>
+                        <span className="font-mono text-sm">{r.competitorCodeMaster ?? "—"}</span>
+                        <CodeOriginBadge row={r} competitor={batch.competitor} />
                       {r.matchedPrayagCode && (
                         <span className="text-xs text-muted-foreground font-mono">→ {r.matchedPrayagCode}</span>
                       )}
@@ -650,7 +738,7 @@ export default function ImportReviewPage() {
             </div>
           )
         )}
-        {activeTab === "new_product" && (
+        {activeTab === "new_product" && !isApollo && (
           rowsByStatus.new_product.length === 0 ? (
             <EmptyState message="No new products found in this catalogue." />
           ) : (
@@ -663,6 +751,7 @@ export default function ImportReviewPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-sm font-medium">{r.competitorCodeCatalogue ?? "—"}</span>
+                      <CodeOriginBadge row={r} competitor={batch.competitor} />
                       {r.variant && <Badge variant="outline" className="text-xs">{r.variant}</Badge>}
                       {r.page != null && <span className="text-xs text-muted-foreground">p.{r.page}</span>}
                     </div>

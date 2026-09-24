@@ -112,6 +112,17 @@ function summarizeData(data: CatalogSyncData): CatalogSyncSummary {
 }
 
 export function createCatalogSyncBundleFromData(data: CatalogSyncData): CatalogSyncBundle {
+  // Always emit the provenance field, including for legacy rows that predate
+  // code_source. This prevents a competitor code from looking supplier-owned
+  // simply because an older caller omitted the field.
+  const bundleData: CatalogSyncData = {
+    ...data,
+    competitorPrices: data.competitorPrices.map((row) => ({
+      ...row,
+      codeSource: row.codeSource ?? null,
+    })),
+  };
+  data = bundleData;
   const counts = countData(data);
   const tableSha256 = Object.fromEntries(
     CATALOG_SYNC_TABLES.map((table) => [table, sha256(JSON.stringify(data[table]))]),
@@ -297,6 +308,7 @@ const TABLE_SCHEMAS: Record<
     price: nullable(finiteNumber),
     unit: nullable(text),
     competitorCode: nullable(text),
+    codeSource: nullable(text),
     effectiveDate: nullable(isoDate),
     matchedPrayagCode: nullable(text),
     matchStatus: nonEmptyText,
@@ -395,6 +407,12 @@ function assertBundleRelationships(data: CatalogSyncData): void {
   // documented source corrections retain events after invalid history rows,
   // products, or superseded batches are removed.
   for (const [index, row] of data.competitorPrices.entries()) {
+    if (typeof row.competitor === "string" && row.competitor.trim().toLowerCase() === "apollo" &&
+        row.competitorCode != null && row.codeSource == null) {
+      throw new Error(
+        `competitorPrices[${index}] has an Apollo code without code_source.`,
+      );
+    }
     if (row.matchedPrayagCode != null && !productCodes.has(row.matchedPrayagCode)) {
       throw new Error(`competitorPrices[${index}] refers to a missing product.`);
     }

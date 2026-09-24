@@ -467,6 +467,8 @@ function buildComparisonRow(
     category: c.category,
     description: c.description,
     size: c.size,
+    competitorCode: c.competitorCode,
+    codeSource: c.codeSource,
     competitorPrice: c.price,
     unit: c.unit,
     effectiveDate: c.effectiveDate,
@@ -1617,6 +1619,8 @@ router.get("/catalog/mapping-review", async (req, res) => {
       category: competitorPricesTable.category,
       description: competitorPricesTable.description,
       size: competitorPricesTable.size,
+      competitorCode: competitorPricesTable.competitorCode,
+      codeSource: competitorPricesTable.codeSource,
       price: competitorPricesTable.price,
       unit: competitorPricesTable.unit,
       matchedPrayagCode: competitorPricesTable.matchedPrayagCode,
@@ -1860,6 +1864,8 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
 
   const header = [
     "Competitor",
+    "Competitor Code",
+    "Competitor Code Source",
     "Category",
     "Description",
     "Size",
@@ -1883,6 +1889,10 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
   ];
   const body = rows.map((r) => [
     r.competitor,
+    r.competitorCode,
+    r.codeSource === "locally_assigned"
+      ? "Internal code / NOT supplier SKU"
+      : r.codeSource,
     r.category,
     r.description,
     r.size,

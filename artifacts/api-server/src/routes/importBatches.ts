@@ -55,6 +55,11 @@ import {
   type PdfPreflight,
 } from "../lib/pdfPreflight.js";
 import { mergeHybridItems, princeItemsToExtracted } from "../lib/pdfHybrid.js";
+import {
+  apolloPipeIdentity,
+  assertApolloCodeAvailable,
+} from "../lib/apolloPipeIdentity.js";
+import type { ExtractedItem } from "../lib/pdfExtractor.js";
 
 const sparshPearlProfile = sparshPearlProfileJson as CatalogueProfile;
 
@@ -141,10 +146,11 @@ async function getTargets(
     description: string | null;
     size: string | null;
     price: number | null;
+    code_source: string | null;
   }>(sql`
-    SELECT competitor_code, matched_prayag_code, category, description, size, price
+    SELECT competitor_code, code_source, matched_prayag_code, category, description, size, price
     FROM (
-      SELECT competitor_code, matched_prayag_code, category, description, size, price, id,
+       SELECT competitor_code, code_source, matched_prayag_code, category, description, size, price, id,
         row_number() OVER (
           PARTITION BY matched_prayag_code
           ORDER BY effective_date DESC NULLS LAST, id DESC
@@ -163,15 +169,125 @@ async function getTargets(
 
   return rows.rows.map((r) => ({
     competitorCode: r.competitor_code,
+    codeSource: r.code_source,
     matchedPrayagCode: r.matched_prayag_code!,
     category: r.category,
-    description: nameMap.get(normCode(r.matched_prayag_code ?? "")) ?? r.description,
+    description: competitor.toLowerCase() === "apollo"
+      ? (r.description ?? nameMap.get(normCode(r.matched_prayag_code ?? "")) ?? null)
+      : (nameMap.get(normCode(r.matched_prayag_code ?? "")) ?? r.description),
     size: r.size,
     existingPrice: r.price,
     prayagMrpCurrent: r.matched_prayag_code
       ? (prayagMrpMap.get(normCode(r.matched_prayag_code)) ?? null)
       : null,
   }));
+}
+
+/**
+ * Apollo is the one PDF whose pipe references are internal handles rather than
+ * supplier identifiers. Keep this adapter here (rather than weakening the
+ * shared catalogue matcher) so Prince/Ashirvad/Sparsh retain their behaviour.
+ */
+function matchApolloPdf(
+  targets: Array<MatchTarget & { codeSource?: string | null }>,
+  extracted: ExtractedItem[],
+  priceBasis: string,
+  gstPct: number | null,
+): { staging: Array<Record<string, unknown>>; coverageGaps: Array<Record<string, unknown>> } {
+  const rows: Array<Record<string, unknown>> = [];
+  const gaps: Array<Record<string, unknown>> = [];
+  const claimed = new Set<ExtractedItem>();
+  const targetIdentityCounts = new Map<string, number>();
+  for (const target of targets) {
+    if (target.codeSource !== "locally_assigned") continue;
+    const key = apolloPipeIdentity(target.description, target.size);
+    if (key) targetIdentityCounts.set(key, (targetIdentityCounts.get(key) ?? 0) + 1);
+  }
+  const effectivePrice = (mrp: number) =>
+    priceBasis === "Ex-GST" ? mrp * (1 + (gstPct ?? 18) / 100) : mrp;
+
+  for (const target of targets) {
+    const local = target.codeSource === "locally_assigned";
+    const unverifiable = target.codeSource !== "supplier" && !local;
+    if (unverifiable) {
+      rows.push({
+        ...target, competitorCodeMaster: null, competitorCodeCatalogue: null, newMrp: null,
+        status: "needs_review", matchMethod: null,
+        reviewReason: "Apollo code origin is unknown; refusing to guess supplier or locally-assigned identity.",
+        catalogueDescription: null, variant: null, page: null, discoveryEvidence: null,
+        adjudicated: false, increasePct: null, gapPct: null,
+      });
+      gaps.push({ category: target.category, description: target.description, size: target.size, reason: "unknown-code-source" });
+      continue;
+    }
+    const targetIdentity = local ? apolloPipeIdentity(target.description, target.size) : null;
+    const duplicateTarget = targetIdentity != null && (targetIdentityCounts.get(targetIdentity) ?? 0) > 1;
+    const candidates = extracted.filter((item) => {
+      if (claimed.has(item)) return false;
+      if (local) {
+        return targetIdentity != null && apolloPipeIdentity(item.product_name, item.variant) === targetIdentity;
+      }
+      return Boolean(item.cat_no && target.competitorCode) &&
+        normCode(item.cat_no) === normCode(target.competitorCode);
+    });
+    const item = candidates[0];
+    const ambiguous = duplicateTarget || (local && candidates.length > 1);
+    if (ambiguous || (local && !item) || (!local && candidates.length === 0)) {
+      rows.push({
+        ...target, competitorCodeMaster: target.competitorCode, competitorCodeCatalogue: null,
+        newMrp: null, status: "needs_review", matchMethod: "identity",
+        reviewReason: ambiguous ? "Apollo pipe identity is ambiguous; no row was selected."
+          : "Apollo catalogue row was not found; review as a new coverage row.",
+        catalogueDescription: null, variant: null, page: null, discoveryEvidence: null,
+        adjudicated: false, increasePct: null, gapPct: null,
+      });
+      if (!item) gaps.push({ category: target.category, description: target.description, size: target.size, reason: "not_found" });
+      continue;
+    }
+    claimed.add(item!);
+    if (item!.mrp == null || !Number.isFinite(item!.mrp) || item!.mrp <= 0) {
+      rows.push({
+        ...target, competitorCodeMaster: null, competitorCodeCatalogue: null, newMrp: null,
+        status: "not_found", matchMethod: "identity", reviewReason: "Apollo coverage gap: catalogue row has no price.",
+        catalogueDescription: item!.product_name, variant: item!.variant, page: item!.page,
+        discoveryEvidence: null, adjudicated: item!.adjudicated, increasePct: null, gapPct: null,
+      });
+      gaps.push({ category: target.category, description: item!.product_name, size: item!.variant, reason: "no-price" });
+      continue;
+    }
+    const newMrp = item!.mrp;
+    rows.push({
+      ...target,
+      competitorCodeMaster: target.competitorCode,
+      competitorCodeCatalogue: item!.cat_no,
+      codeSource: local ? "locally_assigned" : "supplier",
+      catalogueDescription: item!.product_name, variant: item!.variant, newMrp,
+      oldMrp: target.existingPrice,
+      increasePct: target.existingPrice != null && target.existingPrice > 0
+        ? ((newMrp - target.existingPrice) / target.existingPrice) * 100 : null,
+      gapPct: target.prayagMrpCurrent ? ((effectivePrice(newMrp) - target.prayagMrpCurrent) / target.prayagMrpCurrent) * 100 : null,
+      page: item!.page, discoveryEvidence: JSON.stringify({ source: "Apollo PDF", passes: item!.discoveryPasses }),
+      adjudicated: item!.adjudicated, matchMethod: local ? "desc+size" : "code+desc",
+      status: "ok", reviewReason: null,
+    });
+  }
+  // Apollo PDF rows that have no authoritative target are review-only
+  // discoveries. Never promote their PDF cat_no into a supplier code.
+  for (const item of extracted.filter((candidate) => !claimed.has(candidate))) {
+    rows.push({
+      competitor: "Apollo", competitorCodeMaster: null, competitorCodeCatalogue: null,
+      matchedPrayagCode: null, description: null, catalogueDescription: item.product_name,
+      variant: item.variant, newMrp: item.mrp > 0 ? item.mrp : null, oldMrp: null,
+      increasePct: null, prayagMrpCurrent: null, gapPct: null, page: item.page,
+      discoveryEvidence: JSON.stringify({ source: "Apollo PDF", catNoIgnored: item.cat_no }),
+      adjudicated: item.adjudicated, matchMethod: null,
+      status: "needs_review", reviewReason: item.mrp > 0
+        ? "Apollo row has no master target; review-only discovery, no code inferred."
+        : "Apollo coverage gap: catalogue row has no price.",
+    });
+    if (item.mrp <= 0) gaps.push({ description: item.product_name, size: item.variant, reason: "no-price-unmatched" });
+  }
+  return { staging: rows, coverageGaps: gaps };
 }
 
 async function recomputeCurrentFlags(competitor: string): Promise<void> {
@@ -502,6 +618,22 @@ router.post(
     if (ext !== "pdf") {
       res.status(400).json({ error: "This endpoint only accepts PDF files. Upload Excel/CSV via /catalog/load-competitor." });
       return;
+    }
+    if (competitor.toLowerCase() === "apollo") {
+      const existingMappings = await db.execute<{ ready: number }>(sql`
+        SELECT count(*)::int AS ready
+        FROM competitor_prices
+        WHERE lower(competitor) = 'apollo'
+          AND matched_prayag_code IS NOT NULL
+          AND code_source IN ('supplier', 'locally_assigned')
+      `);
+      if (Number(existingMappings.rows[0]?.ready ?? 0) === 0) {
+        res.status(422).json({
+          code: "APOLLO_MASTER_MAPPING_REQUIRED",
+          error: "Apollo PDF import needs reviewed, provenance-marked Apollo-to-Prayag mappings before extraction. No batch or prices were written.",
+        });
+        return;
+      }
     }
 
     // Compute the same read-only evidence exposed by /preflight as a final
@@ -1058,9 +1190,13 @@ router.post(
 
       sendSse("status", { stage: "matching", message: "Matching products…" });
 
-       const matched = matchCatalogue(
-        competitor, targets, extracted, aliases, priceBasis, gstPct,
-      );
+        const apollo = competitor.toLowerCase() === "apollo";
+        const apolloMatch = apollo
+          ? matchApolloPdf(targets as Array<MatchTarget & { codeSource?: string | null }>, extracted, priceBasis, gstPct)
+          : null;
+        const matched = apolloMatch ?? matchCatalogue(
+          competitor, targets, extracted, aliases, priceBasis, gstPct,
+        );
        const conflictCodes = new Set(hybridConflicts.map((conflict) => conflict.code));
        const staging = matched.staging.map((row) => {
          const rowCode = normCode(row.competitorCodeCatalogue ?? row.competitorCodeMaster ?? "");
@@ -1077,12 +1213,17 @@ router.post(
              .join(", ")}. No value was silently selected.`,
          };
        });
-       const { newProducts } = matched;
+        const newProducts: ExtractedItem[] = apollo
+          ? []
+          : ((matched as { newProducts?: ExtractedItem[] }).newProducts ?? []);
 
       type StagingInsert = typeof competitorPriceStagingTable.$inferInsert;
 
       const allRows: StagingInsert[] = [
-        ...staging.map((s) => ({ ...s, batchId }) as StagingInsert),
+          ...staging.map((s) => ({
+            ...s, batchId,
+            codeSource: apollo ? ((s as any).codeSource ?? null) : null,
+          }) as unknown as StagingInsert),
         ...newProducts.map((item) => ({
           batchId,
           competitor,
@@ -1105,7 +1246,8 @@ router.post(
            adjudicated: item.adjudicated,
           matchMethod: null,
           status: "new_product" as const,
-          reviewReason: null,
+           reviewReason: null,
+           ...(apollo ? { codeSource: null } : {}),
         }) as StagingInsert),
       ];
 
@@ -1183,6 +1325,10 @@ router.post(
          passes_run: passesRun,
          model_calls: modelCalls,
          extraction_elapsed_ms: elapsedMs,
+         ...(apollo ? {
+           source: "apollo_p045",
+           coverageGaps: apolloMatch?.coverageGaps ?? [],
+         } : {}),
       };
       await db.update(importBatchesTable)
         .set({
@@ -1288,9 +1434,18 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
     .select()
     .from(competitorPriceStagingTable)
     .where(eq(competitorPriceStagingTable.batchId, batchId));
+  const apolloBatch = batch.competitor.toLowerCase() === "apollo";
+  if (apolloBatch) {
+    const sourceRows = await db.execute<{ id: number; code_source: string | null }>(
+      sql`SELECT id, code_source FROM competitor_price_staging WHERE batch_id = ${batchId}`,
+    );
+    const sourceById = new Map(sourceRows.rows.map((row) => [row.id, row.code_source]));
+    for (const row of stagingRows) (row as any).codeSource = sourceById.get(row.id) ?? null;
+  }
 
   const toCommit = stagingRows.filter(
-    (r) => (r.status === "ok" || r.status === "needs_review") && r.newMrp != null && r.matchedPrayagCode,
+    (r) => (apolloBatch ? r.status === "ok" : (r.status === "ok" || r.status === "needs_review"))
+      && r.newMrp != null && r.matchedPrayagCode,
   );
   const trustedPrince = batchTrusted;
   const trustedToCommit = trustedPrince
@@ -1345,7 +1500,7 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
       (req.body?.injectMrpMutation === "true" || req.body?.injectMrpMutation === true)) {
       await tx.execute(sql`UPDATE mrp_price_history SET mrp = mrp + 0.01 WHERE id = (SELECT id FROM mrp_price_history ORDER BY id LIMIT 1)`);
     }
-    if (!trustedPrince) {
+    if (!trustedPrince && !apolloBatch) {
       await tx.execute(
         sql`DELETE FROM competitor_prices WHERE competitor = ${batch.competitor} AND effective_date = ${batch.effectiveDate}`,
       );
@@ -1408,7 +1563,9 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
         size: r.variant,
         price: r.newMrp!,
         unit: null,
-        competitorCode: r.competitorCodeCatalogue ?? r.competitorCodeMaster,
+        competitorCode: apolloBatch && (r as any).codeSource === "locally_assigned"
+          ? r.competitorCodeMaster
+          : r.competitorCodeCatalogue ?? r.competitorCodeMaster,
         effectiveDate: batch.effectiveDate,
         matchedPrayagCode: r.matchedPrayagCode,
         matchStatus: "matched",
@@ -1419,8 +1576,71 @@ router.post("/catalog/import-batches/:id/approve", requireAdmin, async (req, res
         gstPct: batch.gstPct,
         loadBatchId: batch.loadBatchId,
       }));
-      for (let i = 0; i < values.length; i += 200) {
-        await tx.insert(competitorPricesTable).values(values.slice(i, i + 200));
+      if (apolloBatch) {
+        const allCodes = await tx.execute<{
+          competitor_code: string | null;
+          matched_prayag_code: string | null;
+          competitor: string;
+          code_source: string | null;
+        }>(
+          sql`SELECT competitor_code, matched_prayag_code, competitor, code_source
+              FROM competitor_prices WHERE competitor_code IS NOT NULL`,
+        );
+        for (const row of toCommit) {
+          if ((row as any).codeSource === "locally_assigned" && row.competitorCodeMaster) {
+            // Only reuse an existing internal handle for the same Apollo mapping.
+            // A supplier code or a handle for another product must never be shadowed.
+            const conflicting = allCodes.rows.filter((existing) =>
+              normCode(existing.competitor_code) === normCode(row.competitorCodeMaster) &&
+              !(existing.competitor === batch.competitor &&
+                existing.code_source === "locally_assigned" &&
+                existing.matched_prayag_code === row.matchedPrayagCode));
+            if (conflicting.length) {
+              assertApolloCodeAvailable(
+                row.competitorCodeMaster,
+                conflicting.map((item) => item.competitor_code),
+              );
+            }
+          }
+        }
+      }
+      if (apolloBatch) {
+        const priorRows = await tx.select().from(competitorPricesTable).where(and(
+          eq(competitorPricesTable.competitor, batch.competitor),
+          eq(competitorPricesTable.effectiveDate, batch.effectiveDate),
+        ));
+        const priorByPrayag = new Map(priorRows.map((row) => [row.matchedPrayagCode, row]));
+        for (const value of values) {
+          const prior = priorByPrayag.get(value.matchedPrayagCode ?? null);
+          if (!prior) {
+            await tx.insert(competitorPricesTable).values(value);
+            inserted++;
+          } else if (prior.price !== value.price) {
+            await tx.update(competitorPricesTable).set({
+              price: value.price, competitorCode: value.competitorCode,
+              loadBatchId: batch.loadBatchId, updatedAt: new Date(),
+            }).where(eq(competitorPricesTable.id, prior.id));
+            updated++;
+          } else {
+            unchanged++;
+          }
+        }
+      } else {
+        for (let i = 0; i < values.length; i += 200) {
+          await tx.insert(competitorPricesTable).values(values.slice(i, i + 200));
+        }
+      }
+      if (apolloBatch) {
+        await tx.execute(sql`
+          UPDATE competitor_prices c
+          SET code_source = s.code_source
+          FROM competitor_price_staging s
+          WHERE s.batch_id = ${batchId}
+            AND s.matched_prayag_code = c.matched_prayag_code
+            AND c.competitor = ${batch.competitor}
+            AND c.effective_date = ${batch.effectiveDate}
+            AND s.code_source IS NOT NULL
+        `);
       }
     }
 
@@ -1543,7 +1763,8 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
   const header = [
     "Prayag Code", "Prayag Product", "Division", "Category",
     "Prayag MRP", "Prayag Effective Date",
-    `${batch.competitor} Code (Master)`, `${batch.competitor} Code (Catalogue)`,
+    batch.competitor === "Apollo" ? "Internal/reference code (Master)" : `${batch.competitor} Code (Master)`,
+    `${batch.competitor} Code (Catalogue)`, "Code origin / provenance",
     `${batch.competitor} MRP (${batch.effectiveDate})`,
     "Old MRP", "Increase %", "Gap % vs Prayag",
     "Match Method", "Status", "Review Reason", "Page",
@@ -1557,7 +1778,10 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
     body.push([
       p.itemCode, p.productName ?? "", p.division ?? "", p.category ?? "",
       mrpRow?.mrp ?? null, mrpRow?.effective_date ?? null,
-      s.competitorCodeMaster ?? "", s.competitorCodeCatalogue ?? "",
+      s.competitorCodeMaster ?? "",
+      s.codeSource === "locally_assigned" ? "" : (s.competitorCodeCatalogue ?? ""),
+      s.codeSource === "locally_assigned" ? "Internal code — NOT supplier SKU"
+        : s.codeSource === "supplier" ? "Supplier SKU" : "Origin unverified",
       s.newMrp ?? null, s.oldMrp ?? null,
       s.increasePct != null ? Math.round(s.increasePct * 10) / 10 : null,
       s.gapPct != null ? Math.round(s.gapPct * 10) / 10 : null,
@@ -1568,13 +1792,17 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
   for (const r of stagingRows.filter((r) => r.status === "not_found")) {
     body.push([
       r.matchedPrayagCode ?? "", r.description ?? "", "", "", "", "",
-      r.competitorCodeMaster ?? "", "", null, r.oldMrp ?? null, null, null,
+      r.competitorCodeMaster ?? "", "",
+      r.codeSource === "locally_assigned" ? "Internal code — NOT supplier SKU"
+        : r.codeSource === "supplier" ? "Supplier SKU" : "Origin unverified",
+      null, r.oldMrp ?? null, null, null,
       "", "not_found", r.reviewReason ?? "", null,
     ]);
   }
 
   const newProductHeader = [
     `${batch.competitor} Code`,
+    "Code origin / provenance",
     "Product Name (Extracted)",
     "MRP",
     "Catalogue Page",
@@ -1589,7 +1817,9 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
     .map((r) => {
       const series = resolveNewProductSeries(batch.competitor, r.competitorCodeCatalogue);
       return [
-        r.competitorCodeCatalogue ?? r.competitorCodeMaster ?? "",
+        r.codeSource === "locally_assigned" ? "" : (r.competitorCodeCatalogue ?? r.competitorCodeMaster ?? ""),
+        r.codeSource === "locally_assigned" ? "Internal code — NOT supplier SKU"
+          : r.codeSource === "supplier" ? "Supplier SKU" : "Origin unverified",
         r.catalogueDescription ?? r.description ?? "",
         r.newMrp ?? null,
         r.page ?? null,
@@ -1605,7 +1835,9 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
   const newProductsWs = XLSX.utils.aoa_to_sheet([newProductHeader, ...newProductBody]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Review");
-  XLSX.utils.book_append_sheet(wb, newProductsWs, "New Products");
+  if (batch.competitor !== "Apollo") {
+    XLSX.utils.book_append_sheet(wb, newProductsWs, "New Products");
+  }
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const fname = `${batch.competitor.replace(/\s+/g, "-")}-review-${batch.effectiveDate}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

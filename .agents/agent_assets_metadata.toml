@@ -375,3 +375,17 @@ mtime_ms = 1790170284903
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1f091a6e-d48b-43b8-a035-948b1154373c/0fb14a0f-bcc1-415a-aa97-31850943606b"
 storage_version_token = "1790170325491187"
 content_type = "text/csv"
+
+[[outputs]]
+id = "4fMN1Nv5Sakd8fhQav7lX"
+uri = "file://outputs/P045_Apollo_competitor_master_provenance_and_coverage_gaps.xlsx"
+type = "table"
+title = "P045 Apollo master — corrected provenance and gaps"
+description = "Corrected audit: 273 priced internal pipe codes, 425 supplier fitting rows, and 81 no-price coverage gaps (77 blanks plus four ₹0.00 CPVC rows); all ten UGD mappings documented."
+logical_id = "c92b39bd-3487-4222-b0c1-407941d9867d"
+content_hash = "sha256:1f834d0b64c4898ecb67363d891073c241e9cd04847274d22db701e264108aef"
+size = 540144
+mtime_ms = 1790254858460
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c92b39bd-3487-4222-b0c1-407941d9867d/72015efd-3ca7-4aa0-9523-afceb4df3f38"
+storage_version_token = "1790255321660936"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

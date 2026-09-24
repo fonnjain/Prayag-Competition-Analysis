@@ -151,6 +151,7 @@ type RawCompetitorRow = {
   price: number | null;
   unit: string | null;
   competitor_code: string | null;
+  code_source: string | null;
   effective_date: string | null;
   matched_prayag_code: string | null;
   match_status: string;
@@ -182,6 +183,7 @@ function mapCompetitorRow(r: RawCompetitorRow): CompetitorRow {
     price: r.price ?? null,
     unit: r.unit ?? null,
     competitorCode: r.competitor_code ?? null,
+    codeSource: r.code_source ?? null,
     effectiveDate: r.effective_date ?? null,
     matchedPrayagCode: r.matched_prayag_code ?? null,
     matchStatus: r.match_status ?? "no match (review)",

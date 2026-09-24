@@ -50,6 +50,8 @@ import {
   PRINCE_COMPETITOR,
   PRINCE_EFFECTIVE_DATE,
 } from "../lib/princeMaster";
+import { parseApolloMaster, type ApolloMasterParse } from "../lib/apolloMaster";
+import { apolloPipeIdentity } from "../lib/apolloPipeIdentity";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -2613,6 +2615,8 @@ interface ParsedCompetitorRow {
   unit: string | null;
   effectiveDate: string | null;
   matchedPrayagCode: string | null;
+  competitorCode?: string | null;
+  codeSource?: "supplier" | "locally_assigned";
 }
 
 const SPARSH_MASTER_SHEET = "competitor_mapping";
@@ -2621,6 +2625,25 @@ const SPARSH_MASTER_ROW_COUNT = 150;
 const ASHIRVAD_MASTER_COMPETITOR = "Ashirvad";
 const ASHIRVAD_MASTER_ROW_COUNT = 669;
 const ASHIRVAD_MASTER_EFFECTIVE_DATE = "2025-03-01";
+const APOLLO_PIPE_SHEETS = new Set([
+  "agri pipe", "casing pipe", "cpvc pipe", "ppr pipe",
+  "swr pipe", "ugd pipe", "upvc pipe",
+]);
+const APOLLO_COMPETITOR = "Apollo";
+
+function normalizedSheetName(value: string): string {
+  return value.replace(/\s+/gu, " ").trim().toLowerCase();
+}
+
+/** P045 raw-master detection is deliberately strict: ordinary workbooks are
+ * left on the legacy parser, while a master is never silently misinterpreted. */
+export function isApolloRawMaster(workbook: XLSX.WorkBook): boolean {
+  const pipeSheets = workbook.SheetNames.filter((name) =>
+    APOLLO_PIPE_SHEETS.has(normalizedSheetName(name)),
+  );
+  return pipeSheets.length === APOLLO_PIPE_SHEETS.size;
+}
+
 const ASHIRVAD_MASTER_SHA256 =
   "5dfa4fdcc76595e4e3c090734808a506d85eb3902137428263274272e2b0e499";
 const SPARSH_MASTER_PERIOD_FIELDS = [
@@ -3938,6 +3961,310 @@ router.post(
         return;
       }
 
+       // P045 Apollo's raw master does contain Prayag mappings, but must not
+       // pass through the generic loader. The workbook uses grouped two-row
+       // headers (including
+       // duplicate ITEM CODE/MRP columns), and cannot safely be parsed by the
+       // generic loader.  Reject before any write rather than risk importing
+       // a Prayag reference as an Apollo SKU or silently dropping a sheet.
+       if (isApolloRawMaster(wb)) {
+          if (competitor.trim().toLowerCase() === APOLLO_COMPETITOR.toLowerCase()) {
+            const effectiveDateBody =
+              typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
+                ? req.body.effectiveDate.trim()
+                : null;
+            if (!effectiveDateBody) {
+              res.status(400).json({ error: "effectiveDate (YYYY-MM-DD) is required" });
+              return;
+            }
+            if (!isIsoDate(effectiveDateBody)) {
+              res.status(400).json({ error: "effectiveDate must be a valid calendar date (YYYY-MM-DD)" });
+              return;
+            }
+            const effectiveDate = effectiveDateBody;
+            const sourceHash = sha256ForBuffer(file.buffer);
+            let parsedApollo: ApolloMasterParse;
+            try {
+              parsedApollo = parseApolloMaster(file.buffer);
+            } catch (error) {
+              res.status(422).json({
+                error: error instanceof Error ? error.message : "Apollo master could not be safely parsed.",
+                code: "APOLLO_RAW_MASTER_MAPPING_REQUIRED",
+                noWrites: true,
+              });
+              return;
+            }
+            const existingApollo = await db.execute<{
+              id: number; competitor_code: string | null; code_source: string | null;
+              description: string | null; size: string | null; matched_prayag_code: string | null;
+            }>(sql`SELECT id, competitor_code, code_source, description, size, matched_prayag_code
+                   FROM competitor_prices WHERE competitor = ${APOLLO_COMPETITOR}`);
+            const allCompetitorCodes = await db.execute<{
+              competitor: string; competitor_code: string | null; code_source: string | null;
+              matched_prayag_code: string | null;
+            }>(
+              sql`SELECT competitor, competitor_code, code_source, matched_prayag_code
+                  FROM competitor_prices WHERE competitor_code IS NOT NULL`,
+            );
+            const existingByIdentity = existingApollo.rows.map((row) => ({
+              id: row.id,
+              competitorCode: row.competitor_code,
+              codeSource: row.code_source as "supplier" | "locally_assigned" | null,
+              description: row.description,
+              size: row.size,
+              matchedPrayagCode: row.matched_prayag_code,
+            }));
+            const conflictCodes = new Set(parsedApollo.conflicts.map((conflict) => normCode(conflict.competitorCode)));
+            const accepted: typeof parsedApollo.rows = [];
+            const acceptedPrayagCodes = new Set<string>();
+            const skipped: Array<{ sheet: string; sourceRow: number; reason: string; prayagCode: string | null }> = [];
+            for (const row of parsedApollo.rows) {
+              const codeKey = normCode(row.competitorCode);
+              if (conflictCodes.has(codeKey)) {
+                skipped.push({ sheet: row.sheet, sourceRow: row.sourceRow, prayagCode: row.prayagCode, reason: "supplier price conflict requires review" });
+                continue;
+              }
+              let prayagCode = row.prayagCode ? canonical.get(normCode(row.prayagCode)) ?? null : null;
+              const identity = row.codeSource === "locally_assigned"
+                ? apolloPipeIdentity(row.description, row.size)
+                : null;
+              const matches = identity
+                ? existingByIdentity.filter((candidate) =>
+                    candidate.codeSource === "locally_assigned" &&
+                    apolloPipeIdentity(candidate.description, candidate.size) === identity)
+                : existingByIdentity.filter((candidate) =>
+                    candidate.codeSource === "supplier" &&
+                    normCode(candidate.competitorCode) === codeKey);
+              // The same verified mapping can legitimately occur in several
+              // historical periods; ambiguity means distinct Prayag mappings,
+              // not repeated rows for one mapping.
+              const distinctMappingKeys = new Set(matches.map((match) => normCode(match.matchedPrayagCode)));
+              if (matches.length > 1 && distinctMappingKeys.size === 1) {
+                matches.splice(1);
+              }
+              if (!prayagCode && matches.length === 1) prayagCode = matches[0]!.matchedPrayagCode
+                ? canonical.get(normCode(matches[0]!.matchedPrayagCode)) ?? null : null;
+              if (matches.length > 1) {
+                skipped.push({ sheet: row.sheet, sourceRow: row.sourceRow, prayagCode: row.prayagCode, reason: "ambiguous existing Apollo mapping" });
+                continue;
+              }
+              if (!prayagCode) {
+                skipped.push({ sheet: row.sheet, sourceRow: row.sourceRow, prayagCode: row.prayagCode, reason: "unmapped Prayag code" });
+                continue;
+              }
+              const prayagKey = normCode(prayagCode);
+              if (acceptedPrayagCodes.has(prayagKey)) {
+                skipped.push({ sheet: row.sheet, sourceRow: row.sourceRow, prayagCode, reason: "duplicate Prayag mapping for effective date" });
+                continue;
+              }
+              // A locally assigned code may only collide with its own verified mapping.
+              const collides = allCompetitorCodes.rows.some((candidate) =>
+                normCode(candidate.competitor_code) === codeKey &&
+                !(
+                  candidate.competitor === APOLLO_COMPETITOR &&
+                  candidate.code_source === row.codeSource &&
+                  normCode(candidate.matched_prayag_code) === prayagKey
+                ));
+              if (collides) {
+                res.status(409).json({
+                  error: `Apollo competitor code collision: ${row.competitorCode}`,
+                  code: "APOLLO_COMPETITOR_CODE_COLLISION",
+                  competitorCode: row.competitorCode,
+                  noWrites: true,
+                });
+                return;
+              }
+              accepted.push({ ...row, prayagCode });
+              acceptedPrayagCodes.add(prayagKey);
+            }
+            const values = accepted.map((row) => ({
+              competitor: APOLLO_COMPETITOR,
+              category: row.category,
+              description: row.description,
+              size: row.size,
+              price: row.price,
+              unit: "MRP",
+              competitorCode: row.competitorCode,
+              codeSource: row.codeSource,
+              effectiveDate,
+              matchedPrayagCode: canonical.get(normCode(row.prayagCode!))!,
+              matchStatus: "matched",
+              matchConfidence: "High",
+              prayagMrpAtCompare: null,
+              isCurrent: false,
+              priceBasis: "MRP",
+              gstPct: null,
+            }));
+            let batchId: number | null = null;
+            let idempotent = false;
+            let insertedCount = 0;
+            let updatedCount = 0;
+            let unchangedCount = 0;
+            await db.transaction(async (tx) => {
+              await tx.execute(sql`SELECT pg_advisory_xact_lock(917045)`);
+              const prior = await tx.select({ id: importBatchesTable.id, rowCounts: importBatchesTable.rowCounts })
+                .from(importBatchesTable).where(and(
+                  eq(importBatchesTable.competitor, APOLLO_COMPETITOR),
+                  eq(importBatchesTable.effectiveDate, effectiveDate),
+                  eq(importBatchesTable.fileSha256, sourceHash),
+                  eq(importBatchesTable.status, "approved"),
+                )).limit(1);
+              if (prior.length) {
+                batchId = prior[0]!.id;
+                idempotent = true;
+                return;
+              }
+              // Recheck against the locked, current competitor set.  The
+              // preflight snapshot above is only for user feedback; this is
+              // the write-safety check that prevents a local code shadowing a
+              // supplier code inserted concurrently.
+              const lockedCodes = await tx.execute<{
+                competitor: string; competitor_code: string | null;
+                code_source: string | null; matched_prayag_code: string | null;
+              }>(sql`SELECT competitor, competitor_code, code_source, matched_prayag_code
+                     FROM competitor_prices WHERE competitor_code IS NOT NULL`);
+              for (const value of values) {
+                const collision = lockedCodes.rows.some((candidate) =>
+                  normCode(candidate.competitor_code) === normCode(value.competitorCode) &&
+                  !(
+                    candidate.competitor === APOLLO_COMPETITOR &&
+                    candidate.code_source === value.codeSource &&
+                    normCode(candidate.matched_prayag_code) === normCode(value.matchedPrayagCode)
+                  ));
+                if (collision) {
+                  throw Object.assign(
+                    new Error(`Apollo competitor code collision: ${value.competitorCode}`),
+                    { httpStatus: 409 },
+                  );
+                }
+              }
+              const periodRows = await tx.select({
+                id: competitorPricesTable.id,
+                competitorCode: competitorPricesTable.competitorCode,
+                codeSource: competitorPricesTable.codeSource,
+                description: competitorPricesTable.description,
+                size: competitorPricesTable.size,
+                matchedPrayagCode: competitorPricesTable.matchedPrayagCode,
+                category: competitorPricesTable.category,
+                price: competitorPricesTable.price,
+                unit: competitorPricesTable.unit,
+                matchStatus: competitorPricesTable.matchStatus,
+                matchConfidence: competitorPricesTable.matchConfidence,
+                prayagMrpAtCompare: competitorPricesTable.prayagMrpAtCompare,
+                priceBasis: competitorPricesTable.priceBasis,
+                gstPct: competitorPricesTable.gstPct,
+              }).from(competitorPricesTable).where(and(
+                eq(competitorPricesTable.competitor, APOLLO_COMPETITOR),
+                eq(competitorPricesTable.effectiveDate, effectiveDate),
+              ));
+              const [batch] = await tx.insert(importBatchesTable).values({
+                competitor: APOLLO_COMPETITOR, effectiveDate, sourceFileName: name,
+                priceBasis: "MRP", gstPct: null, status: "approved",
+                rowCounts: JSON.stringify({
+                  total: parsedApollo.rows.length, inserted: values.length, matched: values.length,
+                  coverage_gaps: parsedApollo.coverageGaps, unpriced: parsedApollo.unpriced,
+                  conflicts: parsedApollo.conflicts, skipped, renames: parsedApollo.renames,
+                  pipe_count: parsedApollo.pipeCount, fitting_count: parsedApollo.fittingCount,
+                  source: "apollo_grouped_master_reviewed_mapping", source_sha256: sourceHash,
+                }),
+                extractionModel: null, fileSha256: sourceHash, fileSizeBytes: file.size,
+                extractorVersion: null, catalogueProfileRevision: null, promptRevision: null,
+                model: null, pagesRequested: null, passesRun: null, itemsAdjudicated: null,
+              }).returning({ id: importBatchesTable.id });
+              batchId = batch?.id ?? null;
+              for (const value of values) {
+                const current = periodRows.find((candidate) =>
+                  normCode(candidate.matchedPrayagCode) === normCode(value.matchedPrayagCode));
+                if (current) {
+                  const localIdentityMatches = value.codeSource === "locally_assigned" &&
+                    current.codeSource === "locally_assigned" &&
+                    apolloPipeIdentity(current.description, current.size) === apolloPipeIdentity(value.description, value.size);
+                  const supplierCodeMatches = value.codeSource === "supplier" &&
+                    current.codeSource === "supplier" &&
+                    normCode(current.competitorCode) === normCode(value.competitorCode);
+                  if (!localIdentityMatches && !supplierCodeMatches) {
+                    throw Object.assign(new Error(`Apollo mapping provenance changed for Prayag code ${value.matchedPrayagCode}`), {
+                      httpStatus: 409,
+                    });
+                  }
+                  const changed = [
+                    ["category", current.category, value.category],
+                    ["description", current.description, value.description],
+                    ["size", current.size, value.size],
+                    ["price", current.price, value.price],
+                    ["unit", current.unit, value.unit],
+                    ["competitorCode", current.competitorCode, value.codeSource === "locally_assigned" ? current.competitorCode : value.competitorCode],
+                    ["codeSource", current.codeSource, value.codeSource],
+                    ["matchStatus", current.matchStatus, value.matchStatus],
+                    ["matchConfidence", current.matchConfidence, value.matchConfidence],
+                    ["priceBasis", current.priceBasis, value.priceBasis],
+                    ["gstPct", current.gstPct, value.gstPct],
+                  ].some(([, before, after]) => before !== after);
+                  if (!changed) {
+                    unchangedCount++;
+                    continue;
+                  }
+                  await tx.update(competitorPricesTable).set({
+                    category: value.category,
+                    description: value.description,
+                    size: value.size,
+                    price: value.price,
+                    unit: value.unit,
+                    // A revised file must not replace an established local code.
+                    competitorCode: value.codeSource === "locally_assigned" ? current.competitorCode : value.competitorCode,
+                    codeSource: value.codeSource,
+                    matchStatus: value.matchStatus,
+                    matchConfidence: value.matchConfidence,
+                    priceBasis: value.priceBasis,
+                    gstPct: value.gstPct,
+                  }).where(eq(competitorPricesTable.id, current.id));
+                  updatedCount++;
+                } else {
+                  await tx.insert(competitorPricesTable).values({ ...value, loadBatchId: batchId });
+                  insertedCount++;
+                }
+              }
+              if (insertedCount || updatedCount) {
+                await recomputeCompetitorCurrentFlagsInTransaction(APOLLO_COMPETITOR, tx);
+              }
+              await tx.update(importBatchesTable).set({
+                rowCounts: JSON.stringify({
+                  total: parsedApollo.rows.length, inserted: insertedCount, updated: updatedCount,
+                  unchanged: unchangedCount, matched: insertedCount + updatedCount + unchangedCount,
+                  coverage_gaps: parsedApollo.coverageGaps, unpriced: parsedApollo.unpriced,
+                  conflicts: parsedApollo.conflicts, skipped, renames: parsedApollo.renames,
+                  pipe_count: parsedApollo.pipeCount, fitting_count: parsedApollo.fittingCount,
+                  source: "apollo_grouped_master_reviewed_mapping", source_sha256: sourceHash,
+                }),
+              }).where(eq(importBatchesTable.id, batchId!));
+            });
+            res.json({ results: {
+              competitor: APOLLO_COMPETITOR, file: name, effectiveDate, fileSha256: sourceHash,
+              batchId, totalRows: parsedApollo.rows.length, inserted: idempotent ? 0 : insertedCount,
+              updated: idempotent ? 0 : updatedCount, unchanged: idempotent ? values.length : unchangedCount,
+              matched: idempotent ? 0 : insertedCount + updatedCount + unchangedCount,
+              skipped, coverageGaps: parsedApollo.coverageGaps, conflicts: parsedApollo.conflicts,
+              idempotent, noPrayagWrites: true,
+            } });
+            return;
+          }
+         res.status(422).json({
+           error: "P045 Apollo raw master rejected: grouped two-row headers require explicit column mapping review; no rows were written.",
+           code: "APOLLO_RAW_MASTER_MAPPING_REQUIRED",
+           limitation: "The importer does not safely distinguish Apollo price columns from Prayag reference columns in this workbook format.",
+           noWrites: true,
+         });
+         return;
+       }
+       if (competitor.trim().toLowerCase() === APOLLO_COMPETITOR.toLowerCase()) {
+         res.status(422).json({
+           error: "P045 Apollo upload rejected: competitor code provenance was not explicitly parsed; no rows were written.",
+           code: "APOLLO_PROVENANCE_REQUIRED",
+           noWrites: true,
+         });
+         return;
+       }
+
       const effectiveDateBody =
         typeof req.body.effectiveDate === "string" && req.body.effectiveDate.trim()
           ? req.body.effectiveDate.trim()
@@ -4036,6 +4363,7 @@ router.post(
           // Use the form's effectiveDate — more reliable than parsing from the sheet
           effectiveDate,
           matchedPrayagCode: isMatched ? (canonical.get(norm!) ?? norm) : null,
+          codeSource: "supplier" as const,
           matchStatus: isMatched ? "matched" : "no match (review)",
           matchConfidence: isMatched ? "High" : null,
           prayagMrpAtCompare: prayagMrpSnapshot,
@@ -4073,6 +4401,13 @@ router.post(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to parse and load file";
+      const httpStatus = typeof err === "object" && err !== null && "httpStatus" in err
+        ? Number((err as { httpStatus?: number }).httpStatus)
+        : 0;
+      if (httpStatus >= 400 && httpStatus < 500) {
+        res.status(httpStatus).json({ error: message, noWrites: true });
+        return;
+      }
       if (message.startsWith("Sparsh master ")) {
         res.status(400).json({ error: message });
         return;
