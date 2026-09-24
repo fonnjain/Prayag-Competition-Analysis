@@ -1,0 +1,114 @@
+# P039 — Step 4 — COMPETITION — The constraint, and Part 2
+
+> **P039 Step 4** · app: **COMPETITION** (`prayag-price.com`)
+> **Part A changes the schema. Part B is read-only until §B.3, which changes code.**
+> Quote `P039 Step 4` when reporting back.
+
+Step 3 is accepted. Production is at **14,252 rows, 0 unlinked**, value SHA-256 unchanged, and the 12-row split matched the prediction exactly — PMC-1 to PMC-9 plus `PF243`, `PG243`, `PP243`, with the other 231 the HDPE grid extension.
+
+---
+
+# PART A — Add the NOT NULL constraint
+
+## A1. First, resolve the undo
+
+The undo for the 13 backfill batches is armed with **no time limit**. Once `load_batch_id` is `NOT NULL`, invoking it would attempt to write nulls into a column that forbids them.
+
+Report what the code does today if the undo runs after the constraint exists. Then make it one of these, and say which you chose:
+
+- the undo is **disabled** for these 13 batches once the constraint is added, with a message saying why
+- the undo **fails cleanly** with an explicit error, changing nothing
+
+It must not partially apply, and it must not silently do nothing while reporting success. A half-completed undo across 243 rows is worse than either outcome.
+
+## A2. Re-read before changing anything
+
+Confirm **0 unlinked rows in production**, with the clock time of that read. Do not rely on the 07:32:43 reading — it is a previous observation, not a current state.
+
+## A3. Add the constraint
+
+`mrp_price_history.load_batch_id` becomes `NOT NULL`.
+
+## A4. Prove it holds
+
+Attempt a write with a null `load_batch_id` through **every path that reaches the table**, and confirm each is rejected. Report the paths and the errors.
+
+A constraint nobody has tested is a comment. This is the whole point of the step: a path that cannot write a null cannot regress, and the 243 cannot come back.
+
+## A5. Confirm nothing else moved
+
+```
+total rows      14,252
+value SHA-256   1c2d9ce6d24a01648fee52c20690579aec5841b48ae356b07b8a27c9ffe31787
+```
+
+**Report Part A before starting Part B.**
+
+---
+
+# PART B — P039 Part 2, which has not been reported
+
+Steps 1 to 3 covered Part 1 only — provenance. Part 2 of the original P039 is untouched, and it is the part **P042 is actually waiting on**.
+
+## B1 — Read-only. Change nothing.
+
+Development holds **36 synthetic rows in `catalog_products`**:
+
+```
+30   __MRP_GENERATOR_UNCATEGORISED_<timestamp>__
+ 1   __MRP_MANUAL_PROVENANCE_1788165681442__
+ 1   __MRP_MAY_PROVENANCE_1788165681442__
+ 1   __MRP_PERIOD_PROVENANCE_1788165681442__
+ 1   __MRP_RECONCILED_PROVENANCE_1788165681442__
+ 1   __MRP_UNTRACED_PROVENANCE_1788165681442__
+ 1   __STATUS_1788157498190__
+```
+
+Report:
+
+1. **Which code creates these, and on what trigger. Quote it.**
+2. Whether that path can run in **production**. Production has none today, but "none yet" and "cannot" are different answers, and only the second one is safe.
+3. **What reads them** — product counts, exports, the catalogue API, competitor matching, the generator's own output.
+4. Whether the **three that carry price rows** affect any total. They sit inside development's 14,012. One of them is the single `2026-08-19` row raised as an anomaly under P031 — it is not a price, it is a placeholder.
+
+**Report this before changing anything.** If these placeholders are load-bearing somewhere, removing them later breaks that thing.
+
+## B2 — Confirm the count
+
+Still 36? State the number and the clock time.
+
+## B3 — The fix
+
+**The generator must not create catalogue products.** An uncategorised input is **reported** as uncategorised — it does not become a product. Whatever state the generator needs, it keeps in its own tables.
+
+`catalog_products` holds products Prayag sells.
+
+Prove it: run the generator against an uncategorised input and confirm it reports the input and **creates nothing**.
+
+## B4 — List them. Delete nothing.
+
+List all 36 with what references each, and your recommendation for each.
+
+**Do not delete any of them in this prompt.** Three carry price rows, and removing a product with price history is a data change with a count consequence, not a cleanup. Deletion is P042's job, behind its own five checks.
+
+---
+
+# Report
+
+**Part A**
+- What the undo does today after a constraint, and which of the two behaviours you chose.
+- The pre-change reading, with its clock time.
+- The constraint, added.
+- Every write path tested against a null, with the rejection each produced.
+- Row count and value SHA-256 after.
+
+**Part B**
+- The generator code quoted, with its trigger.
+- Whether it can run in production.
+- What reads the 36.
+- The three with price rows, and whether they move any total.
+- Confirmation that the generator no longer creates products, evidenced by a run.
+- All 36 listed with references and a recommendation each.
+- Confirmation that none was deleted.
+
+State the environment and the clock time against every figure.

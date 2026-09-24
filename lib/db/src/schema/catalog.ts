@@ -154,10 +154,8 @@ export const mrpPriceHistoryTable = pgTable(
     reviewStatus: text("review_status").notNull().default("approved"),
     reviewReasons: text("review_reasons"),
     importBatchId: text("import_batch_id"),
-    // Every active writer supplies an auditable batch. Null remains available
-    // only so legacy rows can be detected and attached by the reconciliation
-    // workflow.
-    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
+    // Every history row must have an auditable load batch.
+    loadBatchId: integer("load_batch_id").notNull().references(() => mrpLoadBatchesTable.id),
     // The most recent controlled revision that touched this row. Full revision
     // history (including previous values) lives in mrp_revision_rows.
     lastRevisionBatchId: integer("last_revision_batch_id"),

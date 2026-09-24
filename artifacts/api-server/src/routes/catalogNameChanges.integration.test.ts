@@ -15,6 +15,7 @@ import router, {
   MANUAL_SOURCE,
   setP026TransactionTestHook,
 } from "./catalogNameChanges";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture";
 
 const app = express();
 app.use(express.json());
@@ -34,6 +35,7 @@ const request = supertest(app);
 
 let code = "";
 let productId = 0;
+let historyFixtureBatchId = 0;
 const createdLoadIds: number[] = [];
 
 async function seedProduct(options: { name?: string; active?: boolean; discontinuedFrom?: string | null } = {}) {
@@ -70,6 +72,10 @@ async function cleanup() {
   if (productId) {
     await db.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, code));
     await db.delete(catalogProductsTable).where(eq(catalogProductsTable.id, productId));
+  }
+  if (historyFixtureBatchId) {
+    await deleteMrpFixtureBatch(historyFixtureBatchId);
+    historyFixtureBatchId = 0;
   }
   code = "";
   productId = 0;
@@ -141,9 +147,10 @@ describe("P026r2 name-change route transactions", () => {
 
   it("rolls back the name, correction, load status, and price mutation on checksum failure", async () => {
     await seedProduct();
+    historyFixtureBatchId = await createMrpFixtureBatch("p026", Date.now());
     await db.insert(mrpPriceHistoryTable).values({
       itemCode: code, mrp: 100, effectiveDate: "2026-01-01", loadDate: "2026-01-01",
-      variant: "Standard", reviewStatus: "approved",
+      variant: "Standard", reviewStatus: "approved", loadBatchId: historyFixtureBatchId,
     });
     const previewResponse = await preview();
     const pendingId = previewResponse.body.pendingBatchId as number;

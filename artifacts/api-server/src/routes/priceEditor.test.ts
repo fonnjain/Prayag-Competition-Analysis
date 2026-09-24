@@ -13,6 +13,7 @@ import {
 import { dateMeaning } from "./priceEditor";
 import { warningFor } from "./mrpRevision";
 import priceEditorRouter from "./priceEditor";
+import { createMrpFixtureBatch, deleteMrpFixtureBatch } from "./testMrpFixture";
 
 const app = express();
 app.use(express.json());
@@ -26,8 +27,10 @@ const request = supertest(app);
 const testCode = `__price_editor_${Date.now()}__`;
 const testCode2 = `${testCode}_first_mapping`;
 const testCompetitor = `__price_editor_competitor_${Date.now()}__`;
+let fixtureBatchId = 0;
 
 beforeAll(async () => {
+  fixtureBatchId = await createMrpFixtureBatch("price-editor", Date.now());
   await db.insert(catalogProductsTable).values({
     itemCode: testCode,
     productName: "Price editor test product",
@@ -56,6 +59,7 @@ afterAll(async () => {
   await db.delete(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.itemCode, testCode));
   await db.delete(catalogPriceEditAuditsTable).where(eq(catalogPriceEditAuditsTable.itemCode, testCode2));
   await db.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, testCode));
+  await deleteMrpFixtureBatch(fixtureBatchId);
   await db.delete(competitorPricesTable).where(
     eq(competitorPricesTable.competitor, testCompetitor),
   );
@@ -135,6 +139,7 @@ describe("single-product price editor semantics", () => {
       loadDate: "2098-01-01",
       reviewStatus: "approved",
       variant: "Standard",
+      loadBatchId: fixtureBatchId,
     });
     const before = await db.select({ count: mrpPriceHistoryTable.id }).from(mrpPriceHistoryTable)
       .where(eq(mrpPriceHistoryTable.itemCode, testCode));

@@ -296,7 +296,10 @@ router.post("/catalog/price-editor/undo/:auditId", requireAdmin, async (req, res
           const deleted = await tx.delete(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.id, target.id)).returning({ id: mrpPriceHistoryTable.id });
           if (deleted.length !== 1) throw Object.assign(new Error("Undo changed an unexpected number of MRP rows."), { status: 409 });
         } else {
-          const updated = await tx.update(mrpPriceHistoryTable).set({ mrp: original.oldValue, loadBatchId: metadata.previousLoadBatchId ?? null }).where(and(eq(mrpPriceHistoryTable.id, target.id), eq(mrpPriceHistoryTable.mrp, original.newValue))).returning({ id: mrpPriceHistoryTable.id });
+          if (metadata.previousLoadBatchId == null) {
+            throw Object.assign(new Error("Undo rejected: prior MRP provenance is missing and load_batch_id cannot be null."), { status: 409 });
+          }
+          const updated = await tx.update(mrpPriceHistoryTable).set({ mrp: original.oldValue, loadBatchId: metadata.previousLoadBatchId }).where(and(eq(mrpPriceHistoryTable.id, target.id), eq(mrpPriceHistoryTable.mrp, original.newValue))).returning({ id: mrpPriceHistoryTable.id });
           if (updated.length !== 1) throw Object.assign(new Error("Undo changed an unexpected number of MRP rows."), { status: 409 });
         }
       } else {

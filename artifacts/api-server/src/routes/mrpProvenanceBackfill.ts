@@ -156,6 +156,17 @@ router.post("/admin/mrp-provenance-backfill/undo/:runId", requireAdmin, async (r
   const result = await db.transaction(async (tx) => {
     const run = (await tx.select().from(mrpProvenanceBackfillRunsTable).where(sql`${mrpProvenanceBackfillRunsTable.id} = ${runId}`).limit(1).for("update"))[0];
     if (!run || run.status !== "applied") throw Object.assign(new Error("Backfill run is missing or already undone."), { status: 409 });
+    // A published NOT NULL constraint makes the legacy unlink operation invalid.
+    // Check before touching any of the rows; the transaction remains all-or-nothing.
+    const column = (await tx.execute(sql`
+      SELECT is_nullable FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'mrp_price_history'
+        AND column_name = 'load_batch_id'
+    `)).rows[0] as { is_nullable?: string } | undefined;
+    if (!column) throw Object.assign(new Error("Cannot determine load_batch_id constraint; undo rejected."), { status: 409 });
+    if (column.is_nullable === "NO") {
+      throw Object.assign(new Error("Undo disabled: mrp_price_history.load_batch_id is NOT NULL; unlinking backfill rows would violate the constraint."), { status: 409 });
+    }
     const snapshot = JSON.parse(run.snapshot) as { rows: LegacyRow[]; batches: Array<{ id: number; rowIds: number[] }> };
     const assigned = new Map<number, number>();
     for (const batch of snapshot.batches) for (const rowId of batch.rowIds) assigned.set(rowId, batch.id);

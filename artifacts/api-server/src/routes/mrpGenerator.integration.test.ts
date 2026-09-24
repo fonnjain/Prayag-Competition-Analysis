@@ -257,9 +257,9 @@ afterAll(async () => {
   resetSalesApiClient();
   await cleanup(() => db.delete(competitorPricesTable).where(sql`${competitorPricesTable.competitor} IN (${COMPETITOR}, ${COMPETITOR_B}, ${P012_COMPETITOR}) OR ${competitorPricesTable.competitorCode} IN (${`PRINCE-BELOW-${RUN}`}, ${`PRINCE-ABOVE-${RUN}`})`));
   await cleanup(() => db.delete(mrpHistoryProvenanceEventsTable).where(inArray(mrpHistoryProvenanceEventsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
-  await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
+  await cleanup(() => db.delete(mrpPriceHistoryTable).where(inArray(mrpPriceHistoryTable.itemCode, [CODE, UNCATEGORISED_CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
   await cleanup(() => deleteMrpFixtureBatch(fixtureBatchId));
-  await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
+  await cleanup(() => db.delete(catalogProductsTable).where(inArray(catalogProductsTable.itemCode, [CODE, UNCATEGORISED_CODE, EXCLUDED_CODE, NO_CHANGE_CODE, RIGHT_ONLY_CODE, PRINCE_BELOW_CODE, PRINCE_ABOVE_CODE, PRINCE_MISSING_CODE, ...P012_CODES, ...HISTORICAL_CODES])));
 });
 
 beforeEach(({ task }) => {
@@ -1147,11 +1147,14 @@ describe("MRP Generator HTTP contract and safety", () => {
     expect(uncategorised.body.products).toEqual(expect.arrayContaining([
       expect.objectContaining({ itemCode: UNCATEGORISED_CODE, category: null }),
     ]));
+    const beforeProducts = await db.select({ id: catalogProductsTable.id }).from(catalogProductsTable);
     const uncategorisedSaved = await admin.post("/api/mrp-generator/matching").send({
       division: "PTMT", category: "__uncategorised__", selectedCompetitors: [COMPETITOR],
       bulkActions: [{ filter: "all", visibleCodes: [UNCATEGORISED_CODE], action: "leave" }],
     });
     expect(uncategorisedSaved.status).toBe(201);
+    const afterProducts = await db.select({ id: catalogProductsTable.id }).from(catalogProductsTable);
+    expect(afterProducts.length).toBe(beforeProducts.length);
     runIds.push(uncategorisedSaved.body.runId);
     expect(uncategorisedSaved.body.scope).toEqual({ division: "PTMT", category: null });
 
