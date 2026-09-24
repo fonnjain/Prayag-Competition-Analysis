@@ -918,6 +918,9 @@ router.post("/catalog/mrp-revisions/:batchId/rollback", requireAdmin, async (req
               .where(and(eq(mrpPriceHistoryTable.itemCode, row.itemCode!), eq(mrpPriceHistoryTable.effectiveDate, row.effectiveDate!), eq(mrpPriceHistoryTable.variant, row.variant))).limit(1))[0];
             if (existing) throw Object.assign(new Error(`Deleted MRP row ${row.rowNumber} was recreated after apply; rollback was not performed.`), { httpStatus: 409 });
             const restored = parseHistorySnapshot(row.previousRowSnapshot);
+            if (!Number.isInteger(restored.loadBatchId) || Number(restored.loadBatchId) <= 0) {
+              throw Object.assign(new Error(`Deleted MRP row ${row.rowNumber} has no load batch; rollback was not performed.`), { httpStatus: 409 });
+            }
             await tx.insert(mrpPriceHistoryTable).values(restored as typeof mrpPriceHistoryTable.$inferInsert);
             await tx.insert(mrpHistoryProvenanceEventsTable).values({
               historyRowId: Number(restored.id ?? row.targetRowId),

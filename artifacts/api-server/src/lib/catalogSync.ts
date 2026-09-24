@@ -267,7 +267,7 @@ const TABLE_SCHEMAS: Record<
     reviewStatus: nonEmptyText,
     reviewReasons: nullable(text),
     importBatchId: nullable(text),
-    loadBatchId: nullable(positiveInteger),
+    loadBatchId: positiveInteger,
     reviewedAt: nullable(isoTimestamp),
   },
   mrpHistoryProvenanceEvents: {
@@ -384,7 +384,10 @@ function assertBundleRelationships(data: CatalogSyncData): void {
     if (!productCodes.has(row.itemCode)) {
       throw new Error(`mrpPriceHistory[${index}] refers to a missing product.`);
     }
-    if (row.loadBatchId != null && !loadBatchIds.has(row.loadBatchId)) {
+    if (row.loadBatchId == null) {
+      throw new Error(`mrpPriceHistory[${index}].loadBatchId is required.`);
+    }
+    if (!loadBatchIds.has(row.loadBatchId)) {
       throw new Error(`mrpPriceHistory[${index}] refers to a missing load batch.`);
     }
   }

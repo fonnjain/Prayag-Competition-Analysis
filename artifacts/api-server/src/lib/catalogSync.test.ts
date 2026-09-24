@@ -170,6 +170,14 @@ describe("catalog sync bundle validation", () => {
     );
   });
 
+  it("rejects history without a load batch before any replacement write", () => {
+    const data = fixtureData();
+    data.mrpPriceHistory[0]!.loadBatchId = null;
+    expect(() => parseAndValidateCatalogSyncBundle(serialize(data))).toThrow(
+      /mrpPriceHistory\[0\]\.loadBatchId has an invalid value/i,
+    );
+  });
+
   it("rejects malformed field types and unexpected fields before any write", () => {
     const invalidDate = fixtureData();
     invalidDate.mrpPriceHistory[0]!.effectiveDate = "2026-02-30";
