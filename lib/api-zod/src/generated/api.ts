@@ -76,7 +76,8 @@ export const DeleteApiKeyResponse = zod.object({
 
 
 /**
- * @summary External API: list products with current MRP (requires X-API-Key header)
+ * Retired products remain in this external catalogue with discontinuedFrom set and no current price after that date. This lets Sales distinguish retirement from deletion. The internal current-catalogue list excludes them.
+ * @summary External API: list live and retired products with current MRP when available (requires X-API-Key header)
  */
 export const ExternalListProductsQueryParams = zod.object({
   "division": zod.coerce.string().optional(),

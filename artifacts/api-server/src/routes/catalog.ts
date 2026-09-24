@@ -185,9 +185,11 @@ router.get("/catalog/products", async (req, res) => {
 
   const currentMap = await getCurrentPriceMap(asOf);
   conditions.push(eq(catalogProductsTable.isActive, true));
-  conditions.push(
-    sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${asOf})`,
-  );
+  if (res.locals.includeRetiredProducts !== true) {
+    conditions.push(
+      sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${asOf})`,
+    );
+  }
 
   const whereExpr =
     conditions.length > 0
@@ -457,14 +459,17 @@ async function getCatalogProduct(req: Request, res: Response) {
     return;
   }
   const asOf = dateParam(req.query.asOf);
+  const visible = [
+    eq(catalogProductsTable.itemCode, itemCode),
+    eq(catalogProductsTable.isActive, true),
+  ];
+  if (res.locals.includeRetiredProducts !== true) {
+    visible.push(sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${asOf})`);
+  }
   const products = await db
     .select()
     .from(catalogProductsTable)
-    .where(and(
-      eq(catalogProductsTable.itemCode, itemCode),
-      eq(catalogProductsTable.isActive, true),
-      sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${asOf})`,
-    ))
+    .where(and(...visible))
     .limit(1);
   const product = products[0];
   if (!product) {
@@ -492,6 +497,7 @@ async function getCatalogProduct(req: Request, res: Response) {
     (row) => `${row.itemCode}\u0000${row.variant}`,
     (row) => row.mrp != null,
   );
+  const isRetiredAtDate = product.discontinuedFrom != null && product.discontinuedFrom <= asOf;
 
   res.json({
     product: {
@@ -510,7 +516,7 @@ async function getCatalogProduct(req: Request, res: Response) {
       discontinuedFrom: product.discontinuedFrom,
     },
     history: history.map((row) => {
-      const status = statuses.get(row.id) ?? "Superseded";
+      const status = isRetiredAtDate ? "Superseded" : statuses.get(row.id) ?? "Superseded";
       return {
         ...row,
         status,

@@ -27,18 +27,22 @@ function forward(
   handler(req, res, next);
 }
 
-router.get("/v1/products", apiKeyAuth, (req, res, next) =>
-  forward(req, res, next, "/catalog/products", catalogRouter),
-);
-router.get("/v1/products/:itemCode", apiKeyAuth, (req: Request<{ itemCode: string }>, res, next) =>
+router.get("/v1/products", apiKeyAuth, (req, res, next) => {
+  // Sales synchronizes this catalogue: retained retired rows must remain
+  // distinguishable from physically deleted codes.
+  res.locals.includeRetiredProducts = true;
+  forward(req, res, next, "/catalog/products", catalogRouter);
+});
+router.get("/v1/products/:itemCode", apiKeyAuth, (req: Request<{ itemCode: string }>, res, next) => {
+  res.locals.includeRetiredProducts = true;
   forward(
     req,
     res,
     next,
     `/catalog/products/${encodeURIComponent(req.params.itemCode)}`,
     catalogRouter,
-  ),
-);
+  );
+});
 router.get("/v1/product", apiKeyAuth, (req, res, next) => {
   const itemCode =
     typeof req.query.itemCode === "string" ? req.query.itemCode.trim() : "";
@@ -46,6 +50,7 @@ router.get("/v1/product", apiKeyAuth, (req, res, next) => {
     res.status(400).json({ error: "itemCode required" });
     return;
   }
+  res.locals.includeRetiredProducts = true;
   forward(
     req,
     res,

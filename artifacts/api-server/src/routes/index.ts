@@ -22,6 +22,7 @@ import priceEditorRouter from "./priceEditor";
 import mrpGeneratorRouter from "./mrpGenerator";
 import catalogNameChangesRouter from "./catalogNameChanges";
 import mrpProvenanceBackfillRouter from "./mrpProvenanceBackfill";
+import productRetirementRouter from "./productRetirement";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,8 @@ router.use(priceEditorRouter);
 router.use(catalogNameChangesRouter);
 router.use(mrpGeneratorRouter);
 router.use(mrpProvenanceBackfillRouter);
+// Only the reversible Retire path is mounted. Product deletion remains blocked
+// until Sales can prove complete all-time coverage.
+router.use(productRetirementRouter);
 
 export default router;

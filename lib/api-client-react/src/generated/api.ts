@@ -598,7 +598,8 @@ export const getExternalListProductsUrl = (params?: ExternalListProductsParams,)
 }
 
 /**
- * @summary External API: list products with current MRP (requires X-API-Key header)
+ * Retired products remain in this external catalogue with discontinuedFrom set and no current price after that date. This lets Sales distinguish retirement from deletion. The internal current-catalogue list excludes them.
+ * @summary External API: list live and retired products with current MRP when available (requires X-API-Key header)
  */
 export const externalListProducts = async (params?: ExternalListProductsParams, options?: RequestInit): Promise<CatalogProductList> => {
 
@@ -645,7 +646,7 @@ export type ExternalListProductsQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary External API: list products with current MRP (requires X-API-Key header)
+ * @summary External API: list live and retired products with current MRP when available (requires X-API-Key header)
  */
 
 export function useExternalListProducts<TData = Awaited<ReturnType<typeof externalListProducts>>, TError = ErrorType<ErrorResponse>>(

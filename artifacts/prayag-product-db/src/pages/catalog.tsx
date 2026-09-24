@@ -13,6 +13,8 @@ import { Search, Download, ChevronLeft, ChevronRight, Pencil, Check, X } from "l
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDisplayDate } from "@/lib/date-format";
 import { productDetailHref } from "@/lib/product-links";
+import { useAuth } from "@workspace/replit-auth-web";
+import { ProductRetirementDialog, ProductRetirementHistory } from "@/components/product-retirement-dialog";
 
 const PAGE_SIZE = 50;
 interface InlineEditState {
@@ -164,6 +166,11 @@ function MrpCell({
 }
 
 export default function CatalogPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [retirementCodes, setRetirementCodes] = useState<string[] | null>(null);
+  const [showRetirementHistory, setShowRetirementHistory] = useState(false);
   const [search, setSearch] = useState("");
   const [division, setDivision] = useState<string>("all");
   const [category, setCategory] = useState<string>("all");
@@ -211,6 +218,10 @@ export default function CatalogPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isAdmin && <Button variant="outline" onClick={() => setShowRetirementHistory(true)}>Recent retirements / Undo</Button>}
+          {isAdmin && selectedCodes.length > 0 && <Button variant="outline" onClick={() => setRetirementCodes(selectedCodes)}>
+            Retire selected ({selectedCodes.length})
+          </Button>}
           <Button variant="outline" asChild>
             <a href={inForceExportUrl} download>
               <Download className="w-4 h-4 mr-2" />
@@ -291,6 +302,7 @@ export default function CatalogPage() {
             <table className="w-full min-w-[900px] text-sm text-left">
             <thead>
               <tr className="border-b bg-muted/50">
+                {isAdmin && <th className="px-2 py-3 font-medium text-muted-foreground">Select</th>}
                 <th className="px-4 py-3 font-medium text-muted-foreground">Item Code</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Name</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Category</th>
@@ -300,18 +312,19 @@ export default function CatalogPage() {
                   <span className="ml-1 text-xs font-normal text-muted-foreground/60">(hover to edit)</span>
                 </th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Effective</th>
+                {isAdmin && <th className="px-4 py-3 font-medium text-muted-foreground">Lifecycle</th>}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={isAdmin ? 8 : 6} className="px-4 py-8 text-center text-muted-foreground">
                     Loading catalog...
                   </td>
                 </tr>
               ) : productsData?.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={isAdmin ? 8 : 6} className="px-4 py-8 text-center text-muted-foreground">
                     No products found.
                   </td>
                 </tr>
@@ -321,6 +334,11 @@ export default function CatalogPage() {
                     key={product.id}
                     className="border-b last:border-0 hover:bg-muted/50 transition-colors"
                   >
+                    {isAdmin && <td className="px-2 py-3">
+                      <input type="checkbox" aria-label={`Select ${product.itemCode}`} checked={selectedCodes.includes(product.itemCode)}
+                        onChange={(event) => setSelectedCodes((codes) => event.target.checked
+                          ? [...codes, product.itemCode] : codes.filter((code) => code !== product.itemCode))} />
+                    </td>}
                     <td className="px-4 py-3 font-medium">
                       <Link href={productDetailHref(product.itemCode)}>
                         <div className="text-primary hover:underline cursor-pointer">
@@ -354,6 +372,9 @@ export default function CatalogPage() {
                     <td className="px-4 py-3 font-mono text-muted-foreground">
                       {product.effectiveDate ? formatDisplayDate(product.effectiveDate) : "-"}
                     </td>
+                    {isAdmin && <td className="px-4 py-3">
+                      <Button variant="outline" size="sm" type="button" onClick={() => setRetirementCodes([product.itemCode])}>Retire</Button>
+                    </td>}
                   </tr>
                 ))
               )}
@@ -390,6 +411,10 @@ export default function CatalogPage() {
           </Button>
         </div>
       </div>
+      {isAdmin && retirementCodes && <ProductRetirementDialog itemCodes={retirementCodes} onClose={() => {
+        setRetirementCodes(null); setSelectedCodes([]);
+      }} />}
+      {isAdmin && showRetirementHistory && <ProductRetirementHistory onClose={() => setShowRetirementHistory(false)} />}
     </div>
   );
 }
