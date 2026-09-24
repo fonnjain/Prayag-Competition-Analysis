@@ -4327,7 +4327,9 @@ router.post(
                updated: idempotent ? 0 : updatedCount,
                unchanged: idempotent ? (idempotentInfo.counts?.matched ?? values.length) : unchangedCount,
               matched: idempotent ? 0 : insertedCount + updatedCount + unchangedCount,
-               skipped: idempotent ? (idempotentInfo.counts?.skipped ?? skipped) : skipped,
+               // The stored skipped list describes the original source load.
+               // A repeat processes no rows, so it skips none.
+               skipped: idempotent ? [] : skipped,
                coverageGaps: idempotent ? (idempotentInfo.counts?.coverage_gaps ?? parsedApollo.coverageGaps) : parsedApollo.coverageGaps,
                conflicts: idempotent ? (idempotentInfo.counts?.conflicts ?? parsedApollo.conflicts) : parsedApollo.conflicts,
               idempotent, noPrayagWrites: true,

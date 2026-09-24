@@ -520,9 +520,18 @@ router.post(
           eq(importBatchesTable.fileSha256, preflight.fileSha256),
         ))
         .orderBy(desc(importBatchesTable.id));
+      // Detection is not a usable extraction recommendation when the
+      // competitor has no positional-text profile. Leave vision as an
+      // explicit, reviewed selection rather than silently choosing it.
+      const missingProfileReason =
+        competitor !== "Prince" &&
+        (preflight.recommendedPath === "text" || preflight.recommendedPath === "text_then_ai")
+          ? `No compatible positional-text extraction profile is configured for ${competitor}; the detected ${preflight.recommendedPath} path cannot be recommended. Select vision explicitly if appropriate.`
+          : null;
+      const recommendedPath = missingProfileReason ? null : preflight.recommendedPath;
       const selectedPath = isExtractionPath(req.body.extractionPath)
         ? req.body.extractionPath
-        : preflight.recommendedPath;
+        : recommendedPath;
       const latestGst = await gstContext(competitor);
       const previous = effectiveDate
         ? await previousComparableBatch(competitor, effectiveDate)
@@ -544,7 +553,9 @@ router.post(
       res.json({
         ...preflight,
         detected: preflight.detectedClass,
-        recommendedPath: preflight.recommendedPath,
+        recommendedPath,
+        missingProfileReason,
+        humanReason: missingProfileReason ?? preflight.humanReason,
         duplicate: duplicateDecision(existingRows, competitor, preflight.fileSha256, effectiveDate, selectedPath),
         duplicateMatches: existingRows.map((row) => {
           const rowCounts = parseRowCounts(row.rowCounts);

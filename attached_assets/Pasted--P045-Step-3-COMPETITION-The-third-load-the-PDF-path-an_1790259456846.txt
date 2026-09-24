@@ -1,0 +1,146 @@
+# P045 — Step 3 — COMPETITION — The third load, the PDF path, and the match key
+
+> **P045 Step 3** · app: **COMPETITION** (`prayag-price.com`)
+> **Development only. Production is not loaded and not published.**
+> Quote `P045 Step 3` when reporting back.
+
+Step 2 reconciles exactly:
+
+```
+698 positively priced source rows
+  - 5 with no matching Prayag code
+  - 2 held for supplier-price conflict   (PPRMB0204XX20MM, twice)
+= 691 loaded         419 supplier + 272 locally_assigned = 691
+```
+
+The double-load is genuine — 691 → 691, created 0, updated 0, fingerprints identical. Catching that the repeat response tallied 667 + 31 = 698 against the **source** rows rather than the 691 **stored** rows is the exact failure this step was written to expose: right data, wrong report. Correcting the report rather than the data was the right instinct.
+
+Four things remain.
+
+---
+
+# 1. The third load — your fix is untested
+
+You corrected the idempotent response and **did not run again**. So the fixed counting has never been observed.
+
+Run the workbook load a **third** time in development and report:
+
+```
+rows before / after        expect 691 / 691
+created / updated          expect 0 / 0
+the response's own tally   expect 691 unchanged, 0 skipped
+full-row fingerprint       expect identical
+```
+
+An unverified fix to a counting bug is how a counting bug survives.
+
+---
+
+# 2. The PDF path — the automatic route does not work
+
+This is the finding that matters for production.
+
+> *The PDF detector had recommended text extraction, but Apollo has no supported positional-text import profile, so this run used an explicit vision override.*
+
+**The automatic path sends Apollo to an extractor it has no profile for.** This run only succeeded because you overrode it by hand. Nobody performing the production load will know to do that — and **P018 exists specifically to make that detection automatic**.
+
+**2.1** Report what happens today when the Apollo PDF is imported **without** the override. Quote the outcome — does it fail, produce nothing, or produce something wrong? Something wrong is the dangerous answer.
+
+**2.2** Then choose one and say which:
+
+- Apollo gets a positional-text import profile, or
+- the detector **refuses** rather than recommending a path that cannot work, naming the missing profile
+
+A detector that recommends an unsupported route is worse than one that has no opinion.
+
+**2.3** The vision run gave **60.6% mapped-product coverage** against the workbook's reviewed mappings, with **418 agreeing and 275 held**. The agreement is real corroboration — two independent readings of the same source. The 275 are where the truth is actually uncertain.
+
+Report the 275 grouped by **why** they are held: no Prayag match, price disagreement, description disagreement, size disagreement, multiple candidates. That tells us whether the gap is extraction quality or genuine ambiguity, and they are fixed by different things.
+
+**2.4** `PMN03122V` proposed ₹60 where the workbook records ₹27, **and named a different fitting**. That reads as row misalignment — a price taken from one row, a description from another — rather than a price disagreement.
+
+Check whether the same misalignment could have landed inside the 418 that agreed. Report how many of the 418 agree on price **and** description **and** size, versus those agreeing on price alone.
+
+**2.5** Confirm the discarded first PDF staging attempt left no rows in any table.
+
+---
+
+# 3. The match key may be built from section headers
+
+The stored reservation identity reads:
+
+```
+ugd ugd pipe 6 m ring fit sn 8 ring fit sn 4|110
+```
+
+`ring fit sn` appears twice, with **two different SN ratings — 8 and 4**. That does not look like one product's own description. It looks assembled from overlapping worksheet section headers.
+
+**This is the match key for all 272 locally assigned rows**, so if it is built from layout rather than from the product, it is fragile: a section heading moves in Apollo's next file and every one of them stops matching.
+
+**3.1** Quote exactly what the identity string is built from — which columns, which headers, in which order.
+
+**3.2** Explain why `ring fit sn` appears twice and why two SN ratings are present. If it is a genuine part of that product's description, say so and the matter is closed.
+
+**3.3** If any part comes from a section header rather than the row itself, report:
+
+- how many of the 272 identities contain header-derived text
+- whether two different products can normalise to the same identity
+- what happens on the next file if a heading changes
+
+**Propose a fix; do not apply one in this prompt.** Changing the match key changes what matches, and that needs its own before-and-after.
+
+---
+
+# 4. The 1,912 unverified rows — a decision, not a defect
+
+```
+Prince         943
+Ashirvad       669
+Sparsh Pearl   300
+Apollo           0
+```
+
+Storing these as `unverified` rather than assuming `supplier` was right. But this is the same shape as the 243 unprovenanced price rows, and that took six steps to close after sitting unnoticed.
+
+**Read-only. Report:**
+
+**4.1** For each competitor, is there a stored source document — a file, a hash, an import batch — that could establish origin? Name it if so.
+
+**4.2** How many could be resolved to `supplier` **from evidence already in the database**, with no inference?
+
+**4.3** How many would require a judgement call, and what would that judgement rest on?
+
+**Do not relabel anything.** This establishes the size and shape of the decision so it can be taken once.
+
+Note the staging table disagrees with the live table — Prince 1,765 staged against 943 live, Sparsh Pearl 150 against 300. Say why.
+
+---
+
+# Rules
+
+1. Development only. No Apollo data reaches production; nothing is published.
+2. No Prayag product created, changed or deleted. The catalogue stays at **6,946**.
+3. No existing Prince, Ashirvad or Sparsh Pearl mapping changes.
+4. No row is relabelled from `unverified`.
+5. The match key is **not** changed in this prompt — proposed only.
+6. `PPRMB0204XX20MM` and the `PMN03122V` discrepancy stay held. Neither is priced.
+
+# Report
+
+1. The third load: four figures, and the response's own tally.
+2. What the Apollo PDF does without the override, quoted; and which of the two fixes you chose.
+3. The 275 held rows, grouped by reason.
+4. Of the 418 agreeing rows, how many agree on price **and** description **and** size.
+5. Confirmation the discarded PDF attempt left no rows.
+6. What the identity string is built from, quoted, and the explanation of the doubled `ring fit sn`.
+7. The three answers on the 1,912, and why staging disagrees with the live table.
+8. Prayag catalogue at 6,946; production still holding 0 Apollo rows.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Still with Prayag
+
+- **`PPRMB0204XX20MM`** — one supplier code, two prices. Needs a ruling.
+- **`PMN03122V`** — ₹60 from the PDF against ₹27 in the workbook, different fitting named. Needs the correct reading confirmed against the printed page.

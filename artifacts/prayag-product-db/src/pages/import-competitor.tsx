@@ -86,6 +86,7 @@ type PdfPreflight = {
   medianDigits: number;
   detectedClass: "text" | "vision" | "uncertain";
   recommendedPath: ExtractionPath | null;
+  missingProfileReason?: string | null;
   textBearingPages: number[];
   nonTextBearingPages: number[];
   assignmentTextBearingCount: number;
@@ -312,15 +313,10 @@ export default function ImportCompetitorPage() {
       if (sequence !== pdfPreflightSequence.current) return;
       const result = data as PdfPreflight;
       setPdfPreflight(result);
-      const recommendedPathIsSupported =
-        result.recommendedPath !== "text" &&
-        result.recommendedPath !== "text_then_ai" || competitor.trim() === "Prince";
-      setPdfExtractionPath(
-        recommendedPathIsSupported ? result.recommendedPath : "vision",
-      );
-      if (!recommendedPathIsSupported) {
-        setPdfOverrideReason("No positional extraction profile is configured for this competitor; using AI vision.");
-      }
+      // No recommendation means the user must consciously select a supported
+      // path; do not turn an unsupported text recommendation into auto-vision.
+      setPdfExtractionPath(result.recommendedPath);
+      setPdfOverrideReason(result.missingProfileReason ?? "");
       if (result.latestGst && !priceBasisTouched) {
         setPriceBasis(result.latestGst.priceBasis);
         if (result.latestGst.gstPct != null) setGstPct(result.latestGst.gstPct);
