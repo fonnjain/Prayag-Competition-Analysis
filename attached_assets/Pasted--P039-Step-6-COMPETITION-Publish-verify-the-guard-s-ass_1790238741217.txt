@@ -1,0 +1,100 @@
+# P039 — Step 6 — COMPETITION — Publish, verify the guard's assumption, release P042
+
+> **P039 Step 6** · app: **COMPETITION** (`prayag-price.com`)
+> **Publishes two code changes to production. Everything else is a read.**
+> Quote `P039 Step 6` when reporting back.
+> **This closes P039.**
+
+---
+
+## A3 from Step 5 is withdrawn
+
+Your refusal was correct and the instruction was wrong.
+
+A3 asked you to exercise every production write path against an omitted batch id. Most of those paths **construct the batch internally — the caller cannot omit it.** There is nothing to exercise, and that is not a gap in the proof; it is the strongest form of it. The remainder would have required changing live prices or using catalogue sync as a probe, which this project forbade three steps earlier.
+
+The guarantee wanted here was never "every path was made to fail." It is **"no path can construct the failing input."** That is a code-reading claim and you answered it — then found two real gaps while looking, which the probe would never have produced.
+
+**Record your path analysis as the finding for A3. Do not attempt the probe.**
+
+---
+
+## 1. Publish the two pending changes
+
+- catalogue sync rejects a null history batch during bundle validation, before replacement starts
+- revision rollback rejects a restoration snapshot without a batch, before inserting it
+
+Then confirm in production, each with its clock time:
+
+```
+total rows        14,252
+unlinked rows     0
+column nullable   NO
+value SHA-256     1c2d9ce6d24a01648fee52c20690579aec5841b48ae356b07b8a27c9ffe31787
+```
+
+**Do not select production-data overwrite.**
+
+---
+
+## 2. Verify the guard's central assumption
+
+The allowlist is:
+
+```js
+const ALLOWED_TEST_DATABASES = new Set(["heliumdb", "heliumdb_test"]);
+```
+
+Everything rests on production **not** being one of those names. That has been assumed, never verified.
+
+**2.1** Read production and report what `SELECT current_database()` actually returns.
+
+**2.2** Then make the assumption explicit rather than implicit: **refuse if the database name matches the production database, in addition to requiring an allowlist match.**
+
+An allowlist protects against a name nobody thought of. A denylist protects against the one name that matters. Both, or the guard depends on a fact no code states.
+
+---
+
+## 3. The 39 files are the Vitest suite. What runs outside it?
+
+The guard protects the API Vitest suite run through its configuration. Standalone scripts do not go through that path.
+
+List **every** standalone script — anything under `scripts/`, any `.mjs` or `.ts` executed directly, any guard-check or maintenance script — that inserts, updates or deletes in `catalog_products`, `mrp_price_history`, `mrp_load_batches`, `competitor_mapping`, or any other live table.
+
+For each, state whether it is covered by the guard.
+
+**If any is not, it is the same hole in a different shape.**
+
+---
+
+## 4. Confirm and stop
+
+Development still holds **36** synthetic products, **14,012** history rows, **0** unlinked. None deleted.
+
+---
+
+# Report
+
+1. The publish, confirmed with the four production figures and their clock times.
+2. Production's `current_database()` value.
+3. The denylist, added and quoted.
+4. Every standalone script touching a live table, listed, with its guard status.
+5. The development counts.
+
+State the environment and the clock time against every figure.
+
+---
+
+# What this closes
+
+**P039 is complete after this step.** Its Part 1 goal — every price row carries a batch id, and no path can write one without — is met in production and now structurally enforced. Its Part 2 goal is met by a better fix than the prompt asked for: the runtime generator was never the cause, the test fixture was, and the suite can no longer reach a database it should not.
+
+**P042 is released.**
+
+That is a decision, not an inference, because the two have been getting conflated. P042's prerequisite was never the whole of P039 — it was specifically that nothing keeps creating placeholder products. The teardown fix and the suite guard close that. The remaining provenance work hardens write paths; it does not gate a delete feature that carries its own five checks and refuses anything ever sold.
+
+**Start P042 once this publish lands.**
+
+- The **30** zero-reference `__MRP_GENERATOR_UNCATEGORISED_*` fixtures are clean candidates.
+- The **six** others carry references — three with price rows, at 125, 654 and 321 — and go through P042's checks, which must account for the count change.
+- **Development's 14,012 includes those 3 fixture price rows.** The real figure is **14,009**. Every count P042 reports for development should say which it means.
