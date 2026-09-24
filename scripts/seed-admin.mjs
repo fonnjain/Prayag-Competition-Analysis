@@ -6,6 +6,7 @@
 import { createRequire } from 'module';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { requireDevelopmentDatabase } from './database-target-guard.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -23,6 +24,12 @@ const ADMIN_LAST_NAME = 'Prayag';
 
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
+try {
+  await requireDevelopmentDatabase(client);
+} catch (error) {
+  await client.end();
+  throw error;
+}
 
 const hash = await bcrypt.hash(ADMIN_PASSWORD, 12);
 

@@ -50,6 +50,31 @@ export const catalogProductsTable = pgTable(
   ],
 );
 
+// P042 product lifecycle audit. Delete snapshots are retained in the batch row
+// so an administrator can undo one bounded, reviewed deletion.
+export const productLifecycleBatchesTable = pgTable(
+  "product_lifecycle_batches",
+  {
+    id: serial("id").primaryKey(),
+    action: text("action").notNull(), // delete | retire
+    itemCode: text("item_code").notNull(),
+    actor: text("actor").notNull(),
+    reason: text("reason"),
+    snapshot: text("snapshot").notNull(),
+    priceRowCount: integer("price_row_count").notNull().default(0),
+    loadBatchId: integer("load_batch_id").references(() => mrpLoadBatchesTable.id),
+    beforeCount: integer("before_count").notNull(),
+    afterCount: integer("after_count"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    undoneBy: text("undone_by"),
+  },
+  (t) => [
+    index("product_lifecycle_batches_item_idx").on(t.itemCode, t.createdAt),
+    index("product_lifecycle_batches_action_idx").on(t.action, t.createdAt),
+  ],
+);
+
 // Canonical official Prayag MRP workbooks, plus the internal manual-correction
 // source used to preserve auditability when no workbook exists.
 export const mrpSourcesTable = pgTable(

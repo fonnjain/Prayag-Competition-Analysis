@@ -288,7 +288,7 @@ export default function CatalogPage() {
           Scroll sideways to view category, price, and effective date.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm text-left">
+            <table className="w-full min-w-[900px] text-sm text-left">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 font-medium text-muted-foreground">Item Code</th>
