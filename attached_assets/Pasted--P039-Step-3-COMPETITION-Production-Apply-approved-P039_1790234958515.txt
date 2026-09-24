@@ -1,0 +1,77 @@
+# P039 — Step 3 — COMPETITION — Production Apply, approved
+
+> **P039 Step 3** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS CHANGES PRODUCTION DATA.** It is the explicit approval Step 2 was told to wait for.
+> Quote `P039 Step 3` when reporting back.
+
+**Approved: apply the provenance backfill to the 243 unlinked rows in production.**
+
+Step 2 is accepted. The development cycle proved what it needed to prove — the value checksum moved only when rows were seeded and removed, and stayed fixed across Apply and Undo. Provenance changed, price did not. Development returned to `14,012 / 0` and to its starting checksum `0cb1e29a42c4faac34c59872690a599d`.
+
+---
+
+## Before you start — one check
+
+The preview reports 13 batches: **12 rows with row-specific insertion-audit evidence, 231 with creation time unknown.**
+
+Confirm the 12 are exactly the **9 PMC rows plus `PF243`, `PG243` and `PP243`**, and that the 231 are the HDPE grid-extension products.
+
+- If that is the split, say so and continue.
+- **If the set differs, stop and report it.** The 231 are believed to have been created in one operation that left no audit, and the 12 individually through the editor, which did. A different split means that account is wrong and the batches may be wrong with it.
+
+---
+
+## The checksum
+
+Use **SHA-256** for the value checksum after the Apply — the same algorithm as the before-reading. **Do not switch to MD5.** Development used MD5 and production used SHA-256; comparing across the two proves nothing while appearing to.
+
+---
+
+## Expected end state
+
+```
+total rows            14,252   unchanged
+unlinked rows         243 -> 0
+value SHA-256         1c2d9ce6d24a01648fee52c20690579aec5841b48ae356b07b8a27c9ffe31787
+                      IDENTICAL before and after
+products created      0
+products deactivated  0
+price values altered  0
+competitor mappings   unchanged
+```
+
+**If the total moves or the SHA-256 differs, undo immediately and report.** Do not explain the difference and carry on. A moved value checksum means provenance reached a price, which this backfill must not be able to do.
+
+---
+
+## After the Apply
+
+1. Read production **twice**, a minute or so apart. Report both readings with their clock times. A single reading cannot distinguish a settled state from one still moving.
+2. Report how many of the 243 ended with a recorded actor and how many with "not recorded".
+3. Report how many carry a recovered insertion time and how many carry unknown.
+4. Confirm no backfill batch claims a source file or a hash.
+5. Keep the undo available. **Report the window it stays open for.**
+
+---
+
+## Then stop
+
+**Do not add the `NOT NULL` constraint on `mrp_price_history.load_batch_id` in this action.**
+
+That is a separate step. It happens after the production null count is confirmed at 0, in a message of its own, with its own approval. A constraint added alongside the data change cannot be reasoned about independently of it.
+
+**Do not choose any option that overwrites production data with development data.** This backfill adds a batch id to rows that already exist. It writes no price, creates no product, deletes nothing.
+
+---
+
+## Report
+
+1. The 12-row split, confirmed or corrected.
+2. Production total and unlinked count, before and after, each with its clock time.
+3. Value SHA-256 before and after.
+4. Actor recorded / not recorded: the counts.
+5. Insertion time recovered / unknown: the counts.
+6. Confirmation that no batch claims a file or a hash.
+7. The undo window.
+
+State the environment and the clock time against every figure.
