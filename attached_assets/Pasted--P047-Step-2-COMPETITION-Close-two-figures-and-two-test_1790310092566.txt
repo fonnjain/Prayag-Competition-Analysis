@@ -1,0 +1,139 @@
+# P047 — Step 2 — COMPETITION — Close two figures and two tests, then publish
+
+> **P047 Step 2** · app: **COMPETITION** (`prayag-price.com`)
+> **Development only until §5. §5 publishes code and loads no data.**
+> Quote `P047 Step 2` when reporting back.
+> **P046's Apply stays blocked.**
+
+The load path is built and your judgement not to call it ready was right — Test 9 is unproven and Test 8 only partly. Four things to close.
+
+**Two gaps that must not be conflated.** They are different questions with different answers:
+
+```
+no load_batch_id         2,460   Prince 800, Ashirvad 669, Sparsh Pearl 300, Apollo 691
+code_source unverified   1,912   Prince 943, Ashirvad 669, Sparsh Pearl 300
+```
+
+2,603 rows less the 143 Prince rows that do carry a batch gives 2,460. The arithmetic is right. A later prompt that treats these as one number will get both wrong.
+
+Note also that Apollo's own 691 development rows carry no batch link — they went in through the old route. **Development is not yet a demonstration of the new path's output.**
+
+---
+
+# 1. Development gained two products. Which two, and from what?
+
+P045 closed at **6,946** with fingerprint `f927316a60c39d418e6d0754de08c555` at **20:56 IST on 24 September**. This report calls **6,948** the pre-test baseline at **22:35**.
+
+Two products appeared in that window and nothing says what created them.
+
+**1.1** Identify both: item code, name, creation time, and **which write path created them**.
+
+**1.2** **If any staging, apply or undo path created them, say so plainly.** That contradicts *a competitor load creates no Prayag product*, and **Test 13 would need re-running rather than passing.**
+
+**1.3** Report the catalogue fingerprint now, and whether `f927316a60c39d418e6d0754de08c555` is still reachable as a baseline or has been superseded.
+
+---
+
+# 2. The leading space
+
+P046's preview reported the first sheet as **`" CPVC PIPE"`, with a leading space**, and flagged it explicitly. This report lists `CPVC PIPE`.
+
+**2.1** Report the **exact** sheet name as the file stores it, byte for byte — quote it with delimiters so the whitespace is visible.
+
+**2.2** State whether the loader matches on the **raw** name or a **trimmed** one, and where any trimming happens.
+
+**2.3** If it trims, confirm two sheets differing only in whitespace cannot silently collide, and say what happens if they do.
+
+A loader looking for `"CPVC PIPE"` against a sheet named `" CPVC PIPE"` finds nothing. That is the P028 failure in miniature, and P028 cost 137 prices.
+
+---
+
+# 3. The two unexercised tests
+
+## 3.1 A non-no-op load, then undo
+
+Every load so far has been a no-op, so restoration has never actually restored anything.
+
+- change one price in a copy of the workbook
+- apply, and confirm the row updated
+- undo
+- confirm the original value returns
+
+**Report the value at all four points.** A restoration that reports success without restoring the value is the failure mode this test exists for.
+
+## 3.2 An undo blocked by a later batch
+
+- apply batch A
+- apply batch B touching the same rows
+- attempt to undo A
+
+It must **refuse cleanly with an explicit error and change nothing.** Report the error, and confirm zero rows moved. Not a partial restore, not a silent no-op reported as success.
+
+---
+
+# 4. The authenticated review page
+
+The anonymous check correctly reached sign-in. That proves the gate and nothing about the page.
+
+Confirm the review screen renders as an authenticated admin sees it:
+
+- the preview counts
+- the held rows
+- the three flags — `PPRMB0204XX20MM` unpriced, `PMN03122V` price dispute, `PMN032404` product-identity dispute
+- the nine `not verified` markers
+
+If the tester has no login secrets, say so and describe exactly what was verified through the API instead. **Do not describe an API result as a visual confirmation.**
+
+---
+
+# 5. Then publish
+
+Once 1 to 4 are answered, publish. Then confirm in production, each with its clock time:
+
+```
+Apollo price rows          expect 0        the load has not run
+Apollo import batches      expect 0
+mrp_price_history          expect 14,252
+value SHA-256              expect 1c2d9ce6d24a01648fee52c20690579aec5841b48ae356b07b8a27c9ffe31787
+catalogue count            expect 7,141
+direct upload write path   expect disabled
+```
+
+**Publishing the path must load no data.** If Apollo rows appear in production after the publish, **undo and report** — that would mean publishing carries data, which this project has assumed it does not.
+
+---
+
+# Rules
+
+1. No production load. §5 publishes code only.
+2. No legacy backfill. The 2,460 stay as they are.
+3. No `NOT NULL` on the competitor table.
+4. No Prayag product created, changed or deactivated. That includes the test in 3.1.
+5. The three held rows stay held. No price invented.
+6. Sales unchanged.
+7. Any test batch created in §3 is discarded, and development is returned to its starting counts — **report them**.
+
+# Report
+
+1. The two products: codes, names, creation times, write path. Whether any load path created them.
+2. The catalogue fingerprint now.
+3. The exact sheet name, quoted with delimiters, and the matching behaviour.
+4. The four values from 3.1.
+5. The refusal from 3.2, and confirmation zero rows moved.
+6. The review page, and what was visual versus API.
+7. The six production figures after publish.
+8. Development's closing counts — products, Apollo rows, MRP history.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Then P046 resumes
+
+Its preview re-runs against the published path, and the Apply can be approved at **691**.
+
+## Two things queued behind this
+
+**P042 needs revising.** You found an existing retire workflow, and 791 products already sit in it — 562 inactive, 229 active-but-retired. P042 said build Retire; it should use what is there. **Also report why a product can be active and retired at once** — two flags that can disagree is the same shape as the `is_current` versus `effective_to` problem in the sibling application, and it decides which one Retire should set.
+
+**P041 stays open on the Sales side.** Your reading of the 401 was right: `SALES_API_KEY` is Competition's outgoing credential and proves nothing about Sales. The open question — whether Sales can fetch `/v1/comparison` from Competition production today — is only answerable from Sales, and P009 recorded "Sales call failing after auth" without closing it.

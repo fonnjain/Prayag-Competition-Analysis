@@ -8,6 +8,13 @@ import { apolloPipeIdentity, apolloPipeIdentityV2 } from "./apolloPipeIdentity";
 const source = fileURLToPath(new URL("../../../../attached_assets/Competitor_Master_-_Plumbing_Apollo_1790252780224.xlsx", import.meta.url));
 
 describe("P045 Apollo master (pure, read-only)", () => {
+  it("rejects worksheets whose raw names differ only by whitespace", () => {
+    const book = XLSX.read(readFileSync(source), { type: "buffer" });
+    expect(book.SheetNames[0]).toBe(" CPVC PIPE");
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["Prayag", "Apollo"]]), "CPVC PIPE");
+    expect(() => parseApolloMaster(book)).toThrow(/Ambiguous Apollo worksheet names.* CPVC PIPE.*CPVC PIPE/);
+  });
+
   it("rejects a generated code that shadows a supplier code", () => {
     const book = XLSX.read(readFileSync(source), { type: "buffer" });
     book.Sheets["CPVC FITTINGS"]!["F5"].v = "APU001";

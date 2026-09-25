@@ -109,7 +109,7 @@ interface BatchData {
   /** Apollo staged-load contract (present only for Apollo workbooks). */
   batchId?: number;
   contentFingerprint?: string;
-  summary?: Record<string, unknown> | null;
+  summary?: ApolloLoadSummaryData | null;
   undoWindowHours?: number;
   created?: number;
   updated?: number;
@@ -120,47 +120,29 @@ interface BatchData {
 }
 
 interface ApolloLoadRow {
-  code?: string;
-  itemCode?: string;
+  competitorCode?: string | null;
+  prayagCode?: string | null;
+  description?: string | null;
+  size?: string | null;
+  codeSource?: string | null;
   oldPrice?: number | null;
   newPrice?: number | null;
-  oldMrp?: number | null;
-  newMrp?: number | null;
   status?: string;
-  heldReason?: string | null;
   reason?: string | null;
-  evidence?: unknown;
+  evidence?: { kind?: string; reason?: string | null } | null;
 }
 
-function formatApolloEvidence(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "string") return value;
-  if (typeof value !== "object") return String(value);
-  const record = value as Record<string, unknown>;
-  const nested = record.evidence;
-  if (nested && nested !== value) {
-    const formatted = formatApolloEvidence(nested);
-    if (formatted) return formatted;
-  }
-  const kind = typeof record.kind === "string" ? record.kind : null;
-  const reason = typeof record.reason === "string" ? record.reason : null;
-  const kindLabel = kind === "price-dispute"
-    ? "Price dispute"
-    : kind === "product-identity-dispute"
-      ? "Product identity dispute"
-      : kind === "not-verified"
-        ? "Not verified"
-        : kind;
-  if (kindLabel || reason) return [kindLabel, reason].filter(Boolean).join(": ");
-  try { return JSON.stringify(value); } catch { return "Structured evidence unavailable"; }
-}
-
-function formatApolloUnpriced(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return `${value} unpriced PPR row${value === 1 ? "" : "s"}`;
-  if (Array.isArray(value)) return value.map(formatApolloEvidence).filter(Boolean).join("; ");
-  return formatApolloEvidence(value);
+interface ApolloLoadSummaryData {
+  total?: number;
+  accepted?: number;
+  held?: number;
+  create?: number;
+  update?: number;
+  unchanged?: number;
+  reviewIssues?: number;
+  notVerified?: number;
+  conflicts?: Array<{ competitorCode?: string; reason?: string }>;
+  unpriced?: unknown;
 }
 
 /** Bearer token stored by the auth layer — needed for raw fetch() calls that
@@ -423,7 +405,7 @@ function isApolloBatch(batch: BatchData): boolean {
 }
 
 function apolloCount(batch: BatchData, key: string): number {
-  const summaryValue = batch.summary?.[key];
+  const summaryValue = (batch.summary as Record<string, unknown> | null | undefined)?.[key];
   const batchValue = key === "created"
     ? batch.created
     : key === "updated"
@@ -436,7 +418,18 @@ function apolloCount(batch: BatchData, key: string): number {
             ? batch.deleted
             : undefined;
   const value = summaryValue ?? batchValue;
-  return typeof value === "number" ? value : 0;
+  if (typeof value === "number") return value;
+  if (Array.isArray(value)) return value.length;
+  if (value && typeof value === "object") {
+    const count = (value as Record<string, unknown>).count ?? (value as Record<string, unknown>).total;
+    if (typeof count === "number") return count;
+    return Object.keys(value).length;
+  }
+  return 0;
+}
+
+function apolloRowCode(row: ApolloLoadRow): string {
+  return row.competitorCode ?? "—";
 }
 
 function ApolloLoadSummary({ batch, isApplying, reason, onReasonChange, onApply, onUndo }: {
@@ -445,48 +438,95 @@ function ApolloLoadSummary({ batch, isApplying, reason, onReasonChange, onApply,
 }) {
   const pending = batch.status === "pending";
   const applied = batch.status === "approved" || (batch.status !== "pending" && batch.created != null);
+  const rows = batch.apolloRows ?? [];
+  const heldRows = rows.filter((row) => row.status === "needs_review");
+  const notVerifiedRows = rows.filter((row) => row.evidence?.kind?.toLowerCase() === "not-verified");
+  const reviewIssues = [
+    ...(batch.summary?.conflicts ?? []).filter(issue => issue.competitorCode).map(issue => ({
+      code: issue.competitorCode!, label: "Unpriced / supplier price conflict",
+    })),
+    ...rows.filter(row => row.competitorCode && (row.evidence?.kind === "price-dispute" || row.evidence?.kind === "product-identity-dispute"))
+      .map(row => ({
+        code: row.competitorCode!,
+        label: row.evidence?.kind === "price-dispute" ? "Price dispute" : "Product identity dispute",
+      })),
+  ];
+  const countCards = [
+    ["Total", apolloCount(batch, "total")],
+    ["Accepted", apolloCount(batch, "accepted")],
+    ["Held", apolloCount(batch, "held")],
+    ["Create", apolloCount(batch, "create")],
+    ["Update", apolloCount(batch, "update")],
+    ["Unchanged", apolloCount(batch, "unchanged")],
+    ["Review issues", apolloCount(batch, "reviewIssues")],
+    ["Not verified", apolloCount(batch, "notVerified")],
+    ["Conflicts", apolloCount(batch, "conflicts")],
+    ["Unpriced", apolloCount(batch, "unpriced")],
+  ];
   return (
     <section className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-4" data-testid="apollo-load-summary">
       <div>
         <h2 className="font-semibold text-blue-950">Apollo staged load</h2>
         <p className="text-sm text-blue-900 mt-1">No Prayag products or prices, and no other brands, change until an administrator applies this reviewed fingerprint.</p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          ["Create", apolloCount(batch, "create") || apolloCount(batch, "created")],
-          ["Update", apolloCount(batch, "update") || apolloCount(batch, "updated")],
-          ["Unchanged", apolloCount(batch, "unchanged")],
-          ["Held", apolloCount(batch, "held")],
-        ].map(([label, count]) => (
-          <div key={label} className="rounded border bg-white/70 p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="text-2xl font-mono font-bold">{count}</div></div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" data-testid="apollo-review-counts">
+        {countCards.map(([label, count]) => (
+          <div key={label} className="rounded border bg-white/70 p-3" data-testid={`apollo-count-${String(label).toLowerCase().replace(/\s+/g, "-")}`}>
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className="text-2xl font-mono font-bold">{count}</div>
+          </div>
         ))}
       </div>
-      <p className="text-sm text-blue-900">Held rows remain untouched pending review. Reasons: {String(batch.summary?.heldReasons ?? batch.summary?.held_reasons ?? "No held-row reasons were returned by the Apollo preview.")}</p>
-      {formatApolloUnpriced(batch.summary?.unpriced) && (
-        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <strong>Unpriced PPR issue:</strong> {formatApolloUnpriced(batch.summary?.unpriced)}
-        </p>
-      )}
-      <p className="text-xs font-mono break-all text-blue-950">Content fingerprint: {batch.contentFingerprint ?? "unavailable"}</p>
-      {(batch.apolloRows?.length ?? 0) > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-blue-950">Row evidence</h3>
-          {batch.apolloRows!.map((row, index) => (
-            (() => {
-              const evidenceText = formatApolloEvidence(row.heldReason ?? row.reason ?? row.evidence);
-              return (
-                <div key={`${row.code ?? row.itemCode ?? "row"}-${index}`} className="rounded border bg-white/70 p-3 text-sm">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <span className="font-mono">{row.code ?? row.itemCode ?? "—"}</span>
-                    <span>{row.status ?? "—"} · {row.oldPrice ?? row.oldMrp ?? "—"} → {row.newPrice ?? row.newMrp ?? "—"}</span>
-                  </div>
-                  {evidenceText && <p className="mt-1 text-xs text-blue-900">{evidenceText}</p>}
-                </div>
-              );
-            })()
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2" data-testid="apollo-review-issues">
+        <h3 className="text-sm font-semibold text-amber-950">Flagged review issues</h3>
+        <ul className="space-y-1 text-sm text-amber-950">
+          {reviewIssues.map(({ code, label }) => (
+            <li key={code} className="flex flex-wrap gap-x-2" data-testid={`apollo-issue-${code}`}>
+              <code className="font-mono font-semibold">{code}</code><span>— {label}</span>
+            </li>
           ))}
+          {reviewIssues.length === 0 && <li>No flagged issues in this preview.</li>}
+        </ul>
+      </div>
+      <div className="space-y-2" data-testid="apollo-held-rows">
+        <h3 className="text-sm font-semibold text-blue-950">Held rows ({heldRows.length})</h3>
+        {heldRows.length > 0 ? heldRows.map((row, index) => (
+          <div key={`${apolloRowCode(row)}-${index}`} className="rounded border bg-white/70 px-3 py-2 text-sm" data-testid={`apollo-held-row-${index}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">Competitor SKU</span>
+                <span className="font-mono font-semibold">{apolloRowCode(row)}</span>
+                {row.codeSource && <Badge variant="outline" className="text-xs">{row.codeSource}</Badge>}
+                {row.prayagCode && <span className="text-xs text-muted-foreground font-mono">→ {row.prayagCode}</span>}
+              </div>
+              <span className="text-xs uppercase text-amber-800">{row.status}</span>
+            </div>
+            {(row.description || row.size) && <p className="mt-1 text-xs text-muted-foreground">{[row.description, row.size].filter(Boolean).join(" · ")}</p>}
+            <div className="mt-1 flex flex-wrap justify-between gap-2">
+              <p className="text-xs text-amber-900">{row.reason || "Held for review; no reason supplied."}</p>
+              {(row.oldPrice != null || row.newPrice != null) && (
+                <span className="text-xs font-mono text-muted-foreground">Old → New: {fmt(row.oldPrice ?? null)} → {fmt(row.newPrice ?? null)}</span>
+              )}
+            </div>
+          </div>
+        )) : (
+          <p className="text-sm text-muted-foreground">Held-row details were not returned in the Apollo preview.</p>
+        )}
+      </div>
+      <div className="space-y-2" data-testid="apollo-not-verified-markers">
+        <h3 className="text-sm font-semibold text-blue-950">Not verified ({apolloCount(batch, "notVerified")})</h3>
+        <div className="flex flex-wrap gap-2">
+          {notVerifiedRows.map((row, index) => (
+            <Badge key={`${apolloRowCode(row)}-${index}`} variant="outline" className="border-slate-300 bg-white text-slate-700" data-testid={`apollo-not-verified-${index}`}>
+              Not verified · <span className="font-mono ml-1">{apolloRowCode(row)}</span>
+            </Badge>
+          ))}
+          {notVerifiedRows.length === 0 && apolloCount(batch, "notVerified") > 0 && (
+            <Badge variant="outline" className="border-slate-300 bg-white text-slate-700">Not verified markers are included in the count; row details are unavailable.</Badge>
+          )}
         </div>
-      )}
+      </div>
+      <p className="text-xs font-mono break-all text-blue-950">Content fingerprint: {batch.contentFingerprint ?? "unavailable"}</p>
       {pending && <div className="flex items-center gap-3 flex-wrap"><Button onClick={onApply} disabled={isApplying || !batch.contentFingerprint} className="gap-2">{isApplying && <Loader2 className="w-4 h-4 animate-spin" />}Admin Apply Apollo Load</Button><span className="text-xs text-blue-900">Applying requires this exact reviewed fingerprint.</span></div>}
       {applied && <div className="space-y-3 border-t border-blue-200 pt-3"><p className="text-sm font-medium text-blue-950">Applied. Undo is available for {batch.undoWindowHours ?? 24} hours.</p><div className="flex gap-2"><Input aria-label="Apollo undo reason" placeholder="Reason for undo" value={reason} onChange={(event) => onReasonChange(event.target.value)} /><Button variant="outline" onClick={onUndo} disabled={isApplying}>Undo load</Button></div></div>}
     </section>
@@ -796,6 +836,7 @@ export default function ImportReviewPage() {
         </div>
       )}
 
+      {!apolloBatch && <>
       {/* Count cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
@@ -820,11 +861,6 @@ export default function ImportReviewPage() {
         ))}
       </div>
 
-      {isApollo && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Apollo imports do not create Prayag products. Unmatched catalogue rows remain review-only.
-        </div>
-      )}
       <CoverageGapSummary rowCounts={batch.rowCounts} />
 
         {((batch.rowCounts?.codes_found_one_pass_only ?? 0) > 0 || (batch.rowCounts?.items_adjudicated ?? 0) > 0) && (
@@ -837,6 +873,7 @@ export default function ImportReviewPage() {
             )}
           </div>
         )}
+      </>}
 
       {/* Action bar */}
       {!isAlreadyDone && !apolloBatch && (
@@ -865,6 +902,7 @@ export default function ImportReviewPage() {
         </div>
       )}
 
+      {!apolloBatch && <>
       {/* Tab bar */}
       <div className="border-b">
         <div className="flex gap-1">
@@ -969,6 +1007,7 @@ export default function ImportReviewPage() {
           )
         )}
       </div>
+      </>}
 
       {/* Bottom action bar (duplicate for long pages) */}
       {!isAlreadyDone && !apolloBatch && (batch.rows ?? []).length > 6 && (

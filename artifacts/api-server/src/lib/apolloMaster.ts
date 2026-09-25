@@ -43,6 +43,13 @@ function workbook(input: ApolloInput): XLSX.WorkBook {
 /** Parse the two-tier (Prayag/Apollo) master, locating Apollo columns by row 1 group. */
 export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
   const book = workbook(input);
+  const canonicalSheets = new Map<string, string>();
+  for (const rawName of book.SheetNames) {
+    const canonical = clean(rawName).normalize("NFC").toUpperCase();
+    const existing = canonicalSheets.get(canonical);
+    if (existing) throw new Error(`Ambiguous Apollo worksheet names: ${JSON.stringify(existing)} and ${JSON.stringify(rawName)}`);
+    canonicalSheets.set(canonical, rawName);
+  }
   const rows: ApolloMasterRow[] = [], unpriced: ApolloUnpricedGap[] = [];
   const coverageGaps: Record<string, number> = {};
   const renames: ApolloRename[] = [];
@@ -59,7 +66,11 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
     if (oldAt >= 0 && newAt >= 0 && sheetAt >= 0 && rowAt >= 0) for (const row of values.slice((headerRow < 0 ? 0 : headerRow) + 1)) {
       const oldCode = clean(row[oldAt]), newCode = clean(row[newAt]), sheet = clean(row[sheetAt]);
       const sourceRow = Number(row[rowAt]);
-      if (oldCode && newCode && sheet && Number.isInteger(sourceRow)) summaryReservations.set(`${sheet}:${sourceRow}`, { oldCode, newCode, sheet, sourceRow });
+      if (oldCode && newCode && sheet && Number.isInteger(sourceRow)) {
+        const key = `${sheet.normalize("NFC").toUpperCase()}:${sourceRow}`;
+        if (summaryReservations.has(key)) throw new Error(`Ambiguous Apollo summary reservation: ${JSON.stringify(sheet)} row ${sourceRow}`);
+        summaryReservations.set(key, { oldCode, newCode, sheet, sourceRow });
+      }
     }
   }
   for (const sheet of book.SheetNames) {
@@ -110,7 +121,7 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       // ordinary blank comparison rows in the original sheet.
       const finalDescription = [category.replace(/\s+PIPE$/i, ""), activeHeading].filter(Boolean).join(" - ");
       const size = sizeCols.map(i => clean(row[i])).filter(Boolean).join(" x ") || null;
-      const summaryMapping = summaryReservations.get(`${sheet}:${r + 1}`);
+      const summaryMapping = summaryReservations.get(`${clean(sheet).normalize("NFC").toUpperCase()}:${r + 1}`);
       if (pipe && coverageStatusCol >= 0 &&
           /coverage gap/i.test(clean(row[coverageStatusCol])) && price === null) {
         const mappedCode = summaryMapping?.newCode && /^APUGD007$/i.test(summaryMapping.newCode) ? "APUGD007" : null;

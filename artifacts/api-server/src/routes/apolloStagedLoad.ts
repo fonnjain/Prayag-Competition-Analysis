@@ -12,7 +12,6 @@ import { normCode } from "../lib/catalog";
 import { apolloPipeIdentityV2 } from "../lib/apolloPipeIdentity";
 import { sha256ForBuffer, isIsoDate } from "../lib/mrpProvenance";
 
-const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const APOLLO = "Apollo";
 const lock = 917045;
@@ -49,6 +48,16 @@ export function stagedRowsDigest(rows: readonly Record<string, unknown>[]): stri
   return createHash("sha256").update(records.join("\n"), "utf8").digest("hex");
 }
 
+/**
+ * Build the staged Apollo route set with an explicit content allowlist.
+ * Production mounts the default router below, whose sole accepted fingerprint
+ * is the fixed trusted master. Tests may construct an isolated app with
+ * additional known fingerprints without changing the production instance.
+ */
+export function createApolloStagedLoadRouter(allowedFingerprints: readonly string[]): IRouter {
+  const router: IRouter = Router();
+  const allowlistedFingerprints = new Set(allowedFingerprints);
+
 router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"), async (req, res) => {
   const file = req.file;
   const effectiveDate = String(req.body?.effectiveDate ?? "").trim();
@@ -61,7 +70,7 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
     res.status(422).json({ error: e instanceof Error ? e.message : "Apollo workbook could not be parsed", noWrites: true }); return;
   }
   const fingerprint = apolloContentFingerprint(parsed.rows);
-  if (fingerprint !== APOLLO_TRUSTED_CONTENT_FINGERPRINT) {
+  if (!allowlistedFingerprints.has(fingerprint)) {
     res.status(422).json({ error: "Apollo workbook content is not the trusted development master", code: "APOLLO_CONTENT_FINGERPRINT_MISMATCH", contentFingerprint: fingerprint, noWrites: true }); return;
   }
   const catalogue = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
@@ -245,7 +254,9 @@ router.post("/catalog/apollo-load/:batchId/apply", requireAdmin, async (req, res
     for (const r of accepted) {
       const prior = live.find(x => x.matchedPrayagCode === r.matchedPrayagCode);
       if (!prior) {
-        const [newRow] = await tx.insert(competitorPricesTable).values({ competitor: APOLLO, category: null, description: r.description, size: r.variant, price: r.newMrp!, unit: "MRP", competitorCode: r.competitorCodeMaster, codeSource: r.codeSource, effectiveDate: lockedBatch.effectiveDate, matchedPrayagCode: r.matchedPrayagCode, matchStatus: "matched", matchConfidence: "High", priceBasis: "MRP", isCurrent: false, loadBatchId: lockedBatch.loadBatchId }).returning({ id: competitorPricesTable.id });
+        const category = (() => { try { return JSON.parse(r.discoveryEvidence ?? "{}").category as string | undefined; } catch { return undefined; } })();
+        if (!category) throw Object.assign(new Error(`Apollo category is missing for ${r.competitorCodeMaster}`), { httpStatus: 409 });
+        const [newRow] = await tx.insert(competitorPricesTable).values({ competitor: APOLLO, category, description: r.description, size: r.variant, price: r.newMrp!, unit: "MRP", competitorCode: r.competitorCodeMaster, codeSource: r.codeSource, effectiveDate: lockedBatch.effectiveDate, matchedPrayagCode: r.matchedPrayagCode, matchStatus: "matched", matchConfidence: "High", priceBasis: "MRP", isCurrent: false, loadBatchId: lockedBatch.loadBatchId }).returning({ id: competitorPricesTable.id });
         insertedIds.push(newRow!.id); created++;
       } else if (prior.price !== r.newMrp) {
         await tx.update(competitorPricesTable).set({ price: r.newMrp!, loadBatchId: lockedBatch.loadBatchId, updatedAt: new Date() }).where(eq(competitorPricesTable.id, prior.id)); updatedIds.push(prior.id); updated++;
@@ -318,4 +329,8 @@ router.post("/catalog/apollo-load/:batchId/undo", requireAdmin, async (req, res)
   res.json({ batchId: id, restored, deleted });
 });
 
+  return router;
+}
+
+const router = createApolloStagedLoadRouter([APOLLO_TRUSTED_CONTENT_FINGERPRINT]);
 export default router;

@@ -40,3 +40,4 @@
 - [P042 Sales deletion proof](p042-sales-deletion-proof.md) — a fiscal-year sales snapshot cannot prove a product was never sold; keep delete unavailable without verified all-time sales and catalogue absence.
 - [Apollo pipe provenance](apollo-pipe-provenance.md) — internal Apollo handles are not supplier SKUs; workbook identity uses sheet category, Prayag code, and size; hold PDF pipe matches without codes.
 - [Apollo PDF size evidence](apollo-pdf-size-evidence.md) — recheck the printed code row before trusting an earlier transcribed size; a filled PDF size is not proof of product identity.
+- [Catalogue baseline fingerprint](catalogue-baseline-fingerprint.md) — historical P045 MD5 uses full product-row JSON joined by pipe in ID order; other MD5 recipes are incomparable.
