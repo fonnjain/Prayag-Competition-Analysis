@@ -1,0 +1,111 @@
+# P048 — Step 2 — COMPETITION — Add a series from the product editor
+
+> **P048 Step 2** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** One more vocabulary control.
+> Quote `P048 Step 2` when reporting back.
+
+P048 is live and working. **Create New Product, Step 2** has a **Series** field, auto-populated from existing values, with no way to add a new one.
+
+Add it — reusing what P048 already built. Three things differ from Division and Category, and they are the substance of this prompt.
+
+---
+
+# 1. Reuse, do not rebuild
+
+**1.1** The Add Series control uses **the same normalisation, refusal, reason and provenance machinery** as Add Division and Add Category. **Do not write a second implementation.** If that means extracting P048's logic into something shared, do that and say so.
+
+**1.2** Report which parts you reused, and anything that had to differ.
+
+A third copy of the same rule is a third place for it to drift.
+
+---
+
+# 2. The duplicate already exists — test against it
+
+The series vocabulary appears to contain **both `Allied` and `ALLIED`**.
+
+If so, this is the **first controlled vocabulary on this project where the near-duplicate is already real** rather than hypothetical. Division and Category were protected before they drifted. Series has already drifted.
+
+**2.1** Confirm whether both genuinely exist as distinct series today, **with product counts for each**.
+
+**2.2** **Do not merge or rename them in this prompt.** Report them. Merging two series with products behind them is a data change with a count consequence, and it belongs with P042.
+
+**2.3** Use the pair as a test: adding `allied` must be refused and offered the existing value — and report **which of the two it offers**.
+
+**That answer is genuinely ambiguous with both present, and the ambiguity is the finding.** Whatever it picks must be deliberate, not whichever row the query happened to return first.
+
+---
+
+# 3. Three things to establish first — read-only
+
+**3.1** List every series in use, with its division and product count.
+
+**3.2** **Is series scoped to a division, to a category, or global?** That decides where uniqueness is checked. Report what the schema actually says, not what seems sensible.
+
+**3.3** **Does Sales map series through a fixed table, the way it maps divisions?**
+
+Division resolves through `SOURCE_DIVISION_MAP` in the Sales application, and an unmapped value silently drops products from `mrp_master` and `mrp_history`. Series appears to be carried through **unmapped**, as `series_range` and `series`.
+
+Confirm that. **If series is unmapped, the Sales warning from P048 Part 1 does not apply here and must not be copied across** — a warning that fires without cause trains people to ignore it. If series turns out to be mapped somewhere, say so; that changes this prompt.
+
+**3.4** The field is read from a column headed `GROUP` in the Pipe & Fitting master and `RANGE` in the CP master. Report what the editor writes it into, and **whether those are the same field**.
+
+---
+
+# 4. Same rules as P048
+
+- admin only; non-admin does not see the button and receives 403
+- normalise to compare, **store what the admin typed**
+- a typed reason, not a dropdown
+- actor, timestamp and reason recorded
+- selectable immediately, no reload
+- **a new series is empty on creation** — it adopts, reclassifies and moves nothing
+- nothing is deleted
+
+---
+
+# Rules
+
+1. Development first, then publish, then confirm **in production**.
+2. No product created, changed or deleted by adding a series.
+3. `Allied` and `ALLIED` are **reported, not merged**.
+4. No Prayag price changes. `mrp_price_history` stays at **14,252** with its checksum.
+5. No Sales application change.
+
+# Tests
+
+```
+1. Non-admin does not see the button and receives 403
+2. Adding a series that normalises to an existing one is refused
+3. Adding "allied" is refused, and the report names which existing value was offered
+4. The stored value keeps the admin's own capitalisation
+5. Creation with no typed reason is refused
+6. A new series is empty; no existing product moves into it
+7. Uniqueness is checked at the scope 3.2 established
+8. No Sales warning appears on series creation, unless 3.3 shows series is mapped
+9. mrp_price_history count and checksum unchanged
+```
+
+**Test 3 is the interesting one.** With two case-variants already present, the "offer the existing one" path has two candidates.
+
+# Report
+
+1. What you reused from P048, and anything that had to differ.
+2. Every series, with division and product count.
+3. Whether `Allied` and `ALLIED` both exist, with counts.
+4. **Which value Test 3 offered, and why that one.**
+5. Series scope — division, category, or global — from the schema.
+6. Whether Sales maps series.
+7. What the editor writes, and whether `GROUP` and `RANGE` are the same field.
+8. `mrp_price_history` count and checksum, before and after.
+9. Production confirmation after publish, with clock times.
+
+State the environment and the clock time against every figure.
+
+---
+
+## What the `Allied` / `ALLIED` pair implies
+
+That vocabulary was already drifting **before any Add button existed**. The buttons make drift possible on purpose; they did not cause this.
+
+Which is both an argument for the refusal being there, and a separate argument for someone eventually deciding which of those two is the real one. **That decision is not in this prompt** — it needs product counts on both sides and a ruling from Prayag, exactly as the duplicate Prince codes did under P034.

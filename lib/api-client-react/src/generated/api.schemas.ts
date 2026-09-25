@@ -2424,6 +2424,14 @@ export interface LocallyAddedDivisionOption {
   salesMapped: boolean;
 }
 
+export interface LocallyAddedSeriesOption {
+  division: string;
+  name: string;
+  actor: string;
+  createdAt: string;
+  reason: string;
+}
+
 export interface NewProductOptionsResponse {
   divisions: string[];
   categories: string[];
@@ -2431,6 +2439,7 @@ export interface NewProductOptionsResponse {
   salesKnownDivisions: string[];
   byDivision: NewProductOptionsResponseByDivisionItem[];
   locallyAddedDivisions: LocallyAddedDivisionOption[];
+  locallyAddedSeries: LocallyAddedSeriesOption[];
 }
 
 export interface PriceEditorDivisionInput {
@@ -2460,6 +2469,23 @@ export interface PriceEditorCategoryInput {
 }
 
 export interface PriceEditorCategoryResponse {
+  division: string;
+  name: string;
+  actor: string;
+  createdAt: string;
+  reason: string;
+}
+
+export interface PriceEditorSeriesInput {
+  /** @minLength 1 */
+  division: string;
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  reason: string;
+}
+
+export interface PriceEditorSeriesResponse {
   division: string;
   name: string;
   actor: string;

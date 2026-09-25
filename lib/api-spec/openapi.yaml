@@ -2300,6 +2300,21 @@ paths:
         "400": { description: Missing or invalid input }
         "403": { description: Administrator access required }
         "409": { description: Normalized category already exists, content: { application/json: { schema: { $ref: "#/components/schemas/VocabularyDuplicateResponse" } } } }
+  /catalog/price-editor/series:
+    post:
+      operationId: addPriceEditorSeries
+      tags: [catalog]
+      summary: Add an audited local series option to an existing division without moving products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PriceEditorSeriesInput" }
+      responses:
+        "201": { description: Series option added, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorSeriesResponse" } } } }
+        "400": { description: Missing or invalid input }
+        "403": { description: Administrator access required }
+        "409": { description: Normalized series already exists, content: { application/json: { schema: { $ref: "#/components/schemas/VocabularyDuplicateResponse" } } } }
   /catalog/price-editor/new-product/options:
     get:
       operationId: getPriceEditorNewProductOptions
@@ -4327,7 +4342,7 @@ components:
         unusualCodeConfirmed: { type: boolean }
     NewProductOptionsResponse:
       type: object
-      required: [divisions, categories, series, byDivision, locallyAddedDivisions, salesKnownDivisions]
+      required: [divisions, categories, series, byDivision, locallyAddedDivisions, locallyAddedSeries, salesKnownDivisions]
       properties:
         divisions: { type: array, items: { type: string } }
         categories: { type: array, items: { type: string } }
@@ -4345,6 +4360,9 @@ components:
         locallyAddedDivisions:
           type: array
           items: { $ref: "#/components/schemas/LocallyAddedDivisionOption" }
+        locallyAddedSeries:
+          type: array
+          items: { $ref: "#/components/schemas/LocallyAddedSeriesOption" }
     LocallyAddedDivisionOption:
       type: object
       required: [name, actor, createdAt, reason, salesMapped]
@@ -4380,6 +4398,32 @@ components:
         name: { type: string, minLength: 1 }
         reason: { type: string, minLength: 1 }
     PriceEditorCategoryResponse:
+      type: object
+      required: [division, name, actor, createdAt, reason]
+      properties:
+        division: { type: string }
+        name: { type: string }
+        actor: { type: string }
+        createdAt: { type: string, format: date-time }
+        reason: { type: string }
+    PriceEditorSeriesInput:
+      type: object
+      required: [division, name, reason]
+      additionalProperties: false
+      properties:
+        division: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        reason: { type: string, minLength: 1 }
+    PriceEditorSeriesResponse:
+      type: object
+      required: [division, name, actor, createdAt, reason]
+      properties:
+        division: { type: string }
+        name: { type: string }
+        actor: { type: string }
+        createdAt: { type: string, format: date-time }
+        reason: { type: string }
+    LocallyAddedSeriesOption:
       type: object
       required: [division, name, actor, createdAt, reason]
       properties:

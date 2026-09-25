@@ -20,6 +20,7 @@ import {
   mrpSourcesTable,
   locallyAddedDivisionsTable,
   locallyAddedCategoriesTable,
+  locallyAddedSeriesTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import {
@@ -28,19 +29,21 @@ import {
 } from "../lib/catalog";
 import { warningFor } from "./mrpRevision";
 import { sha256ForManualCorrection } from "../lib/mrpProvenance";
+import {
+  chooseVocabularyCollision,
+  duplicateVocabulary,
+  lockPriceEditorVocabulary,
+  normalizeVocabularyKey,
+  priceEditorActor,
+  vocabularyAudit,
+  vocabularyReason,
+} from "../lib/priceEditorVocabulary";
 
 const router: IRouter = Router();
 const iso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const today = () => new Date().toISOString().slice(0, 10);
-const actor = (req: Request) => req.user?.email ?? req.user?.id ?? "unknown";
+const actor = (req: Request) => priceEditorActor(req);
 const normalizeNewCode = (value: unknown) => String(value ?? "").toUpperCase().replace(/\s+/g, "").replace(/\.0$/, "");
-const normalizeVocabularyKey = (value: string) => value.normalize("NFKC").trim().replace(/\s+/g, " ")
-  .toLocaleLowerCase("en").replace(/[\p{P}\p{S}]/gu, " ").trim().replace(/\s+/g, " ")
-  .split(" ").filter(Boolean).map((word) => {
-    if (word.length > 3 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
-    if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
-    return word;
-  }).join(" ");
 const SALES_KNOWN_DIVISIONS = [
   "Pipes & Fittings",
   "PTMT & Plastic Fittings",
@@ -51,9 +54,6 @@ const SALES_KNOWN_DIVISIONS = [
   "QUAA & FERN",
 ];
 const UNKNOWN_SALES_DIVISION_WARNING = "This division is not known to the Sales application. Products in it will not appear in Sales reporting until it is mapped there.";
-function duplicateVocabulary(existingValue: string) {
-  return { code: "VOCABULARY_DUPLICATE", existingValue };
-}
 const editDistance = (a: string, b: string) => {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i += 1) {
@@ -379,6 +379,7 @@ router.get("/catalog/price-editor/new-product/options", requireAdmin, async (_re
   }).from(catalogProductsTable).where(eq(catalogProductsTable.isActive, true));
   const addedDivisions = await db.select().from(locallyAddedDivisionsTable).orderBy(asc(locallyAddedDivisionsTable.name));
   const addedCategories = await db.select().from(locallyAddedCategoriesTable).orderBy(asc(locallyAddedCategoriesTable.name));
+  const addedSeries = await db.select().from(locallyAddedSeriesTable).orderBy(asc(locallyAddedSeriesTable.name));
   const divisions = [...new Set([
     ...rows.map((r) => r.division).filter((v): v is string => !!v),
     ...addedDivisions.map((d) => d.name),
@@ -387,43 +388,61 @@ router.get("/catalog/price-editor/new-product/options", requireAdmin, async (_re
     ...rows.map((r) => r.category).filter((v): v is string => !!v),
     ...addedCategories.map((c) => c.name),
   ])].sort();
-  const series = [...new Set(rows.map((r) => r.series).filter((v): v is string => !!v))].sort();
+  const series = [...new Set([
+    ...rows.map((r) => r.series).filter((v): v is string => !!v),
+    ...addedSeries.map((s) => s.name),
+  ])].sort();
   const byDivision = divisions.map((division) => ({
     division,
     categories: [...new Set([
       ...rows.filter((r) => r.division === division).map((r) => r.category).filter((v): v is string => !!v),
       ...addedCategories.filter((c) => c.divisionKey === normalizeVocabularyKey(division)).map((c) => c.name),
     ])].sort(),
-    series: [...new Set(rows.filter((r) => r.division === division).map((r) => r.series).filter((v): v is string => !!v))].sort(),
+    series: [...new Set([
+      ...rows.filter((r) => r.division === division).map((r) => r.series).filter((v): v is string => !!v),
+      ...addedSeries.filter((s) => s.divisionKey === normalizeVocabularyKey(division)).map((s) => s.name),
+    ])].sort(),
   }));
   const locallyAdded = addedDivisions.map(({ name, actor: createdBy, createdAt, reason }) => ({
     name, actor: createdBy, createdAt, reason, salesMapped: SALES_KNOWN_DIVISIONS.includes(name),
   }));
-  return res.json({ divisions, categories, series, byDivision, locallyAddedDivisions: locallyAdded, salesKnownDivisions: SALES_KNOWN_DIVISIONS });
+  return res.json({
+    divisions, categories, series, byDivision, locallyAddedDivisions: locallyAdded,
+    locallyAddedSeries: addedSeries.map(({ division, name, actor: createdBy, createdAt, reason }) => ({
+      division, name, actor: createdBy, createdAt, reason,
+    })),
+    salesKnownDivisions: SALES_KNOWN_DIVISIONS,
+  });
 });
 
 router.post("/catalog/price-editor/divisions", requireAdmin, async (req, res): Promise<any> => {
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+  const reason = vocabularyReason(req.body);
   if (!reason) return res.status(400).json({ error: "Reason is required." });
   if (!name) return res.status(400).json({ error: "Name is required." });
   const normalizedKey = normalizeVocabularyKey(name);
   if (!normalizedKey) return res.status(400).json({ error: "Name must contain letters or numbers." });
   try {
     const result = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"price-editor:vocabulary"}))`);
+      await lockPriceEditorVocabulary(tx);
       const productDivisions = await tx.select({ division: catalogProductsTable.division }).from(catalogProductsTable)
         .where(sql`${catalogProductsTable.division} is not null`);
-      const duplicateProduct = productDivisions.find((row) => row.division && normalizeVocabularyKey(row.division) === normalizedKey);
+      const duplicateProduct = chooseVocabularyCollision(name, productDivisions.flatMap((row) =>
+        row.division && normalizeVocabularyKey(row.division) === normalizedKey ? [{ name: row.division }] : [],
+      ));
       const duplicateAdded = (await tx.select().from(locallyAddedDivisionsTable)
         .where(eq(locallyAddedDivisionsTable.normalizedKey, normalizedKey)).limit(1))[0];
       if (duplicateProduct || duplicateAdded) {
-        return { conflict: duplicateVocabulary(duplicateProduct?.division ?? duplicateAdded!.name) };
+        const selected = chooseVocabularyCollision(name, [
+          ...(duplicateProduct ? [duplicateProduct] : []),
+          ...(duplicateAdded ? [{ name: duplicateAdded.name }] : []),
+        ]);
+        return { conflict: duplicateVocabulary(selected!.name) };
       }
       // Sales uses an exact string lookup, not our near-duplicate normalizer.
       const salesMapped = SALES_KNOWN_DIVISIONS.includes(name);
       const [created] = await tx.insert(locallyAddedDivisionsTable).values({
-        name, normalizedKey, actor: actor(req), reason, salesMapped,
+        name, normalizedKey, ...vocabularyAudit(req, reason), salesMapped,
       }).returning();
       return {
         name: created!.name, actor: created!.actor, createdAt: created!.createdAt,
@@ -447,7 +466,7 @@ router.post("/catalog/price-editor/divisions", requireAdmin, async (req, res): P
 router.post("/catalog/price-editor/categories", requireAdmin, async (req, res): Promise<any> => {
   const divisionInput = typeof req.body?.division === "string" ? req.body.division.trim() : "";
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+  const reason = vocabularyReason(req.body);
   if (!reason) return res.status(400).json({ error: "Reason is required." });
   if (!divisionInput) return res.status(400).json({ error: "Division is required." });
   if (!name) return res.status(400).json({ error: "Name is required." });
@@ -456,7 +475,7 @@ router.post("/catalog/price-editor/categories", requireAdmin, async (req, res): 
   if (!normalizedKey) return res.status(400).json({ error: "Name must contain letters or numbers." });
   try {
     const result = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"price-editor:vocabulary"}))`);
+      await lockPriceEditorVocabulary(tx);
       const productDivisions = await tx.select({ division: catalogProductsTable.division }).from(catalogProductsTable)
         .where(sql`${catalogProductsTable.division} is not null`);
       const matchingDivision = productDivisions.find((row) => row.division === divisionInput)
@@ -468,16 +487,22 @@ router.post("/catalog/price-editor/categories", requireAdmin, async (req, res): 
 
       const products = await tx.select({ category: catalogProductsTable.category })
         .from(catalogProductsTable).where(eq(catalogProductsTable.division, division));
-      const duplicateProduct = products.find((row) => row.category && normalizeVocabularyKey(row.category) === normalizedKey);
+      const duplicateProduct = chooseVocabularyCollision(name, products.flatMap((row) =>
+        row.category && normalizeVocabularyKey(row.category) === normalizedKey ? [{ name: row.category }] : [],
+      ));
       const duplicateAdded = (await tx.select().from(locallyAddedCategoriesTable).where(and(
         eq(locallyAddedCategoriesTable.divisionKey, divisionKey),
         eq(locallyAddedCategoriesTable.normalizedKey, normalizedKey),
       )).limit(1))[0];
       if (duplicateProduct || duplicateAdded) {
-        return { conflict: duplicateVocabulary(duplicateProduct?.category ?? duplicateAdded!.name) };
+        const selected = chooseVocabularyCollision(name, [
+          ...(duplicateProduct ? [duplicateProduct] : []),
+          ...(duplicateAdded ? [{ name: duplicateAdded.name }] : []),
+        ]);
+        return { conflict: duplicateVocabulary(selected!.name) };
       }
       const [created] = await tx.insert(locallyAddedCategoriesTable).values({
-        division, divisionKey, name, normalizedKey, actor: actor(req), reason,
+        division, divisionKey, name, normalizedKey, ...vocabularyAudit(req, reason),
       }).returning();
       return {
         division: created!.division, name: created!.name, actor: created!.actor,
@@ -497,6 +522,68 @@ router.post("/catalog/price-editor/categories", requireAdmin, async (req, res): 
     }
     req.log.error({ err: e }, "local category creation failed");
     return res.status(409).json({ error: "Could not add category." });
+  }
+});
+
+router.post("/catalog/price-editor/series", requireAdmin, async (req, res): Promise<any> => {
+  const divisionInput = typeof req.body?.division === "string" ? req.body.division.trim() : "";
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const reason = vocabularyReason(req.body);
+  if (!reason) return res.status(400).json({ error: "Reason is required." });
+  if (!divisionInput) return res.status(400).json({ error: "Division is required." });
+  if (!name) return res.status(400).json({ error: "Name is required." });
+  const divisionKey = normalizeVocabularyKey(divisionInput);
+  const normalizedKey = normalizeVocabularyKey(name);
+  if (!normalizedKey) return res.status(400).json({ error: "Name must contain letters or numbers." });
+  try {
+    const result = await db.transaction(async (tx) => {
+      await lockPriceEditorVocabulary(tx);
+      const productDivisions = await tx.select({ division: catalogProductsTable.division }).from(catalogProductsTable)
+        .where(sql`${catalogProductsTable.division} is not null`);
+      const matchingDivision = productDivisions.find((row) => row.division === divisionInput)
+        ?? productDivisions.find((row) => row.division && normalizeVocabularyKey(row.division) === divisionKey);
+      const locallyAddedDivision = (await tx.select().from(locallyAddedDivisionsTable)
+        .where(eq(locallyAddedDivisionsTable.normalizedKey, divisionKey)).limit(1))[0];
+      const division = matchingDivision?.division ?? locallyAddedDivision?.name;
+      if (!division) return { error: "Division must be selected from existing catalogue divisions or locally added divisions." };
+
+      const products = await tx.select({ series: catalogProductsTable.seriesRange }).from(catalogProductsTable)
+        .where(eq(catalogProductsTable.division, division));
+      const matchingProductSeries = products.filter((row) => row.series && normalizeVocabularyKey(row.series) === normalizedKey);
+      const addedSeries = await tx.select().from(locallyAddedSeriesTable).where(and(
+        eq(locallyAddedSeriesTable.divisionKey, divisionKey),
+        eq(locallyAddedSeriesTable.normalizedKey, normalizedKey),
+      ));
+      if (matchingProductSeries.length || addedSeries.length) {
+        const counts = new Map<string, number>();
+        for (const row of matchingProductSeries) counts.set(row.series!, (counts.get(row.series!) ?? 0) + 1);
+        const collisions = [
+          ...[...counts].map(([candidate, count]) => ({ name: candidate, count })),
+          ...addedSeries.map((entry) => ({ name: entry.name, count: 0 })),
+        ];
+        return { conflict: duplicateVocabulary(chooseVocabularyCollision(name, collisions)!.name) };
+      }
+      const [created] = await tx.insert(locallyAddedSeriesTable).values({
+        division, divisionKey, name, normalizedKey, ...vocabularyAudit(req, reason),
+      }).returning();
+      return {
+        division: created!.division, name: created!.name, actor: created!.actor,
+        createdAt: created!.createdAt, reason: created!.reason,
+      };
+    });
+    if ("error" in result) return res.status(400).json({ error: result.error });
+    if ("conflict" in result) return res.status(409).json(result.conflict);
+    return res.status(201).json(result);
+  } catch (e: any) {
+    if (e?.code === "23505") {
+      const existing = (await db.select().from(locallyAddedSeriesTable).where(and(
+        eq(locallyAddedSeriesTable.divisionKey, divisionKey),
+        eq(locallyAddedSeriesTable.normalizedKey, normalizedKey),
+      )).limit(1))[0];
+      if (existing) return res.status(409).json(duplicateVocabulary(existing.name));
+    }
+    req.log.error({ err: e }, "local series creation failed");
+    return res.status(409).json({ error: "Could not add series." });
   }
 });
 
@@ -572,14 +659,25 @@ async function validateNewProductInput(input: ReturnType<typeof newProductInput>
     divisionKey: locallyAddedCategoriesTable.divisionKey,
     name: locallyAddedCategoriesTable.name,
   }).from(locallyAddedCategoriesTable);
+  const addedSeries = await db.select({
+    divisionKey: locallyAddedSeriesTable.divisionKey,
+    normalizedKey: locallyAddedSeriesTable.normalizedKey,
+  }).from(locallyAddedSeriesTable);
   if (products.some((p) => normalizeNewCode(p.itemCode) === input.itemCode)) return `Code ${input.itemCode} already exists. Use the price editor above to change its price.`;
   const divisionExists = products.some((p) => p.division === input.division) ||
     addedDivisions.some((division) => division.name === input.division);
   if (!divisionExists) return "Division must be selected from the catalogue.";
-  const categoryExists = products.some((p) => p.division === input.division && p.category === input.category) ||
-    addedCategories.some((category) => category.divisionKey === normalizeVocabularyKey(input.division) && category.name === input.category);
+  const categoryKey = normalizeVocabularyKey(input.category);
+  const categoryExists = products.some((p) => p.division === input.division && p.category &&
+    normalizeVocabularyKey(p.category) === categoryKey) ||
+    addedCategories.some((category) => category.divisionKey === normalizeVocabularyKey(input.division) &&
+      normalizeVocabularyKey(category.name) === categoryKey);
   if (!categoryExists) return "Category must be selected from this division's catalogue.";
-  const matchingSeries = products.some((p) => p.division === input.division && p.seriesRange === input.series);
+  const seriesKey = normalizeVocabularyKey(input.series);
+  const matchingSeries = products.some((p) => p.division === input.division && p.seriesRange &&
+    normalizeVocabularyKey(p.seriesRange) === seriesKey) ||
+    addedSeries.some((series) => series.divisionKey === normalizeVocabularyKey(input.division) &&
+      series.normalizedKey === seriesKey);
   if (!matchingSeries && !input.newSeriesConfirmed) return `Series "${input.series}" is new in ${input.division}; explicit confirmation is required.`;
   return null;
 }

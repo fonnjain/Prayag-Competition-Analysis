@@ -459,3 +459,17 @@ mtime_ms = 1790320708287
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/0f576717-0d11-4441-b818-153a53fbc878/937e9966-77d8-4b08-bcfb-60a6e6b67e92"
 storage_version_token = "1790320710036407"
 content_type = "text/csv"
+
+[[outputs]]
+id = "dp5HWjbTGZF6GwOFYVZy5"
+uri = "file://reports/p048-step2-development-series-inventory.html"
+type = "html"
+title = "P048 Step 2 — every series by division"
+description = "Read-only development inventory with exact series names and product counts, timestamped in IST."
+logical_id = "9f577be4-1e98-4a5f-b238-b71f1d8fb5a8"
+content_hash = "sha256:9dcfc05f9cce172a729ad6a88a6d0682c89615db60fc86250436833ebf0aeb5b"
+size = 25924
+mtime_ms = 1790328142328
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9f577be4-1e98-4a5f-b238-b71f1d8fb5a8/299b6ebe-b6a5-4148-891c-cba6d1952ec6"
+storage_version_token = "1790328143791077"
+content_type = "text/html"

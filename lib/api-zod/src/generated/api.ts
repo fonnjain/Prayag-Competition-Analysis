@@ -2517,6 +2517,21 @@ export const AddPriceEditorCategoryBody = zod.object({
 
 
 /**
+ * @summary Add an audited local series option to an existing division without moving products
+ */
+
+
+
+
+
+export const AddPriceEditorSeriesBody = zod.object({
+  "division": zod.string().min(1),
+  "name": zod.string().min(1),
+  "reason": zod.string().min(1)
+})
+
+
+/**
  * @summary Catalogue classifications available for one-product creation
  */
 export const GetPriceEditorNewProductOptionsResponse = zod.object({
@@ -2535,6 +2550,13 @@ export const GetPriceEditorNewProductOptionsResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "reason": zod.string(),
   "salesMapped": zod.boolean()
+})),
+  "locallyAddedSeries": zod.array(zod.object({
+  "division": zod.string(),
+  "name": zod.string(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "reason": zod.string()
 }))
 })
 

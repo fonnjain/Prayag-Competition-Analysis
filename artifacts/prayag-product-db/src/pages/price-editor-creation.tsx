@@ -1,5 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +8,7 @@ import {
   useGetPriceEditorNewProductOptions,
   useAddPriceEditorDivision,
   useAddPriceEditorCategory,
+  useAddPriceEditorSeries,
   useCheckPriceEditorNewProductCode,
   usePreviewPriceEditorNewProduct,
   useApplyPriceEditorNewProduct,
@@ -69,12 +70,88 @@ const date = (s?: string | null) => s ? new Date(`${s}T00:00:00`).toLocaleDateSt
 const errorText = (e: unknown) => e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "The request failed. Try again.";
 const SALES_DIVISION_WARNING = "This division is not known to the Sales application. Products in it will not appear in Sales reporting until it is mapped there.";
 
+function ClassificationDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  nameLabel,
+  nameId,
+  nameTestId,
+  name,
+  onNameChange,
+  reasonId,
+  reasonTestId,
+  reason,
+  onReasonChange,
+  reasonPlaceholder,
+  error,
+  warning,
+  submitTestId,
+  submitLabel,
+  submittingLabel,
+  submitting,
+  canSubmit,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  nameLabel: string;
+  nameId: string;
+  nameTestId: string;
+  name: string;
+  onNameChange: (value: string) => void;
+  reasonId: string;
+  reasonTestId: string;
+  reason: string;
+  onReasonChange: (value: string) => void;
+  reasonPlaceholder: string;
+  error: string | null;
+  warning?: ReactNode;
+  submitTestId: string;
+  submitLabel: string;
+  submittingLabel: string;
+  submitting: boolean;
+  canSubmit: boolean;
+  onSubmit: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <label htmlFor={nameId} className="block text-sm font-medium">{nameLabel} <span className="text-destructive">*</span>
+            <Input id={nameId} data-testid={nameTestId} className="mt-1" value={name} onChange={e => onNameChange(e.target.value)} maxLength={120} />
+          </label>
+          <label htmlFor={reasonId} className="block text-sm font-medium">Reason <span className="text-destructive">*</span>
+            <Textarea id={reasonId} data-testid={reasonTestId} className="mt-1" rows={3} value={reason} onChange={e => onReasonChange(e.target.value)} placeholder={reasonPlaceholder} />
+          </label>
+          {warning}
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" data-testid={submitTestId} disabled={!canSubmit || submitting} onClick={onSubmit}>
+            {submitting ? submittingLabel : submitLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function ProductCreationTab() {
   const options = useGetPriceEditorNewProductOptions();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const addDivision = useAddPriceEditorDivision();
   const addCategory = useAddPriceEditorCategory();
+  const addSeries = useAddPriceEditorSeries();
   const queryClient = useQueryClient();
   
   const [code, setCode] = useState("");
@@ -104,6 +181,10 @@ export function ProductCreationTab() {
   const [newDivisionReason, setNewDivisionReason] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryReason, setNewCategoryReason] = useState("");
+  const [showAddSeries, setShowAddSeries] = useState(false);
+  const [newSeriesName, setNewSeriesName] = useState("");
+  const [newSeriesReason, setNewSeriesReason] = useState("");
+  const [locallyAddedSeries, setLocallyAddedSeries] = useState<Record<string, string[]>>({});
   const [classificationError, setClassificationError] = useState<string | null>(null);
   
   const formVersion = useRef(0);
@@ -121,7 +202,9 @@ export function ProductCreationTab() {
   }, [options.data, division]);
 
   const isCodeDuplicate = !!codeCheck.data?.duplicate;
-  const isNewSeries = series.trim().length > 0 && !!divisionOptions && !divisionOptions.series.includes(series.trim());
+  const isNewSeries = series.trim().length > 0 && !!divisionOptions &&
+    !divisionOptions.series.includes(series.trim()) &&
+    !locallyAddedSeries[division]?.includes(series.trim());
   const nearestSeries = useMemo(() => {
     if (!isNewSeries || !divisionOptions) return [];
     return [...divisionOptions.series]
@@ -213,6 +296,36 @@ export function ProductCreationTab() {
     });
   };
 
+  const submitSeries = () => {
+    const name = newSeriesName.trim();
+    const reason = newSeriesReason.trim();
+    if (!division || !name || !reason) return;
+    setClassificationError(null);
+    addSeries.mutate({ data: { division, name, reason } }, {
+      onSuccess: async () => {
+        setLocallyAddedSeries(current => ({
+          ...current,
+          [division]: [...new Set([...(current[division] ?? []), name])],
+        }));
+        setSeries(name);
+        setNewSeriesConfirmed(false);
+        change();
+        setNewSeriesName("");
+        setNewSeriesReason("");
+        setShowAddSeries(false);
+        try {
+          await refreshOptions();
+        } catch (e) {
+          setClassificationError(`Series was added, but the options list could not be refreshed: ${errorText(e)}`);
+        }
+      },
+      onError: e => {
+        const existing = duplicateValue(e);
+        setClassificationError(existing ? `A series named “${String(existing)}” already exists in this division. It has not been selected; choose it from the list if appropriate.` : errorText(e));
+      },
+    });
+  };
+
   const runPreview = () => {
     if (!canPreview) return;
     const request: NewProductRequest = {
@@ -295,7 +408,7 @@ export function ProductCreationTab() {
           <div>
             <label htmlFor="select-division" className="block text-sm font-medium">Division <span className="text-destructive">*</span></label>
             <div className="mt-1 flex gap-2">
-              <select id="select-division" data-testid="select-division" disabled={apply.isPending} className="h-10 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" value={division} onChange={e => handleDivisionChange(e.target.value)}>
+              <select id="select-division" data-testid="select-division" disabled={apply.isPending || addCategory.isPending || addSeries.isPending} className="h-10 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" value={division} onChange={e => handleDivisionChange(e.target.value)}>
                 <option value="">Select division…</option>
                 {options.data?.divisions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -309,7 +422,7 @@ export function ProductCreationTab() {
                 <option value="">Select category…</option>
                 {divisionOptions?.categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              {isAdmin && <Button data-testid="button-add-category" type="button" variant="outline" disabled={apply.isPending || !division} onClick={() => { setClassificationError(null); setShowAddCategory(true); }}>Add</Button>}
+              {isAdmin && <Button data-testid="button-add-category" type="button" variant="outline" disabled={apply.isPending || addCategory.isPending || !division} onClick={() => { setClassificationError(null); setShowAddCategory(true); }}>Add</Button>}
             </div>
           </div>
           <div>
@@ -352,10 +465,13 @@ export function ProductCreationTab() {
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className="block text-sm font-medium">Series <span className="text-destructive">*</span>
-              <Input data-testid="input-series" list="series-options" disabled={apply.isPending || !divisionOptions} className="mt-1" value={series} onChange={e => { setSeries(e.target.value); change(); }} />
-              <datalist id="series-options">
-                {divisionOptions?.series.map(s => <option key={s} value={s} />)}
-              </datalist>
+              <div className="mt-1 flex gap-2">
+                <Input data-testid="input-series" list="series-options" disabled={apply.isPending || !divisionOptions} className="min-w-0 flex-1" value={series} onChange={e => { setSeries(e.target.value); change(); }} />
+                {isAdmin && <Button data-testid="button-add-series" type="button" variant="outline" disabled={apply.isPending || addSeries.isPending || !division} onClick={() => { setClassificationError(null); setShowAddSeries(true); }}>Add</Button>}
+                <datalist id="series-options">
+                  {divisionOptions?.series.map(s => <option key={s} value={s} />)}
+                </datalist>
+              </div>
             </label>
             {isNewSeries && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -421,59 +537,82 @@ export function ProductCreationTab() {
 
       {isAdmin && (
         <>
-          <Dialog open={showAddDivision} onOpenChange={open => { setShowAddDivision(open); if (!open) setClassificationError(null); }}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add division</DialogTitle>
-                <DialogDescription>Create a local division classification. This does not create a product or price.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <label htmlFor="input-new-division" className="block text-sm font-medium">Division name <span className="text-destructive">*</span>
-                  <Input id="input-new-division" data-testid="input-new-division" className="mt-1" value={newDivisionName} onChange={e => setNewDivisionName(e.target.value)} maxLength={120} />
-                </label>
-                <label htmlFor="textarea-division-reason" className="block text-sm font-medium">Reason <span className="text-destructive">*</span>
-                  <Textarea id="textarea-division-reason" data-testid="textarea-division-reason" className="mt-1" rows={3} value={newDivisionReason} onChange={e => setNewDivisionReason(e.target.value)} placeholder="Why is this division needed?" />
-                </label>
-                {!options.data?.salesKnownDivisions.includes(newDivisionName.trim()) && (
-                  <Alert variant="destructive" data-testid="warning-division-sales">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Not mapped to Sales</AlertTitle>
-                    <AlertDescription>{SALES_DIVISION_WARNING}</AlertDescription>
-                  </Alert>
-                )}
-                {classificationError && <p className="text-sm text-destructive" role="alert">{classificationError}</p>}
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowAddDivision(false)}>Cancel</Button>
-                <Button type="button" data-testid="button-confirm-add-division" disabled={!newDivisionName.trim() || !newDivisionReason.trim() || addDivision.isPending} onClick={submitDivision}>
-                  {addDivision.isPending ? "Adding…" : "Confirm add division"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={showAddCategory} onOpenChange={open => { setShowAddCategory(open); if (!open) setClassificationError(null); }}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add category to {division || "division"}</DialogTitle>
-                <DialogDescription>Create a category for the selected division. This does not create a product or price.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <label htmlFor="input-new-category" className="block text-sm font-medium">Category name <span className="text-destructive">*</span>
-                  <Input id="input-new-category" data-testid="input-new-category" className="mt-1" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} maxLength={120} />
-                </label>
-                <label htmlFor="textarea-category-reason" className="block text-sm font-medium">Reason <span className="text-destructive">*</span>
-                  <Textarea id="textarea-category-reason" data-testid="textarea-category-reason" className="mt-1" rows={3} value={newCategoryReason} onChange={e => setNewCategoryReason(e.target.value)} placeholder="Why is this category needed?" />
-                </label>
-                {classificationError && <p className="text-sm text-destructive" role="alert">{classificationError}</p>}
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowAddCategory(false)}>Cancel</Button>
-                <Button type="button" data-testid="button-confirm-add-category" disabled={!newCategoryName.trim() || !newCategoryReason.trim() || addCategory.isPending} onClick={submitCategory}>
-                  {addCategory.isPending ? "Adding…" : "Add category"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <ClassificationDialog
+            open={showAddDivision}
+            onOpenChange={open => { setShowAddDivision(open); if (!open) setClassificationError(null); }}
+            title="Add division"
+            description="Create a local division classification. This does not create a product or price."
+            nameLabel="Division name"
+            nameId="input-new-division"
+            nameTestId="input-new-division"
+            name={newDivisionName}
+            onNameChange={setNewDivisionName}
+            reasonId="textarea-division-reason"
+            reasonTestId="textarea-division-reason"
+            reason={newDivisionReason}
+            onReasonChange={setNewDivisionReason}
+            reasonPlaceholder="Why is this division needed?"
+            error={classificationError}
+            warning={!options.data?.salesKnownDivisions.includes(newDivisionName.trim()) ? (
+              <Alert variant="destructive" data-testid="warning-division-sales">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Not mapped to Sales</AlertTitle>
+                <AlertDescription>{SALES_DIVISION_WARNING}</AlertDescription>
+              </Alert>
+            ) : undefined}
+            submitTestId="button-confirm-add-division"
+            submitLabel="Confirm add division"
+            submittingLabel="Adding…"
+            submitting={addDivision.isPending}
+            canSubmit={!!newDivisionName.trim() && !!newDivisionReason.trim()}
+            onSubmit={submitDivision}
+          />
+          <ClassificationDialog
+            open={showAddCategory}
+            onOpenChange={open => { setShowAddCategory(open); if (!open) setClassificationError(null); }}
+            title={`Add category to ${division || "division"}`}
+            description="Create a category for the selected division. This does not create a product or price."
+            nameLabel="Category name"
+            nameId="input-new-category"
+            nameTestId="input-new-category"
+            name={newCategoryName}
+            onNameChange={setNewCategoryName}
+            reasonId="textarea-category-reason"
+            reasonTestId="textarea-category-reason"
+            reason={newCategoryReason}
+            onReasonChange={setNewCategoryReason}
+            reasonPlaceholder="Why is this category needed?"
+            error={classificationError}
+            submitTestId="button-confirm-add-category"
+            submitLabel="Add category"
+            submittingLabel="Adding…"
+            submitting={addCategory.isPending}
+            canSubmit={!!newCategoryName.trim() && !!newCategoryReason.trim()}
+            onSubmit={submitCategory}
+          />
+          <ClassificationDialog
+            open={showAddSeries}
+            onOpenChange={open => { setShowAddSeries(open); if (!open) setClassificationError(null); }}
+            title={`Add series to ${division || "division"}`}
+            description="Create a series for the selected division. This does not create a product or price."
+            nameLabel="Series name"
+            nameId="input-new-series"
+            nameTestId="input-new-series"
+            name={newSeriesName}
+            onNameChange={setNewSeriesName}
+            reasonId="textarea-series-reason"
+            reasonTestId="textarea-series-reason"
+            reason={newSeriesReason}
+            onReasonChange={setNewSeriesReason}
+            reasonPlaceholder="Why is this series needed?"
+            error={classificationError}
+            submitTestId="button-confirm-add-series"
+            submitLabel="Add series"
+            submittingLabel="Adding…"
+            submitting={addSeries.isPending}
+            canSubmit={!!division && !!newSeriesName.trim() && !!newSeriesReason.trim()}
+            onSubmit={submitSeries}
+          />
         </>
       )}
     </div>

@@ -189,6 +189,8 @@ import type {
   PriceEditorProductResponse,
   PriceEditorSaveRequest,
   PriceEditorSaveResponse,
+  PriceEditorSeriesInput,
+  PriceEditorSeriesResponse,
   PriceEditorUndoResponse,
   PriceFinderBrowseResponse,
   PriceFinderComparisonResponse,
@@ -7315,6 +7317,77 @@ export const useAddPriceEditorCategory = <TError = ErrorType<void | VocabularyDu
         TContext
       > => {
       return useMutation(getAddPriceEditorCategoryMutationOptions(options));
+    }
+
+export const getAddPriceEditorSeriesUrl = () => {
+
+
+
+
+  return `/api/catalog/price-editor/series`
+}
+
+/**
+ * @summary Add an audited local series option to an existing division without moving products
+ */
+export const addPriceEditorSeries = async (priceEditorSeriesInput: PriceEditorSeriesInput, options?: RequestInit): Promise<PriceEditorSeriesResponse> => {
+
+  return customFetch<PriceEditorSeriesResponse>(getAddPriceEditorSeriesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      priceEditorSeriesInput,)
+  }
+);}
+
+
+
+
+export const getAddPriceEditorSeriesMutationOptions = <TError = ErrorType<void | VocabularyDuplicateResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPriceEditorSeries>>, TError,{data: BodyType<PriceEditorSeriesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addPriceEditorSeries>>, TError,{data: BodyType<PriceEditorSeriesInput>}, TContext> => {
+
+const mutationKey = ['addPriceEditorSeries'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addPriceEditorSeries>>, {data: BodyType<PriceEditorSeriesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addPriceEditorSeries(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddPriceEditorSeriesMutationResult = NonNullable<Awaited<ReturnType<typeof addPriceEditorSeries>>>
+    export type AddPriceEditorSeriesMutationBody = BodyType<PriceEditorSeriesInput>
+    export type AddPriceEditorSeriesMutationError = ErrorType<void | VocabularyDuplicateResponse>
+
+    /**
+ * @summary Add an audited local series option to an existing division without moving products
+ */
+export const useAddPriceEditorSeries = <TError = ErrorType<void | VocabularyDuplicateResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPriceEditorSeries>>, TError,{data: BodyType<PriceEditorSeriesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addPriceEditorSeries>>,
+        TError,
+        {data: BodyType<PriceEditorSeriesInput>},
+        TContext
+      > => {
+      return useMutation(getAddPriceEditorSeriesMutationOptions(options));
     }
 
 export const getGetPriceEditorNewProductOptionsUrl = () => {
