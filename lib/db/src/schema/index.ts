@@ -22,3 +22,4 @@ export * from "./apiKeys";
 export * from "./auth";
 export * from "./activity";
 export * from "./apolloReservations";
+export * from "./priceEditorVocabulary";

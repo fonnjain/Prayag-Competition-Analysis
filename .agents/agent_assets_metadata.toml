@@ -445,3 +445,17 @@ mtime_ms = 1790264037385
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d1942329-6381-4a98-8c56-a7fb5f522cf3/bd7edbe2-f893-4c8e-96d8-0dc5376762c8"
 storage_version_token = "1790264061961575"
 content_type = "text/html"
+
+[[outputs]]
+id = "QvNTwIzv_F6pyD0PQKyPa"
+uri = "file://reports/p048-development-vocabulary-audit.csv"
+type = "table"
+title = "P048 development vocabulary audit"
+description = "Every current division and division/category pair with product counts; read-only snapshot from 25 September 2026."
+logical_id = "0f576717-0d11-4441-b818-153a53fbc878"
+content_hash = "sha256:f5f0b6cae933e411436896665cbd5cd316c8e2ce7caabdb6cf87b340a5019175"
+size = 17880
+mtime_ms = 1790320708287
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/0f576717-0d11-4441-b818-153a53fbc878/937e9966-77d8-4b08-bcfb-60a6e6b67e92"
+storage_version_token = "1790320710036407"
+content_type = "text/csv"

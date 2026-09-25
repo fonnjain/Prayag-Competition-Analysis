@@ -2270,6 +2270,36 @@ paths:
         - { name: itemCode, in: query, required: true, schema: { type: string } }
       responses:
         "200": { description: Recent edits, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorEditsResponse" } } } }
+  /catalog/price-editor/divisions:
+    post:
+      operationId: addPriceEditorDivision
+      tags: [catalog]
+      summary: Add an audited local division option without creating or moving products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PriceEditorDivisionInput" }
+      responses:
+        "201": { description: Division option added, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorDivisionResponse" } } } }
+        "400": { description: Name or reason is required }
+        "403": { description: Administrator access required }
+        "409": { description: Normalized division already exists, content: { application/json: { schema: { $ref: "#/components/schemas/VocabularyDuplicateResponse" } } } }
+  /catalog/price-editor/categories:
+    post:
+      operationId: addPriceEditorCategory
+      tags: [catalog]
+      summary: Add an audited local category option to an existing division
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PriceEditorCategoryInput" }
+      responses:
+        "201": { description: Category option added, content: { application/json: { schema: { $ref: "#/components/schemas/PriceEditorCategoryResponse" } } } }
+        "400": { description: Missing or invalid input }
+        "403": { description: Administrator access required }
+        "409": { description: Normalized category already exists, content: { application/json: { schema: { $ref: "#/components/schemas/VocabularyDuplicateResponse" } } } }
   /catalog/price-editor/new-product/options:
     get:
       operationId: getPriceEditorNewProductOptions
@@ -4297,11 +4327,12 @@ components:
         unusualCodeConfirmed: { type: boolean }
     NewProductOptionsResponse:
       type: object
-      required: [divisions, categories, series, byDivision]
+      required: [divisions, categories, series, byDivision, locallyAddedDivisions, salesKnownDivisions]
       properties:
         divisions: { type: array, items: { type: string } }
         categories: { type: array, items: { type: string } }
         series: { type: array, items: { type: string } }
+        salesKnownDivisions: { type: array, items: { type: string } }
         byDivision:
           type: array
           items:
@@ -4311,6 +4342,58 @@ components:
               division: { type: string }
               categories: { type: array, items: { type: string } }
               series: { type: array, items: { type: string } }
+        locallyAddedDivisions:
+          type: array
+          items: { $ref: "#/components/schemas/LocallyAddedDivisionOption" }
+    LocallyAddedDivisionOption:
+      type: object
+      required: [name, actor, createdAt, reason, salesMapped]
+      properties:
+        name: { type: string }
+        actor: { type: string }
+        createdAt: { type: string, format: date-time }
+        reason: { type: string }
+        salesMapped: { type: boolean }
+    PriceEditorDivisionInput:
+      type: object
+      required: [name, reason]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        reason: { type: string, minLength: 1 }
+    PriceEditorDivisionResponse:
+      type: object
+      required: [name, actor, createdAt, reason, salesMapped, warning]
+      properties:
+        name: { type: string }
+        actor: { type: string }
+        createdAt: { type: string, format: date-time }
+        reason: { type: string }
+        salesMapped: { type: boolean }
+        warning: { type: [string, "null"] }
+    PriceEditorCategoryInput:
+      type: object
+      required: [division, name, reason]
+      additionalProperties: false
+      properties:
+        division: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        reason: { type: string, minLength: 1 }
+    PriceEditorCategoryResponse:
+      type: object
+      required: [division, name, actor, createdAt, reason]
+      properties:
+        division: { type: string }
+        name: { type: string }
+        actor: { type: string }
+        createdAt: { type: string, format: date-time }
+        reason: { type: string }
+    VocabularyDuplicateResponse:
+      type: object
+      required: [code, existingValue]
+      properties:
+        code: { type: string, const: VOCABULARY_DUPLICATE }
+        existingValue: { type: string }
     NewProductCodeCheckResponse:
       type: object
       required: [normalizedCode, duplicate, unusualShape, closest]
@@ -4397,6 +4480,9 @@ components:
         file:
           type: string
           format: binary
+        competitor:
+          type: string
+          description: Existing or new competitor brand whose trusted parser, if any, should inspect the workbook.
     CompetitorWorkbookPeriod:
       type: object
       required: [key, label, sourceEffectiveDate]
@@ -4413,6 +4499,8 @@ components:
       required: [isSparshMaster, periods]
       properties:
         isSparshMaster:
+          type: boolean
+        requiresCompetitor:
           type: boolean
         periods:
           type: array
@@ -4431,7 +4519,7 @@ components:
         effectiveDate:
           type: string
           format: date
-          description: Required for ordinary uploads; omitted for a verified multi-period master.
+          description: Required for ordinary uploads; when the source contains a date it must match exactly. Existing undated single-brand files continue to use this operator-supplied date. Omitted for a verified multi-period master.
         periodDates:
           type: string
           description: JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods.

@@ -53,6 +53,10 @@ import {
 } from "../lib/princeMaster";
 import { parseApolloMaster, type ApolloMasterParse } from "../lib/apolloMaster";
 import { apolloPipeIdentityV2 } from "../lib/apolloPipeIdentity";
+import {
+  detectGroupedCompetitorBrands,
+  validateGenericWorkbookDate,
+} from "../lib/competitorWorkbookSafety";
 
 // Price-gap guardrail for auto-matched competitor imports. A correct match
 // between equivalent products has a realistic gap; a gap far outside this band
@@ -3082,6 +3086,20 @@ router.post(
       res.json({ isSparshMaster: false, isAshirvadMaster: false, isPrinceMaster: false });
       return;
     }
+    const selectedCompetitor = typeof req.body.competitor === "string" ? req.body.competitor.trim() : "";
+    const selectedBrand = selectedCompetitor.toLocaleLowerCase("en");
+    if (!selectedBrand) {
+      // Do not inspect a recognized competitor's positional/date contract
+      // until the operator has named the brand whose columns are intended.
+      res.json({
+        isSparshMaster: false,
+        isAshirvadMaster: false,
+        isPrinceMaster: false,
+        periods: [],
+        requiresCompetitor: true,
+      });
+      return;
+    }
 
     try {
       const existingProducts = await db
@@ -3094,23 +3112,24 @@ router.post(
         existingProducts.map((product) => [normalizePrinceCode(product.itemCode), product.itemCode]),
       );
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
-       const ashirvadMaster = parseAshirvadCompetitorMaster(
-         file.buffer,
-         workbook,
-         canonical,
-       );
-      const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
+      const ashirvadMaster = selectedBrand === ASHIRVAD_MASTER_COMPETITOR.toLocaleLowerCase("en")
+        ? parseAshirvadCompetitorMaster(file.buffer, workbook, canonical)
+        : null;
+      const sparshMaster = selectedBrand === SPARSH_MASTER_COMPETITOR.toLocaleLowerCase("en")
+        ? parseSparshCompetitorMaster(workbook, canonical)
+        : null;
       const princeMaster = (() => {
-         if (!isPrinceCompetitorMasterWorkbook(workbook)) return null;
-         try {
-            return parsePrinceCompetitorMaster(file.buffer, workbook, princeCanonical);
-         } catch (error) {
-           // A workbook that is not the locked Prince snapshot is an ordinary
-           // workbook; preserve the generic preview behaviour.
-           if (error instanceof Error && /checksum/i.test(error.message)) return null;
-           throw error;
-         }
-       })();
+        if (selectedBrand !== PRINCE_COMPETITOR.toLocaleLowerCase("en")) return null;
+        if (!isPrinceCompetitorMasterWorkbook(workbook)) return null;
+        try {
+          return parsePrinceCompetitorMaster(file.buffer, workbook, princeCanonical);
+        } catch (error) {
+          // A workbook that is not the locked Prince snapshot is an ordinary
+          // workbook; preserve the generic preview behaviour.
+          if (error instanceof Error && /checksum/i.test(error.message)) return null;
+          throw error;
+        }
+      })();
 
       const liveCheckCodes = ["C133", "PMR-8", "PMR-9"];
       const liveProducts = existingProducts.filter((row) => liveCheckCodes.includes(row.itemCode));
@@ -3131,9 +3150,9 @@ router.post(
       }));
       res.json({
         isSparshMaster: Boolean(sparshMaster),
-         isAshirvadMaster: Boolean(ashirvadMaster),
-         isPrinceMaster: Boolean(princeMaster),
-         prince: princeMaster ? {
+        isAshirvadMaster: Boolean(ashirvadMaster),
+        isPrinceMaster: Boolean(princeMaster),
+        prince: princeMaster ? {
            rows: princeMaster.rows.length + princeMaster.rejectedRows.filter((row) => row.princeCode && row.price != null).length,
            loadableRows: princeMaster.rows.length,
            catalogMatched: princeMaster.catalogMatchedRows.length,
@@ -3150,7 +3169,7 @@ router.post(
            worksheetNames: princeMaster.worksheetNames,
            effectiveDates: princeMaster.effectiveDates,
            liveCatalogueChecks,
-         } : null,
+        } : null,
         periods: sparshMaster?.periods.map((period) => ({
           key: period.key,
           label: period.label,
@@ -3182,15 +3201,29 @@ router.post(
       res.status(400).json({ error: "Upload an .xlsx, .xls, or .csv file" }); return;
     }
 
+    const selectedBrand = competitor.toLocaleLowerCase("en");
+    if (selectedBrand === "apollo") {
+      res.status(409).json({
+        error: "Apollo workbooks must be previewed through the brand-specific Apollo loader.",
+        code: "APOLLO_BRAND_PREVIEW_REQUIRED",
+      });
+      return;
+    }
+
     try {
       const products = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
       const knownCodes = new Set(products.map((p) => normCode(p.itemCode)));
       const canonical = new Map(products.map((p) => [normCode(p.itemCode), p.itemCode]));
       const princeCanonical = new Map(products.map((p) => [normalizePrinceCode(p.itemCode), p.itemCode]));
       const workbook = XLSX.read(file.buffer, { type: "buffer" });
-      const ashirvadMaster = parseAshirvadCompetitorMaster(file.buffer, workbook, canonical);
-      const sparshMaster = parseSparshCompetitorMaster(workbook, canonical);
+      const ashirvadMaster = selectedBrand === ASHIRVAD_MASTER_COMPETITOR.toLocaleLowerCase("en")
+        ? parseAshirvadCompetitorMaster(file.buffer, workbook, canonical)
+        : null;
+      const sparshMaster = selectedBrand === SPARSH_MASTER_COMPETITOR.toLocaleLowerCase("en")
+        ? parseSparshCompetitorMaster(workbook, canonical)
+        : null;
       const princeMaster = (() => {
+        if (selectedBrand !== PRINCE_COMPETITOR.toLocaleLowerCase("en")) return null;
         if (!isPrinceCompetitorMasterWorkbook(workbook)) return null;
         try {
           return parsePrinceCompetitorMaster(file.buffer, workbook, princeCanonical);
@@ -3205,6 +3238,17 @@ router.post(
           code: "TRUSTED_PRINCE_MASTER_REQUIRED",
         });
         return;
+      }
+      if (!princeMaster && !ashirvadMaster && !sparshMaster) {
+        const groupedBrands = detectGroupedCompetitorBrands(workbook);
+        if (groupedBrands.length > 0) {
+          res.status(409).json({
+            error: `This workbook contains brand-specific columns (${groupedBrands.join(", ")}) and cannot be staged with generic numeric-column detection. Select a supported brand-specific loader.`,
+            code: "GROUPED_COMPETITOR_BRAND_SCOPE_REQUIRED",
+            brands: groupedBrands,
+          });
+          return;
+        }
       }
       const sourceHash = sha256ForBuffer(file.buffer);
       const priceBasis = req.body.priceBasis === "Ex-GST" ? "Ex-GST" : "MRP";
@@ -3558,6 +3602,16 @@ router.post(
         const candidate = parseCompetitorSheet(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null }), knownCodes);
         if (candidate.length > parsed.length) parsed = candidate;
       }
+      let sourceEffectiveDate: string | null;
+      try {
+        sourceEffectiveDate = validateGenericWorkbookDate(
+          parsed.map((row) => row.effectiveDate),
+          effectiveDate,
+        );
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : "Workbook date does not match the selected competitor period." });
+        return;
+      }
       let matched = 0; let needsReview = 0;
       const rows = parsed.map((row) => {
         const norm = row.matchedPrayagCode;
@@ -3572,8 +3626,11 @@ router.post(
           variant: row.size, price: row.price, competitorCode: null, status: matchedCode ? "ok" as const : "needs_review" as const,
           prayagMrp: matchedCode ? prayagMrp : null };
       });
-      const batchId = await createBatch(competitor, effectiveDate, rows, {
+      const resolvedEffectiveDate = sourceEffectiveDate ?? effectiveDate;
+      const batchId = await createBatch(competitor, resolvedEffectiveDate, rows, {
         ok: matched, needs_review: needsReview, not_found: 0, new_products: 0, total: rows.length,
+        source_effective_date: sourceEffectiveDate,
+        operator_effective_date: effectiveDate,
       });
       res.status(201).json({ batchId, batchIds: [batchId], status: "pending" });
     } catch (error) {

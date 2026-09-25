@@ -1,0 +1,142 @@
+# P048 — COMPETITION — Add a division or category from the product editor
+
+> **P048** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** It adds two vocabulary controls.
+> Quote `P048` when reporting back.
+
+In the Single Product Editor's **Create New Product**, Division and Category are populated from existing values with no way to add a new one. Add that — carefully, because both are controlled vocabularies and **one of them crosses into another application**.
+
+---
+
+# PART 0 — First, read-only: what exists today
+
+**0.1** List every **division** currently in use, with its product count.
+
+**0.2** List every **category**, with its division and product count.
+
+**0.3** Report any **near-duplicates already present** — values differing only by case, spacing, punctuation, or singular/plural. If Uncategorized still holds anything, say what.
+
+**0.4** **Where are these values stored** — a reference table, or distinct values read off the product rows? That decides what "add" even means.
+
+**Report this before building.**
+
+---
+
+# PART 1 — The Sales consequence, which the button must state
+
+The Sales application maps Competition's divisions through a **fixed table** in `syncedCache.ts`:
+
+```
+"Pipes & Fittings"         -> "Pipe & Fitting"
+"PTMT & Plastic Fittings"  -> "PTMT"
+"CP Fittings / Faucets"    -> "CP"
+"Hardware"                 -> "Hardware"
+"Ceramic Sanitaryware"     -> "Sanitaryware"
+"CP (QUAA / FERN)"         -> "QUAA & FERN"
+"QUAA & FERN"              -> "QUAA & FERN"
+```
+
+Anything not on that list resolves to `null`. Both the `mrp_master` and `mrp_history` inserts on that side carry `WHERE d.app_segment IS NOT NULL`.
+
+**So a product in a brand-new division syncs into `mrp_synced` and then silently fails to reach the tables Sales actually reads.** No error, no warning — the product simply has no MRP on that side.
+
+**1.1** When an admin adds a division, the confirmation says so plainly. Something to the effect of:
+
+> *This division is not known to the Sales application. Products in it will not appear in Sales reporting until it is mapped there.*
+
+**1.2** Record every locally-added division in a list the app can show, so the gap stays visible afterwards and not only at the moment of creation.
+
+**1.3** Adding a **category** should not have this problem — Sales maps divisions, not categories. **Confirm that from the data rather than assuming it.**
+
+---
+
+# PART 2 — Add Division
+
+**2.1** **Admin only.** Non-admin does not see the button; the endpoint returns 403.
+
+**2.2** **Normalise before comparing** — trim, collapse internal whitespace, case-fold, strip punctuation. If the normalised value matches an existing division, **refuse and offer the existing one**. Do not create a near-duplicate, and do not silently reuse.
+
+**2.3** The **stored** value keeps the admin's capitalisation and spacing. Only the comparison is normalised.
+
+**2.4** A **typed reason** is required. Not a dropdown — words.
+
+**2.5** Record it: actor, timestamp, reason, the value created.
+
+**2.6** The new division is selectable immediately, without a reload.
+
+---
+
+# PART 3 — Add Category
+
+Same rules as Part 2, plus:
+
+**3.1** A category belongs to a division. Creating one requires a division already chosen, and the uniqueness check is **within that division** — two divisions may legitimately hold a category of the same name.
+
+**3.2** **Report whether the existing schema actually ties category to division, or whether categories are global.** If they are global, say so — that changes 3.1, and it is better known now than after the button ships.
+
+---
+
+# PART 4 — What must not happen
+
+1. **No product is created, changed or deleted** by adding a vocabulary value.
+2. A new division or category is **empty on creation**. It does not adopt, reclassify or move any existing product.
+3. **Nothing is deleted.** Removing a division or category is not in this prompt — a vocabulary value with products behind it is a data change, not a tidy-up, and belongs with P042.
+4. No competitor row is touched.
+5. The value is **not** pushed to the Sales application. That is a separate, deliberate change on that side.
+
+---
+
+# Rules
+
+1. Development first, then publish, then confirm the behaviour **in production**. That last step has been missed four times on this project.
+2. Admin only, both controls, both endpoints.
+3. No Prayag price changes. `mrp_price_history` stays at **14,252** with its checksum.
+4. Every created value carries actor, timestamp and a typed reason.
+5. **No Sales application change.**
+
+# Tests
+
+```
+ 1. Non-admin does not see either button and receives 403 from both endpoints
+ 2. Adding a division that normalises to an existing one is refused, and the
+    existing one is offered
+ 3. "CPVC Pipe", "cpvc pipe" and "CPVC  Pipe" all collide with each other
+ 4. The stored value keeps the admin's own capitalisation
+ 5. Creation with no typed reason is refused
+ 6. A new division is empty; no existing product moves into it
+ 7. The Sales warning appears on division creation and not on category creation
+ 8. A locally-added division appears in the list of divisions unknown to Sales
+ 9. The new value is selectable without a page reload
+10. mrp_price_history count and checksum unchanged
+11. No product created, changed or deleted by either action
+```
+
+**Test 3 is the one that stops Uncategorized happening again.**
+**Test 7 is the one that stops products vanishing from Sales without anyone noticing.**
+
+# Report
+
+1. Parts 0.1 to 0.4 — the current vocabulary, the near-duplicates, and where the values live.
+2. Whether category is tied to division in the schema, or global.
+3. The normalisation rule, quoted.
+4. The Sales warning text as a user sees it.
+5. The list of divisions unknown to Sales.
+6. Confirmation that adding a value moves no product.
+7. `mrp_price_history` count and checksum, before and after.
+8. Production confirmation after publish, with clock times.
+
+State the environment and the clock time against every figure.
+
+---
+
+## One decision to take before this ships
+
+If a new division means products go missing from Sales reporting, it may be better for the button to **create the division and raise a flag** than to let someone add one quietly on a Friday afternoon.
+
+Part 1.2 gives you the list. Whether that is enough, or whether creation should **block** until Sales is updated, is a business call rather than a technical one. Report which behaviour you built, and make it easy to change.
+
+## Why the normalisation rule matters here
+
+Uncategorized took three prompts to clear — P029, P035, P036 — and the fix had to be applied twice because the first pass reached development only.
+
+A free-text box on a controlled vocabulary is how you get `CPVC`, `CPVC Pipe` and `cpvc pipes` as three divisions, each with a share of the products. **The refusal in 2.2 is the whole value of this prompt.** The buttons are the easy part.

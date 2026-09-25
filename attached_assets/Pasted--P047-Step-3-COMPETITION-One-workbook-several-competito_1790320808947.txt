@@ -1,0 +1,100 @@
+# P047 — Step 3 — COMPETITION — One workbook, several competitors, several dates
+
+> **P047 Step 3** · app: **COMPETITION** (`prayag-price.com`)
+> **State which environment every figure comes from, first.**
+> **If this is production, stop and say so — P046's Apply is blocked and P047 is awaiting Publish.**
+> Quote `P047 Step 3` when reporting back.
+
+An Apollo upload was refused with:
+
+```
+HTTP 400  Prince sheet CPVC PIPE must use effective date 2026-03-01
+          at audited position 6; found 2026-08-01
+```
+
+**The refusal is correct and it stays.**
+
+A single supplied date — 1 August 2026, which is **Apollo's** — was about to be stamped across a competitor column carrying **2026-03-01**, which is **Prince's**. That is the P028 failure exactly: *"One global date silently backdates 137 prices."* This time it was caught.
+
+Two things are wrong here, and **neither of them is the date**.
+
+---
+
+# 1. Why is an Apollo upload reading Prince's columns?
+
+The competitor master is one workbook holding several competitors side by side — Prayag, Prince, Ashirvad, Sparsh Pearl, and now Apollo. The error names **Prince**, so the load is not scoped to Apollo.
+
+**1.1** Report what the loader does with the **Competitor Brand Name** field. Does it scope the read to that competitor's columns, or does it parse every competitor column it recognises regardless of what was entered?
+
+**1.2** Apollo does not appear in the existing brand list — the screen offers only Ashirvad, Prince and Sparsh Pearl. Report what happens when a name is entered that is **not** in that list: created, rejected, or silently resolved to something else. **The error naming Prince suggests the last, and that is the defect.**
+
+**1.3** **A load named for one competitor must read only that competitor's columns.** Confirm that is the behaviour, or make it so.
+
+---
+
+# 2. The effective date belongs to the column, not to the upload
+
+Each competitor's price column carries its own date:
+
+```
+Apollo    2026-08-01
+Prince    2026-03-01
+Prayag    10 Aug 2026
+```
+
+The audited positions already encode this. The upload screen asks for one date and applies it across all of them.
+
+**2.1** Report where each competitor's effective date is recorded — a header cell, the audited position table, or both.
+
+**2.2** **The date should be read from the file, per competitor, not supplied once by the user.** If the field stays, it applies **only** to the named competitor, and it must match what the file says for that competitor — or the upload is refused **with both values shown**.
+
+**2.3** **Never apply one supplied date across columns belonging to different competitors.** That is what this refusal prevented, and it must remain impossible.
+
+---
+
+# 3. Adding Apollo as a new competitor
+
+**3.1** Report how a new competitor brand is created today, and whether the upload screen can do it.
+
+**3.2** If it cannot, report what is needed.
+
+**Do not work around it by uploading under an existing brand.** That is precisely how Apollo's 691 rows would end up filed as Prince's, and unpicking that is far harder than this error is to fix.
+
+---
+
+# 4. Do not weaken the guard
+
+The positional audit and the effective-date check **stay**. No relaxing, no disabling, no bypass flag, no "force" option.
+
+**If a legitimate Apollo load cannot pass them, the loader is wrong, not the guard.**
+
+**4.1** Report exactly what would have to change for an Apollo-scoped load to pass **both checks unchanged**.
+
+---
+
+# Rules
+
+1. **No competitor data is loaded in this prompt.**
+2. The positional audit and effective-date checks are not relaxed, disabled or bypassed.
+3. No Prayag product or price changes.
+4. No existing Prince, Ashirvad or Sparsh Pearl row changes.
+5. **If this is production, nothing is written — report and stop.**
+
+# Report
+
+1. **The environment, stated first.**
+2. What the brand-name field scopes, and what happens with a name not in the list.
+3. Where each competitor's effective date lives in the file.
+4. Whether a load can be scoped to one competitor's columns today.
+5. How a new competitor brand is created.
+6. What would let an Apollo-scoped load pass both checks unchanged.
+
+State the clock time against every figure.
+
+---
+
+## The short version
+
+**Do not retype the date to make it pass.** If it goes through at 2026-03-01, Apollo's prices land against Prince's audited positions, and that is harder to unpick than this error is to fix.
+
+The guard did its job. The loader needs to learn that one workbook can carry several competitors, each with its own date.

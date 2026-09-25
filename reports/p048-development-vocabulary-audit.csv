@@ -1,0 +1,402 @@
+scope,division,category,product_count
+division,CP (QUAA / FERN),,161
+category,CP (QUAA / FERN),Accessories,31
+category,CP (QUAA / FERN),Ace,13
+category,CP (QUAA / FERN),Cistern,2
+category,CP (QUAA / FERN),Dale,11
+category,CP (QUAA / FERN),Duet,11
+category,CP (QUAA / FERN),Hugo,11
+category,CP (QUAA / FERN),Phoenix,12
+category,CP (QUAA / FERN),Phoenix (Gold),11
+category,CP (QUAA / FERN),Phoenix (Prime),11
+category,CP (QUAA / FERN),Phoenix (Royal),11
+category,CP (QUAA / FERN),Phoenix (Wine),11
+category,CP (QUAA / FERN),Ryan,13
+category,CP (QUAA / FERN),Seat Cover,2
+category,CP (QUAA / FERN),Stella,11
+division,CP Fittings / Faucets,,1374
+category,CP Fittings / Faucets,,161
+category,CP Fittings / Faucets,AQUA 54,4
+category,CP Fittings / Faucets,ASPIRE 52,8
+category,CP Fittings / Faucets,Accessories,266
+category,CP Fittings / Faucets,Allied,26
+category,CP Fittings / Faucets,Allied (Concealed),3
+category,CP Fittings / Faucets,Aqua 54,37
+category,CP Fittings / Faucets,Aspire 52,48
+category,CP Fittings / Faucets,BLAZE 62,4
+category,CP Fittings / Faucets,Blaze 62,36
+category,CP Fittings / Faucets,CYGNUS 71,2
+category,CP Fittings / Faucets,Cygnus 71,34
+category,CP Fittings / Faucets,EMERALD 61,2
+category,CP Fittings / Faucets,EUROPA 90,2
+category,CP Fittings / Faucets,EVIAN 87,4
+category,CP Fittings / Faucets,Europa 90,36
+category,CP Fittings / Faucets,Evian 87,40
+category,CP Fittings / Faucets,Faucet Collection,95
+category,CP Fittings / Faucets,Frost 77,21
+category,CP Fittings / Faucets,Gracia 74,20
+category,CP Fittings / Faucets,LAGUNA 93,4
+category,CP Fittings / Faucets,Laguna 93,40
+category,CP Fittings / Faucets,MACASA 76,4
+category,CP Fittings / Faucets,MARCUS 68,4
+category,CP Fittings / Faucets,Macasa 76,41
+category,CP Fittings / Faucets,Marcus 68,42
+category,CP Fittings / Faucets,NIAGARA 81,2
+category,CP Fittings / Faucets,Niagara 81,35
+category,CP Fittings / Faucets,OCEAN 55,4
+category,CP Fittings / Faucets,OPUS 89,2
+category,CP Fittings / Faucets,ORBIT 53,4
+category,CP Fittings / Faucets,Ocean 55,37
+category,CP Fittings / Faucets,Orbit 53,37
+category,CP Fittings / Faucets,POLO 60,4
+category,CP Fittings / Faucets,Polo 60,36
+category,CP Fittings / Faucets,SAGA 79F,11
+category,CP Fittings / Faucets,Saga 79F,34
+category,CP Fittings / Faucets,Tranquil 73,20
+category,CP Fittings / Faucets,URBONA 78,2
+category,CP Fittings / Faucets,Urbona 78,39
+category,CP Fittings / Faucets,VINCENT 66,2
+category,CP Fittings / Faucets,VIRGO P66,2
+category,CP Fittings / Faucets,Vincent 66,40
+category,CP Fittings / Faucets,Virgo P66,37
+category,CP Fittings / Faucets,Viva 72,20
+category,CP Fittings / Faucets,Waves 83,22
+division,CP Fittings / Faucets | Ceramic Sanitaryware,,2
+category,CP Fittings / Faucets | Ceramic Sanitaryware,Accessories,2
+division,CP Fittings / Faucets | PTMT & Plastic Fittings,,2
+category,CP Fittings / Faucets | PTMT & Plastic Fittings,Allied,2
+division,CP Fittings / Faucets | PTMT & Plastic Fittings | Pipes & Fittings,,3
+category,CP Fittings / Faucets | PTMT & Plastic Fittings | Pipes & Fittings,CPVC Fittings,3
+division,Ceramic Sanitaryware,,217
+category,Ceramic Sanitaryware,3D Flush Tanks,1
+category,Ceramic Sanitaryware,Apex,1
+category,Ceramic Sanitaryware,Aqua Pan,1
+category,Ceramic Sanitaryware,Aquifer,2
+category,Ceramic Sanitaryware,Artisian,1
+category,Ceramic Sanitaryware,Astra Anglo Indian,2
+category,Ceramic Sanitaryware,Astro,2
+category,Ceramic Sanitaryware,Athos,3
+category,Ceramic Sanitaryware,Aviva,1
+category,Ceramic Sanitaryware,Aviva (Matt Black),1
+category,Ceramic Sanitaryware,Aviva (Matt Green),1
+category,Ceramic Sanitaryware,Aviva (Matt Grey),1
+category,Ceramic Sanitaryware,Aviva (Matt Khaki),1
+category,Ceramic Sanitaryware,Bela,1
+category,Ceramic Sanitaryware,Blaze,3
+category,Ceramic Sanitaryware,Bliss,1
+category,Ceramic Sanitaryware,Bloom,1
+category,Ceramic Sanitaryware,Breeze,1
+category,Ceramic Sanitaryware,Caliber,1
+category,Ceramic Sanitaryware,Cardiff,1
+category,Ceramic Sanitaryware,Cardiff (Matt Black),1
+category,Ceramic Sanitaryware,Cardiff (Matt Green),1
+category,Ceramic Sanitaryware,Cardiff (Matt Grey),1
+category,Ceramic Sanitaryware,Cardiff (Matt Khaki),1
+category,Ceramic Sanitaryware,Casa,1
+category,Ceramic Sanitaryware,Caspian,1
+category,Ceramic Sanitaryware,Cello,1
+category,Ceramic Sanitaryware,Cistern,6
+category,Ceramic Sanitaryware,"City Pan 20""",1
+category,Ceramic Sanitaryware,"City Pan 23""",1
+category,Ceramic Sanitaryware,Classic,1
+category,Ceramic Sanitaryware,Concealed Cistern,2
+category,Ceramic Sanitaryware,Coral,2
+category,Ceramic Sanitaryware,Cornet,1
+category,Ceramic Sanitaryware,Coy,1
+category,Ceramic Sanitaryware,Cresta,1
+category,Ceramic Sanitaryware,Crios,1
+category,Ceramic Sanitaryware,Croma,1
+category,Ceramic Sanitaryware,Crystal,2
+category,Ceramic Sanitaryware,Daisy,1
+category,Ceramic Sanitaryware,Delta,2
+category,Ceramic Sanitaryware,Dew,1
+category,Ceramic Sanitaryware,Diamond,1
+category,Ceramic Sanitaryware,Domica,1
+category,Ceramic Sanitaryware,Drenche,1
+category,Ceramic Sanitaryware,Dune,2
+category,Ceramic Sanitaryware,Eco,1
+category,Ceramic Sanitaryware,"Eco Orissa Pan 20""",1
+category,Ceramic Sanitaryware,"Eco Orissa Pan 23""",1
+category,Ceramic Sanitaryware,Elena,1
+category,Ceramic Sanitaryware,Era,1
+category,Ceramic Sanitaryware,Eva,1
+category,Ceramic Sanitaryware,Eve,3
+category,Ceramic Sanitaryware,Evian,1
+category,Ceramic Sanitaryware,Flora,1
+category,Ceramic Sanitaryware,Florina,2
+category,Ceramic Sanitaryware,Fusion,1
+category,Ceramic Sanitaryware,Garnet,2
+category,Ceramic Sanitaryware,Geo (Matt Black),1
+category,Ceramic Sanitaryware,Geo (Matt Green),1
+category,Ceramic Sanitaryware,Geo (Matt Grey),1
+category,Ceramic Sanitaryware,Geo (Matt Khaki),1
+category,Ceramic Sanitaryware,Glaze,1
+category,Ceramic Sanitaryware,Gracia,2
+category,Ceramic Sanitaryware,Hazel,1
+category,Ceramic Sanitaryware,Helix,3
+category,Ceramic Sanitaryware,Iris (Isi),1
+category,Ceramic Sanitaryware,Kona,1
+category,Ceramic Sanitaryware,Lab Sink,2
+category,Ceramic Sanitaryware,Lagoon,1
+category,Ceramic Sanitaryware,Latina,1
+category,Ceramic Sanitaryware,Lavish (Glossy White),1
+category,Ceramic Sanitaryware,Lavish (Matt Black),1
+category,Ceramic Sanitaryware,Lavish (Matt Grey),1
+category,Ceramic Sanitaryware,Leo,1
+category,Ceramic Sanitaryware,Lexo,1
+category,Ceramic Sanitaryware,Lexus,1
+category,Ceramic Sanitaryware,Libra,1
+category,Ceramic Sanitaryware,Linea,2
+category,Ceramic Sanitaryware,Liva,1
+category,Ceramic Sanitaryware,Livone,1
+category,Ceramic Sanitaryware,Loto,1
+category,Ceramic Sanitaryware,Lotus,1
+category,Ceramic Sanitaryware,Lumina,1
+category,Ceramic Sanitaryware,Luxor,1
+category,Ceramic Sanitaryware,Macasa,1
+category,Ceramic Sanitaryware,Magic,1
+category,Ceramic Sanitaryware,Majestic,2
+category,Ceramic Sanitaryware,Marco,3
+category,Ceramic Sanitaryware,Marcus,4
+category,Ceramic Sanitaryware,Marvel,1
+category,Ceramic Sanitaryware,Matrix,2
+category,Ceramic Sanitaryware,Metro,1
+category,Ceramic Sanitaryware,Midas,1
+category,Ceramic Sanitaryware,Milano,2
+category,Ceramic Sanitaryware,Milt,1
+category,Ceramic Sanitaryware,Mist,1
+category,Ceramic Sanitaryware,Mist (ISI),1
+category,Ceramic Sanitaryware,Modena Bidet (Square),1
+category,Ceramic Sanitaryware,Mute Series - Soft Close,3
+category,Ceramic Sanitaryware,Neon,3
+category,Ceramic Sanitaryware,Nexa (Matt Black),1
+category,Ceramic Sanitaryware,Nexa (Matt Green),1
+category,Ceramic Sanitaryware,Nexa (Matt Grey),1
+category,Ceramic Sanitaryware,Nexa (Matt Khaki),1
+category,Ceramic Sanitaryware,Niall,1
+category,Ceramic Sanitaryware,Nova,2
+category,Ceramic Sanitaryware,Novel Bidet (Round),1
+category,Ceramic Sanitaryware,Novo,1
+category,Ceramic Sanitaryware,Oasis,1
+category,Ceramic Sanitaryware,Olivia,1
+category,Ceramic Sanitaryware,Omega,1
+category,Ceramic Sanitaryware,Omini,1
+category,Ceramic Sanitaryware,Opal (ISI),1
+category,Ceramic Sanitaryware,Orbit 53,1
+category,Ceramic Sanitaryware,"Orissa Pan 20""",1
+category,Ceramic Sanitaryware,"Orissa Pan 21""",1
+category,Ceramic Sanitaryware,"Orissa Pan 23""",1
+category,Ceramic Sanitaryware,"Orissa Pan 23"" (ISI)",1
+category,Ceramic Sanitaryware,Oval,1
+category,Ceramic Sanitaryware,P Trap,1
+category,Ceramic Sanitaryware,Pearl,1
+category,Ceramic Sanitaryware,Picasso,3
+category,Ceramic Sanitaryware,Pollar,1
+category,Ceramic Sanitaryware,Polo,1
+category,Ceramic Sanitaryware,Prime,3
+category,Ceramic Sanitaryware,Prime Plus (Glossy White),1
+category,Ceramic Sanitaryware,Prime Plus (Matt Black),1
+category,Ceramic Sanitaryware,Prime Plus (Matt Grey),1
+category,Ceramic Sanitaryware,Pristine,1
+category,Ceramic Sanitaryware,Queens,2
+category,Ceramic Sanitaryware,Real,1
+category,Ceramic Sanitaryware,Resa,1
+category,Ceramic Sanitaryware,Retro,1
+category,Ceramic Sanitaryware,"Rimless Orissa Pan 22""",1
+category,Ceramic Sanitaryware,Rio,2
+category,Ceramic Sanitaryware,Rob,1
+category,Ceramic Sanitaryware,Rocio,1
+category,Ceramic Sanitaryware,Rollex,1
+category,Ceramic Sanitaryware,Rollin,1
+category,Ceramic Sanitaryware,Rosa,1
+category,Ceramic Sanitaryware,Ruby,2
+category,Ceramic Sanitaryware,Sage,1
+category,Ceramic Sanitaryware,Salsa,2
+category,Ceramic Sanitaryware,Sierra,1
+category,Ceramic Sanitaryware,Sigma,1
+category,Ceramic Sanitaryware,Signet,1
+category,Ceramic Sanitaryware,Sleek,1
+category,Ceramic Sanitaryware,Sophia,1
+category,Ceramic Sanitaryware,Spa,3
+category,Ceramic Sanitaryware,Square,1
+category,Ceramic Sanitaryware,Squating Pan,1
+category,Ceramic Sanitaryware,Stella,1
+category,Ceramic Sanitaryware,Swirl,2
+category,Ceramic Sanitaryware,Ultra,1
+category,Ceramic Sanitaryware,Urbona,2
+category,Ceramic Sanitaryware,Vegas,1
+category,Ceramic Sanitaryware,Vigo,1
+category,Ceramic Sanitaryware,Vintage,1
+category,Ceramic Sanitaryware,Virgo,1
+category,Ceramic Sanitaryware,Vitro,1
+category,Ceramic Sanitaryware,Viva,1
+category,Ceramic Sanitaryware,Waves,2
+category,Ceramic Sanitaryware,Zeta,2
+division,Ceramic Sanitaryware | PTMT & Plastic Fittings,,50
+category,Ceramic Sanitaryware | PTMT & Plastic Fittings,Cistern,18
+category,Ceramic Sanitaryware | PTMT & Plastic Fittings,Cistern's & Seat Cover's Accessories,15
+category,Ceramic Sanitaryware | PTMT & Plastic Fittings,Concealed Cistern,3
+category,Ceramic Sanitaryware | PTMT & Plastic Fittings,Mute Series,4
+category,Ceramic Sanitaryware | PTMT & Plastic Fittings,Toilet Seat Covers,10
+division,Hardware,,288
+category,Hardware,HW Trading,3
+category,Hardware,NOS,36
+category,Hardware,SET,124
+category,Hardware,SS-202,88
+category,Hardware,SS-304,37
+division,PTMT,,32
+category,PTMT,,30
+category,PTMT,Test,2
+division,PTMT & Plastic Fittings,,2344
+category,PTMT & Plastic Fittings,,224
+category,PTMT & Plastic Fittings,1200 Series 304 Super Steel (1.00 Mm),41
+category,PTMT & Plastic Fittings,204 Super Steel (0.65 Mm),7
+category,PTMT & Plastic Fittings,204 Super Steel (0.85 Mm),13
+category,PTMT & Plastic Fittings,304 Super Steel (0.85 Mm),83
+category,PTMT & Plastic Fittings,600 Series 204 Super Steel (0.85),6
+category,PTMT & Plastic Fittings,800 Series 304 Super Steel (0.75 Mm),18
+category,PTMT & Plastic Fittings,800 Series 304 Super Steel (0.75),6
+category,PTMT & Plastic Fittings,900 Series 304 Super Steel (0.85 Mm),43
+category,PTMT & Plastic Fittings,Apex,17
+category,PTMT & Plastic Fittings,Astra,17
+category,PTMT & Plastic Fittings,Ball Cocks,25
+category,PTMT & Plastic Fittings,Bathroom Mirror & Cabinet,18
+category,PTMT & Plastic Fittings,Black Pearl,18
+category,PTMT & Plastic Fittings,Black Sapphire,29
+category,PTMT & Plastic Fittings,Brass Ball Cocks (ISI),16
+category,PTMT & Plastic Fittings,Cistern & Seat Cover,1
+category,PTMT & Plastic Fittings,Cobra,29
+category,PTMT & Plastic Fittings,Collapsible Waste Pipe,13
+category,PTMT & Plastic Fittings,Crystal,27
+category,PTMT & Plastic Fittings,Delta,22
+category,PTMT & Plastic Fittings,Delta (Black),18
+category,PTMT & Plastic Fittings,Delta (Gold),17
+category,PTMT & Plastic Fittings,Delta (Peach),17
+category,PTMT & Plastic Fittings,Delta (Royal),17
+category,PTMT & Plastic Fittings,Delta (Wine),17
+category,PTMT & Plastic Fittings,Diamond,29
+category,PTMT & Plastic Fittings,Ebon,17
+category,PTMT & Plastic Fittings,Erosa,28
+category,PTMT & Plastic Fittings,Erosa (Black),28
+category,PTMT & Plastic Fittings,Erosa (Blue),28
+category,PTMT & Plastic Fittings,Erosa (Gold),28
+category,PTMT & Plastic Fittings,Faucets & Jet Sprays,17
+category,PTMT & Plastic Fittings,Flora,18
+category,PTMT & Plastic Fittings,Flora (Gold),18
+category,PTMT & Plastic Fittings,Flora (Peach),18
+category,PTMT & Plastic Fittings,Flora (Royal),18
+category,PTMT & Plastic Fittings,Flora (Wine),18
+category,PTMT & Plastic Fittings,Flush Valves,2
+category,PTMT & Plastic Fittings,Garden Pipe,45
+category,PTMT & Plastic Fittings,Glory,3
+category,PTMT & Plastic Fittings,Grand,27
+category,PTMT & Plastic Fittings,Hardware Items,8
+category,PTMT & Plastic Fittings,Helix,31
+category,PTMT & Plastic Fittings,Helix (Gold),29
+category,PTMT & Plastic Fittings,Helix (Peach),29
+category,PTMT & Plastic Fittings,Helix (Royal),29
+category,PTMT & Plastic Fittings,Helix (Wine),29
+category,PTMT & Plastic Fittings,Ibix,21
+category,PTMT & Plastic Fittings,Ibix (Gold),18
+category,PTMT & Plastic Fittings,Ibix (Peach),18
+category,PTMT & Plastic Fittings,Ibix (Wine),18
+category,PTMT & Plastic Fittings,Ibix Royal),17
+category,PTMT & Plastic Fittings,Lagoona,19
+category,PTMT & Plastic Fittings,Lagoona (Gold),19
+category,PTMT & Plastic Fittings,Lagoona (Peach),19
+category,PTMT & Plastic Fittings,Lagoona (Royal),19
+category,PTMT & Plastic Fittings,Lagoona (Wine),19
+category,PTMT & Plastic Fittings,Luxor,3
+category,PTMT & Plastic Fittings,Novo,15
+category,PTMT & Plastic Fittings,Novo (Black),15
+category,PTMT & Plastic Fittings,Novo (Dark Blue),15
+category,PTMT & Plastic Fittings,Novo (Gold),15
+category,PTMT & Plastic Fittings,Novo (Peach),15
+category,PTMT & Plastic Fittings,Novo (Royal),15
+category,PTMT & Plastic Fittings,Novo (Wine),15
+category,PTMT & Plastic Fittings,Ovian,25
+category,PTMT & Plastic Fittings,Ovian (Gold),20
+category,PTMT & Plastic Fittings,Ovian (Peach),20
+category,PTMT & Plastic Fittings,Ovian (Royal),20
+category,PTMT & Plastic Fittings,Ovian (Wine),20
+category,PTMT & Plastic Fittings,P.V.C. Connections,13
+category,PTMT & Plastic Fittings,P.V.C. Connections (Plain Nut Round),6
+category,PTMT & Plastic Fittings,PTMT Taps,9
+category,PTMT & Plastic Fittings,Push Cock,9
+category,PTMT & Plastic Fittings,Quadra,23
+category,PTMT & Plastic Fittings,Quadra (Black),17
+category,PTMT & Plastic Fittings,Quadra (Dark Blue),16
+category,PTMT & Plastic Fittings,Quadra (Gold),18
+category,PTMT & Plastic Fittings,Quadra (Peach),18
+category,PTMT & Plastic Fittings,Quadra (Royal),18
+category,PTMT & Plastic Fittings,Quadra (Wine),18
+category,PTMT & Plastic Fittings,Roman,26
+category,PTMT & Plastic Fittings,Sapphire,29
+category,PTMT & Plastic Fittings,Shower Sets (Gold),1
+category,PTMT & Plastic Fittings,Shower Sets (Peach),1
+category,PTMT & Plastic Fittings,Shower Sets (Royal),1
+category,PTMT & Plastic Fittings,Shower Sets (Wine),1
+category,PTMT & Plastic Fittings,Showers & Accessories,33
+category,PTMT & Plastic Fittings,Showers & Accessories (Gold),11
+category,PTMT & Plastic Fittings,Showers & Accessories (Peach),11
+category,PTMT & Plastic Fittings,Showers & Accessories (Royal),11
+category,PTMT & Plastic Fittings,Showers & Accessories (Wine),11
+category,PTMT & Plastic Fittings,Showers Sets,15
+category,PTMT & Plastic Fittings,Sink Accessories,2
+category,PTMT & Plastic Fittings,Sink Fittings,39
+category,PTMT & Plastic Fittings,Special Cock,19
+category,PTMT & Plastic Fittings,Spindles Set Accessories,14
+category,PTMT & Plastic Fittings,Standard (New Handle),35
+category,PTMT & Plastic Fittings,Standard (Old Handle),32
+category,PTMT & Plastic Fittings,Tank Nipples,9
+category,PTMT & Plastic Fittings,Toilet Seat Covers,1
+category,PTMT & Plastic Fittings,Ultra,16
+category,PTMT & Plastic Fittings,Ultra (Black),16
+category,PTMT & Plastic Fittings,Ultra (Gold),16
+category,PTMT & Plastic Fittings,Ultra (Peach),16
+category,PTMT & Plastic Fittings,Ultra (Royal),16
+category,PTMT & Plastic Fittings,Ultra (Wine),16
+category,PTMT & Plastic Fittings,Vitro,16
+category,PTMT & Plastic Fittings,Vitro (Gold),16
+category,PTMT & Plastic Fittings,Vitro (Peach),16
+category,PTMT & Plastic Fittings,Vitro (Royal),16
+category,PTMT & Plastic Fittings,Vitro (Wine),16
+category,PTMT & Plastic Fittings,Washing Machine,7
+category,PTMT & Plastic Fittings,Waste Coupling,20
+category,PTMT & Plastic Fittings,Waste Pipes,11
+category,PTMT & Plastic Fittings,Water Tank Line Filter,7
+division,Pipes & Fittings,,2469
+category,Pipes & Fittings,,9
+category,Pipes & Fittings,AGRI Fittings,135
+category,Pipes & Fittings,AGRI Pipe,123
+category,Pipes & Fittings,AGRI Smart Fittings,33
+category,Pipes & Fittings,AGRI Smart Pipe,7
+category,Pipes & Fittings,CPVC Fittings,284
+category,Pipes & Fittings,CPVC Pipe,40
+category,Pipes & Fittings,Casing Pipe,15
+category,Pipes & Fittings,Column Pipe,26
+category,Pipes & Fittings,HDPE Pipe,229
+category,Pipes & Fittings,OPVC Fittings,10
+category,Pipes & Fittings,OPVC Pipe,24
+category,Pipes & Fittings,PE-AL-PE Fittings,84
+category,Pipes & Fittings,PE-AL-PE Pipe,24
+category,Pipes & Fittings,PEXI Pipe,5
+category,Pipes & Fittings,PPR Fittings,336
+category,Pipes & Fittings,PPR Pipe,90
+category,Pipes & Fittings,SILENT FITTINGS,30
+category,Pipes & Fittings,SWR Fittings,149
+category,Pipes & Fittings,SWR PIPE,80
+category,Pipes & Fittings,SWR Pipe,160
+category,Pipes & Fittings,Silent Fittings,80
+category,Pipes & Fittings,Tool,16
+category,Pipes & Fittings,UGD Fittings,28
+category,Pipes & Fittings,UGD Pipe,20
+category,Pipes & Fittings,UPVC Fittings,291
+category,Pipes & Fittings,UPVC PIPE,12
+category,Pipes & Fittings,UPVC Pipe,52
+category,Pipes & Fittings,Water Tank,77
+division,Sanitaryware,,1
+category,Sanitaryware,Fixture,1
+division,Test,,5
+category,Test,Audit,5
+

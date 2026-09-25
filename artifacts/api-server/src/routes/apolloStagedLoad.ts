@@ -69,6 +69,16 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
   try { parsed = parseApolloMaster(file.buffer); } catch (e) {
     res.status(422).json({ error: e instanceof Error ? e.message : "Apollo workbook could not be parsed", noWrites: true }); return;
   }
+  if (parsed.effectiveDate !== effectiveDate) {
+    res.status(409).json({
+      error: `Supplied effective date ${effectiveDate} does not match the Apollo price date in the workbook (${parsed.effectiveDate}).`,
+      code: "APOLLO_EFFECTIVE_DATE_MISMATCH",
+      suppliedEffectiveDate: effectiveDate,
+      sourceEffectiveDate: parsed.effectiveDate,
+      noWrites: true,
+    });
+    return;
+  }
   const fingerprint = apolloContentFingerprint(parsed.rows);
   if (!allowlistedFingerprints.has(fingerprint)) {
     res.status(422).json({ error: "Apollo workbook content is not the trusted development master", code: "APOLLO_CONTENT_FINGERPRINT_MISMATCH", contentFingerprint: fingerprint, noWrites: true }); return;
@@ -131,7 +141,7 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
     create: rows.filter(x => x.status === "ok" && !oldByIdentity.has(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)).length,
     update: rows.filter(x => x.status === "ok" && oldByIdentity.has(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`) && oldByIdentity.get(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)!.price !== x.row.price).length,
     unchanged: rows.filter(x => x.status === "ok" && oldByIdentity.get(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)?.price === x.row.price).length };
-  const batchRows = JSON.stringify({ ...counts, contentFingerprint: fingerprint, reason, beforeSnapshot: before, beforeProducts, workbookPrayagCodes, stagedDigest, reservations: parsed.reservations, insertedIds: [], updatedIds: [], createdAt: new Date().toISOString(), source: "apollo_staged_load", conflicts: parsed.conflicts, unpriced: parsed.unpriced, renames: parsed.renames });
+  const batchRows = JSON.stringify({ ...counts, contentFingerprint: fingerprint, sourceEffectiveDate: parsed.effectiveDate, reason, beforeSnapshot: before, beforeProducts, workbookPrayagCodes, stagedDigest, reservations: parsed.reservations, insertedIds: [], updatedIds: [], createdAt: new Date().toISOString(), source: "apollo_staged_load", conflicts: parsed.conflicts, unpriced: parsed.unpriced, renames: parsed.renames });
   const batch = await db.transaction(async (tx) => {
     const source = (await tx.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable).where(eq(mrpSourcesTable.division, "Apollo")).limit(1))[0]
       ?? (await tx.insert(mrpSourcesTable).values({ division: "Apollo", sheetId: "apollo-master", sheetUrl: "internal://apollo-master", expectedFileName: file.originalname, notes: "Development-only staged Apollo competitor loads", sourceKind: "competitor" }).returning({ id: mrpSourcesTable.id }))[0]!;
@@ -154,7 +164,7 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
     })));
     return createdBatch;
   });
-  const response = { batchId: batch!.id, contentFingerprint: fingerprint, summary: counts, rows: rows.map(x => ({ ...x.row, oldPrice: oldByIdentity.get(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)?.price ?? null, newPrice: x.row.price, status: x.status, reason: x.reason, evidence: x.evidence })), undoWindowHours: 24 };
+  const response = { batchId: batch!.id, contentFingerprint: fingerprint, sourceEffectiveDate: parsed.effectiveDate, summary: counts, rows: rows.map(x => ({ ...x.row, oldPrice: oldByIdentity.get(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)?.price ?? null, newPrice: x.row.price, status: x.status, reason: x.reason, evidence: x.evidence })), undoWindowHours: 24 };
   res.json(response);
 });
 

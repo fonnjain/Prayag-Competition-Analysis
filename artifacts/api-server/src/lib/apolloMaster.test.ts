@@ -23,6 +23,7 @@ describe("P045 Apollo master (pure, read-only)", () => {
   });
   it("reads the real two-tier workbook without confusing Prayag and Apollo columns", () => {
     const parsed = parseApolloMaster(readFileSync(source));
+    expect(parsed.effectiveDate).toBe("2026-08-01");
     expect(parsed.rows).toHaveLength(698);
     expect(parsed.pipeCount).toBe(273);
     expect(parsed.fittingCount).toBe(425);
@@ -51,6 +52,44 @@ describe("P045 Apollo master (pure, read-only)", () => {
     ]));
     expect(parsed.unpriced.every(r => !parsed.rows.some(x => x.competitorCode === r.generatedCode && x.sheet === r.sheet))).toBe(true);
     expect(parsed.conflicts.some(c => c.competitorCode === "PPRMB0204XX20MM")).toBe(true);
+  });
+
+  it("reads an Excel serial from the Apollo price column as its canonical date", () => {
+    const book = XLSX.read(readFileSync(source), { type: "buffer", cellDates: false });
+    const sheet = book.Sheets[" CPVC PIPE"]!;
+    sheet.G2 = { t: "n", v: 46235, z: "General" };
+    expect(parseApolloMaster(book).effectiveDate).toBe("2026-08-01");
+  });
+
+  it("ignores a different competitor's dated columns after the Apollo group", () => {
+    const book = XLSX.read(readFileSync(source), { type: "buffer", cellDates: false });
+    XLSX.utils.sheet_add_aoa(book.Sheets[" CPVC PIPE"]!, [
+      ["Prince", null],
+      ["ITEM CODE", "01 Mar, 2026"],
+    ], { origin: "H1" });
+    const parsed = parseApolloMaster(book);
+    expect(parsed.effectiveDate).toBe("2026-08-01");
+    expect(parsed.rows).toHaveLength(698);
+  });
+
+  it("rejects a missing Apollo date rather than borrowing the Prayag date", () => {
+    const book = XLSX.read(readFileSync(source), { type: "buffer", cellDates: false });
+    const sheet = book.Sheets[" CPVC PIPE"]!;
+    sheet.G2 = { t: "s", v: "MRP" };
+    expect(() => parseApolloMaster(book)).toThrow(/Apollo price date is missing or invalid.*CPVC PIPE.*MRP/);
+  });
+
+  it("rejects multiple dated Apollo price columns in one worksheet", () => {
+    const book = XLSX.read(readFileSync(source), { type: "buffer", cellDates: false });
+    const sheet = book.Sheets[" CPVC PIPE"]!;
+    XLSX.utils.sheet_add_aoa(sheet, [["02 Aug, 2026"]], { origin: "H2" });
+    expect(() => parseApolloMaster(book)).toThrow(/Multiple Apollo price periods.*CPVC PIPE.*2026-08-01.*2026-08-02/);
+  });
+
+  it("rejects different Apollo dates across worksheets instead of choosing one global period", () => {
+    const book = XLSX.read(readFileSync(source), { type: "buffer", cellDates: false });
+    book.Sheets["CPVC FITTINGS"]!.G2 = { t: "s", v: "02 Aug, 2026" };
+    expect(() => parseApolloMaster(book)).toThrow(/Multiple Apollo effective dates.*CPVC PIPE=2026-08-01.*CPVC FITTINGS=2026-08-02/);
   });
 
   it("applies the same parsed file idempotently in memory (0 -> N -> N)", () => {

@@ -2416,11 +2416,60 @@ export type NewProductOptionsResponseByDivisionItem = {
   series: string[];
 };
 
+export interface LocallyAddedDivisionOption {
+  name: string;
+  actor: string;
+  createdAt: string;
+  reason: string;
+  salesMapped: boolean;
+}
+
 export interface NewProductOptionsResponse {
   divisions: string[];
   categories: string[];
   series: string[];
+  salesKnownDivisions: string[];
   byDivision: NewProductOptionsResponseByDivisionItem[];
+  locallyAddedDivisions: LocallyAddedDivisionOption[];
+}
+
+export interface PriceEditorDivisionInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  reason: string;
+}
+
+export interface PriceEditorDivisionResponse {
+  name: string;
+  actor: string;
+  createdAt: string;
+  reason: string;
+  salesMapped: boolean;
+  /** @nullable */
+  warning: string | null;
+}
+
+export interface PriceEditorCategoryInput {
+  /** @minLength 1 */
+  division: string;
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  reason: string;
+}
+
+export interface PriceEditorCategoryResponse {
+  division: string;
+  name: string;
+  actor: string;
+  createdAt: string;
+  reason: string;
+}
+
+export interface VocabularyDuplicateResponse {
+  code: 'VOCABULARY_DUPLICATE';
+  existingValue: string;
 }
 
 export type NewProductCodeCheckResponseDuplicate = null | {
@@ -2501,6 +2550,8 @@ export interface ErrorResponse {
 
 export interface CompetitorWorkbookPreviewInput {
   file: Blob;
+  /** Existing or new competitor brand whose trusted parser, if any, should inspect the workbook. */
+  competitor?: string;
 }
 
 export interface CompetitorWorkbookPeriod {
@@ -2511,6 +2562,7 @@ export interface CompetitorWorkbookPeriod {
 
 export interface CompetitorWorkbookPreview {
   isSparshMaster: boolean;
+  requiresCompetitor?: boolean;
   periods: CompetitorWorkbookPeriod[];
 }
 
@@ -2526,7 +2578,7 @@ export interface CompetitorWorkbookImportInput {
   file: Blob;
   /** @minLength 1 */
   competitor: string;
-  /** Required for ordinary uploads; omitted for a verified multi-period master. */
+  /** Required for ordinary uploads; when the source contains a date it must match exactly. Existing undated single-brand files continue to use this operator-supplied date. Omitted for a verified multi-period master. */
   effectiveDate?: string;
   /** JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods. */
   periodDates?: string;

@@ -16,7 +16,7 @@ export type ApolloRename = { oldCode: string; newCode: string; sheet: string; so
 export type ApolloMasterParse = {
   rows: ApolloMasterRow[]; coverageGaps: Record<string, number>; unpriced: ApolloUnpricedGap[];
   renames: ApolloRename[]; conflicts: ApolloPriceConflict[]; pipeCount: number; fittingCount: number;
-  reservations: ApolloCodeReservation[];
+  reservations: ApolloCodeReservation[]; effectiveDate: string;
 };
 
 export type ApolloInput = string | Uint8Array | ArrayBuffer | XLSX.WorkBook;
@@ -33,7 +33,46 @@ const isCode = (v: unknown) => /^[A-Z][A-Z0-9 _-]{2,}$/i.test(clean(v));
 // number (for example, 01 Aug 2026 becomes 46235).  Keep accepting those
 // headers as dated Apollo price columns without changing column semantics.
 const isDateHeader = (v: string) =>
-  /^\d{1,2}\s+[a-z]{3}/i.test(v) || (/^\d{5}$/.test(v) && Number(v) >= 20000 && Number(v) <= 100000);
+  /^\d{1,2}(?:st|nd|rd|th)?\s+[a-z]{3}/i.test(v) || (/^\d{5}$/.test(v) && Number(v) >= 20000 && Number(v) <= 100000);
+
+function parseApolloHeaderDate(value: unknown): string | null {
+  const fromParts = (year: number, month: number, day: number) => {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+      ? `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      : null;
+  };
+  const fromExcelSerial = (serial: number): string | null => {
+    if (!Number.isInteger(serial) || serial < 1 || serial > 100000) return null;
+    const parts = XLSX.SSF.parse_date_code(serial);
+    return parts ? fromParts(parts.y, parts.m, parts.d) : null;
+  };
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    return fromParts(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+  }
+  if (typeof value === "number") return fromExcelSerial(value);
+  const text = clean(value);
+  if (!text) return null;
+  if (/^\d{5}$/.test(text)) return fromExcelSerial(Number(text));
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return fromParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const monthNumbers: Record<string, number> = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  };
+  const monthWord = (month: string) => monthNumbers[month.slice(0, 3).toLowerCase()] ?? null;
+  const dayFirst = text.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]{3,9}),?\s+(\d{4})$/i);
+  if (dayFirst) {
+    const month = monthWord(dayFirst[2]!);
+    return month ? fromParts(Number(dayFirst[3]), month, Number(dayFirst[1])) : null;
+  }
+  const monthFirst = text.match(/^([a-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i);
+  if (monthFirst) {
+    const month = monthWord(monthFirst[1]!);
+    return month ? fromParts(Number(monthFirst[3]), month, Number(monthFirst[2])) : null;
+  }
+  return null;
+}
 
 function workbook(input: ApolloInput): XLSX.WorkBook {
   if (typeof input === "object" && !(input instanceof Uint8Array) && !(input instanceof ArrayBuffer) && "SheetNames" in input) return input as XLSX.WorkBook;
@@ -54,6 +93,7 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
   const coverageGaps: Record<string, number> = {};
   const renames: ApolloRename[] = [];
   const seenCodes = new Map<string, ApolloMasterRow[]>();
+  const apolloSheetDates: Array<{ sheet: string; date: string }> = [];
   const summaryReservations = new Map<string, { oldCode: string; newCode: string; sheet: string; sourceRow: number }>();
   const summary = book.Sheets[book.SheetNames.find(s => /^P045 SUMMARY$/i.test(s)) ?? ""];
   if (summary) {
@@ -83,10 +123,22 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
     const group = values[0].map(clean), headers = values[1].map(clean);
     const apolloStarts = group.map((v, i) => /^apollo$/i.test(v) ? i : -1).filter(i => i >= 0);
     if (!apolloStarts.length) throw new Error(`Malformed Apollo sheet grouping (Apollo group missing): ${sheet}`);
+    if (apolloStarts.length !== 1) throw new Error(`Ambiguous Apollo price periods: ${sheet} has ${apolloStarts.length} Apollo column groups.`);
     const aStart = apolloStarts[0];
-    const aEnd = apolloStarts[1] ?? values[0].length;
+    // A combined master may place another competitor after Apollo. Never
+    // inspect its price/date headers as part of Apollo's column group.
+    const nextGroup = group.findIndex((label, index) => index > aStart && label.length > 0);
+    const aEnd = nextGroup < 0 ? values[0].length : nextGroup;
     const aHeaders = headers.slice(aStart, aEnd);
     const codeOffset = aHeaders.findIndex(v => /^item code$/i.test(v));
+    if (codeOffset < 0) throw new Error(`Malformed Apollo sheet grouping (Apollo code column missing): ${sheet}`);
+    const apolloDateHeaders = aHeaders
+      .map((header, offset) => ({ header, offset, date: parseApolloHeaderDate(values[1]?.[aStart + offset]) }))
+      .filter((entry) => entry.offset > codeOffset && entry.date !== null);
+    if (apolloDateHeaders.length > 1) {
+      const dates = apolloDateHeaders.map((entry) => entry.date).join(", ");
+      throw new Error(`Multiple Apollo price periods are not supported: ${sheet} contains Apollo date columns ${dates}.`);
+    }
     // Some sheets put the actual dated Apollo price immediately after code;
     // casing/UGD/PPR put an MRP-per-metre marker there and the dated value
     // one column farther right.
@@ -95,6 +147,12 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       : aHeaders.findIndex((v, i) => i > codeOffset &&
         (/mrp|price|net|date/i.test(v) || isDateHeader(v)) && !/^item code$/i.test(v));
     if (codeOffset < 0 || priceOffset < 0) throw new Error(`Malformed Apollo sheet grouping (Apollo code/price missing): ${sheet}`);
+    const sheetEffectiveDate = parseApolloHeaderDate(values[1]?.[aStart + priceOffset]);
+    if (!sheetEffectiveDate) {
+      const headerValue = clean(values[1]?.[aStart + priceOffset]) || "blank";
+      throw new Error(`Apollo price date is missing or invalid at ${sheet} Apollo price header: ${JSON.stringify(headerValue)}.`);
+    }
+    apolloSheetDates.push({ sheet, date: sheetEffectiveDate });
     const aCode = aStart + codeOffset, aPrice = aStart + priceOffset;
     const prayagStart = group.findIndex(v => /^prayag$/i.test(v));
     const pStart = prayagStart < 0 ? 0 : prayagStart;
@@ -152,6 +210,10 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       seenCodes.set(key, [...(seenCodes.get(key) ?? []), out]);
     }
   }
+  const distinctApolloDates = [...new Set(apolloSheetDates.map(({ date }) => date))];
+  if (distinctApolloDates.length !== 1) {
+    throw new Error(`Multiple Apollo effective dates are not supported: ${apolloSheetDates.map(({ sheet, date }) => `${sheet}=${date}`).join("; ")}.`);
+  }
   const conflicts = [...seenCodes.entries()].flatMap(([competitorCode, list]) => {
     const prices = [...new Set(list.map(x => x.price))];
     return prices.length > 1 ? [{ competitorCode, prices, rows: list.map(x => ({ sheet: x.sheet, sourceRow: x.sourceRow })) }] : [];
@@ -170,7 +232,7 @@ export function parseApolloMaster(input: ApolloInput): ApolloMasterParse {
       prayagCode: gap.prayagCode, sheet: gap.sheet, sourceRow: gap.sourceRow,
     }));
   }
-  return { rows, coverageGaps, unpriced, renames, conflicts, reservations, pipeCount: rows.filter(r => r.codeSource === "locally_assigned").length, fittingCount: rows.filter(r => r.codeSource === "supplier").length };
+  return { rows, coverageGaps, unpriced, renames, conflicts, reservations, effectiveDate: distinctApolloDates[0]!, pipeCount: rows.filter(r => r.codeSource === "locally_assigned").length, fittingCount: rows.filter(r => r.codeSource === "supplier").length };
 }
 
 export type ApolloPlanState = { rows: ApolloMasterRow[] };

@@ -234,7 +234,7 @@ export default function ImportCompetitorPage() {
     }
   };
 
-  const handleFileChange = async (nextFile: File | null) => {
+  const handleFileChange = async (nextFile: File | null, selectedCompetitor = competitor) => {
     const requestSequence = ++workbookPreviewSequence.current;
     setFile(nextFile);
     setResult(null);
@@ -244,14 +244,14 @@ export default function ImportCompetitorPage() {
     invalidatePdfPreflight();
     setPriceBasisTouched(false);
 
-    if (!nextFile || nextFile.name.toLowerCase().endsWith(".pdf") || competitor.trim().toLowerCase() === "apollo") {
+    if (!nextFile || nextFile.name.toLowerCase().endsWith(".pdf") || selectedCompetitor.trim().toLowerCase() === "apollo") {
       setIsPreviewingWorkbook(false);
       return;
     }
 
     setIsPreviewingWorkbook(true);
     try {
-      const data = await previewCompetitorWorkbook({ file: nextFile });
+      const data = await previewCompetitorWorkbook({ file: nextFile, competitor: selectedCompetitor.trim() || undefined });
       if (requestSequence !== workbookPreviewSequence.current) return;
 
       if (data.isSparshMaster && Array.isArray(data.periods) && data.periods.length > 0) {
@@ -672,7 +672,13 @@ export default function ImportCompetitorPage() {
                 type="text"
                 placeholder="e.g. Sparsh Pearl, Astral"
                 value={competitor}
-                 onChange={(e) => { setCompetitor(e.target.value); setPriceBasisTouched(false); if (isPdf) invalidatePdfPreflight(); }}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    setCompetitor(selected);
+                    setPriceBasisTouched(false);
+                    if (isPdf) invalidatePdfPreflight();
+                    else if (file) void handleFileChange(file, selected);
+                  }}
                 required
               />
               <datalist id="brand-suggestions">
@@ -737,7 +743,7 @@ export default function ImportCompetitorPage() {
                   data-testid="input-competitor-effective-date"
                 />
                 <p className="text-xs text-muted-foreground">
-                  The date from which these prices apply (w.e.f.).
+                  For a dated workbook, this must match the selected competitor's price-column date. It is never applied to another competitor's columns.
                 </p>
                 {formatDateWords(effectiveDate) && (
                   <p className="text-xs font-medium text-primary" data-testid="resolved-effective-date">

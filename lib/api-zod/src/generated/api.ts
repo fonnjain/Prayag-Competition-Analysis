@@ -1106,11 +1106,13 @@ export const GetCompetitorBrandsResponse = zod.object({
  * @summary Detect validated source periods in a competitor workbook
  */
 export const PreviewCompetitorWorkbookBody = zod.object({
-  "file": zod.instanceof(File)
+  "file": zod.instanceof(File),
+  "competitor": zod.string().optional().describe('Existing or new competitor brand whose trusted parser, if any, should inspect the workbook.')
 })
 
 export const PreviewCompetitorWorkbookResponse = zod.object({
   "isSparshMaster": zod.boolean(),
+  "requiresCompetitor": zod.boolean().optional(),
   "periods": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string(),
@@ -1128,7 +1130,7 @@ export const PreviewCompetitorWorkbookResponse = zod.object({
 export const LoadCompetitorWorkbookBody = zod.object({
   "file": zod.instanceof(File),
   "competitor": zod.string().min(1),
-  "effectiveDate": zod.coerce.date().optional().describe('Required for ordinary uploads; omitted for a verified multi-period master.'),
+  "effectiveDate": zod.coerce.date().optional().describe('Required for ordinary uploads; when the source contains a date it must match exactly. Existing undated single-brand files continue to use this operator-supplied date. Omitted for a verified multi-period master.'),
   "periodDates": zod.string().optional().describe('JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods.'),
   "priceBasis": zod.enum(['MRP', 'Ex-GST']).optional(),
   "gstPct": zod.number().optional()
@@ -1166,7 +1168,7 @@ export const LoadCompetitorWorkbookResponse = zod.object({
 export const StageCompetitorWorkbookBody = zod.object({
   "file": zod.instanceof(File),
   "competitor": zod.string().min(1),
-  "effectiveDate": zod.coerce.date().optional().describe('Required for ordinary uploads; omitted for a verified multi-period master.'),
+  "effectiveDate": zod.coerce.date().optional().describe('Required for ordinary uploads; when the source contains a date it must match exactly. Existing undated single-brand files continue to use this operator-supplied date. Omitted for a verified multi-period master.'),
   "periodDates": zod.string().optional().describe('JSON array of approved YYYY-MM-DD dates, ordered to match the previewed master periods.'),
   "priceBasis": zod.enum(['MRP', 'Ex-GST']).optional(),
   "gstPct": zod.number().optional()
@@ -2487,16 +2489,52 @@ export const GetPriceEditorEditsResponse = zod.object({
 
 
 /**
+ * @summary Add an audited local division option without creating or moving products
+ */
+
+
+
+
+export const AddPriceEditorDivisionBody = zod.object({
+  "name": zod.string().min(1),
+  "reason": zod.string().min(1)
+})
+
+
+/**
+ * @summary Add an audited local category option to an existing division
+ */
+
+
+
+
+
+export const AddPriceEditorCategoryBody = zod.object({
+  "division": zod.string().min(1),
+  "name": zod.string().min(1),
+  "reason": zod.string().min(1)
+})
+
+
+/**
  * @summary Catalogue classifications available for one-product creation
  */
 export const GetPriceEditorNewProductOptionsResponse = zod.object({
   "divisions": zod.array(zod.string()),
   "categories": zod.array(zod.string()),
   "series": zod.array(zod.string()),
+  "salesKnownDivisions": zod.array(zod.string()),
   "byDivision": zod.array(zod.object({
   "division": zod.string(),
   "categories": zod.array(zod.string()),
   "series": zod.array(zod.string())
+})),
+  "locallyAddedDivisions": zod.array(zod.object({
+  "name": zod.string(),
+  "actor": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "reason": zod.string(),
+  "salesMapped": zod.boolean()
 }))
 })
 
