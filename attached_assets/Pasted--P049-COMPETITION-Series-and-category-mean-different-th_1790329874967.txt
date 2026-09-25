@@ -1,0 +1,147 @@
+# P049 — COMPETITION — Series and category mean different things depending on how a product arrived
+
+> **P049** · app: **COMPETITION** (`prayag-price.com`)
+> **READ-ONLY. Change nothing.** No commits. No data changes. No relabelling.
+> Quote `P049` when reporting back.
+
+P048 Step 2 surfaced this, and it outranks everything else in that report:
+
+> *The normalized authoritative master writes its `series` value to **both `series_range` and `category`**; the generic importer treats `GROUP` as category and `RANGE` as series.*
+
+**Those two paths disagree.** One duplicates a single value into series **and** category. The other splits `GROUP` and `RANGE` into category and series respectively.
+
+So **`category` means a different thing depending on how the product arrived**, and nothing in the data says which.
+
+Your own caveat is the correct stopping point and the most useful sentence in that report: *"I cannot assert that equivalence for every import path."* This prompt establishes the shape of it before anyone tries to fix it.
+
+---
+
+# Why this matters beyond tidiness
+
+**It reaches back into the Uncategorized work.** P029, P035 and P036 took three prompts to clear 13 products with `category = NULL`, and the fix had to be applied twice because the first pass reached development only.
+
+If `category` is sometimes a genuine category and sometimes a copy of series, then that vocabulary was never one thing. **A future cleanup built on the assumption that it is would make the data worse while appearing to tidy it.**
+
+It also means **P048's Add Category and Add Series are feeding fields that partly overlap** — which is not a reason to undo either, but it is a reason to know the shape before more values are added.
+
+---
+
+# 1. Every write path, and what it writes
+
+For each path that writes `series_range` or `category`, report **which source column goes to which field**. Quote the code.
+
+```
+authoritative master loader        series -> series_range AND category ?
+generic importer                   GROUP -> category, RANGE -> series ?
+single product editor              series_range only ?
+new-products bulk upload           ?
+MRP generator                      ?
+catalogue sync                     ?
+any other path                     ?
+```
+
+**Enumerate the paths from the code, not from this list.** This list is what P048 Step 2 reported plus guesses, and a path missing from it is exactly what would be missed.
+
+---
+
+# 2. How many products are in each state?
+
+**2.1** Count products where `category` **equals** `series_range`.
+
+**2.2** Count products where they **differ**, and both are non-null.
+
+**2.3** Count products where `category` is null and `series_range` is not, and the reverse.
+
+**2.4** Count products where both are null.
+
+The four counts must sum to the catalogue total. Report the total and confirm they do.
+
+**2.5** Do these counts split cleanly by how the product arrived — by `load_batch_id`, source, or creation path? **If the equal-value products are exactly those from the authoritative master, that confirms the mechanism.** If they do not split cleanly, something else is also writing these fields and that is a more interesting finding.
+
+Report for **development and production separately**, each with its clock time. They diverge.
+
+---
+
+# 3. Which one do the screens and exports actually use?
+
+**3.1** Where does the application display or filter on `category`? Where on `series_range`?
+
+**3.2** Is there any screen where the two are shown side by side, so a user would see the same value twice?
+
+**3.3** Do any of the 353 division–series combinations exist only because a category value was copied into series, or the reverse?
+
+---
+
+# 4. What the sibling application does with them
+
+I have read the Sales application's source, so this part is answered rather than asked — confirm it if you can, and say if you find otherwise:
+
+```
+division      mapped through SOURCE_DIVISION_MAP; an unmapped value drops
+              products from mrp_master and mrp_history
+series        carried through UNMAPPED into mrp_synced.series_range
+              and mrp_master.series
+category      not part of the division mapping
+```
+
+**4.1** Confirm nothing on the Competition side sends `category` to Sales in a way that would be read as series, or the reverse.
+
+**4.2** One open question I raised on weak evidence and could not settle: Sales builds `mrp_master.series` from **its own six local workbooks**, and a comment in its schema lists `ALLIED` in capitals. Competition holds `Allied`. **If both exist, the same series is spelled two ways across the two applications**, and Sales filters reports on series.
+
+You correctly found no `ALLIED` in Competition. **Do not try to answer the Sales side from here** — it needs reading Sales' own values, and that is a SALES prompt. Just record the question so it is not lost.
+
+---
+
+# 5. One checksum definition, please
+
+Four flavours are now in circulation:
+
+```
+development   MD5      0cb1e29a...   0ae6afdc...
+development   SHA-256  15b513c4...
+production    SHA-256  1c2d9ce6...
+production    MD5      0419971c...
+```
+
+You flagged the definition difference each time, which is right. But it keeps recurring because nothing fixes it, and **two correct reports can look like they disagree.**
+
+**5.1** Propose one algorithm and one row definition for the MRP value checksum, to be used in both environments.
+
+**5.2** Record it where the next person finds it — not in a prompt, in the codebase.
+
+**5.3** Report the value under that single definition for development and production, so there is one comparable pair on record.
+
+**Propose and record the definition. Do not change any existing stored checksum.**
+
+---
+
+# Rules
+
+1. **Read-only.** No code changes, no data changes, no relabelling, no merging.
+2. Nothing is "fixed" in this prompt. Establishing the shape is the whole task.
+3. No product created, changed or deleted.
+4. No price value read as anything other than a price.
+5. State the environment and the clock time against every figure. Development and production differ and both matter.
+
+# Report
+
+1. Every write path, with source column to destination field, quoted.
+2. The four counts from §2, summing to the catalogue total, for **both** environments.
+3. Whether the counts split cleanly by arrival path.
+4. Where each field is displayed, filtered and exported.
+5. Whether any of the 353 combinations exist only through a copied value.
+6. Confirmation of the Sales-side behaviour in §4, and the `Allied` / `ALLIED` question recorded.
+7. Your proposed single checksum definition, and the comparable pair under it.
+
+---
+
+## What comes after
+
+Once the shape is known, the decision is a business one: **are series and category two different things Prayag needs, or one thing recorded twice?**
+
+- If two, the paths that conflate them are bugs and some products carry a category that is really a series.
+- If one, the redundant field should stop being written and the screens should stop offering both.
+
+**That ruling needs Prayag, not an agent** — exactly as the duplicate Prince codes did under P034. This prompt gives them the counts to rule on.
+
+P048 Step 2 is **not blocked by this** and can publish. The series control is correct, the refusal works, and no product or price moved.
