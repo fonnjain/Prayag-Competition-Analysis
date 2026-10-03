@@ -18,18 +18,19 @@ blocking them pushes operators toward direct database edits.
 **How to apply:** Scope guards to whole-catalogue replacement entrypoints. Audit
 other endpoints' permissions and affected rows without altering those permissions.
 
-If a team data-promotion workflow needs a replacement for signed dev-to-production
-catalogue sync, review a separate scoped route rather than re-enable wholesale
-production replacement. Do not equate absence from deployment scripts with proof
-that no manual or external team workflow depends on it.
+The signed dev-to-production snapshot replacement workflow is retired. The user
+confirmed: "Retired. Do not keep a production transfer path." If promotion is
+needed again, it must be separately reviewed and additive, with preview, apply
+and undo like the price loaders—not a replacement.
 
-**Why:** The user requires release/deployment and team-workflow dependency checks
-before publishing this restriction, and explicitly prefers a reviewed replacement
-route if promotion is still needed.
+**Why:** Whole-snapshot replacement can erase production-only price periods.
+The user treats the historical replacement as the reason to retire the workflow,
+not a reason to preserve it.
 
-**How to apply:** Report automated dependencies separately from historical/manual
-use. Obtain confirmation of current team reliance before treating the transfer
-path as retired; any replacement needs separate review.
+**How to apply:** Never relax the production replacement prohibition for publishing
+or manual data promotion. Do not design or implement a new transfer route without
+separate review. Historical loss investigations are read-only; no restoration,
+price-period recreation or repair is implied by permission to investigate.
 
 **Why:** The user's production acceptance check explicitly requires this
 prohibition. Admin permission and a spelling-preview fingerprint are not an

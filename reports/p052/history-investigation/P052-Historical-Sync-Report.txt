@@ -1,0 +1,54 @@
+P052 — READ-ONLY HISTORICAL SYNC INVESTIGATION
+Report date: 3 October 2026. All clocks IST (UTC+05:30).
+No application code, catalogue, price rows, periods, sources or database schema were changed. No restore, replay, seed, reset, import, Apply or undo was executed. Outputs are evidence files only.
+
+DECISION
+The user confirmed the signed development-to-production replacement workflow is retired. Keep the production block. A future data promotion, if separately authorized, must be reviewed and additive, with preview, apply and undo—not replacement.
+Publishing is a user action. A Publish suggestion was supplied; this investigation did not publish automatically.
+
+1. SUCCESSFUL, FAILED AND PARTIAL APPLIES
+Complete surviving production catalog_sync_audits table queried at 2026-10-03 17:15:15 IST, without a date filter or row limit:
+- Total audit records: 1.
+- Succeeded: 1.
+- Failed: 0.
+- Running/incomplete: 0.
+- Other statuses, including partial: 0.
+The sole record started 2026-08-19 17:14:50 IST and completed 17:14:54 IST. It has no recorded error.
+This is the ONLY successful sync apply in the surviving production audit. No failed or partial apply is recorded there.
+The August implementation performed the catalogue deletes/inserts and success audit update in the same transaction. A failure within that transaction rolls back the replacement; the audit created beforehand can then be marked failed or remain running if interrupted. Neither condition is recorded in production.
+Caveat: authorization, upload validation and preflight failures can occur before an apply audit is inserted. The absence of failed audit rows does not prove that no rejected HTTP request ever occurred. Historical August request logs were not available in the inspected evidence, so no complete list of unaudited rejected requests can be produced.
+See companion production-sync-audits.csv; actor/account details are intentionally omitted.
+
+2. WHAT THE 735-ROW DECREASE MEANS
+Production audit at 2026-10-03 17:15:15 IST:
+Before event at 2026-08-19 17:14:50 IST: catalogue 6,764; MRP history 13,485; distinct history codes 6,330; MRP load batches 0; unlinked MRP rows 13,485; history-provenance events 0.
+After event at 2026-08-19 17:14:54 IST: catalogue 6,859; MRP history 12,750; distinct history codes 6,303; MRP load batches 8; unlinked MRP rows 0; history-provenance events 4.
+Therefore 735 is the NET ROW-COUNT DECREASE, not an audited set of exactly 735 missing product/date keys. Likewise 95 is the net catalogue-count increase, not proof that only 95 product codes were added and none removed.
+The implementation physically deleted all existing 13,485 MRP rows and inserted the incoming 12,750 rows. Some logical product/date prices may have been retained, changed or replaced, and incoming new keys may offset missing old keys. Without both row-level datasets, the exact lost key/value set cannot be calculated.
+
+REQUESTED ROW MANIFEST
+Item codes: cannot reconstruct the exact removed production set from available evidence.
+Effective dates: cannot reconstruct the exact removed production set from available evidence.
+Original load_batch_id: the audit establishes NULL for every pre-sync MRP row, because all 13,485 were unlinked and the pre-sync load-batch table contained 0 rows. No original load-batch IDs existed to enumerate. Legacy import-batch values are not retained in the sync summaries and cannot be inferred.
+No guessed item-code/date CSV is presented as a confirmed production deletion list.
+
+3. SURVIVING EVIDENCE AND ITS LIMITS
+A. The production audit stores aggregate summaries and a digest, not a before-image or per-row deletion manifest. The application never persisted the outgoing row-level dataset in that audit.
+B. attached_assets/prayag-verified-catalog-sync.json is the incoming development export, created 2026-08-19 16:57:26 IST. Filesystem verification at 2026-10-03 17:13:29 IST independently recomputed the JSON payload SHA-256:
+2af927e902f83ed6533203cc48459a8119c3232c20b4414f5988bf074a205703
+It matches the production audit. It contains 12,750 incoming MRP rows and 8 incoming load batches; it proves what was loaded, not what production lost.
+C. Database inventory at 2026-10-03 17:08:04 IST found no backup/snapshot tables in either development or production's non-system schemas. The documented development table mrp_price_history_backup_20260819_full_rebuild is absent. The historical development report described 13,463 backup rows; this was not a certified snapshot of the 13,485 pre-sync production rows. The reason/date of the backup's disappearance was not established.
+D. Git history and local report/asset/temp inventories did not contain a row-level pre-sync production export. The bundled seed is only a partial historical dataset (development workspace filesystem inspection 2026-10-03 17:09:00 IST: 5,253 price rows), not a reconstruction of production's 13,485 rows. It cannot justify a confirmed lost-row list.
+E. Production inspection at 2026-10-03 17:10:19 IST found no pre-event price-edit or revision-row records. The 4 provenance events with older timestamps were carried by the incoming bundle; the production before-summary contained 0 provenance events. Imported development timestamps are not proof of an independent production before-image.
+
+4. PRICE PERIODS THAT MAY BE MISUNDERSTOOD
+The development rebuild report explicitly excluded these dates as unsourced: 2024-01-01, 2025-06-01, 2026-01-20 and 2026-04-20.
+Production read at 2026-10-03 17:10:14 IST: current MRP history 14,302 rows; rows on those four dates 0.
+This is a confirmed present-day absence and a documented rebuild decision. It does NOT prove the exact count/item codes on each date in pre-sync production, or that these four dates account for the net 735-row decrease. Other removed or changed production-only periods cannot be ruled out without the before-image.
+
+5. WHAT WOULD PERMIT EXACT RECONSTRUCTION
+An MRP-history-only production export or historical backup representing production immediately before 2026-08-19 17:14:50 IST. Compare it read-only against the verified incoming bundle, distinguishing absent keys, new keys, changed prices and provenance changes. Current production can then be checked for subsequent restoration/correction of each missing key.
+No live checkpoint/database restore was performed. This report does not authorize restoration, insertion, recreation of periods or price repair.
+
+PUBLICATION OBSERVATION
+A non-mutating production GET /api/catalog/reset/preview at 2026-10-03 17:11:35 IST returned HTTP 401 Unauthorized, not the P052 production-refusal code. Publication of the new block was not confirmed by that observation. No production POST reset, seed or sync was called. Signed-in screen verification also remains outstanding.

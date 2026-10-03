@@ -753,3 +753,31 @@ mtime_ms = 1791025794909
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d8a0bffd-de6c-4ff3-9ed3-9866d76d0f31/d8950a25-e135-4618-a5c8-19fc684a2b5f"
 storage_version_token = "1791025795819495"
 content_type = "text/plain"
+
+[[outputs]]
+id = "fW9bY6XWhPgahirpBhRri"
+uri = "file://reports/p052/history-investigation/P052-Historical-Sync-Report.txt"
+type = "text"
+title = "P052 historical sync investigation"
+description = "Sole recorded successful production apply, no recorded failed/partial applies, and an explicit account of why the exact lost row manifest cannot be reconstructed from surviving evidence."
+logical_id = "9ce376bd-6981-4435-8b7c-6fd0868b8a0c"
+content_hash = "sha256:7d3f6939e621f79626473a4102132c85060f91ab86ac0458528e8f2349d8459c"
+size = 6800
+mtime_ms = 1791027960173
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9ce376bd-6981-4435-8b7c-6fd0868b8a0c/8c67a150-ad6d-4b03-b74b-b7c1ff6bd631"
+storage_version_token = "1791027961870474"
+content_type = "text/plain"
+
+[[outputs]]
+id = "Siag83PFYgAyR9dfmLwF8"
+uri = "file://reports/p052/history-investigation/production-sync-audits.csv"
+type = "table"
+title = "Surviving production sync audit"
+description = "Complete read-only audit export captured 3 October 2026 at 17:15:15 IST, including before/after summaries; no actor/account details."
+logical_id = "9c36fbaa-1e19-4212-97a0-27d015f0baf7"
+content_hash = "sha256:809975330082155a1ea94bb29eeb2e10a1b985ac310755c023a241b320b4e5d2"
+size = 952
+mtime_ms = 1791027915777
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9c36fbaa-1e19-4212-97a0-27d015f0baf7/1a3575d0-5a1e-43b3-b093-cd79bd60f634"
+storage_version_token = "1791027963160497"
+content_type = "text/csv"
