@@ -18,6 +18,19 @@ blocking them pushes operators toward direct database edits.
 **How to apply:** Scope guards to whole-catalogue replacement entrypoints. Audit
 other endpoints' permissions and affected rows without altering those permissions.
 
+If a team data-promotion workflow needs a replacement for signed dev-to-production
+catalogue sync, review a separate scoped route rather than re-enable wholesale
+production replacement. Do not equate absence from deployment scripts with proof
+that no manual or external team workflow depends on it.
+
+**Why:** The user requires release/deployment and team-workflow dependency checks
+before publishing this restriction, and explicitly prefers a reviewed replacement
+route if promotion is still needed.
+
+**How to apply:** Report automated dependencies separately from historical/manual
+use. Obtain confirmation of current team reliance before treating the transfer
+path as retired; any replacement needs separate review.
+
 **Why:** The user's production acceptance check explicitly requires this
 prohibition. Admin permission and a spelling-preview fingerprint are not an
 environment-level prohibition.
