@@ -1,0 +1,49 @@
+P051 Part 1 — development verification (2026-10-03 IST)
+
+Scope: spelling collision prevention only. No merge workflow, live product retirement/deletion, or stored Category/Range/division correction was performed.
+
+Implemented policy:
+- Reuses the P048 normalizer; matches within the exact division only.
+- New products use an existing stored spelling. If multiple spellings exist, more active products wins, even over an exact incoming text match.
+- Preview shows matched existing spelling/new, input, will-write value, all candidates and active counts. New categories require the existing normal admin approval.
+- Tied active counts stop for review. Apply checks the preview fingerprint again under the shared vocabulary lock.
+- P049 wins: existing products do not receive Category/Range/division changes from loads, including null-field backfill.
+- Exact item-code matches preserve their own classification even when legacy item codes have a normalized collision; ambiguous aliases stop.
+- Signed corrections and historical undo values are never silently canonicalized; conflicting restoration is rejected.
+- Legacy raw SQL reload/erase helpers are disabled before their database work.
+- Bulk accepts an optional explicit Category column. Absent Category remains compatible; no Category-from-name heuristic was introduced. The Part 0 prose suggesting that heuristic was inaccurate.
+
+Audited path coverage:
+- Authoritative master: shared planner scenarios and P049 regressions.
+- Generic importer, bulk new-products, single editor, sync: actual private SQL/API integrations for matched/new/two-existing cases.
+- Existing category backfill persistence: removed; private importer checks preserve existing null classification.
+- Seed/reset: actual private SQL spelling writes using a small catalogue fixture and empty competitor seed.
+- Fixed correction/undo and deletion undo: immutable-value validator scenarios and audited wiring; P029 API regressions.
+- Unsupported operator helpers: fail-closed wiring check.
+
+Verification:
+- 7 suites, 71 tests passed in the coherent pass; P048/P049/P029 regressions passed.
+- Final lock-order cleanup: existing core/P029 checks passed, plus 2 new lock-order checks passed (73 distinct checks overall). Apply and Undo take correction then vocabulary lock once.
+- Disabled operator entrypoints are explicitly retained by narrow gitignore exceptions; other .local files remain ignored.
+- Project-wide type-check passed; final changed API and web package type-checks passed.
+- API and Product Database development workflows rebuilt/restarted and serving.
+- Browser UI fixtures passed matched/new/two-existing display checks. Mobile batch-header overflow fixed and focused 402px recheck passed. Browser auth/API interception was test-only; this is not genuine production authentication evidence.
+
+Data evidence:
+Development before: 2026-10-03 14:32:22 IST — 14012 MRP rows.
+Development after: 2026-10-03 15:03:36 IST — 14012 MRP rows.
+Development before/after SHA-256: 4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2
+Full development item_code/category/series_range/division CSV is byte-equivalent before/after (350026 bytes).
+Production pre-build baseline: 2026-10-03 14:32:29 IST — 14302 rows; SHA-256 e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458.
+Production post-publish confirmation: PENDING; not claimed.
+
+Affected groups:
+- 20 duplicate Category groups per environment; no active-count ties.
+- affected-groups.csv lists every candidate, active/total count, preferred spelling, evidence clock and existing range-copy hold.
+- Production group counts are explicitly Part 0 reference evidence, not a post-publish check.
+- These groups are not merged or rewritten; the preference affects new product writes only.
+
+Separate pre-existing limitation:
+The full bundled competitor seed contains duplicate keys under the current unique index (observed Prince/C101/2025-10-09). It was not repaired or run against live data. A separate follow-up was proposed; the seed spelling tests isolate that unrelated dataset.
+
+Next gate: user publishes; then obtain genuine production evidence and read-only before/after counts/checksums with IST clocks.

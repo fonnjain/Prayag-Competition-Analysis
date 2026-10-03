@@ -1,0 +1,7 @@
+Checked only the existing two-candidate fixture at 402px in the current browser session; did not rerun upload/preview or click Apply/Discard. The existing auth/preview interception and mutation block were left in place.
+
+- Viewport width: **402px**; document and body `scrollWidth`: **387px** — no page-level horizontal overflow after the header fix.
+- Scrolled the preview table internally to the candidates column: `scrollLeft` **337px** of **650px** total, with a **313px** visible wrapper.
+- Screenshot shows the existing decision and both candidate counts: `Fixture Category 3` = **2** active products, `FIXTURE-CATEGORY-3` = **1**.
+
+No data was written or changed.

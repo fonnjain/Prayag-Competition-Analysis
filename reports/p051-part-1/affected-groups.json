@@ -1,0 +1,776 @@
+[
+  {
+    "environment": "development",
+    "evidence": "Current counts; classification baseline unchanged after implementation",
+    "auditIST": "2026-10-03 15:03:36",
+    "groups": [
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "aqua 54",
+        "selectedSpelling": "Aqua 54",
+        "candidates": [
+          {
+            "category": "Aqua 54",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "AQUA 54",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "aspire 52",
+        "selectedSpelling": "Aspire 52",
+        "candidates": [
+          {
+            "category": "Aspire 52",
+            "products": 48,
+            "activeProducts": 48
+          },
+          {
+            "category": "ASPIRE 52",
+            "products": 8,
+            "activeProducts": 3
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "blaze 62",
+        "selectedSpelling": "Blaze 62",
+        "candidates": [
+          {
+            "category": "Blaze 62",
+            "products": 36,
+            "activeProducts": 36
+          },
+          {
+            "category": "BLAZE 62",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "cygnu 71",
+        "selectedSpelling": "Cygnus 71",
+        "candidates": [
+          {
+            "category": "Cygnus 71",
+            "products": 34,
+            "activeProducts": 34
+          },
+          {
+            "category": "CYGNUS 71",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "europa 90",
+        "selectedSpelling": "Europa 90",
+        "candidates": [
+          {
+            "category": "Europa 90",
+            "products": 36,
+            "activeProducts": 36
+          },
+          {
+            "category": "EUROPA 90",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "evian 87",
+        "selectedSpelling": "Evian 87",
+        "candidates": [
+          {
+            "category": "Evian 87",
+            "products": 40,
+            "activeProducts": 40
+          },
+          {
+            "category": "EVIAN 87",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "laguna 93",
+        "selectedSpelling": "Laguna 93",
+        "candidates": [
+          {
+            "category": "Laguna 93",
+            "products": 40,
+            "activeProducts": 40
+          },
+          {
+            "category": "LAGUNA 93",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "macasa 76",
+        "selectedSpelling": "Macasa 76",
+        "candidates": [
+          {
+            "category": "Macasa 76",
+            "products": 41,
+            "activeProducts": 41
+          },
+          {
+            "category": "MACASA 76",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "marcu 68",
+        "selectedSpelling": "Marcus 68",
+        "candidates": [
+          {
+            "category": "Marcus 68",
+            "products": 42,
+            "activeProducts": 42
+          },
+          {
+            "category": "MARCUS 68",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "niagara 81",
+        "selectedSpelling": "Niagara 81",
+        "candidates": [
+          {
+            "category": "Niagara 81",
+            "products": 35,
+            "activeProducts": 35
+          },
+          {
+            "category": "NIAGARA 81",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "ocean 55",
+        "selectedSpelling": "Ocean 55",
+        "candidates": [
+          {
+            "category": "Ocean 55",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "OCEAN 55",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "orbit 53",
+        "selectedSpelling": "Orbit 53",
+        "candidates": [
+          {
+            "category": "Orbit 53",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "ORBIT 53",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "polo 60",
+        "selectedSpelling": "Polo 60",
+        "candidates": [
+          {
+            "category": "Polo 60",
+            "products": 36,
+            "activeProducts": 36
+          },
+          {
+            "category": "POLO 60",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "saga 79f",
+        "selectedSpelling": "Saga 79F",
+        "candidates": [
+          {
+            "category": "Saga 79F",
+            "products": 34,
+            "activeProducts": 34
+          },
+          {
+            "category": "SAGA 79F",
+            "products": 11,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "urbona 78",
+        "selectedSpelling": "Urbona 78",
+        "candidates": [
+          {
+            "category": "Urbona 78",
+            "products": 39,
+            "activeProducts": 39
+          },
+          {
+            "category": "URBONA 78",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "vincent 66",
+        "selectedSpelling": "Vincent 66",
+        "candidates": [
+          {
+            "category": "Vincent 66",
+            "products": 40,
+            "activeProducts": 40
+          },
+          {
+            "category": "VINCENT 66",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "virgo p66",
+        "selectedSpelling": "Virgo P66",
+        "candidates": [
+          {
+            "category": "Virgo P66",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "VIRGO P66",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "Pipes & Fittings",
+        "normalisedKey": "silent fitting",
+        "selectedSpelling": "Silent Fittings",
+        "candidates": [
+          {
+            "category": "Silent Fittings",
+            "products": 80,
+            "activeProducts": 79
+          },
+          {
+            "category": "SILENT FITTINGS",
+            "products": 30,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "Pipes & Fittings",
+        "normalisedKey": "swr pipe",
+        "selectedSpelling": "SWR Pipe",
+        "candidates": [
+          {
+            "category": "SWR Pipe",
+            "products": 160,
+            "activeProducts": 160
+          },
+          {
+            "category": "SWR PIPE",
+            "products": 80,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "Pipes & Fittings",
+        "normalisedKey": "upvc pipe",
+        "selectedSpelling": "UPVC Pipe",
+        "candidates": [
+          {
+            "category": "UPVC Pipe",
+            "products": 52,
+            "activeProducts": 52
+          },
+          {
+            "category": "UPVC PIPE",
+            "products": 12,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      }
+    ]
+  },
+  {
+    "environment": "production",
+    "evidence": "Part 0 reference audit, not post-publish confirmation",
+    "auditIST": "2026-10-03 12:52:53",
+    "groups": [
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "aqua 54",
+        "selectedSpelling": "Aqua 54",
+        "candidates": [
+          {
+            "category": "Aqua 54",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "AQUA 54",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "aspire 52",
+        "selectedSpelling": "Aspire 52",
+        "candidates": [
+          {
+            "category": "Aspire 52",
+            "products": 48,
+            "activeProducts": 48
+          },
+          {
+            "category": "ASPIRE 52",
+            "products": 8,
+            "activeProducts": 3
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "blaze 62",
+        "selectedSpelling": "Blaze 62",
+        "candidates": [
+          {
+            "category": "Blaze 62",
+            "products": 36,
+            "activeProducts": 36
+          },
+          {
+            "category": "BLAZE 62",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "cygnu 71",
+        "selectedSpelling": "Cygnus 71",
+        "candidates": [
+          {
+            "category": "Cygnus 71",
+            "products": 34,
+            "activeProducts": 34
+          },
+          {
+            "category": "CYGNUS 71",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "europa 90",
+        "selectedSpelling": "Europa 90",
+        "candidates": [
+          {
+            "category": "Europa 90",
+            "products": 36,
+            "activeProducts": 36
+          },
+          {
+            "category": "EUROPA 90",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "evian 87",
+        "selectedSpelling": "Evian 87",
+        "candidates": [
+          {
+            "category": "Evian 87",
+            "products": 40,
+            "activeProducts": 40
+          },
+          {
+            "category": "EVIAN 87",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "laguna 93",
+        "selectedSpelling": "Laguna 93",
+        "candidates": [
+          {
+            "category": "Laguna 93",
+            "products": 40,
+            "activeProducts": 40
+          },
+          {
+            "category": "LAGUNA 93",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "macasa 76",
+        "selectedSpelling": "Macasa 76",
+        "candidates": [
+          {
+            "category": "Macasa 76",
+            "products": 41,
+            "activeProducts": 41
+          },
+          {
+            "category": "MACASA 76",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "marcu 68",
+        "selectedSpelling": "Marcus 68",
+        "candidates": [
+          {
+            "category": "Marcus 68",
+            "products": 42,
+            "activeProducts": 42
+          },
+          {
+            "category": "MARCUS 68",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "niagara 81",
+        "selectedSpelling": "Niagara 81",
+        "candidates": [
+          {
+            "category": "Niagara 81",
+            "products": 35,
+            "activeProducts": 35
+          },
+          {
+            "category": "NIAGARA 81",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "ocean 55",
+        "selectedSpelling": "Ocean 55",
+        "candidates": [
+          {
+            "category": "Ocean 55",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "OCEAN 55",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "orbit 53",
+        "selectedSpelling": "Orbit 53",
+        "candidates": [
+          {
+            "category": "Orbit 53",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "ORBIT 53",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "polo 60",
+        "selectedSpelling": "Polo 60",
+        "candidates": [
+          {
+            "category": "Polo 60",
+            "products": 36,
+            "activeProducts": 36
+          },
+          {
+            "category": "POLO 60",
+            "products": 4,
+            "activeProducts": 2
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "saga 79f",
+        "selectedSpelling": "Saga 79F",
+        "candidates": [
+          {
+            "category": "Saga 79F",
+            "products": 34,
+            "activeProducts": 34
+          },
+          {
+            "category": "SAGA 79F",
+            "products": 11,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "urbona 78",
+        "selectedSpelling": "Urbona 78",
+        "candidates": [
+          {
+            "category": "Urbona 78",
+            "products": 39,
+            "activeProducts": 39
+          },
+          {
+            "category": "URBONA 78",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "vincent 66",
+        "selectedSpelling": "Vincent 66",
+        "candidates": [
+          {
+            "category": "Vincent 66",
+            "products": 40,
+            "activeProducts": 40
+          },
+          {
+            "category": "VINCENT 66",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "CP Fittings / Faucets",
+        "normalisedKey": "virgo p66",
+        "selectedSpelling": "Virgo P66",
+        "candidates": [
+          {
+            "category": "Virgo P66",
+            "products": 37,
+            "activeProducts": 37
+          },
+          {
+            "category": "VIRGO P66",
+            "products": 2,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "Pipes & Fittings",
+        "normalisedKey": "silent fitting",
+        "selectedSpelling": "Silent Fittings",
+        "candidates": [
+          {
+            "category": "Silent Fittings",
+            "products": 80,
+            "activeProducts": 79
+          },
+          {
+            "category": "SILENT FITTINGS",
+            "products": 30,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "Pipes & Fittings",
+        "normalisedKey": "swr pipe",
+        "selectedSpelling": "SWR Pipe",
+        "candidates": [
+          {
+            "category": "SWR Pipe",
+            "products": 160,
+            "activeProducts": 160
+          },
+          {
+            "category": "SWR PIPE",
+            "products": 80,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      },
+      {
+        "division": "Pipes & Fittings",
+        "normalisedKey": "upvc pipe",
+        "selectedSpelling": "UPVC Pipe",
+        "candidates": [
+          {
+            "category": "UPVC Pipe",
+            "products": 52,
+            "activeProducts": 52
+          },
+          {
+            "category": "UPVC PIPE",
+            "products": 12,
+            "activeProducts": 0
+          }
+        ],
+        "rangeCopyHold": true,
+        "action": "New products only; no stored product changed"
+      }
+    ]
+  }
+]

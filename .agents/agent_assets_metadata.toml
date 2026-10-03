@@ -697,3 +697,31 @@ mtime_ms = 1791017653848
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/36b36c39-3c3e-4169-82de-b1237942d426/61ad948c-4748-48af-8b8b-fd42308fc969"
 storage_version_token = "1791017676807436"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "CP10y31bGoodgVEfKwLJX"
+uri = "file://reports/p051-part-1/affected-groups.csv"
+type = "table"
+title = "Category spelling affected groups"
+description = "20 groups per environment, preferred spellings and every candidate/count. No groups were merged; production figures are reference evidence."
+logical_id = "617e307a-f9c5-4cf1-b216-82f0b2efcdd1"
+content_hash = "sha256:261d2c5fe53d91fc7ea388d7f9fa90f12518055a2e1ba9857168d3a1cc175ba1"
+size = 12742
+mtime_ms = 1791020179471
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/617e307a-f9c5-4cf1-b216-82f0b2efcdd1/df3d009a-c04e-45f2-b3cc-39da97f0b47d"
+storage_version_token = "1791020907104068"
+content_type = "text/csv"
+
+[[outputs]]
+id = "JaPIfWudWs81hSI3iSdNG"
+uri = "file://reports/p051-part-1/development-verification.txt"
+type = "text"
+title = "Part 1 development verification"
+description = "Tests, UI checks, unchanged MRP checksum/classification evidence and IST clocks. Production confirmation remains pending publication."
+logical_id = "5c0fef6b-833a-479a-bbbf-6505d836a946"
+content_hash = "sha256:92d3c5415efa8f37650b5644f74c948f1ec5d27239ce294f88c70802684bb8bd"
+size = 4216
+mtime_ms = 1791020905416
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/5c0fef6b-833a-479a-bbbf-6505d836a946/a39c59e3-b014-490d-a59c-19c827930e79"
+storage_version_token = "1791020908381424"
+content_type = "text/plain"

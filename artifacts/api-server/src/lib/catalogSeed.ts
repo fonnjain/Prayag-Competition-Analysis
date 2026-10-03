@@ -1,3 +1,4 @@
+import { planNewProductCategories, assertCategorySpellingPlan, assertCategorySpellingPreview, lockCategorySpellings } from "./categorySpellingGuard";
 import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
@@ -91,8 +92,19 @@ async function chunkedInsert<T>(
   }
 }
 
-export async function loadCatalogSeed(): Promise<void> {
+export async function previewCatalogSeedCategories() {
+  const plan = planNewProductCategories(data.products, await db.select().from(catalogProductsTable));
+  assertCategorySpellingPlan(plan);
+  return { categorySpellings: plan.categorySpellings, categorySpellingFingerprint: plan.categorySpellingFingerprint };
+}
+export async function loadCatalogSeed(expectedSpellingFingerprint?: string): Promise<void> {
   await db.transaction(async (tx) => {
+    await lockCategorySpellings(tx);
+    const storedProducts = await tx.select().from(catalogProductsTable);
+    const categoryPlan = planNewProductCategories(data.products, storedProducts);
+    assertCategorySpellingPlan(categoryPlan);
+    if (expectedSpellingFingerprint !== undefined) assertCategorySpellingPreview(expectedSpellingFingerprint, categoryPlan);
+    const guardedProducts = new Map(categoryPlan.rows.map(row => [row.itemCode, row]));
     const removedHistory = await tx
       .select({
         id: mrpPriceHistoryTable.id,
@@ -157,15 +169,15 @@ export async function loadCatalogSeed(): Promise<void> {
       batch.map((p) => ({
         itemCode: p.itemCode,
         productName: p.productName,
-        division: p.division,
-        category: p.category,
-        seriesRange: p.seriesRange,
+        division: guardedProducts.get(p.itemCode)!.division,
+        category: guardedProducts.get(p.itemCode)!.category,
+        seriesRange: guardedProducts.get(p.itemCode)!.seriesRange,
         // Persist the nominal size parsed from the product name when the source
         // size is blank, so size matching is exact for downstream consumers.
         size: p.size ?? parseSizeFromName(p.productName),
         uom: p.uom || "NOS",
         kgCost: null,
-        isActive: p.isActive,
+        isActive: guardedProducts.get(p.itemCode)!.isActive,
         sourceFiles: p.sourceFiles,
         dataFlag: p.dataFlag,
       })),

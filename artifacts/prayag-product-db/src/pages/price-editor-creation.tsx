@@ -15,7 +15,8 @@ import {
   useGetPriceEditorNewProductUndoStatus,
   useUndoPriceEditorNewProduct,
   useDeactivatePriceEditorNewProduct,
-  NewProductRequest
+  NewProductRequest,
+  type CategorySpellingDecision
 } from "@workspace/api-client-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { productDetailHref } from "@/lib/product-links";
 import { AlertTriangle, CheckCircle2, Undo2, XCircle } from "lucide-react";
 import { useEditorInvalidate } from "./price-editor";
+import { CategorySpellingPreview } from "@/components/category-spelling-preview";
 import { useAuth } from "@workspace/replit-auth-web";
 import {
   AlertDialog,
@@ -186,6 +188,7 @@ export function ProductCreationTab() {
   const [newSeriesReason, setNewSeriesReason] = useState("");
   const [locallyAddedSeries, setLocallyAddedSeries] = useState<Record<string, string[]>>({});
   const [classificationError, setClassificationError] = useState<string | null>(null);
+  const [categorySpellingError, setCategorySpellingError] = useState<CategorySpellingDecision[]>([]);
   
   const formVersion = useRef(0);
   
@@ -282,6 +285,7 @@ export function ProductCreationTab() {
     const reason = newCategoryReason.trim();
     if (!division || !name || !reason) return;
     setClassificationError(null);
+    setCategorySpellingError([]);
     addCategory.mutate({ data: { division, name, reason } }, {
       onSuccess: async () => {
         setCategory(name);
@@ -298,6 +302,8 @@ export function ProductCreationTab() {
       onError: e => {
         const existing = duplicateValue(e);
         setClassificationError(existing ? `A category named “${String(existing)}” already exists in this division. It has not been selected; choose it from the list if appropriate.` : errorText(e));
+        const body = e as { data?: { categorySpellings?: CategorySpellingDecision[] }; response?: { data?: { categorySpellings?: CategorySpellingDecision[] } }; categorySpellings?: CategorySpellingDecision[] };
+        setCategorySpellingError(body.data?.categorySpellings ?? body.response?.data?.categorySpellings ?? body.categorySpellings ?? []);
       },
     });
   };
@@ -392,6 +398,7 @@ export function ProductCreationTab() {
       {saved && <SavedResult result={saved} onClear={() => setSaved(null)} invalidate={invalidate} />}
       {formError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Could not complete request</AlertTitle><AlertDescription>{formError}</AlertDescription></Alert>}
       {classificationError && <Alert variant="destructive" role="alert"><AlertTriangle className="h-4 w-4" /><AlertTitle>Could not add classification</AlertTitle><AlertDescription>{classificationError}</AlertDescription></Alert>}
+      <CategorySpellingPreview decisions={categorySpellingError} />
 
       {(options.data?.locallyAddedDivisions?.filter(item => !item.salesMapped).length ?? 0) > 0 && (
         <section aria-labelledby="local-divisions-heading" className="rounded-xl border border-amber-300 bg-amber-50/70 p-5 shadow-sm">
@@ -518,8 +525,9 @@ export function ProductCreationTab() {
         {snapshot && preview.data && (
           <div className="mt-4 rounded-lg border-2 border-[#2d7c78] bg-[#f2fbfa] p-4">
             <h3 className="font-semibold">Confirm creation</h3>
+            <CategorySpellingPreview decisions={preview.data.categorySpellings} />
             <p className="mt-2 text-sm">
-              <b>WILL CREATE</b> product <b>{preview.data.normalizedCode} ({snapshot.productName})</b> in <b>{snapshot.division} / {snapshot.category}</b> with an exact MRP of <b>{money(snapshot.mrp)}</b>{supportsCatalogRange(snapshot.division) && snapshot.series ? <> in Range <b>{snapshot.series}</b></> : null}, effective from <b>{date(snapshot.effectiveDate)}</b>.
+              <b>WILL CREATE</b> product <b>{preview.data.normalizedCode} ({snapshot.productName})</b> in <b>{snapshot.division} / {preview.data.categorySpellings?.[0]?.selectedCategory ?? snapshot.category}</b> with an exact MRP of <b>{money(snapshot.mrp)}</b>{supportsCatalogRange(snapshot.division) && snapshot.series ? <> in Range <b>{snapshot.series}</b></> : null}, effective from <b>{date(snapshot.effectiveDate)}</b>.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">Reason: {snapshot.reason}</p>
             <div className="mt-2 text-sm text-muted-foreground">

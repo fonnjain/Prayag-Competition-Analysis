@@ -202,6 +202,7 @@ import type {
   PromoteMrpGeneratorSimpleScenarioBody,
   ReconcileSanitarywareVariantProvenanceBody,
   RecordAcceptBatch,
+  ResetCatalogBody,
   ResetUserPasswordBody,
   RollbackMrpRevisionResult,
   RunMrpGeneratorScenarioParams,
@@ -1848,14 +1849,15 @@ export const getResetCatalogUrl = () => {
 /**
  * @summary Reset the product catalog to the original clean import
  */
-export const resetCatalog = async ( options?: RequestInit): Promise<OkResponse> => {
+export const resetCatalog = async (resetCatalogBody: ResetCatalogBody, options?: RequestInit): Promise<OkResponse> => {
 
   return customFetch<OkResponse>(getResetCatalogUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      resetCatalogBody,)
   }
 );}
 
@@ -1863,8 +1865,8 @@ export const resetCatalog = async ( options?: RequestInit): Promise<OkResponse> 
 
 
 export const getResetCatalogMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,{data: BodyType<ResetCatalogBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,{data: BodyType<ResetCatalogBody>}, TContext> => {
 
 const mutationKey = ['resetCatalog'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1876,10 +1878,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetCatalog>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetCatalog>>, {data: BodyType<ResetCatalogBody>}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  resetCatalog(requestOptions)
+          return  resetCatalog(data,requestOptions)
         }
 
 
@@ -1890,18 +1892,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ResetCatalogMutationResult = NonNullable<Awaited<ReturnType<typeof resetCatalog>>>
-
+    export type ResetCatalogMutationBody = BodyType<ResetCatalogBody>
     export type ResetCatalogMutationError = ErrorType<unknown>
 
     /**
  * @summary Reset the product catalog to the original clean import
  */
 export const useResetCatalog = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCatalog>>, TError,{data: BodyType<ResetCatalogBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof resetCatalog>>,
         TError,
-        void,
+        {data: BodyType<ResetCatalogBody>},
         TContext
       > => {
       return useMutation(getResetCatalogMutationOptions(options));

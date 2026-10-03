@@ -1,0 +1,75 @@
+{
+  "batchId": 188,
+  "status": "pending",
+  "expiresAt": "2026-10-04T09:41:06.326Z",
+  "fileName": "p051-fixture.xlsx",
+  "fileSha256": "d73730e60360052847bbfd78fee03aac330145634f1dab2257c0eff476ac0347",
+  "catalogBefore": 6961,
+  "catalogAfter": 6962,
+  "willCreateCount": 1,
+  "rejectedCount": 0,
+  "immediateCount": 1,
+  "immediateMessage": "1 product(s) will go live immediately because the effective date has passed.",
+  "preview": {
+    "kind": "new-products",
+    "mode": "new_products",
+    "categorySpellings": [
+      {
+        "itemCode": "P051-6",
+        "division": "CP Fittings / Faucets",
+        "inputCategory": "Novel Category 6",
+        "selectedCategory": "Novel Category 6",
+        "status": "new",
+        "candidates": [],
+        "selectionReason": "New Category; requires the normal administrator approval. Equivalent new rows use the first previewed spelling."
+      }
+    ],
+    "categorySpellingFingerprint": "c0f749cba163cff18a6a6766ed0afaf6643f1c94f9880a62da6d4cb0877f1123",
+    "reason": "Private guard verification",
+    "fileName": "p051-fixture.xlsx",
+    "fileSha256": "d73730e60360052847bbfd78fee03aac330145634f1dab2257c0eff476ac0347",
+    "willCreate": [
+      {
+        "itemCode": "P051-6",
+        "division": "CP Fittings / Faucets",
+        "category": "Novel Category 6",
+        "series": null,
+        "seriesRange": null,
+        "productName": "Private Fixture",
+        "size": "15 mm",
+        "mrp": 100,
+        "effectiveDate": "2026-10-01",
+        "row": 2
+      }
+    ],
+    "rejectedRows": [],
+    "rangeWarnings": [],
+    "rowsToCreate": 1,
+    "willCreateCount": 1,
+    "rejectedCount": 0,
+    "catalogBeforeCount": 6961,
+    "catalogAfterCount": 6962,
+    "catalogBefore": 6961,
+    "catalogAfter": 6962,
+    "periods": [
+      {
+        "effectiveDate": "2026-10-01",
+        "isNew": false,
+        "isExisting": true,
+        "existingRowCount": 6,
+        "existingCount": 6,
+        "createCount": 1,
+        "afterRowCount": 7,
+        "afterCount": 7,
+        "goesLiveImmediately": true,
+        "isImmediate": true
+      }
+    ],
+    "immediateProductCount": 1,
+    "immediateCount": 1,
+    "immediateMessage": "1 product(s) will go live immediately because the effective date has passed.",
+    "canApply": true,
+    "noChangeReason": null
+  },
+  "result": null
+}

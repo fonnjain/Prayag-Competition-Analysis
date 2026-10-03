@@ -629,6 +629,10 @@ export const ReconcileSanitarywareVariantProvenanceResponse = zod.object({
 /**
  * @summary Reset the product catalog to the original clean import
  */
+export const ResetCatalogBody = zod.object({
+  "categorySpellingFingerprint": zod.string()
+})
+
 export const ResetCatalogResponse = zod.object({
   "ok": zod.boolean()
 })
@@ -2626,6 +2630,18 @@ export const PreviewPriceEditorNewProductResponse = zod.object({
   "newSeriesConfirmed": zod.boolean().optional(),
   "unusualCodeConfirmed": zod.boolean().optional()
 }).and(zod.object({
+  "categorySpellings": zod.array(zod.object({
+  "itemCode": zod.string().optional(),
+  "division": zod.string().nullable(),
+  "inputCategory": zod.string(),
+  "selectedCategory": zod.string().nullable(),
+  "status": zod.enum(['matched existing spelling', 'new', 'ambiguous']),
+  "selectionReason": zod.string(),
+  "candidates": zod.array(zod.object({
+  "category": zod.string(),
+  "activeProducts": zod.number()
+}))
+})).optional(),
   "token": zod.string(),
   "normalizedCode": zod.string(),
   "periodExists": zod.boolean(),

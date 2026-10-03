@@ -1,3 +1,4 @@
+import { planCategorySpellings, readCategoryCatalogue, assertCategorySpellingPlan, assertCategorySpellingPreview, lockCategorySpellings } from "../lib/categorySpellingGuard";
 import { Router, type IRouter, type Request } from "express";
 import { supportsCatalogRange } from "@workspace/formatting";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
@@ -486,21 +487,17 @@ router.post("/catalog/price-editor/categories", requireAdmin, async (req, res): 
       const division = matchingDivision?.division ?? locallyAddedDivision?.name;
       if (!division) return { error: "Division must be selected from existing catalogue divisions or locally added divisions." };
 
-      const products = await tx.select({ category: catalogProductsTable.category })
-        .from(catalogProductsTable).where(eq(catalogProductsTable.division, division));
-      const duplicateProduct = chooseVocabularyCollision(name, products.flatMap((row) =>
-        row.category && normalizeVocabularyKey(row.category) === normalizedKey ? [{ name: row.category }] : [],
-      ));
+      const categoryPlan = planCategorySpellings([{ division, category: name }], await readCategoryCatalogue(tx));
+      const decision = categoryPlan.categorySpellings[0]!;
+      const duplicateProduct = decision.candidates.length ? { name: decision.selectedCategory } : null;
       const duplicateAdded = (await tx.select().from(locallyAddedCategoriesTable).where(and(
         eq(locallyAddedCategoriesTable.divisionKey, divisionKey),
         eq(locallyAddedCategoriesTable.normalizedKey, normalizedKey),
       )).limit(1))[0];
       if (duplicateProduct || duplicateAdded) {
-        const selected = chooseVocabularyCollision(name, [
-          ...(duplicateProduct ? [duplicateProduct] : []),
-          ...(duplicateAdded ? [{ name: duplicateAdded.name }] : []),
-        ]);
-        return { conflict: duplicateVocabulary(selected!.name) };
+        if (!decision.selectedCategory) return { conflict: { code: "CATEGORY_SPELLING_AMBIGUOUS", error: decision.selectionReason, categorySpellings: [decision] } };
+        const conflict = duplicateVocabulary(duplicateProduct?.name ?? duplicateAdded!.name);
+        return { conflict: decision.candidates.length > 1 ? { ...conflict, categorySpellings: [decision] } : conflict };
       }
       const [created] = await tx.insert(locallyAddedCategoriesTable).values({
         division, divisionKey, name, normalizedKey, ...vocabularyAudit(req, reason),
@@ -655,7 +652,7 @@ async function validateNewProductInput(input: ReturnType<typeof newProductInput>
       !Number.isFinite(input.mrp) || input.mrp <= 0 || !iso(input.effectiveDate) || !input.reason) {
     return "Code, product name, division, category, positive MRP, effective date, and reason are required. Range is optional.";
   }
-  const products = await db.select().from(catalogProductsTable).where(eq(catalogProductsTable.isActive, true));
+  const products = await db.select().from(catalogProductsTable);
   const addedDivisions = await db.select({ name: locallyAddedDivisionsTable.name }).from(locallyAddedDivisionsTable);
   const addedCategories = await db.select({
     divisionKey: locallyAddedCategoriesTable.divisionKey,
@@ -699,13 +696,16 @@ router.post("/catalog/price-editor/new-product/preview", requireAdmin, async (re
   const divisionCodes = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable)
     .where(eq(catalogProductsTable.division, input.division));
   const unusualShape = divisionCodes.length > 0 && Math.min(...divisionCodes.map((r) => editDistance(input.itemCode, normalizeNewCode(r.itemCode)))) > Math.max(2, Math.ceil(input.itemCode.length * 0.55));
-  const payload = JSON.stringify({ ...input, unusualCodeConfirmed: false });
+  const categoryPlan = planCategorySpellings([input], await readCategoryCatalogue());
+  assertCategorySpellingPlan(categoryPlan);
+  const payload = JSON.stringify({ ...input, unusualCodeConfirmed: false, categorySpellingFingerprint: categoryPlan.categorySpellingFingerprint });
   const token = randomUUID();
   await db.insert(newProductPreviewStatesTable).values({
     token, payload, createdBy: actor(req), expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
   return res.json({
     ...input,
+    categorySpellings: categoryPlan.categorySpellings,
     normalizedCode: input.itemCode,
     token,
     periodExists: period.length > 0,
@@ -729,6 +729,7 @@ router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req,
   if (codeCheck && !input.unusualCodeConfirmed) return res.status(400).json({ error: "This code is unusual for the selected division. Confirm Continue anyway before creating it." });
   try {
     const result = await db.transaction(async (tx) => {
+      await lockCategorySpellings(tx);
       const preview = (await tx.select().from(newProductPreviewStatesTable).where(and(
         eq(newProductPreviewStatesTable.token, token),
         eq(newProductPreviewStatesTable.status, "preview"),
@@ -736,7 +737,9 @@ router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req,
         sql`${newProductPreviewStatesTable.expiresAt} > now()`,
       )).limit(1).for("update"))[0];
       const previewInput = { ...input, unusualCodeConfirmed: false };
-      if (!preview || preview.payload !== JSON.stringify(previewInput)) throw new Error("Preview is stale, expired, already used, or does not match this product.");
+      const categoryPlan = planCategorySpellings([input], await readCategoryCatalogue(tx));
+      assertCategorySpellingPreview(preview && JSON.parse(preview.payload).categorySpellingFingerprint, categoryPlan);
+      if (!preview || preview.payload !== JSON.stringify({ ...previewInput, categorySpellingFingerprint: categoryPlan.categorySpellingFingerprint })) throw new Error("Preview is stale, expired, already used, or does not match this product.");
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"new-product:" + input.itemCode}))`);
       const allProducts = await tx.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable).for("update");
       const existing = allProducts.filter((p) => normalizeNewCode(p.itemCode) === input.itemCode);
@@ -763,7 +766,7 @@ router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req,
       }).returning({ id: mrpLoadBatchesTable.id });
       const productRows = await tx.insert(catalogProductsTable).values({
         itemCode: input.itemCode, productName: input.productName, division: input.division,
-        seriesRange: input.series || null, category: input.category, size: input.size,
+        seriesRange: input.series || null, category: categoryPlan.rows[0]!.category, size: input.size,
         sourceFiles: "single-product-editor", dataFlag: "manual_creation",
       }).returning();
       const historyRows = await tx.insert(mrpPriceHistoryTable).values({

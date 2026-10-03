@@ -1,3 +1,5 @@
+import { CategorySpellingPreview } from "@/components/category-spelling-preview";
+import type { CategorySpellingDecision } from "@workspace/api-client-react";
 import { useEffect, useMemo, useState } from "react";
 import { MasterClassificationPreview } from "@/components/MasterClassificationPreview";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ interface MrpPeriod { effectiveDate: string; count: number }
 interface MrpSource { id: number; division: string; sheetUrl: string; expectedFileName: string | null }
 interface PriceChange { itemCode: string; productName?: string | null; oldMrp: number | null; newMrp: number; effectiveDate: string; delta: number }
 interface Preview {
+  categorySpellings?: CategorySpellingDecision[];
   kind: string; rowsToWrite: number; productRows: number; priceRows: number;
   periods: { effectiveDate: string; rowCount: number; isNew: boolean; movedInCount: number }[];
   immediatePriceChanges: PriceChange[]; immediatePriceChangeCount: number;
@@ -299,6 +302,7 @@ export default function LoadMrpPage() {
       <Button type="submit" disabled={!file || !sourceId || !downloadedAt || !effectiveDate || isUploading} className="w-full">{isUploading ? "Creating preview…" : <><Upload className="w-4 h-4 mr-2" />Preview upload</>}</Button>
     </form></div>
     {batch && preview && <section className="bg-card border rounded-lg p-6 space-y-6">
+      <CategorySpellingPreview decisions={preview.categorySpellings} />
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"><div><h2 className="font-semibold text-lg flex gap-2 items-center"><FileSpreadsheet className="w-5 h-5 text-primary" />MRP load preview</h2><p className="text-sm text-muted-foreground mt-1">Batch #{batchId} · Status: <span className="font-medium capitalize">{expired && batch.status === "pending" ? "expired" : batch.status}</span>{batch.expiresAt && batch.status === "pending" && !expired ? ` · Expires ${new Date(batch.expiresAt).toLocaleString()}` : ""}</p></div>
         {batch.status === "applied" && <div className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">Applied{batch.appliedAt ? ` ${new Date(batch.appliedAt).toLocaleString()}` : ""}{batch.appliedBy ? ` by ${batch.appliedBy}` : ""}.</div>}
         {batch.status === "discarded" && <div className="rounded border border-muted bg-muted/50 px-3 py-2 text-sm">Discarded{batch.discardedAt ? ` ${new Date(batch.discardedAt).toLocaleString()}` : ""}{batch.discardedBy ? ` by ${batch.discardedBy}` : ""}.</div>}

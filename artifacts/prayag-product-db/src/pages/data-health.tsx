@@ -1,3 +1,5 @@
+import { CategorySpellingPreview } from "@/components/category-spelling-preview";
+import type { CategorySpellingDecision } from "@workspace/api-client-react";
 import { formatMoney, formatCount } from "@workspace/formatting";
 import {
   useGetCatalogDataHealth,
@@ -89,6 +91,7 @@ interface CatalogSyncPreview {
   incoming: CatalogSyncSummary;
   current: CatalogSyncSummary;
   preflightToken: string;
+  categorySpellings?: CategorySpellingDecision[];
   expiresInMinutes: number;
 }
 
@@ -364,6 +367,8 @@ function CatalogSyncPanel({
                   <h3 className="font-semibold text-red-900">
                     Production replacement preview
                   </h3>
+                  <p className="mt-2 text-sm">Existing products keep their Category, Range and division. The spelling check applies only to new product codes.</p>
+                  <CategorySpellingPreview decisions={preview.categorySpellings} />
                   <p className="mt-1 break-all font-mono text-xs text-red-800">
                     SHA-256: {preview.checksum}
                   </p>
@@ -459,6 +464,15 @@ function CatalogSyncPanel({
 }
 
 export default function DataHealthPage() {
+  const [resetOpen, setResetOpen] = useState(false);
+  const resetPreview = useQuery({
+    queryKey: ["catalog", "reset", "category-spelling-preview"], enabled: resetOpen, staleTime: 0,
+    queryFn: async (): Promise<{ categorySpellings: CategorySpellingDecision[]; categorySpellingFingerprint: string }> => {
+      const response = await fetch("/api/catalog/reset/preview");
+      if (!response.ok) throw new Error((await response.json()).error ?? "Could not preview Category spellings.");
+      return response.json();
+    },
+  });
   const { data, isLoading } = useGetCatalogDataHealth();
   const { data: provenance } = useQuery<{ sources: MrpSourceHealth[] }>({
     queryKey: ["catalog", "mrp-provenance"],
@@ -545,7 +559,7 @@ export default function DataHealthPage() {
             Monitor catalog integrity and identify missing information.
           </p>
         </div>
-        <AlertDialog>
+        <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
           <AlertDialogTrigger asChild>
             <Button variant="outline" disabled={resetMutation.isPending}>
               <RotateCcw className="w-4 h-4 mr-2" />
@@ -561,9 +575,14 @@ export default function DataHealthPage() {
                 then will be removed. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <p className="text-sm">Existing products keep their Category, Range and division. The spelling check applies only to new product codes.</p>
+            {resetPreview.isFetching && <p>Checking Category spellings…</p>}
+            {resetPreview.error && <p role="alert">{resetPreview.error.message}</p>}
+            <CategorySpellingPreview decisions={resetPreview.data?.categorySpellings} />
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => resetMutation.mutate()}>
+              <AlertDialogAction disabled={!resetPreview.data || resetPreview.isFetching || !!resetPreview.error}
+                onClick={() => resetMutation.mutate({ data: { categorySpellingFingerprint: resetPreview.data!.categorySpellingFingerprint } })}>
                 Reset
               </AlertDialogAction>
             </AlertDialogFooter>

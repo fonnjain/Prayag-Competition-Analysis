@@ -1,3 +1,4 @@
+import { planCategorySpellings, assertCategorySpellingPlan, lockCategorySpellings } from "./categorySpellingGuard";
 import * as XLSX from "xlsx";
 import { masterClassification, supportsCatalogRange } from "@workspace/formatting";
 import { and, eq, sql } from "drizzle-orm";
@@ -477,6 +478,7 @@ export interface StoredMasterClassification {
   division: string | null;
   category: string | null;
   seriesRange: string | null;
+  isActive?: boolean | null;
 }
 
 /** P049 Step 3: classify against the catalogue, never against a guessed alias. */
@@ -486,7 +488,7 @@ export function planAuthoritativeClassifications(
 ) {
   const existing = new Map(products.map(row => [authoritativeCode(row.itemCode), row]));
   const acceptedCodes = new Set<string>();
-  const newProducts: Array<{ itemCode: string; category: string; seriesRange?: string | null }> = [];
+  const newProducts: Array<{ itemCode: string; division: string; category: string; seriesRange?: string | null }> = [];
   const rejectedRows: Array<{ itemCode: string; row: number; reason: string }> = [];
   const classificationDifferences: Array<{
     itemCode: string; message: string; differingFields: string[];
@@ -533,11 +535,14 @@ export function planAuthoritativeClassifications(
       return;
     }
     const classification = masterClassification({ ...row, category: file.category });
-    newProducts.push({ itemCode: row.itemCode, ...classification });
+    newProducts.push({ itemCode: row.itemCode, division: row.division, ...classification });
     if (!rangeDivision) newNonRangeProducts++;
     acceptedCodes.add(code);
   });
-  return { acceptedCodes, newProducts, rejectedRows, classificationDifferences,
+  const spellingPlan = planCategorySpellings(newProducts as Array<typeof newProducts[number] & { division: string }>, products);
+  assertCategorySpellingPlan(spellingPlan);
+  return { acceptedCodes, newProducts: spellingPlan.rows.map(({ division: _division, ...row }) => row), rejectedRows, classificationDifferences,
+    categorySpellings: spellingPlan.categorySpellings, categorySpellingFingerprint: spellingPlan.categorySpellingFingerprint,
     counts: { existingProducts, newNonRangeProducts, refusedNewRangeProducts } };
 }
 
@@ -576,6 +581,7 @@ export async function loadAuthoritativeMaster(input: {
   const loadNotes = `${parsed.loadReason}${namePreservationNote}`;
 
   const load = async (tx: DatabaseTransaction) => {
+    await lockCategorySpellings(tx);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(917_901)`);
     // Serialize catalogue membership with concurrent product creation. Existing
     // rows are price-only; a new-code race must never become a classification upsert.
@@ -643,6 +649,7 @@ export async function loadAuthoritativeMaster(input: {
         division: catalogProductsTable.division,
         category: catalogProductsTable.category,
         seriesRange: catalogProductsTable.seriesRange,
+        isActive: catalogProductsTable.isActive,
       })
       .from(catalogProductsTable);
     const classificationPlan = planAuthoritativeClassifications(parsed.productRows, existingProducts);

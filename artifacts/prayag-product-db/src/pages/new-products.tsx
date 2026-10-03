@@ -1,4 +1,6 @@
 import { formatMoney, formatCount } from "@workspace/formatting";
+import { CategorySpellingPreview } from "@/components/category-spelling-preview";
+import type { CategorySpellingDecision } from "@workspace/api-client-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +61,7 @@ interface CompetitorEffect {
 }
 
 interface Preview {
+  categorySpellings?: CategorySpellingDecision[];
   kind: string;
   mode: string;
   fileName: string;
@@ -338,19 +341,20 @@ export default function NewProductsPage() {
 
       {batch && preview && (
         <section className="space-y-5" data-testid="section-preview">
+          <CategorySpellingPreview decisions={preview.categorySpellings} />
           <div className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0 max-w-full flex-1">
                 <div className="flex items-center gap-2">
                   <FilePlus className="h-5 w-5 text-[#2d7c78]" />
                   <h2 className="font-semibold text-lg">Batch {batch.batchId}</h2>
                 </div>
-                <p className="mt-1 font-medium">{preview.fileName}</p>
+                <p className="mt-1 font-medium break-all">{preview.fileName}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-xs font-mono text-muted-foreground truncate max-w-sm" title={preview.fileSha256}>
+                  <p className="min-w-0 flex-1 text-xs font-mono text-muted-foreground truncate max-w-sm" title={preview.fileSha256}>
                     SHA-256 {preview.fileSha256}
                   </p>
-                  <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => {
+                  <Button variant="ghost" size="sm" className="shrink-0 h-6 px-2 text-[10px]" onClick={() => {
                     navigator.clipboard.writeText(preview.fileSha256);
                     toast({ title: "Copied", description: "SHA-256 hash copied to clipboard." });
                   }}>

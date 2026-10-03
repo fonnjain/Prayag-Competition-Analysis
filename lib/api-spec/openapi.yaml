@@ -670,6 +670,15 @@ paths:
       operationId: resetCatalog
       tags: [catalog]
       summary: Reset the product catalog to the original clean import
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [categorySpellingFingerprint]
+              properties:
+                categorySpellingFingerprint: { type: string }
       responses:
         "200":
           description: Reset done
@@ -4465,6 +4474,9 @@ components:
         - type: object
           required: [token, normalizedCode, periodExists, periodCount, goesLiveImmediately, dateMeaning, nearbySeries, unusualShape]
           properties:
+            categorySpellings:
+              type: array
+              items: { $ref: "#/components/schemas/CategorySpellingDecision" }
             token: { type: string }
             normalizedCode: { type: string }
             periodExists: { type: boolean }
@@ -4473,6 +4485,25 @@ components:
             dateMeaning: { type: string }
             nearbySeries: { type: array, items: { type: string } }
             unusualShape: { type: boolean }
+    CategorySpellingDecision:
+      type: object
+      required: [division, inputCategory, selectedCategory, status, candidates, selectionReason]
+      properties:
+        itemCode: { type: string }
+        division: { type: ["string", "null"] }
+        inputCategory: { type: string }
+        selectedCategory: { type: ["string", "null"] }
+        status: { type: string, enum: ["matched existing spelling", "new", "ambiguous"] }
+        selectionReason: { type: string }
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/CategorySpellingCandidate" }
+    CategorySpellingCandidate:
+      type: object
+      required: [category, activeProducts]
+      properties:
+        category: { type: string }
+        activeProducts: { type: integer }
     NewProductApplyRequest:
       allOf:
         - $ref: "#/components/schemas/NewProductRequest"

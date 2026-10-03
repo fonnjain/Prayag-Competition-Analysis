@@ -1,3 +1,4 @@
+import { previewCatalogSyncCategories } from "../lib/catalogSync";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
 import { desc } from "drizzle-orm";
@@ -70,11 +71,12 @@ router.post("/catalog/sync/preflight", upload.single("file"), async (req, res) =
   try {
     const bundle = parseAndValidateCatalogSyncBundle(req.file.buffer);
     const email = req.user!.email!;
-    const current = await getCatalogSyncSnapshot();
+    const current = await previewCatalogSyncCategories(bundle);
     res.json({
       checksum: bundle.manifest.payloadSha256,
       createdAt: bundle.manifest.createdAt,
       incoming: summarizeCatalogSyncBundle(bundle),
+      categorySpellings: current.categorySpellings,
       current: current.summary,
       preflightToken: createCatalogSyncPreflightToken(
         bundle,

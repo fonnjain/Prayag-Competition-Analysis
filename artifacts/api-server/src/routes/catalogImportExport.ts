@@ -1,3 +1,4 @@
+import { planCategorySpellings, readCategoryCatalogue, assertCategorySpellingPlan, assertCategorySpellingPreview, assertExactCategoryRestoration, lockCategorySpellings } from "../lib/categorySpellingGuard";
 import { Router, type IRouter } from "express";
 import { supportsCatalogRange } from "@workspace/formatting";
 import { createHash, randomUUID } from "node:crypto";
@@ -117,6 +118,7 @@ type P029Classification = Pick<typeof catalogProductsTable.$inferSelect, typeof 
 export interface NewProductRow {
   itemCode: string;
   division: string;
+  category?: string | null;
   series: string | null;
   seriesRange?: string | null;
   productName: string;
@@ -168,6 +170,7 @@ export function parseNewProductsWorkbook(buffer: Buffer): {
   const aliases: Record<string, string[]> = {
     itemCode: ["itemcode", "catno", "catnumber", "productcode"],
     division: ["division"],
+    category: ["category", "subcategory"],
     series: ["seriesrange", "series", "range"],
     productName: ["productname", "product"],
     size: ["size"],
@@ -228,7 +231,7 @@ export function parseNewProductsWorkbook(buffer: Buffer): {
       if (reason) {
         rejectedRows.push({ row: index + 1, itemCode, reason });
       } else {
-        rows.push({ itemCode: itemCode!, division, series: supportsCatalogRange(division) ? series : null, seriesRange: supportsCatalogRange(division) ? series : null, productName, size, mrp, effectiveDate: effectiveDate!, row: index + 1 });
+        rows.push({ itemCode: itemCode!, division, category: columns.has("category") ? norm(input[columns.get("category")!]) || null : null, series: supportsCatalogRange(division) ? series : null, seriesRange: supportsCatalogRange(division) ? series : null, productName, size, mrp, effectiveDate: effectiveDate!, row: index + 1 });
       }
     }
   }
@@ -379,7 +382,7 @@ export async function applyP019PrinceRematch(
 export function pendingAuthoritativePreview(
   parsed: ParsedAuthoritativeMaster,
   products: { itemCode: string; productName: string | null; discontinuedFrom: string | null;
-    division?: string | null; category?: string | null; seriesRange?: string | null }[],
+    division?: string | null; category?: string | null; seriesRange?: string | null; isActive?: boolean | null }[],
   history: { itemCode: string; effectiveDate: string; mrp: number | null; variant: string }[],
 ) {
   const today = new Date().toISOString().slice(0, 10);
@@ -435,6 +438,8 @@ export function pendingAuthoritativePreview(
     productRows: parsed.productRows.length,
     priceRows: acceptedPrices.length,
     classificationCounts: classification.counts,
+    categorySpellings: classification.categorySpellings,
+    categorySpellingFingerprint: classification.categorySpellingFingerprint,
     classificationDifferences: classification.classificationDifferences,
     classificationDifferenceCount: classification.classificationDifferences.length,
     classificationPolicy: "Existing products: prices only. classification differs — not changed. New non-Range products: master series → Category; no Range. New CP/PTMT products without Category: create in the product editor.",
@@ -1228,7 +1233,7 @@ const FILENAME_DIVISION_MAP: Array<{ pattern: RegExp; division: string }> = [
   { pattern: /quaa|fern/i,                     division: "QUAA & FERN" },
 ];
 
-function divisionFromFilename(filename: string): string | null {
+export function divisionFromFilename(filename: string): string | null {
   const base = filename.replace(/\.[^.]+$/, "").toLowerCase();
   for (const { pattern, division } of FILENAME_DIVISION_MAP) {
     if (pattern.test(base)) return division;
@@ -1332,7 +1337,7 @@ async function reconcileSourceDiscontinuations(
   }
 }
 
-async function persistParsedRows(
+export async function persistParsedRows(
   parsedRows: ParsedRow[],
   sourcePriceObservations: SourcePriceObservation[],
   filename: string,
@@ -1425,6 +1430,7 @@ async function persistParsedRows(
   const inferredDivision = divisionFromFilename(filename);
 
   const write = async (tx: DatabaseTransaction) => {
+    await lockCategorySpellings(tx);
     const existingPairs = await tx
       .select({
         itemCode: mrpPriceHistoryTable.itemCode,
@@ -1435,7 +1441,7 @@ async function persistParsedRows(
     // Key = "CODE__VARIANT" so a Standard row doesn't block a new Ivory row.
     const dupSet = new Set(existingPairs.map((p) => `${normCode(p.itemCode)}__${p.variant}`));
 
-    // Fetch existing products that are missing name or division so we can backfill.
+    // Resolve current membership under the shared spelling lock; never backfill classifications.
     const existingRows = await tx
       .select({
         itemCode: catalogProductsTable.itemCode,
@@ -1444,7 +1450,15 @@ async function persistParsedRows(
         category: catalogProductsTable.category,
       })
       .from(catalogProductsTable);
-    const existingMap = new Map(existingRows.map((r) => [r.itemCode, r]));
+    const existingMap = new Map(existingRows.map((r) => [normCode(r.itemCode), r]));
+    for (const row of existingRows) { knownCodes.add(normCode(row.itemCode)); canonical.set(normCode(row.itemCode), row.itemCode); }
+    const categoryPlan = planCategorySpellings(
+      [...byCodeVariant.values()].filter(row => !existingMap.has(normCode(row.itemCode)))
+        .map(row => ({ itemCode: row.itemCode, division: inferredDivision, category: row.category })),
+      await readCategoryCatalogue(tx),
+    );
+    assertCategorySpellingPlan(categoryPlan);
+    const guardedCategories = new Map(categoryPlan.rows.map(row => [row.itemCode, row.category]));
     const previousResult = await tx.execute<{
       item_code: string;
       mrp: number | null;
@@ -1463,15 +1477,13 @@ async function persistParsedRows(
 
     const newProductValues: (typeof catalogProductsTable.$inferInsert)[] = [];
     const historyValues: (typeof mrpPriceHistoryTable.$inferInsert)[] = [];
-    // Backfill updates: itemCode -> {productName?, division?, category?}
-    const backfillMap = new Map<string, Partial<typeof catalogProductsTable.$inferInsert>>();
     // Track which codes have had their catalog product created/updated this run.
     const processedItemCodes = new Set<string>();
 
     for (const [, { itemCode: code, price, productName, category, variant }] of byCodeVariant) {
       const isKnown = knownCodes.has(code);
       const storedCode = canonical.get(code) ?? code;
-      const existing = existingMap.get(storedCode);
+       const existing = existingMap.get(code);
       const division = existing?.division ?? inferredDivision;
       const reasons = anomalyReasons(
         price,
@@ -1487,7 +1499,7 @@ async function persistParsedRows(
             itemCode: storedCode,
             productName: productName ?? null,
             division: inferredDivision,
-            category: category ?? null,
+            category: guardedCategories.get(code) ?? null,
             uom: "NOS",
             isActive: true,
             sourceFiles: filename,
@@ -1499,14 +1511,7 @@ async function persistParsedRows(
           canonical.set(code, storedCode);
         } else {
           summary.matchedProducts++;
-          // Backfill any null metadata on existing products.
-          if (existing) {
-            const patch: Partial<typeof catalogProductsTable.$inferInsert> = {};
-            if (!existing.productName && productName) patch.productName = productName;
-            if (!existing.division && inferredDivision) patch.division = inferredDivision;
-            if (!existing.category && category) patch.category = category;
-            if (Object.keys(patch).length > 0) backfillMap.set(storedCode, patch);
-          }
+          // P049 wins even when stored metadata is null: existing products are prices-only.
         }
       }
 
@@ -1578,29 +1583,6 @@ async function persistParsedRows(
       }
     }
 
-    // Apply backfill patches for existing products with null metadata.
-    // Group by patch shape to minimize number of UPDATE statements.
-    if (backfillMap.size > 0) {
-      // Simple approach: update one at a time in batches of 500 using inArray
-      // for the common case where all patches in a batch share the same fields.
-      const byPatch = new Map<string, string[]>();
-      for (const [code, patch] of backfillMap) {
-        const key = JSON.stringify(patch);
-        const list = byPatch.get(key) ?? [];
-        list.push(code);
-        byPatch.set(key, list);
-      }
-      for (const [patchJson, codes] of byPatch) {
-        const patch = JSON.parse(patchJson) as Partial<typeof catalogProductsTable.$inferInsert>;
-        for (let i = 0; i < codes.length; i += 500) {
-          await tx
-            .update(catalogProductsTable)
-            .set(patch)
-            .where(inArray(catalogProductsTable.itemCode, codes.slice(i, i + 500)));
-        }
-      }
-    }
-
     await reconcileSourceDiscontinuations(
       tx,
       sourcePriceObservations,
@@ -1649,7 +1631,7 @@ router.post("/catalog/new-products/preview", requireAdmin, upload.single("file")
       res.status(409).json({ error: duplicatePending ? "This new-products workbook is already awaiting review." : "This new-products workbook has already been applied.", duplicate: true });
       return;
     }
-    const existing = await db.select({ itemCode: catalogProductsTable.itemCode, productName: catalogProductsTable.productName }).from(catalogProductsTable);
+    const existing = await db.select().from(catalogProductsTable);
     const existingCodes = new Set(existing.map((row) => normCode(row.itemCode)));
     const seen = new Set<string>();
     const rejectedRows = [...parsed.rejectedRows];
@@ -1685,8 +1667,12 @@ router.post("/catalog/new-products/preview", requireAdmin, upload.single("file")
         isImmediate: effectiveDate <= today,
       };
     });
+    const categoryPlan = planCategorySpellings(accepted.map(row => ({ ...row, category: row.category ?? null })), existing);
+    assertCategorySpellingPlan(categoryPlan);
+    accepted.splice(0, accepted.length, ...categoryPlan.rows);
     const preview = {
       kind: "new-products", mode: "new_products",
+      categorySpellings: categoryPlan.categorySpellings, categorySpellingFingerprint: categoryPlan.categorySpellingFingerprint,
       reason: req.body.reason.trim(),
       fileName: file.originalname,
       fileSha256,
@@ -1746,6 +1732,7 @@ router.post("/catalog/new-products/:batchId/apply", requireAdmin, async (req, re
   const confirmed = Number(req.body?.rowsToCreate);
   try {
     const outcome = await db.transaction(async (tx) => {
+      await lockCategorySpellings(tx);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(917_902)`);
       const [batch] = await tx.select().from(mrpPendingBatchesTable).where(eq(mrpPendingBatchesTable.id, id)).limit(1);
       if (!batch) throw new Error("New-products batch not found.");
@@ -1768,6 +1755,11 @@ router.post("/catalog/new-products/:batchId/apply", requireAdmin, async (req, re
       if (!preview.canApply) throw new Error(preview.noChangeReason ?? "No valid new products would be created.");
       if (confirmed !== preview.rowsToCreate) throw new Error(`Confirmation must repeat ${preview.rowsToCreate} products to create.`);
       const payload = JSON.parse(batch.payload) as { rows: NewProductRow[]; reason?: string };
+      const originalDecisions = (JSON.parse(batch.preview) as { categorySpellings?: Array<{ itemCode?: string; inputCategory: string }>; categorySpellingFingerprint?: string });
+      const originalCategories = new Map(originalDecisions.categorySpellings?.map(row => [row.itemCode, row.inputCategory]));
+      const categoryPlan = planCategorySpellings(payload.rows.map(row => ({ ...row, category: originalCategories.get(row.itemCode) ?? row.category ?? null })), await readCategoryCatalogue(tx));
+      assertCategorySpellingPreview(originalDecisions.categorySpellingFingerprint, categoryPlan);
+      payload.rows = categoryPlan.rows;
       const existing = await tx.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
       const existingCodes = new Set(existing.map((row) => normCode(row.itemCode)));
       if (payload.rows.some((row) => existingCodes.has(normCode(row.itemCode)))) throw new Error("One or more products now exist in the catalogue. Refresh the preview; no rows were written.");
@@ -1779,7 +1771,7 @@ router.post("/catalog/new-products/:batchId/apply", requireAdmin, async (req, re
       if (!load) throw new Error("Could not create load provenance batch.");
       const today = new Date().toISOString().slice(0, 10);
       await tx.insert(catalogProductsTable).values(payload.rows.map((row) => ({
-        itemCode: row.itemCode, productName: row.productName, division: row.division, seriesRange: supportsCatalogRange(row.division) ? row.series : null, size: row.size,
+        itemCode: row.itemCode, productName: row.productName, division: row.division, category: row.category ?? null, seriesRange: supportsCatalogRange(row.division) ? row.series : null, size: row.size,
         sourceFiles: batch.fileName, dataFlag: "new_products_upload",
       })));
       const insertedHistory = await tx.insert(mrpPriceHistoryTable).values(payload.rows.map((row) => ({
@@ -1876,6 +1868,7 @@ router.post("/catalog/mrp-loads/:batchId/apply", requireAdmin, async (req, res):
         ),
       );
     const outcome = await db.transaction(async (tx) => {
+      await lockCategorySpellings(tx);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${917_902 + id})`);
       const [batch] = await tx.select().from(mrpPendingBatchesTable)
         .where(eq(mrpPendingBatchesTable.id, id)).limit(1);
@@ -1892,6 +1885,12 @@ router.post("/catalog/mrp-loads/:batchId/apply", requireAdmin, async (req, res):
       let result: unknown;
       let appliedLoadBatchId: number;
       if ("kind" in payload && payload.kind === "ordinary") {
+        const stored = await readCategoryCatalogue(tx);
+        const existingCodes = new Set(stored.map(row => normCode(row.itemCode)));
+        const categoryPlan = planCategorySpellings(payload.entries.flatMap(entry => entry.rows
+          .filter(row => !existingCodes.has(normCode(row.itemCode)))
+          .map(row => ({ itemCode: row.itemCode, division: divisionFromFilename(entry.fileName), category: row.category }))), stored);
+        assertCategorySpellingPreview(JSON.parse(batch.preview).categorySpellingFingerprint, categoryPlan);
         const [load] = await tx.insert(mrpLoadBatchesTable).values({
           sourceId: batch.sourceId, fileName: batch.fileName, fileSha256: batch.fileSha256,
           fileSizeBytes: batch.fileSizeBytes, downloadedAt: batch.downloadedAt,
@@ -1915,6 +1914,12 @@ router.post("/catalog/mrp-loads/:batchId/apply", requireAdmin, async (req, res):
         await recomputeCurrentFlagsInTransaction(tx);
         result = { kind: "ordinary", loadBatchId: appliedLoadBatchId, summaries, rowsWritten };
       } else {
+        const currentClassification = planAuthoritativeClassifications((payload as ParsedAuthoritativeMaster).productRows,
+          (await tx.select().from(catalogProductsTable)));
+        assertCategorySpellingPreview(JSON.parse(batch.preview).categorySpellingFingerprint, {
+          rows: [], categorySpellings: currentClassification.categorySpellings,
+          categorySpellingFingerprint: currentClassification.categorySpellingFingerprint,
+        });
         const authoritative = await loadAuthoritativeMaster({
           parsed: payload as ParsedAuthoritativeMaster,
           fileSizeBytes: batch.fileSizeBytes,
@@ -2071,6 +2076,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         division: catalogProductsTable.division,
         category: catalogProductsTable.category,
         seriesRange: catalogProductsTable.seriesRange,
+        isActive: catalogProductsTable.isActive,
       }).from(catalogProductsTable);
       const history = await db.select({
         itemCode: mrpPriceHistoryTable.itemCode,
@@ -2190,10 +2196,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
 
     // Parse once and stage the exact parser output.  In particular, do not
     // create an mrp_load_batches record here: source uploads are previews.
-    const existingProductsForPreview = await db.select({
-      itemCode: catalogProductsTable.itemCode,
-      productName: catalogProductsTable.productName,
-    }).from(catalogProductsTable);
+    const existingProductsForPreview = await db.select().from(catalogProductsTable);
     const previewKnownCodes = new Set(existingProductsForPreview.map((p) => normCode(p.itemCode)));
     const entries: Array<{
       fileName: string; effectiveDate: string; rows: ParsedRow[];
@@ -2268,6 +2271,10 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
       itemCode: mrpPriceHistoryTable.itemCode, effectiveDate: mrpPriceHistoryTable.effectiveDate,
       mrp: mrpPriceHistoryTable.mrp, variant: mrpPriceHistoryTable.variant,
     }).from(mrpPriceHistoryTable);
+    const categoryPlan = planCategorySpellings(entries.flatMap(entry => entry.rows
+      .filter(row => !previewKnownCodes.has(normCode(row.itemCode)))
+      .map(row => ({ itemCode: row.itemCode, division: divisionFromFilename(entry.fileName), category: row.category }))), existingProductsForPreview);
+    assertCategorySpellingPlan(categoryPlan);
     const today = new Date().toISOString().slice(0, 10);
     const knownPeriods = new Set(historyForPreview.map((row) => row.effectiveDate));
     const latest = new Map<string, { mrp: number | null; effectiveDate: string }>();
@@ -2297,6 +2304,7 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
       immediatePriceChanges, immediatePriceChangeCount: immediatePriceChanges.length,
       newProducts: [...new Set(allRows.filter((row) => !previewKnownCodes.has(normCode(row.itemCode))).map((row) => row.itemCode))],
       catalogueProductsAbsentFromFile: existingProductsForPreview.filter((row) => !allRows.some((input) => normCode(input.itemCode) === normCode(row.itemCode))).map((row) => row.itemCode),
+      categorySpellings: categoryPlan.categorySpellings, categorySpellingFingerprint: categoryPlan.categorySpellingFingerprint,
       discontinuations: {
         total: discontinuationDates.length,
         immediate: discontinuationDates.filter((date) => date <= today).length,
@@ -4926,6 +4934,10 @@ router.post("/catalog/ugd-classification/preview", requireAdmin, async (req, res
     if (priceChecks.some((row) => !row.matches)) {
       throw new Error("P029 preview stopped: every sibling and Self Fit MRP must match the exact P029 expected MRP.");
     }
+    const categoryPlan = assertExactCategoryRestoration(rows.map(row => ({
+      itemCode: row.itemCode, division: row.correctedValues.division as string | null,
+      category: row.correctedValues.category as string | null,
+    })), await readCategoryCatalogue());
     const correctionKey = randomUUID();
     const actor = req.user?.email ?? req.user?.id ?? null;
     await db.insert(catalogProductClassificationCorrectionsTable).values(rows.map((row) => ({
@@ -4934,6 +4946,7 @@ router.post("/catalog/ugd-classification/preview", requireAdmin, async (req, res
     })));
     res.json({
       correctionKey, status: "preview", rows, priceChecks,
+      categorySpellings: categoryPlan.categorySpellings,
       copiedFields: P029_CLASSIFICATION_FIELDS,
       sizeAction: "unchanged: all siblings and targets verified null",
       canApply: true,
@@ -4949,6 +4962,7 @@ router.post("/catalog/ugd-classification/:correctionKey/apply", requireAdmin, as
   try {
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(929007)`);
+      await lockCategorySpellings(tx);
       const rows = await tx.select().from(catalogProductClassificationCorrectionsTable)
         .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.appliedAt} IS NULL`));
       if (rows.length !== P029_PAIRS.length) throw new Error("P029 preview not found, already applied, or incomplete.");
@@ -4993,6 +5007,7 @@ router.post("/catalog/ugd-classification/:correctionKey/apply", requireAdmin, as
         notes: "P029 classification-only correction; no price rows written.",
       }).returning({ id: mrpLoadBatchesTable.id });
       if (!load) throw new Error("P029 provenance batch could not be created.");
+      assertExactCategoryRestoration(rows.map(row => ({ itemCode: row.itemCode, ...JSON.parse(row.correctedValues) })), await readCategoryCatalogue(tx));
       for (const row of rows) {
         const updated = await tx.update(catalogProductsTable).set({
           ...JSON.parse(row.correctedValues),
@@ -5016,6 +5031,7 @@ router.post("/catalog/ugd-classification/:correctionKey/undo", requireAdmin, asy
   try {
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(929007)`);
+      await lockCategorySpellings(tx);
       const rows = await tx.select().from(catalogProductClassificationCorrectionsTable)
         .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.appliedAt} IS NOT NULL AND ${catalogProductClassificationCorrectionsTable.undoneAt} IS NULL`));
       if (rows.length !== P029_PAIRS.length) throw new Error("P029 correction is not applied, already undone, or incomplete.");
@@ -5037,6 +5053,7 @@ router.post("/catalog/ugd-classification/:correctionKey/undo", requireAdmin, asy
         throw new Error("P029 undo stopped: one or more products changed after apply.");
       }
       if (!alreadyRestored) {
+        assertExactCategoryRestoration(rows.map(row => ({ itemCode: row.itemCode, ...JSON.parse(row.previousValues) })), await readCategoryCatalogue(tx));
         for (const row of rows) {
           const restored = await tx.update(catalogProductsTable)
             .set({ ...JSON.parse(row.previousValues), updatedAt: new Date() })

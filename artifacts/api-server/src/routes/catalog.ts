@@ -12,7 +12,7 @@ import {
   mrpLoadBatchesTable,
   mrpHistoryProvenanceEventsTable,
 } from "@workspace/db";
-import { loadCatalogSeed, seedVariantPricesIfEmpty } from "../lib/catalogSeed";
+import { loadCatalogSeed, previewCatalogSeedCategories, seedVariantPricesIfEmpty } from "../lib/catalogSeed";
 import {
   ensureManualMrpSource,
   reconcileSanitarywareVariantProvenance,
@@ -728,9 +728,17 @@ router.post("/catalog/seed-variant-prices", requireAdmin, async (req, res) => {
 });
 
 // POST /catalog/reset — restore catalog to the original clean import.
+router.get("/catalog/reset/preview", requireAdmin, async (_req, res) => {
+  try { res.json(await previewCatalogSeedCategories()); }
+  catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : "Could not preview Category spellings." }); }
+});
 router.post("/catalog/reset", requireAdmin, async (req, res) => {
   try {
-    await loadCatalogSeed();
+    if (typeof req.body?.categorySpellingFingerprint !== "string") {
+      res.status(409).json({ error: "Preview Category spellings before the normal admin reset approval." });
+      return;
+    }
+    await loadCatalogSeed(req.body.categorySpellingFingerprint);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "catalog reset failed");

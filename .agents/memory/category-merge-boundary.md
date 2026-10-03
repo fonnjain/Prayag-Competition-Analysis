@@ -38,3 +38,17 @@ names. A prevention-only guard must reuse the shared vocabulary normalizer
 without bulk rewriting existing spellings. Active CP products with capitalised
 range names in Category and empty Range belong to semantic correction review,
 not an automatic spelling merge.
+
+Spelling prevention applies to newly created product codes only. Loads do not
+fill null Category/division or replace an existing Category/Range/division.
+For new products, match within the exact stored division and prefer the spelling
+with more active products even when the submitted spelling exactly matches a
+less-used alternative. Ties stop for review.
+
+**Why:** The user approved prevention only, with P049's existing-product
+classification boundary taking priority; equivalent text is not merge approval.
+
+**How to apply:** Show input, proposed spelling, and every stored candidate/count
+before normal administrator approval. Recheck the preview against current
+counts. Signed corrections and historical undo snapshots must remain exact:
+reject a spelling conflict instead of rewriting the signed or inverse value.

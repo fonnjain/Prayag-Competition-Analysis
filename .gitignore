@@ -47,6 +47,12 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+# Retain only the fail-closed legacy catalogue entrypoints; all other local
+# runtime files, skills and operator scratch work remain ignored.
+!.local/
+.local/*
+!.local/reload-verified.mjs
+!.local/erase_and_load_sparsh.py
 
 # Catalogue PDF fixtures (binary, do not commit)
 artifacts/api-server/src/lib/fixtures/*.pdf

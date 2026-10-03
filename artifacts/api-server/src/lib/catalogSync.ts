@@ -1,3 +1,4 @@
+import { planNewProductCategories, assertCategorySpellingPlan, lockCategorySpellings } from "./categorySpellingGuard";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { asc, sql } from "drizzle-orm";
 import {
@@ -610,6 +611,20 @@ export async function getCatalogSyncSnapshot(): Promise<{
   };
 }
 
+export async function previewCatalogSyncCategories(bundle: CatalogSyncBundle) {
+  const current = await readConsistentCatalogSyncData();
+  const plan = planNewProductCategories(bundle.data.catalogProducts.map(row => ({
+    itemCode: String(row.itemCode), division: row.division as string | null, category: row.category as string | null,
+    seriesRange: row.seriesRange as string | null, isActive: row.isActive as boolean,
+  })), current.catalogProducts.map(row => ({
+    itemCode: String(row.itemCode), division: row.division as string | null, category: row.category as string | null,
+    seriesRange: row.seriesRange as string | null, isActive: row.isActive as boolean,
+  })));
+  assertCategorySpellingPlan(plan);
+  return { categorySpellings: plan.categorySpellings, categorySpellingFingerprint: plan.categorySpellingFingerprint,
+    checksum: sha256(JSON.stringify(current)), summary: summarizeData(current) };
+}
+
 async function getCurrentCatalogSyncSummaryWith(
   executor: any,
 ): Promise<CatalogSyncSummary> {
@@ -779,6 +794,7 @@ export async function applyCatalogSyncBundle(
   try {
     const data = reviveDates(bundle.data);
     const result = await db.transaction(async (tx) => {
+      await lockCategorySpellings(tx);
       await tx.execute(sql`
         LOCK TABLE
           catalog_products,
@@ -792,6 +808,16 @@ export async function applyCatalogSyncBundle(
         IN ACCESS EXCLUSIVE MODE
       `);
       const currentData = await readCatalogSyncData(tx);
+      const categoryPlan = planNewProductCategories(data.catalogProducts.map(row => ({
+        ...row, itemCode: String(row.itemCode), division: row.division as string | null,
+        category: row.category as string | null, seriesRange: row.seriesRange as string | null,
+        isActive: row.isActive as boolean,
+      })), currentData.catalogProducts.map(row => ({
+        itemCode: String(row.itemCode), division: row.division as string | null, category: row.category as string | null,
+        seriesRange: row.seriesRange as string | null, isActive: row.isActive as boolean,
+      })));
+      assertCategorySpellingPlan(categoryPlan);
+      data.catalogProducts = categoryPlan.rows;
       const currentChecksum = sha256(JSON.stringify(currentData));
       const before = summarizeData(currentData);
       if (!safeEqualHex(currentChecksum, expectedCurrentChecksum)) {

@@ -2523,7 +2523,34 @@ export interface NewProductCodeCheckResponse {
   closest: string[];
 }
 
+export type CategorySpellingDecisionStatus = typeof CategorySpellingDecisionStatus[keyof typeof CategorySpellingDecisionStatus];
+
+
+export const CategorySpellingDecisionStatus = {
+  matched_existing_spelling: 'matched existing spelling',
+  new: 'new',
+  ambiguous: 'ambiguous',
+} as const;
+
+export interface CategorySpellingCandidate {
+  category: string;
+  activeProducts: number;
+}
+
+export interface CategorySpellingDecision {
+  itemCode?: string;
+  /** @nullable */
+  division: string | null;
+  inputCategory: string;
+  /** @nullable */
+  selectedCategory: string | null;
+  status: CategorySpellingDecisionStatus;
+  selectionReason: string;
+  candidates: CategorySpellingCandidate[];
+}
+
 export type NewProductPreviewResponse = NewProductRequest & {
+  categorySpellings?: CategorySpellingDecision[];
   token: string;
   normalizedCode: string;
   periodExists: boolean;
@@ -4811,6 +4838,10 @@ export type PatchCatalogProductMrp200 = {
 
 export type ReconcileSanitarywareVariantProvenanceBody = {
   confirmation: string;
+};
+
+export type ResetCatalogBody = {
+  categorySpellingFingerprint: string;
 };
 
 export type GetComparisonParams = {

@@ -1,3 +1,4 @@
+import { assertExactCategoryRestoration, readCategoryCatalogue, lockCategorySpellings } from "../lib/categorySpellingGuard";
 import { Router, type Request } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
@@ -140,11 +141,17 @@ router.post("/admin/product-lifecycle/undo/:batchId", requireAdmin, async (req: 
   const [batch] = await db.select().from(productLifecycleBatchesTable).where(eq(productLifecycleBatchesTable.id, id)).limit(1);
   if (!batch || batch.action !== "delete" || batch.undoneAt || Date.now() - batch.createdAt.getTime() > UNDO_WINDOW_MS) return res.status(409).json({ error: "Undo unavailable outside the 24-hour window or batch already undone." });
   const snapshot = JSON.parse(batch.snapshot) as { product: typeof catalogProductsTable.$inferInsert; prices: typeof mrpPriceHistoryTable.$inferInsert[] };
-  await db.transaction(async (tx) => {
+  try { await db.transaction(async (tx) => {
+    await lockCategorySpellings(tx);
+    assertExactCategoryRestoration([{
+      itemCode: snapshot.product.itemCode, division: snapshot.product.division ?? null, category: snapshot.product.category ?? null,
+    }], await readCategoryCatalogue(tx));
     await tx.insert(catalogProductsTable).values(snapshot.product);
     if (snapshot.prices.length) await tx.insert(mrpPriceHistoryTable).values(snapshot.prices);
     await tx.update(productLifecycleBatchesTable).set({ undoneAt: new Date(), undoneBy: req.user?.email ?? req.user?.id ?? "admin" }).where(eq(productLifecycleBatchesTable.id, id));
-  });
+  }); } catch (error) {
+    return res.status(409).json({ error: error instanceof Error ? error.message : "Exact restoration stopped; no rows were written." });
+  }
   res.json({ ok: true, restoredItemCode: batch.itemCode, batchId: id });
 });
 
