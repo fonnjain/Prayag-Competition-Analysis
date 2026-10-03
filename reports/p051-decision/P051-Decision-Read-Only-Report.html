@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P051 decision — read-only preparations</title>
+<style>body{font:15px/1.6 system-ui,sans-serif;color:#172431;background:#f4f6f8}main{max-width:1050px;margin:32px auto;background:white;padding:32px;border-radius:10px}table{border-collapse:collapse;width:100%;font-size:12px;margin:20px 0}th,td{padding:9px;border:1px solid #dce2e8;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#edf2f6}.notice{padding:16px;background:#fff6e4;border-left:4px solid #a56b00}h2{margin-top:30px}@media(max-width:700px){main{padding:15px;margin:0}table{display:block;overflow:auto}}</style>
+<main><p>COMPETITION · Reported 2026-10-03 13:56:10 IST · 3 October 2026</p>
+<h1>P051 decision — read-only preparations complete</h1>
+<p class="notice"><strong>The Part 1 application guard is not built or published yet.</strong>
+The checked production frontend bundle did not contain P049 Step 3. Application code is left unchanged so P049 can be published first.
+After that publication, implement and publish only the category-normalisation guard, then confirm it in production.
+No merge workflow, merge, retirement or deletion is included.</p>
+<h2>Read-only findings</h2>
+<table><thead><tr><th>Environment</th><th>Query clock IST</th><th>Pipe group rows</th><th>Active</th><th>Spaced codes</th><th>Twins found</th><th>Already unspaced</th><th>Active CP added</th><th>ITEM CODE price rows</th></tr></thead><tbody><tr><td>development</td><td>2026-10-03 13:48:36</td><td>122</td><td>0</td><td>92</td><td>92</td><td>30</td><td>21</td><td>0</td></tr><tr><td>production</td><td>2026-10-03 13:48:39</td><td>122</td><td>0</td><td>92</td><td>92</td><td>30</td><td>21</td><td>0</td></tr></tbody></table>
+<h2>Pipes pairing download</h2><p>One combined CSV covers the entire uppercase-category group in both environments.
+Whitespace is removed from the code only; punctuation and case are retained and the twin must exist in the same stored division.
+Already-unspaced group members remain in the file with a clear non-pair status, not a self-twin.
+Active flags and latest recorded Standard MRP, effective date, variant and price basis are included for both sides.
+Empty price cells mean no Standard MRP value is available; they are not zero-price assertions.
+Latest recorded is not an as-of/current-price assertion. Pairing is not an identity or Sales verification.</p>
+<p><strong>Marker detail:</strong> in each environment at its query clock above, 114 group members currently carry
+<code>mrp_repair_2026</code>; 8 carry <code>removed_by_authoritative_master_2026_09_01</code>.
+The CSV retains these current values. All group members are inactive. No category change or retirement action was taken.</p>
+<h2>Expanded P049 review</h2><p>Each environment's existing three-division review file now includes 21 additional ACTIVE CP products:
+3,272 original equality candidates + 21 additions = <strong>3,293 review rows</strong>.
+The new rows are flagged exactly <strong>capitalised range in category, Range empty</strong>, with looks_like=range.
+Their inclusion is a reviewed-source decision, not an approved correction. Combined divisions remain separate.</p>
+<h2>Header product</h2><p><code>ITEM CODE</code> remains inactive in Pipes &amp; Fittings / Silent Fittings.
+Its exact-code history lookup includes all variants and returned no rows in either environment at the clocks shown.
+It was not deleted; the header report is input for the separate retirement/deletion review.</p>
+<h2>Sales blocker</h2><p>Category is in the Sales catalogue feed. No future category merge may be applied until an explicit reviewed approval
+and a Sales-side check confirm the effect. This condition is recorded in the audit code comments and project instructions;
+it must accompany any future application merge code. There is no merge workflow here.</p>
+<h2>Unchanged database proof</h2>
+<table><thead><tr><th>Environment</th><th>Before IST</th><th>After IST</th><th>MRP history rows</th><th>Unchanged MRP value SHA-256</th><th>MRP and classifications unchanged</th></tr></thead><tbody><tr><td>development</td><td>2026-10-03 13:48:36</td><td>2026-10-03 13:53:33</td><td>14012</td><td>4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2</td><td>True</td></tr><tr><td>production</td><td>2026-10-03 13:48:39</td><td>2026-10-03 13:53:38</td><td>14302</td><td>e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458</td><td>True</td></tr></tbody></table>
+<p>Category / series_range / division / code snapshots also have identical before/after counts and SHA-256 values.
+No database writer was called. MRP uses the exact existing value-only checksum definition, including every variant.</p>
+<h2>Pending Part 1 work</h2><p>Once P049 is live: reuse the existing P048 shared normalisation function in every audited category writer.
+Loads must reuse the existing spelling in the same division and show both values as <strong>matched existing spelling</strong>;
+a genuinely new category must show as <strong>new</strong>. No stored-spelling merge is authorised.
+Tests and real production confirmation of the application guard remain pending that implementation and publication.</p></main></html>

@@ -436,14 +436,14 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                 </Select>
               </div>
               <div>
-                <Label>Series</Label>
+                <Label>Range</Label>
                 <Select
                   value={(Array.isArray(scope.series) ? scope.series[0] : scope.series) || "all"}
                   onValueChange={(value) => setScope({ ...scope, series: value === "all" ? undefined : value })}
                 >
-                  <SelectTrigger><SelectValue placeholder="All Series" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="All Ranges" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Series</SelectItem>
+                    <SelectItem value="all">All Ranges</SelectItem>
                     {scopesData?.series.map((series) => (
                       <SelectItem key={series} value={series}>{series}</SelectItem>
                     ))}
@@ -871,7 +871,7 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
                               <SelectItem value="all">everything (catch-all)</SelectItem>
                               <SelectItem value="division">Division</SelectItem>
                               <SelectItem value="category">Category</SelectItem>
-                              <SelectItem value="series">Series</SelectItem>
+                              <SelectItem value="series">Range</SelectItem>
                               <SelectItem value="explicit_codes">Item Codes</SelectItem>
                             </SelectContent>
                           </Select>

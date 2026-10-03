@@ -1,0 +1,102 @@
+{
+  "scope": [
+    "CP Fittings / Faucets",
+    "CP (QUAA / FERN)",
+    "PTMT & Plastic Fittings"
+  ],
+  "rangeOptional": true,
+  "classificationUnchanged": {
+    "development": true,
+    "production": true
+  },
+  "before": {
+    "development": {
+      "clockIST": "2026-10-03 12:07:17",
+      "rows": 14012,
+      "sha256": "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2"
+    },
+    "production": {
+      "clockIST": "2026-10-03 12:07:31",
+      "rows": 14302,
+      "sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+    }
+  },
+  "after": {
+    "development": "environment,audit_ist,history_rows,value_sha256\ndevelopment,2026-10-03 12:34:06,14012,4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2\n",
+    "production": "environment,audit_ist,history_rows,value_sha256\nproduction,2026-10-03 12:34:29,14302,e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458\n"
+  },
+  "sqlTests": {
+    "clockIST": "2026-10-03 12:28:09 to 12:28:24",
+    "passed": 12,
+    "disposableSchema": true
+  },
+  "formattingTests": 3,
+  "productionUIVerifiedAfterPublish": false,
+  "checksumProof": "audit_ist,history_rows,value_sha256\n2026-10-03 12:24:52,14252,e09c0fad6b028284a8f15026801ff30993972fcf97387dc105b0b40510fb865d\n",
+  "additionalTests": {
+    "clockIST": "2026-10-03 12:39:48 to 12:39:51",
+    "passed": 17,
+    "suites": [
+      "historicalMrp",
+      "catalogSync"
+    ]
+  },
+  "sourceInspection": {
+    "environment": "workspace source inspection; revised development loader, not yet published",
+    "clockIST": "2026-10-03 12:43:25",
+    "file": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx",
+    "sha256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+    "sourceSheet": "products",
+    "headers": [
+      "item_code",
+      "division",
+      "series",
+      "product_name",
+      "size",
+      "mrp",
+      "effective_date",
+      "previous_mrp",
+      "mrp_ivory",
+      "mrp_white_with_jet",
+      "mrp_pink_green_blue",
+      "checked_by",
+      "status_note"
+    ],
+    "productRows": 6106,
+    "refusedMissingCategory": 6106,
+    "firstRefusedCodes": [
+      "F-51",
+      "F-61",
+      "F-70",
+      "F-71",
+      "F-72"
+    ]
+  },
+  "salesContractByteIdentical": true,
+  "classificationSnapshotDetails": {
+    "development": {
+      "products": 6948,
+      "exactNonEmptyEqualityBefore": 6116,
+      "categoryRangeByteIdentical": true
+    },
+    "production": {
+      "products": 7191,
+      "exactNonEmptyEqualityBefore": 6361,
+      "categoryRangeByteIdentical": true
+    }
+  },
+  "browserVerification": {
+    "environment": "development",
+    "reportedIST": "2026-10-03 12:46:21",
+    "initialScopeChecksPassed": true,
+    "initialDialogStateBug": "Add Range reopened after division/tab switching",
+    "fixed": true,
+    "focusedRegressionPassed": true,
+    "draftAndProductRangeReset": true,
+    "actualDatabaseWrites": false,
+    "finalScreenshot": "j3491f",
+    "generatorScopeSelector": "Source/typecheck verification; not exercised by browser"
+  },
+  "generatedIST": "2026-10-03 12:46:21",
+  "exactProductionEqualityNote": "Current before/after classification snapshots both contain 6361 exact non-empty Category=Range candidates; older 6347 figure is not reproducible from these preserved snapshots. No correction was applied."
+}

@@ -1,0 +1,11 @@
+{
+  "mrp": {
+    "rows": 14302,
+    "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+  },
+  "audit_ist": "2026-10-03 13:53:38",
+  "classification": {
+    "rows": 7191,
+    "sha256": "b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376"
+  }
+}

@@ -1,0 +1,3 @@
+environment,audit_ist,code,division,category,active,price_row_count,price_row_id,effective_date,variant,mrp,net_price,discount_pct,price_basis,is_current,load_batch_id,disposition
+development,2026-10-03 13:48:36,ITEM CODE,Pipes & Fittings,Silent Fittings,False,0,,,,,,,,,,P042 input only; not deleted; all variants included in price-row lookup
+production,2026-10-03 13:48:39,ITEM CODE,Pipes & Fittings,Silent Fittings,False,0,,,,,,,,,,P042 input only; not deleted; all variants included in price-row lookup

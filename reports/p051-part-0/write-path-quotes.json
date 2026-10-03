@@ -1,0 +1,126 @@
+{
+  "environment": "development workspace; P049 code present, P051 not implemented",
+  "auditIST": "2026-10-03 13:02:43",
+  "paths": [
+    {
+      "path": "P048 shared rule",
+      "file": "artifacts/api-server/src/lib/priceEditorVocabulary.ts",
+      "start": 1,
+      "end": 12,
+      "note": "Existing function used by the audit. NFKC, whitespace/case/punctuation normalization PLUS singular/plural endings. No duplicate implementation.",
+      "code": "import type { Request } from \"express\";\nimport { sql } from \"drizzle-orm\";\n\nexport const normalizeVocabularyKey = (value: string) => value.normalize(\"NFKC\").trim().replace(/\\s+/g, \" \")\n  .toLocaleLowerCase(\"en\").replace(/[\\p{P}\\p{S}]/gu, \" \").trim().replace(/\\s+/g, \" \")\n  .split(\" \").filter(Boolean).map((word) => {\n    if (word.length > 3 && word.endsWith(\"ies\")) return `${word.slice(0, -3)}y`;\n    if (word.length > 3 && word.endsWith(\"s\") && !word.endsWith(\"ss\")) return word.slice(0, -1);\n    return word;\n  }).join(\" \");\n\nexport function vocabularyReason(body: unknown): string {"
+    },
+    {
+      "path": "Authoritative master insert/upsert",
+      "file": "artifacts/api-server/src/lib/authoritativeMrpMaster.ts",
+      "start": 648,
+      "end": 680,
+      "note": "No normalized spelling guard yet. P049 genuinely sourced Category and missing-category refusal remain required.",
+      "code": "      .returning({ id: mrpLoadBatchesTable.id });\n    const loadBatchId = batch[0]!.id;\n\n    for (let index = 0; index < parsed.productRows.length; index += 500) {\n      const values = parsed.productRows.slice(index, index + 500).map((row) => ({\n        itemCode: row.itemCode,\n        productName: preservedNamesByCode.get(row.itemCode) ?? row.productName,\n        division: row.division,\n        ...masterClassification(row),\n        size: row.size,\n        uom: \"NOS\",\n        isActive: true,\n        discontinuedFrom: null,\n        discontinuedCheckedBy: null,\n        discontinuedStatusNote: null,\n        sourceFiles: parsed.fileName,\n        dataFlag: parsed.dataFlag,\n        updatedAt: new Date(),\n      }));\n      await tx\n        .insert(catalogProductsTable)\n        .values(values)\n        .onConflictDoUpdate({\n          target: catalogProductsTable.itemCode,\n          set: {\n            productName: sql`excluded.product_name`,\n            division: sql`excluded.division`,\n            category: sql`excluded.category`,\n            seriesRange: sql`CASE WHEN excluded.division IN (${sql.join(RANGE_DIVISIONS.map(division => sql`${division}`), sql`, `)}) THEN excluded.series_range ELSE ${catalogProductsTable.seriesRange} END`,\n            size: sql`excluded.size`,\n            isActive: true,\n            discontinuedFrom: null,\n            discontinuedCheckedBy: null,"
+    },
+    {
+      "path": "Generic MRP importer: new products and missing-category backfill",
+      "file": "artifacts/api-server/src/routes/catalogImportExport.ts",
+      "start": 1479,
+      "end": 1505,
+      "note": "Raw parsed Category is inserted or used to backfill a missing field. Includes staged/revision apply paths calling this importer.",
+      "code": "      if (!processedItemCodes.has(code)) {\n        processedItemCodes.add(code);\n        if (!isKnown) {\n          newProductValues.push({\n            itemCode: storedCode,\n            productName: productName ?? null,\n            division: inferredDivision,\n            category: category ?? null,\n            uom: \"NOS\",\n            isActive: true,\n            sourceFiles: filename,\n            dataFlag: \"new_from_load\",\n          });\n          summary.newProducts++;\n          summary.unmatchedCodes.push(storedCode);\n          knownCodes.add(code);\n          canonical.set(code, storedCode);\n        } else {\n          summary.matchedProducts++;\n          // Backfill any null metadata on existing products.\n          if (existing) {\n            const patch: Partial<typeof catalogProductsTable.$inferInsert> = {};\n            if (!existing.productName && productName) patch.productName = productName;\n            if (!existing.division && inferredDivision) patch.division = inferredDivision;\n            if (!existing.category && category) patch.category = category;\n            if (Object.keys(patch).length > 0) backfillMap.set(storedCode, patch);\n          }"
+    },
+    {
+      "path": "Generic importer backfill persistence",
+      "file": "artifacts/api-server/src/routes/catalogImportExport.ts",
+      "start": 1588,
+      "end": 1601,
+      "note": "Persists the category patch built above.",
+      "code": "      }\n      for (const [patchJson, codes] of byPatch) {\n        const patch = JSON.parse(patchJson) as Partial<typeof catalogProductsTable.$inferInsert>;\n        for (let i = 0; i < codes.length; i += 500) {\n          await tx\n            .update(catalogProductsTable)\n            .set(patch)\n            .where(inArray(catalogProductsTable.itemCode, codes.slice(i, i + 500)));\n        }\n      }\n    }\n\n    await reconcileSourceDiscontinuations(\n      tx,"
+    },
+    {
+      "path": "New-products bulk upload apply",
+      "file": "artifacts/api-server/src/routes/catalogImportExport.ts",
+      "start": 1775,
+      "end": 1784,
+      "note": "Stores category derived from uploaded product name without shared normalization.",
+      "code": "      if (!load) throw new Error(\"Could not create load provenance batch.\");\n      const today = new Date().toISOString().slice(0, 10);\n      await tx.insert(catalogProductsTable).values(payload.rows.map((row) => ({\n        itemCode: row.itemCode, productName: row.productName, division: row.division, seriesRange: supportsCatalogRange(row.division) ? row.series : null, size: row.size,\n        sourceFiles: batch.fileName, dataFlag: \"new_products_upload\",\n      })));\n      const insertedHistory = await tx.insert(mrpPriceHistoryTable).values(payload.rows.map((row) => ({\n        itemCode: row.itemCode, mrp: row.mrp, priceBasis: \"MRP\", effectiveDate: row.effectiveDate, loadDate: today,\n        sourceFile: batch.fileName, reviewStatus: \"approved\", reviewedAt: new Date(), loadBatchId: load.id, variant: \"Standard\",\n        notes: \"Created by new-products upload\","
+    },
+    {
+      "path": "Single-product creation: normalization exists, raw write remains",
+      "file": "artifacts/api-server/src/routes/priceEditor.ts",
+      "start": 670,
+      "end": 678,
+      "note": "Normalized membership check accepts an API-supplied case variant; it does not resolve it to the existing spelling.",
+      "code": "    addedDivisions.some((division) => division.name === input.division);\n  if (!divisionExists) return \"Division must be selected from the catalogue.\";\n  const categoryKey = normalizeVocabularyKey(input.category);\n  const categoryExists = products.some((p) => p.division === input.division && p.category &&\n    normalizeVocabularyKey(p.category) === categoryKey) ||\n    addedCategories.some((category) => category.divisionKey === normalizeVocabularyKey(input.division) &&\n      normalizeVocabularyKey(category.name) === categoryKey);\n  if (!categoryExists) return \"Category must be selected from this division's catalogue.\";\n  const seriesKey = normalizeVocabularyKey(input.series);"
+    },
+    {
+      "path": "Single-product creation insert",
+      "file": "artifacts/api-server/src/routes/priceEditor.ts",
+      "start": 761,
+      "end": 770,
+      "note": "Writes input.category as received after the membership validation.",
+      "code": "          mrp: input.mrp, reason: input.reason,\n        })}`,\n      }).returning({ id: mrpLoadBatchesTable.id });\n      const productRows = await tx.insert(catalogProductsTable).values({\n        itemCode: input.itemCode, productName: input.productName, division: input.division,\n        seriesRange: input.series || null, category: input.category, size: input.size,\n        sourceFiles: \"single-product-editor\", dataFlag: \"manual_creation\",\n      }).returning();\n      const historyRows = await tx.insert(mrpPriceHistoryTable).values({\n        itemCode: input.itemCode, mrp: input.mrp, netPrice: null, discountPct: null,"
+    },
+    {
+      "path": "Cross-environment catalogue sync apply",
+      "file": "artifacts/api-server/src/lib/catalogSync.ts",
+      "start": 819,
+      "end": 828,
+      "note": "Deletes/replaces catalogue rows from the approved bundle without category spelling reconciliation. Must retain preview drift/checksum protections.",
+      "code": "      await tx.delete(catalogProductsTable);\n\n      await insertChunks(tx, catalogProductsTable, data.catalogProducts);\n      await insertChunks(tx, mrpSourcesTable, data.mrpSources);\n      await insertChunks(tx, mrpLoadBatchesTable, data.mrpLoadBatches);\n      await insertChunks(tx, mrpPriceHistoryTable, data.mrpPriceHistory);\n      await insertChunks(\n        tx,\n        mrpHistoryProvenanceEventsTable,\n        data.mrpHistoryProvenanceEvents,"
+    },
+    {
+      "path": "Seed/reset insertion",
+      "file": "artifacts/api-server/src/lib/catalogSeed.ts",
+      "start": 155,
+      "end": 174,
+      "note": "Cold-start seed and explicitly approved reset restore bundled category text unchanged. No spelling preview.",
+      "code": "    await chunkedInsert(data.products, (batch) =>\n      tx.insert(catalogProductsTable).values(\n      batch.map((p) => ({\n        itemCode: p.itemCode,\n        productName: p.productName,\n        division: p.division,\n        category: p.category,\n        seriesRange: p.seriesRange,\n        // Persist the nominal size parsed from the product name when the source\n        // size is blank, so size matching is exact for downstream consumers.\n        size: p.size ?? parseSizeFromName(p.productName),\n        uom: p.uom || \"NOS\",\n        kgCost: null,\n        isActive: p.isActive,\n        sourceFiles: p.sourceFiles,\n        dataFlag: p.dataFlag,\n      })),\n      ),\n    );\n"
+    },
+    {
+      "path": "Fixed classification correction apply",
+      "file": "artifacts/api-server/src/routes/catalogImportExport.ts",
+      "start": 4980,
+      "end": 4989,
+      "note": "P029 correctedValues can include Category; normalization must not silently alter a signed correction or its inverse.",
+      "code": "      for (const row of rows) {\n        const updated = await tx.update(catalogProductsTable).set({\n          ...JSON.parse(row.correctedValues),\n          updatedAt: new Date(),\n        }).where(eq(catalogProductsTable.itemCode, row.itemCode)).returning({ id: catalogProductsTable.id });\n        if (updated.length !== 1) throw new Error(`P029 apply stopped: compare-and-swap failed for ${row.itemCode}.`);\n      }\n      const audited = await tx.update(catalogProductClassificationCorrectionsTable).set({ loadBatchId: load.id, actor, appliedAt: new Date() })\n        .where(and(eq(catalogProductClassificationCorrectionsTable.correctionKey, correctionKey), sql`${catalogProductClassificationCorrectionsTable.appliedAt} IS NULL`));\n      if (audited.rowCount !== P029_PAIRS.length) throw new Error(\"P029 apply stopped: audit rows changed concurrently.\");"
+    },
+    {
+      "path": "Classification correction undo",
+      "file": "artifacts/api-server/src/routes/catalogImportExport.ts",
+      "start": 5022,
+      "end": 5032,
+      "note": "Exact historical restoration; preserve inverse semantics rather than silently rewriting snapshots.",
+      "code": "      }\n      if (!alreadyRestored) {\n        for (const row of rows) {\n          const restored = await tx.update(catalogProductsTable)\n            .set({ ...JSON.parse(row.previousValues), updatedAt: new Date() })\n            .where(eq(catalogProductsTable.itemCode, row.itemCode))\n            .returning({ id: catalogProductsTable.id });\n          if (restored.length !== 1) {\n            throw new Error(`P029 undo stopped: compare-and-swap failed for ${row.itemCode}.`);\n          }\n        }"
+    },
+    {
+      "path": "Product deletion undo",
+      "file": "artifacts/api-server/src/routes/productLifecycle.ts",
+      "start": 140,
+      "end": 147,
+      "note": "Reinserts a historical product snapshot. Exact restoration, not a new free-form category selection.",
+      "code": "  const [batch] = await db.select().from(productLifecycleBatchesTable).where(eq(productLifecycleBatchesTable.id, id)).limit(1);\n  if (!batch || batch.action !== \"delete\" || batch.undoneAt || Date.now() - batch.createdAt.getTime() > UNDO_WINDOW_MS) return res.status(409).json({ error: \"Undo unavailable outside the 24-hour window or batch already undone.\" });\n  const snapshot = JSON.parse(batch.snapshot) as { product: typeof catalogProductsTable.$inferInsert; prices: typeof mrpPriceHistoryTable.$inferInsert[] };\n  await db.transaction(async (tx) => {\n    await tx.insert(catalogProductsTable).values(snapshot.product);\n    if (snapshot.prices.length) await tx.insert(mrpPriceHistoryTable).values(snapshot.prices);\n    await tx.update(productLifecycleBatchesTable).set({ undoneAt: new Date(), undoneBy: req.user?.email ?? req.user?.id ?? \"admin\" }).where(eq(productLifecycleBatchesTable.id, id));\n  });"
+    },
+    {
+      "path": "Legacy operator reload helper",
+      "file": ".local/reload-verified.mjs",
+      "start": 103,
+      "end": 113,
+      "note": "Unconfigured/manual helper reads raw category. Not run; must not remain a supported guard bypass.",
+      "code": "    if (!code) continue;\n    const key = normCode(code);\n    if (catByCode.has(key)) continue;\n    catByCode.set(key, {\n      item_code: code,\n      product_name: cleanStr(r.product_name),\n      division: cleanStr(r.division),\n      category: cleanStr(r.category),\n      size: cleanStr(r.size),\n      uom: cleanStr(r.uom) || \"NOS\",\n      is_active: r.is_active === false ? false : true,"
+    },
+    {
+      "path": "Legacy operator reload persistence",
+      "file": ".local/reload-verified.mjs",
+      "start": 224,
+      "end": 233,
+      "note": "Unconfigured/manual direct catalogue insert. Not run.",
+      "code": "  const catalogRows = [...catByCode.values()];\n  const mrpFinal = [...mrpByKey.values()];\n\n  await chunkInsert(client, \"catalog_products\",\n    [\"item_code\", \"product_name\", \"division\", \"category\", \"size\", \"uom\", \"is_active\"],\n    catalogRows);\n  await chunkInsert(client, \"mrp_price_history\",\n    [\"item_code\", \"mrp\", \"price_basis\", \"effective_date\", \"load_date\", \"is_current\", \"source_file\"],\n    mrpFinal);\n  await chunkInsert(client, \"competitor_prices\","
+    },
+    {
+      "path": "Legacy operator erase/load helper",
+      "file": ".local/erase_and_load_sparsh.py",
+      "start": 47,
+      "end": 61,
+      "note": "Unconfigured destructive helper with raw catalogue SQL. Not run; outside approved application workflows.",
+      "code": "    assert code and code not in seen, f\"bad/dup code: {code}\"\n    seen.add(code)\n    cat = category(r[\"prayag_series\"])\n    name = r[\"name\"].strip()\n    pearl_code = norm_code(r[\"pearl_code\"])\n\n    out.append(\n        \"INSERT INTO catalog_products (item_code, product_name, division, category, uom, is_active, source_files) \"\n        f\"VALUES ({q(code)}, {q(name)}, {q(DIVISION)}, {q(cat)}, 'NOS', true, {q(SOURCE_FILE)});\"\n    )\n    out.append(\n        \"INSERT INTO mrp_price_history (item_code, mrp, price_basis, effective_date, load_date, source_file, is_current) \"\n        f\"VALUES ({q(code)}, {q(r['prayag_mrp'])}, 'MRP', {q(EFFECTIVE_DATE)}, {q(LOAD_DATE)}, {q(SOURCE_FILE)}, true);\"\n    )\n    out.append("
+    }
+  ]
+}

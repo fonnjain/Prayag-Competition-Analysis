@@ -5,6 +5,30 @@ const money = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 });
 
+/** Prayag's approved Range divisions. Exact stored values only; no aliases. */
+export const RANGE_DIVISIONS = [
+  "CP Fittings / Faucets",
+  "CP (QUAA / FERN)",
+  "PTMT & Plastic Fittings",
+] as const;
+
+export function supportsCatalogRange(division: string | null | undefined): boolean {
+  return RANGE_DIVISIONS.some(value => value === division);
+}
+
+/** Inserts a resolved Category; the master planner resolves non-Range series first. */
+export function masterClassification(row: {
+  itemCode: string; division: string; category?: string | null; series: string | null;
+}): { category: string; seriesRange?: string | null } {
+  if (!row.category?.trim()) {
+    throw new Error(`Product ${row.itemCode}: a real Category is required before insertion; CP/PTMT Range cannot be used as Category.`);
+  }
+  return {
+    category: row.category.trim(),
+    ...(supportsCatalogRange(row.division) ? { seriesRange: row.series } : {}),
+  };
+}
+
 const moneyWhole = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",

@@ -171,7 +171,7 @@ function canonicalHistory(rows: HistoricalPriceRow[], asOf: string): HistoricalP
 }
 
 function seriesName(product: HistoricalProduct): string {
-  return product.seriesRange?.trim() || "(Unassigned series)";
+  return product.seriesRange?.trim() || "(Unassigned Range)";
 }
 
 /**
@@ -328,7 +328,7 @@ export function evaluateHistoricalMrp(
     const suggested = analysis.usable && due && product.currentMrp != null && analysis.typicalRate != null
       ? roundCurrency(product.currentMrp * (1 + analysis.typicalRate / 100)) : null;
     const reason = suggested != null
-      ? `Series ${series} ${analysis.confidence} rate applied (${analysis.typicalRate!.toFixed(2)}%), ${overdue ? "overdue" : "due"}.`
+      ? `Range ${series} ${analysis.confidence} rate applied (${analysis.typicalRate!.toFixed(2)}%), ${overdue ? "overdue" : "due"}.`
       : productReason ?? (product.currentMrp == null
         ? "No suggestion: current MRP is unavailable."
         : "No historical suggestion.");

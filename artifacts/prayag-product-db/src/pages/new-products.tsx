@@ -30,7 +30,7 @@ import {
 interface ProductRow {
   itemCode: string;
   division: string;
-  seriesRange: string;
+  seriesRange: string | null;
   productName: string;
   size: string | null;
   mrp: number;
@@ -70,6 +70,7 @@ interface Preview {
   willCreate: ProductRow[];
   rejectedCount: number;
   rejectedRows: RejectedRow[];
+  rangeWarnings?: RejectedRow[];
   periods: PeriodEffect[];
   immediateCount: number;
   immediateMessage: string | null;
@@ -306,7 +307,7 @@ export default function NewProductsPage() {
             data-testid="input-file"
             required 
           />
-          <p className="text-xs text-muted-foreground">Must contain columns: Item Code, Division, Series, Product, Size (optional), MRP, Date.</p>
+          <p className="text-xs text-muted-foreground">Must contain columns: Item Code, Division, Product, Size (optional), MRP, Effective Date. Range is optional for CP and PTMT only; legacy headers are also accepted.</p>
         </div>
         
         <div className="space-y-2 lg:col-span-2">
@@ -398,6 +399,7 @@ export default function NewProductsPage() {
               <div className="mt-5 rounded border p-4">
                 <h3 className="text-sm font-semibold">Periods Affected</h3>
                 <div className="mt-3 space-y-2">
+                  {preview.rangeWarnings?.map(warning => <p key={`${warning.row}-${warning.itemCode}`} className="text-sm text-amber-800">Row {warning.row}, {warning.itemCode}: {warning.reason}</p>)}
                   {preview.periods.map(period => (
                     <div key={period.effectiveDate} className="flex flex-wrap items-center justify-between gap-4 text-sm bg-muted/20 px-3 py-2 rounded">
                       <div className="flex items-center gap-2">
@@ -487,7 +489,7 @@ export default function NewProductsPage() {
                         <thead className="sticky top-0 bg-muted/80 backdrop-blur text-xs text-muted-foreground">
                           <tr>
                             <th className="px-4 py-2 font-medium">Code / Product</th>
-                            <th className="px-4 py-2 font-medium">Div / Series</th>
+                            <th className="px-4 py-2 font-medium">Div / Range</th>
                             <th className="px-4 py-2 font-medium">Size</th>
                             <th className="px-4 py-2 font-medium text-right">MRP</th>
                             <th className="px-4 py-2 font-medium">W.E.F</th>

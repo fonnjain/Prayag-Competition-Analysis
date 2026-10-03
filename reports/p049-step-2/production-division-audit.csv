@@ -1,0 +1,11 @@
+environment,audit_ist,division,products,missing_range,stored_range,equal_category_range,equal_with_authoritative_marker
+production,2026-10-03 12:37:39,CP (QUAA / FERN),161,0,161,161,161
+production,2026-10-03 12:37:39,CP Fittings / Faucets,1374,334,1040,1040,1040
+production,2026-10-03 12:37:39,CP Fittings / Faucets | Ceramic Sanitaryware,2,0,2,2,2
+production,2026-10-03 12:37:39,CP Fittings / Faucets | PTMT & Plastic Fittings,2,0,2,2,2
+production,2026-10-03 12:37:39,CP Fittings / Faucets | PTMT & Plastic Fittings | Pipes & Fittings,3,0,3,3,3
+production,2026-10-03 12:37:39,Ceramic Sanitaryware,217,0,217,217,217
+production,2026-10-03 12:37:39,Ceramic Sanitaryware | PTMT & Plastic Fittings,50,0,50,50,50
+production,2026-10-03 12:37:39,Hardware,288,3,285,285,285
+production,2026-10-03 12:37:39,PTMT & Plastic Fittings,2344,273,2071,2071,2071
+production,2026-10-03 12:37:39,Pipes & Fittings,2750,184,2566,2530,2275

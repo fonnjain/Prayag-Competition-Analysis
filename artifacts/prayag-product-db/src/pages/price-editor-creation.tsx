@@ -1,4 +1,4 @@
-import { formatMoney } from "@workspace/formatting";
+import { formatMoney, supportsCatalogRange } from "@workspace/formatting";
 import { useMemo, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -202,7 +202,8 @@ export function ProductCreationTab() {
   }, [options.data, division]);
 
   const isCodeDuplicate = !!codeCheck.data?.duplicate;
-  const isNewSeries = series.trim().length > 0 && !!divisionOptions &&
+  const rangeVisible = supportsCatalogRange(division);
+  const isNewSeries = rangeVisible && series.trim().length > 0 && !!divisionOptions &&
     !divisionOptions.series.includes(series.trim()) &&
     !locallyAddedSeries[division]?.includes(series.trim());
   const nearestSeries = useMemo(() => {
@@ -217,7 +218,7 @@ export function ProductCreationTab() {
 
   const canPreview = !isCodeDuplicate && debouncedCode.trim().length > 1 && debouncedCode === code &&
     productName.trim().length > 0 && 
-    division && category && series.trim().length > 0 && numeric > 0 && effectiveDate && remarks.trim().length > 0 &&
+    division && category && numeric > 0 && effectiveDate && remarks.trim().length > 0 &&
     (!isNewSeries || newSeriesConfirmed);
 
   const invalidate = useEditorInvalidate();
@@ -234,6 +235,11 @@ export function ProductCreationTab() {
     setDivision(val);
     setCategory("");
     setSeries("");
+    setNewSeriesConfirmed(false);
+    setShowAddSeries(false);
+    setNewSeriesName("");
+    setNewSeriesReason("");
+    setClassificationError(null);
     change();
   };
 
@@ -316,12 +322,12 @@ export function ProductCreationTab() {
         try {
           await refreshOptions();
         } catch (e) {
-          setClassificationError(`Series was added, but the options list could not be refreshed: ${errorText(e)}`);
+          setClassificationError(`Range was added, but the options list could not be refreshed: ${errorText(e)}`);
         }
       },
       onError: e => {
         const existing = duplicateValue(e);
-        setClassificationError(existing ? `A series named “${String(existing)}” already exists in this division. It has not been selected; choose it from the list if appropriate.` : errorText(e));
+        setClassificationError(existing ? `A Range named “${String(existing)}” already exists in this division. It has not been selected; choose it from the list if appropriate.` : errorText(e));
       },
     });
   };
@@ -332,7 +338,7 @@ export function ProductCreationTab() {
       itemCode: debouncedCode.trim(),
       productName: productName.trim(),
       division,
-      series: series.trim(),
+      series: rangeVisible ? series.trim() : "",
       category,
       size: size.trim() || null,
       mrp: numeric,
@@ -436,7 +442,7 @@ export function ProductCreationTab() {
                     <XCircle className="h-4 w-4" />
                     <AlertTitle className="text-sm font-semibold mb-1">Code already exists</AlertTitle>
                     <AlertDescription className="text-xs">
-                      {codeCheck.data.normalizedCode} is already a product in {codeCheck.data.duplicate.division} / {codeCheck.data.duplicate.category}. Series: {codeCheck.data.duplicate.series}. Current MRP: {money(codeCheck.data.duplicate.currentMrp)} (effective {codeCheck.data.duplicate.currentEffectiveDate ? date(codeCheck.data.duplicate.currentEffectiveDate) : "—"}).
+                      {codeCheck.data.normalizedCode} is already a product in {codeCheck.data.duplicate.division} / {codeCheck.data.duplicate.category}.{supportsCatalogRange(codeCheck.data.duplicate.division) && <> Range: {codeCheck.data.duplicate.series || "—"}.</>} Current MRP: {money(codeCheck.data.duplicate.currentMrp)} (effective {codeCheck.data.duplicate.currentEffectiveDate ? date(codeCheck.data.duplicate.currentEffectiveDate) : "—"}).
                     </AlertDescription>
                   </Alert>
                 ) : codeCheck.data.unusualShape ? (
@@ -463,8 +469,8 @@ export function ProductCreationTab() {
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold mb-4">2. Initial Price configuration</h2>
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium">Series <span className="text-destructive">*</span>
+          {rangeVisible && <div>
+            <label className="block text-sm font-medium">Range <span className="text-muted-foreground font-normal">(Optional)</span>
               <div className="mt-1 flex gap-2">
                 <Input data-testid="input-series" list="series-options" disabled={apply.isPending || !divisionOptions} className="min-w-0 flex-1" value={series} onChange={e => { setSeries(e.target.value); change(); }} />
                 {isAdmin && <Button data-testid="button-add-series" type="button" variant="outline" disabled={apply.isPending || addSeries.isPending || !division} onClick={() => { setClassificationError(null); setShowAddSeries(true); }}>Add</Button>}
@@ -475,15 +481,15 @@ export function ProductCreationTab() {
             </label>
             {isNewSeries && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="text-sm text-amber-800 font-medium">This is a new series.</p>
+                <p className="text-sm text-amber-800 font-medium">This is a new Range.</p>
                 <p className="mt-1 text-xs text-amber-700">Nearest existing names: {nearestSeries.length ? nearestSeries.map(n => <strong key={n}>{n}</strong>).reduce((prev, curr) => <>{prev}, {curr}</>) : "None"}</p>
                 <label className="mt-3 flex items-start gap-2 text-sm font-medium text-amber-900">
                   <input data-testid="checkbox-confirm-series" type="checkbox" className="mt-1" checked={newSeriesConfirmed} onChange={e => { setNewSeriesConfirmed(e.target.checked); change(); }} disabled={apply.isPending} />
-                  I confirm this is deliberately a new series and not a typo.
+                  I confirm this is deliberately a new Range and not a typo.
                 </label>
               </div>
             )}
-          </div>
+          </div>}
           <div>
             <label className="block text-sm font-medium">MRP <span className="text-destructive">*</span>
               <Input data-testid="input-mrp" type="number" min="0.01" step="0.01" disabled={apply.isPending} className="mt-1" value={value} onChange={e => { setValue(e.target.value); change(); }} />
@@ -513,7 +519,7 @@ export function ProductCreationTab() {
           <div className="mt-4 rounded-lg border-2 border-[#2d7c78] bg-[#f2fbfa] p-4">
             <h3 className="font-semibold">Confirm creation</h3>
             <p className="mt-2 text-sm">
-              <b>WILL CREATE</b> product <b>{preview.data.normalizedCode} ({snapshot.productName})</b> in <b>{snapshot.division} / {snapshot.category}</b> with an exact MRP of <b>{money(snapshot.mrp)}</b> in series <b>{snapshot.series}</b>, effective from <b>{date(snapshot.effectiveDate)}</b>.
+              <b>WILL CREATE</b> product <b>{preview.data.normalizedCode} ({snapshot.productName})</b> in <b>{snapshot.division} / {snapshot.category}</b> with an exact MRP of <b>{money(snapshot.mrp)}</b>{supportsCatalogRange(snapshot.division) && snapshot.series ? <> in Range <b>{snapshot.series}</b></> : null}, effective from <b>{date(snapshot.effectiveDate)}</b>.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">Reason: {snapshot.reason}</p>
             <div className="mt-2 text-sm text-muted-foreground">
@@ -591,11 +597,11 @@ export function ProductCreationTab() {
             onSubmit={submitCategory}
           />
           <ClassificationDialog
-            open={showAddSeries}
+            open={showAddSeries && rangeVisible}
             onOpenChange={open => { setShowAddSeries(open); if (!open) setClassificationError(null); }}
-            title={`Add series to ${division || "division"}`}
-            description="Create a series for the selected division. This does not create a product or price."
-            nameLabel="Series name"
+            title={`Add Range to ${division || "division"}`}
+            description="Create a Range for the selected division. This does not create a product or price."
+            nameLabel="Range name"
             nameId="input-new-series"
             nameTestId="input-new-series"
             name={newSeriesName}
@@ -604,10 +610,10 @@ export function ProductCreationTab() {
             reasonTestId="textarea-series-reason"
             reason={newSeriesReason}
             onReasonChange={setNewSeriesReason}
-            reasonPlaceholder="Why is this series needed?"
+            reasonPlaceholder="Why is this Range needed?"
             error={classificationError}
             submitTestId="button-confirm-add-series"
-            submitLabel="Add series"
+            submitLabel="Add Range"
             submittingLabel="Adding…"
             submitting={addSeries.isPending}
             canSubmit={!!division && !!newSeriesName.trim() && !!newSeriesReason.trim()}

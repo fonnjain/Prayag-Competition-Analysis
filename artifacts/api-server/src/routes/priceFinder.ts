@@ -601,7 +601,7 @@ router.get("/price-finder/search", async (req, res) => {
     .map(({ row }) => toSearchResult(row));
 
   const suggestionFields = [
-    { field: "Series", key: "category" as const },
+    { field: "Category", key: "category" as const },
     { field: "Size", key: "size" as const },
     { field: "Division", key: "division" as const },
   ];

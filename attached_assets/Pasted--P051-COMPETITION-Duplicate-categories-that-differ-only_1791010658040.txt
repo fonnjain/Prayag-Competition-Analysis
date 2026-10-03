@@ -1,0 +1,120 @@
+# P051 — COMPETITION — Duplicate categories that differ only in spelling
+
+> **P051** · app: **COMPETITION** (`prayag-price.com`)
+> **Run after P049 Step 2 is delivered.** Both touch the master loader.
+> **THIS PROMPT CHANGES CODE. It changes no stored value until a list is approved.**
+> Quote `P051` when reporting back.
+
+The Category dropdown in Create New Product shows both:
+
+```
+BLAZE 62
+Blaze 62
+```
+
+The user reports **many more pairs like this**. It is the same failure as `Allied` / `ALLIED` in series. P048's normalised refusal stops it happening **through the Add button**, but these were created by **loads and imports**, which do not use that check.
+
+There are two problems here, and the second one is bigger:
+
+1. **The same category is spelled two or more ways**, so products are split between them and every category filter and count is wrong.
+2. **`Blaze 62` is a CP range name, not a category.** It is in category because the master loader copied series into category (P049). Merging the two spellings would tidy a value that may be wrong in the first place.
+
+So this prompt **finds and lists** both problems, **builds** the merge, and **applies nothing** until Prayag approves the list.
+
+---
+
+# PART 0 — Read-only. Report before building.
+
+**0.1** Where is category stored: a reference table, or distinct values read off product rows? (P048 Part 0.4 established this; quote it.)
+
+**0.2** Group every category by the **P048 normalisation rule** (trim, collapse whitespace, case-fold, strip punctuation). List every group that has **more than one stored spelling**. For each spelling give:
+
+```
+division | stored spelling | product count | how the products arrived (load batch / importer / editor) | first and last created time
+```
+
+Do this for **development and production separately**, with clock times.
+
+**0.3** For every category value in those groups, say whether it **equals the product's `series_range`** (i.e. it is a loader copy of a range, not a real category).
+
+**0.4** Check the same thing for **series_range** values (e.g. `Allied` / `ALLIED`) and **division**, and report any groups found. **Report only. This prompt fixes category.**
+
+**0.5** Name **every write path** that can create a category without the P048 normalised check: master loader, generic importer, new-products bulk upload, catalogue sync, any other. Quote the code.
+
+---
+
+# PART 1 — Stop new duplicates at every write path
+
+**1.1** Every path from 0.5 checks a new category against existing ones **using the same shared normalisation function P048 built**. Do not write a second copy of the rule.
+
+**1.2** On a load, if an incoming value normalises to an existing category in the same division, **write the existing stored spelling**, and count it in the load preview as *"matched existing spelling"* with both values shown.
+
+**1.3** No path may create a new category silently. A genuinely new category on a load is listed in the preview as *new*, and needs the same admin approval the load already needs.
+
+---
+
+# PART 2 — Build the merge. Do not apply it.
+
+**2.1** Produce a download, one row per duplicate group, per environment:
+
+```
+division | normalised key | every stored spelling with product count |
+proposed spelling | is it a range copy (0.3) | products affected
+```
+
+**2.2** Default proposed spelling, which Prayag can overrule per row:
+- the spelling used in Prayag's own master or price list, if it appears there; otherwise
+- the spelling with the most products; ties go to Title Case.
+
+Leave a blank column **"Prayag decision"** for them to fill in.
+
+**2.3** Rows that are **range copies** (0.3) are marked **"wait for range correction"** and get **no** proposed merge. They are handled with the P049 Step 2 Part 4 list, not here, so a value is not merged now and relabelled later.
+
+**2.4** Build the merge as **preview → apply → undo**, admin only, with typed reason, actor and timestamp, and one load batch per apply so it can be reversed in one action.
+
+**2.5** **Do not run apply.** Show the preview counts for development only.
+
+---
+
+# Rules
+
+1. **No stored category, series_range or division changes in this prompt.**
+2. No product created, deleted or moved between divisions.
+3. Merges are never automatic. They are applied only from an approved list, in a later step.
+4. Range copies are not merged here (2.3).
+5. No Prayag price changes. `mrp_price_history` stays **development 14,012 / production 14,302** with the checksums recorded in P049 Step 2, before and after.
+6. No Sales application change. Category is not in the Sales division mapping; confirm that the merge, when applied, will not change anything Sales reads.
+7. Development first. Publish only the Part 1 guard. Confirm it in production.
+
+# Tests
+
+```
+1. Loading "blaze 62" where "Blaze 62" exists writes "Blaze 62", and the
+   preview shows "matched existing spelling"
+2. Same through the generic importer, bulk upload and catalogue sync
+3. A genuinely new category on a load appears as "new" in the preview
+4. The guard uses the one shared normalisation function (show the import)
+5. Merge preview shows exact before/after counts per spelling
+6. Range-copy groups get no proposed merge
+7. No stored value changed (row-level compare on category, series_range, division)
+8. mrp_price_history count and checksum unchanged, both environments
+```
+
+# Report
+
+1. Where category is stored.
+2. Every duplicate group, with spellings, counts and arrival path, **both environments**.
+3. Which groups are range copies.
+4. Duplicate groups found in series_range and division (report only).
+5. Every write path, and how each now uses the shared check.
+6. The download for Prayag.
+7. Merge preview counts (development).
+8. Test results, `mrp_price_history` before and after, production confirmation of the Part 1 guard.
+
+State the environment and the clock time against every figure.
+
+---
+
+## What comes next
+
+Prayag fills in the "Prayag decision" column. A later step applies the approved merges with preview → apply → undo, development first, then production. The range-copy rows wait for the P049 Step 2 Part 4 ruling.

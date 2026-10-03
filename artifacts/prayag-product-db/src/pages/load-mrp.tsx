@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MasterClassificationPreview } from "@/components/MasterClassificationPreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,10 +33,16 @@ interface Preview {
   protectedNameConflicts: unknown[];
   rejectedRows: { itemCode?: string; row?: number; reason: string }[];
   rejectedReasonSummary: Record<string, number>;
+  classificationCounts?: { existingProducts: number; newNonRangeProducts: number; refusedNewRangeProducts: number };
+  classificationDifferences?: { itemCode: string; message: string; differingFields: string[];
+    stored: { division: string | null; category: string | null; seriesRange: string | null };
+    file: { division: string; category: string | null; seriesRange: string | null; categoryProvided: boolean; rangeProvided: boolean } }[];
+  classificationPolicy?: string;
+  lifecyclePolicy?: string;
   canApply: boolean; noChangeReason: string | null;
 }
 interface PendingBatch {
-  id?: number; batchId?: number; status: "pending" | "applied" | "discarded" | "expired";
+  id?: number; batchId?: number; status: "pending" | "applied" | "discarded" | "expired" | "duplicate";
   expiresAt?: string; appliedAt?: string | null; appliedBy?: string | null;
   discardedAt?: string | null; discardedBy?: string | null; preview: Preview;
   result?: {
@@ -148,6 +155,12 @@ export default function LoadMrpPage() {
       const res = await fetch("/api/catalog/load-mrp", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 && data.duplicate) {
+        if (data.preview) {
+          setBatch({ status: "duplicate", preview: data.preview });
+          const url = new URL(window.location.href);
+          url.searchParams.delete("batchId");
+          window.history.replaceState({}, "", url);
+        }
         setDuplicateMessage(data.error || "This identical file has already been staged or loaded. No second preview was created.");
         return;
       }
@@ -298,6 +311,7 @@ export default function LoadMrpPage() {
       {batch.status === "applied" && flaggedMrpCount > 0 && reviewBatchId && <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950"><h3 className="font-semibold">{formatCount(flaggedMrpCount)} suspicious price row{flaggedMrpCount === 1 ? "" : "s"} still require review</h3><p className="mt-1 text-sm">These rows were written in a blocked review state and cannot become current until approved.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={isReviewing} onClick={() => void reviewFlaggedPrices("cancel")}>Cancel flagged rows</Button><Button disabled={isReviewing} onClick={() => void reviewFlaggedPrices("approve")}>{isReviewing ? "Reviewing…" : "Approve flagged rows"}</Button></div></div>}
       {reviewFeedback && <div className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{reviewFeedback}</div>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Metric label="Rows to write" value={preview.rowsToWrite} /><Metric label="New products" value={preview.newProducts.length} /><Metric label="Absent from file" value={preview.catalogueProductsAbsentFromFile.length} /><Metric label="Protected names" value={preview.protectedNameConflicts.length} /></div>
+      {preview.classificationCounts && <MasterClassificationPreview counts={preview.classificationCounts} differences={preview.classificationDifferences ?? []} policy={preview.classificationPolicy} lifecyclePolicy={preview.lifecyclePolicy} />}
       <PreviewList title="Periods in this file" empty="No periods found.">{preview.periods.map(period => <div key={period.effectiveDate} className="flex justify-between gap-3"><span className="font-mono">{formatDisplayDate(period.effectiveDate)} {period.isNew && <span className="ml-1 rounded bg-primary px-1.5 py-0.5 font-sans text-xs text-primary-foreground">new</span>}</span><span className="text-muted-foreground">{formatCount(period.rowCount)} rows · {formatCount(period.movedInCount)} moved in</span></div>)}</PreviewList>
       <div className="grid gap-4 md:grid-cols-2"><PreviewList title={`New products / codes (${preview.newProducts.length})`} empty="No new products.">{preview.newProducts.map(product => <span key={productCode(product)} className="font-mono mr-3 inline-block">{productCode(product)}</span>)}</PreviewList><PreviewList title={`Catalogue products absent from file (${preview.catalogueProductsAbsentFromFile.length})`} empty="None.">{preview.catalogueProductsAbsentFromFile.map(code => <span key={code} className="font-mono mr-3 inline-block">{code}</span>)}</PreviewList></div>
       <div className="grid gap-4 md:grid-cols-2"><div className="rounded border p-4"><h3 className="font-medium">Discontinuations</h3><p className="mt-2 text-sm"><strong>{formatCount(preview.discontinuations.total)}</strong> total · <strong className="text-amber-700">{formatCount(preview.discontinuations.immediate)}</strong> immediate · <strong>{formatCount(preview.discontinuations.future)}</strong> future</p></div><PreviewList title={`Protected-name conflicts (${preview.protectedNameConflicts.length})`} empty="None — audited names will not need preserving.">{preview.protectedNameConflicts.map((conflict, index) => <div key={index} className="font-mono text-xs break-all">{typeof conflict === "string" ? conflict : JSON.stringify(conflict)}</div>)}</PreviewList></div>

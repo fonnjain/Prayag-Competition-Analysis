@@ -1,0 +1,77 @@
+# P049 — Step 3 — COMPETITION — The master loader must not block price loads
+
+> **P049 Step 3** · app: **COMPETITION** (`prayag-price.com`)
+> **DO NOT PUBLISH P049 Step 2 YET.** Fix this in development first, then publish both together.
+> **THIS PROMPT CHANGES CODE. It changes no stored value.**
+> Quote `P049 Step 3` when reporting back.
+
+P049 Step 2 is good work: the right scope, Range optional, hidden values preserved, and MRP count and checksum identical in both environments. The extra 50 production rows are explained and accepted. They are single-product-editor creations by preeti.chauhan@prayagindia.com on 25–26 Sep: MHC-01 to 10, 36 PN…W/G codes, WCT-3LL-05/07/10 and 5794.
+
+**One result must not ship:** the authoritative master loader now refuses **all 6,106 rows**, because the master has no category column. Publishing that would block every future Prayag MRP load. That came from my instruction in Step 2 §3.2 ("refuse the row"), which was written for rows with no category. It did not consider that **existing** products already have one.
+
+---
+
+# What the data now shows
+
+Your review file, production, shows what the master's `series` column really holds:
+
+```
+Pipes & Fittings, Hardware, Ceramic   HDPE Pipe, PPR Fittings, UPVC Fittings ...  -> a real CATEGORY
+CP, CP (QUAA / FERN), PTMT            Aspire 52, Marcus 68, Blaze 62 ...          -> a RANGE
+```
+
+So the master's `series` column is **category for most divisions and range for the three Range divisions**. Outside those three, category equal to range is **correct**, not a loader error. Only the three Range divisions need review.
+
+---
+
+# 1. Loader rule
+
+**1.1 Existing product** (code already in the catalogue): the loader writes **prices only**. It **never writes `category`, `series_range` or `division`** for an existing product. A difference between the file and the stored value is shown in the preview as *"classification differs — not changed"*, with both values. It does not block the load.
+
+**1.2 New product, division outside the three Range divisions:** master `series` → `category`. `series_range` is not written.
+
+**1.3 New product in a Range division:** master `series` → `series_range`. There is no category in the file, so **the row is refused with a clear message** ("new CP/PTMT product needs a category: create it in the product editor"). Only these rows are refused.
+
+**1.4 Report** how many rows of the current master (`Prayag_MRP_Authoritative_v2_01Sep2026.xlsx`, and v4 if present) fall under 1.1, 1.2 and 1.3. **1.3 should be zero or close to it.** If the master is loaded again unchanged, nothing is refused.
+
+---
+
+# 2. Narrow the review list
+
+**2.1** Reissue the category/range review downloads **only for the three Range divisions** (production: 1,040 + 161 + 2,071 = 3,272 candidates). Add a column `looks_like` with value `range` or `category`, by your own reading, and say how you decided. *Accessories* is plainly a category; *Marcus 68* is plainly a range.
+
+**2.2** Keep the 57 combined-division products in a separate file. They wait for their own prompt.
+
+**2.3** Change nothing in these products.
+
+---
+
+# Rules
+
+1. No stored category, series_range, division or price changes.
+2. Every check from Step 2 still passes: scope, optional Range, hidden values preserved, Sales field names byte-identical.
+3. `mrp_price_history` stays **development 14,012 / production 14,302** with the Step 2 checksums, before and after.
+4. Then **publish Step 2 and Step 3 together**, and confirm in production.
+
+# Tests
+
+```
+1. Reloading the current master as preview: 0 rows refused for an existing product
+2. Preview lists every "classification differs — not changed" row, with both values
+3. Existing product: category, series_range, division unchanged after apply (dev, disposable schema)
+4. New pipe product: series -> category; series_range empty
+5. New CP product: refused with the message in 1.3
+6. All 32 Step 2 checks pass again
+7. mrp_price_history count and checksum unchanged, both environments
+```
+
+# Report
+
+1. The loader rule as built, quoted.
+2. 1.1 / 1.2 / 1.3 counts for the current master.
+3. Count of "classification differs" rows, with a download.
+4. The narrowed review file (three divisions) and the combined-division file.
+5. Test results and MRP before and after.
+6. After publish: production confirmation of the Range screen and the loader preview, with clock times.
+
+State the environment and the clock time against every figure.

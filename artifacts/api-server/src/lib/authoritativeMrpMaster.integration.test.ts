@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+// P049 Step 3 exercises the unchanged real workbooks, with no synthetic Category
+// column. Every mutation remains confined to the disposable schema below.
 import {
   catalogProductsTable,
   db,
@@ -444,7 +446,7 @@ describe("authoritative MRP master transaction guarantees", () => {
   );
 
   it(
-    "persists exact prices, variants, withdrawals, deactivations, and provenance linkage",
+    "persists exact prices, variants and provenance while preserving every existing catalogue field",
     async () => {
       expect(sha256ForBuffer(MASTER_BUFFER)).toBe(AUTHORITATIVE_MASTER_SHA256);
       const parsed = parseAuthoritativeMasterBuffer(MASTER_BUFFER);
@@ -454,7 +456,8 @@ describe("authoritative MRP master transaction guarantees", () => {
           await removeExistingAuthoritativeBatches(tx);
           await tx
             .delete(catalogProductsTable)
-            .where(eq(catalogProductsTable.itemCode, "EP-GANESHA"));
+            .where(sql`UPPER(${catalogProductsTable.itemCode}) = ${"EP-GANESHA"}`);
+          const existingCatalogueBefore = await tx.select().from(catalogProductsTable);
           const catalogCodesBefore = new Set(
             (
               await tx
@@ -475,7 +478,8 @@ describe("authoritative MRP master transaction guarantees", () => {
           if (result.duplicate) return;
           expect(result.productRows).toBe(6_076);
           expect(result.priceRows).toBe(6_226);
-          expect(result.discontinuedRows).toBe(233);
+          expect(result.discontinuedRows).toBe(0);
+          expect(result.sourceDiscontinuedRows).toBe(233);
           expect(result.excludedRows).toBe(142);
           expect(result.newCodes).toContain("EP-GANESHA");
           expect(result.newCodes).toHaveLength(
@@ -631,63 +635,11 @@ describe("authoritative MRP master transaction guarantees", () => {
             ]),
           );
 
-          const discontinued = await tx
-            .select({
-              itemCode: catalogProductsTable.itemCode,
-              discontinuedFrom: catalogProductsTable.discontinuedFrom,
-              discontinuedCheckedBy: catalogProductsTable.discontinuedCheckedBy,
-              discontinuedStatusNote: catalogProductsTable.discontinuedStatusNote,
-            })
-            .from(catalogProductsTable)
-            .where(
-              inArray(
-                catalogProductsTable.itemCode,
-                parsed.discontinuedRows.map((row) => row.itemCode),
-              ),
-            );
-          expect(discontinued).toHaveLength(233);
-          expect(
-            new Set(
-              discontinued.map((row) =>
-                JSON.stringify([
-                  row.itemCode,
-                  row.discontinuedFrom,
-                  row.discontinuedCheckedBy,
-                  row.discontinuedStatusNote,
-                ]),
-              ),
-            ),
-          ).toEqual(
-            new Set(
-              parsed.discontinuedRows.map((row) =>
-                JSON.stringify([
-                  row.itemCode,
-                  row.discontinuedFrom,
-                  row.checkedBy,
-                  row.statusNote,
-                ]),
-              ),
-            ),
-          );
-
-          const deactivated = await tx
-            .select({
-              itemCode: catalogProductsTable.itemCode,
-              isActive: catalogProductsTable.isActive,
-              dataFlag: catalogProductsTable.dataFlag,
-            })
-            .from(catalogProductsTable)
-            .where(inArray(catalogProductsTable.itemCode, [...DEACTIVATED_CODES]));
-          expect(deactivated).toHaveLength(DEACTIVATED_CODES.length);
-          expect(deactivated).toEqual(
-            expect.arrayContaining(
-              DEACTIVATED_CODES.map((itemCode) => ({
-                itemCode,
-                isActive: false,
-                dataFlag: "removed_by_authoritative_master_2026_09_01",
-              })),
-            ),
-          );
+          const afterByCode = new Map((await tx.select().from(catalogProductsTable)).map(row => [row.itemCode, row]));
+          for (const beforeRow of existingCatalogueBefore) {
+            expect(afterByCode.get(beforeRow.itemCode)).toEqual(beforeRow);
+          }
+          expect(result.deactivatedCodes).toEqual([]);
 
           const [excludedHistory] = (
             await tx.execute<{ count: number }>(sql`

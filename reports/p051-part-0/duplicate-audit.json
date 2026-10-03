@@ -1,0 +1,5015 @@
+{
+  "development": {
+    "environment": "development",
+    "auditIST": "2026-10-03 12:50:55",
+    "products": 6948,
+    "sourceMarkers": [
+      "authoritative_master_v2_2026_09_01",
+      "mrp_repair_2026",
+      "new_from_load",
+      null,
+      "removed_by_authoritative_master_2026_09_01",
+      "new_products_upload"
+    ],
+    "fields": {
+      "category": [
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "aqua 54",
+          "spellings": [
+            {
+              "stored_spelling": "AQUA 54",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5492-ON-OFF-P",
+                "DB-54-3 IN-N",
+                "DB-54-3 IN-ON-OFF-N",
+                "DB-54-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Aqua 54",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5402",
+                "5404",
+                "5406",
+                "5407",
+                "5408",
+                "5410",
+                "5411",
+                "5412",
+                "5414",
+                "5416",
+                "5417",
+                "5418",
+                "5420",
+                "5450",
+                "5451",
+                "5454",
+                "5455",
+                "5470",
+                "5475",
+                "5480",
+                "5491-N",
+                "5492-N",
+                "5492-ON-OFF-N",
+                "5492-P",
+                "5493-N",
+                "5493-ON-OFF-N",
+                "5495",
+                "5496",
+                "5498",
+                "BB-54",
+                "CP-54",
+                "DB-54-3IN-N",
+                "DB-54-3IN-ON-OFF-N",
+                "DB-54-H-N",
+                "DB-54-H-ON-OFF-N",
+                "DB-54-H-P",
+                "DB-54-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "aspire 52",
+          "spellings": [
+            {
+              "stored_spelling": "ASPIRE 52",
+              "products": 8,
+              "active_products": 3,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 8,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5292-ON-OFF-P",
+                "C 5211",
+                "DB-52-3 IN-N",
+                "DB-52-3 IN-ON-OFF-N",
+                "DB-52-H-ON-OFF-P",
+                "PD-3 IN-N",
+                "PD-3 IN-ON-OFF-N",
+                "PD-46-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Aspire 52",
+              "products": 48,
+              "active_products": 48,
+              "exact_category_range_equal": 48,
+              "normalised_category_range_equal": 48,
+              "authoritative_marked": 48,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 48,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5202",
+                "5203",
+                "5204",
+                "5206",
+                "5207",
+                "5208",
+                "5210",
+                "5212",
+                "5214",
+                "5216",
+                "5217",
+                "5218",
+                "5220",
+                "5250",
+                "5251",
+                "5252",
+                "5254-S",
+                "5255",
+                "5265",
+                "5270",
+                "5275",
+                "5280",
+                "5291-N",
+                "5292-N",
+                "5292-ON-OFF-N",
+                "5292-P",
+                "5293-N",
+                "5293-ON-OFF-N",
+                "5295",
+                "5296",
+                "5298",
+                "BB-52-S",
+                "BD-40",
+                "C5211",
+                "CP-07",
+                "CP-52",
+                "DB-52-3IN-N",
+                "DB-52-3IN-ON-OFF-N",
+                "DB-52-H-N",
+                "DB-52-H-ON-OFF-N",
+                "DB-52-H-P",
+                "DB-52-N",
+                "PD-3IN-N",
+                "PD-3IN-ON-OFF-N",
+                "PD-40-N",
+                "PD-46-H-N",
+                "PD-46-H-ON-OFF-N",
+                "PD-46-H-P"
+              ]
+            }
+          ],
+          "products_affected": 56,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "blaze 62",
+          "spellings": [
+            {
+              "stored_spelling": "BLAZE 62",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6292-ON-OFF-P",
+                "DB-62-3 IN-N",
+                "DB-62-3 IN-ON-OFF-N",
+                "DB-62-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Blaze 62",
+              "products": 36,
+              "active_products": 36,
+              "exact_category_range_equal": 36,
+              "normalised_category_range_equal": 36,
+              "authoritative_marked": 36,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 36,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6202",
+                "6204",
+                "6206",
+                "6207",
+                "6208",
+                "6210",
+                "6211",
+                "6212",
+                "6214",
+                "6216",
+                "6218",
+                "6220",
+                "6250",
+                "6251",
+                "6254",
+                "6255",
+                "6270",
+                "6275",
+                "6280",
+                "6291-N",
+                "6292-N",
+                "6292-ON-OFF-N",
+                "6292-P",
+                "6293-N",
+                "6293-ON-OFF-N",
+                "6295",
+                "6296",
+                "6298",
+                "BB-62",
+                "CP-62",
+                "DB-62-3IN-N",
+                "DB-62-3IN-ON-OFF-N",
+                "DB-62-H-N",
+                "DB-62-H-ON-OFF-N",
+                "DB-62-H-P",
+                "DB-62-N"
+              ]
+            }
+          ],
+          "products_affected": 40,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "cygnu 71",
+          "spellings": [
+            {
+              "stored_spelling": "CYGNUS 71",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-71-3 IN-N",
+                "DB-71-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Cygnus 71",
+              "products": 34,
+              "active_products": 34,
+              "exact_category_range_equal": 34,
+              "normalised_category_range_equal": 34,
+              "authoritative_marked": 34,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 34,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7102",
+                "7103",
+                "7104",
+                "7106",
+                "7108",
+                "7110",
+                "7111",
+                "7113",
+                "7114",
+                "7116",
+                "7118",
+                "7120",
+                "7151",
+                "7152",
+                "7154",
+                "7155",
+                "7170",
+                "7175",
+                "7180",
+                "7191-N",
+                "7192-N",
+                "7192-ON-OFF-N",
+                "7193-N",
+                "7193-ON-OFF-N",
+                "7194",
+                "7195",
+                "7196",
+                "7198",
+                "BB-71",
+                "DB-71-3IN-N",
+                "DB-71-3IN-ON-OFF-N",
+                "DB-71-H-N",
+                "DB-71-H-ON-OFF-N",
+                "DB-71-N"
+              ]
+            }
+          ],
+          "products_affected": 36,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "europa 90",
+          "spellings": [
+            {
+              "stored_spelling": "EUROPA 90",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-90-3 IN-N",
+                "DB-90-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Europa 90",
+              "products": 36,
+              "active_products": 36,
+              "exact_category_range_equal": 36,
+              "normalised_category_range_equal": 36,
+              "authoritative_marked": 36,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 36,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "9002",
+                "9003",
+                "9004",
+                "9006",
+                "9008",
+                "9010",
+                "9011",
+                "9013",
+                "9014",
+                "9016",
+                "9018",
+                "9020",
+                "9051",
+                "9052",
+                "9054",
+                "9055",
+                "9061",
+                "9070",
+                "9071",
+                "9075",
+                "9076",
+                "9080",
+                "9091-N",
+                "9092-N",
+                "9092-ON-OFF-N",
+                "9093-N",
+                "9093-ON-OFF-N",
+                "9095",
+                "9096",
+                "9098",
+                "BB-90",
+                "DB-90-3IN-N",
+                "DB-90-3IN-ON-OFF-N",
+                "DB-90-H-N",
+                "DB-90-H-ON-OFF-N",
+                "DB-90-N"
+              ]
+            }
+          ],
+          "products_affected": 38,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "evian 87",
+          "spellings": [
+            {
+              "stored_spelling": "EVIAN 87",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "8792-ON-OFF-P",
+                "DB-87-3 IN-N",
+                "DB-87-3 IN-ON-OFF-N",
+                "DB-87-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Evian 87",
+              "products": 40,
+              "active_products": 40,
+              "exact_category_range_equal": 40,
+              "normalised_category_range_equal": 40,
+              "authoritative_marked": 40,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 40,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "8702",
+                "8703",
+                "8704",
+                "8706",
+                "8708",
+                "8710",
+                "8711",
+                "8712",
+                "8714",
+                "8716",
+                "8718",
+                "8720",
+                "8750",
+                "8751",
+                "8752",
+                "8754",
+                "8755",
+                "8756",
+                "8770",
+                "8771",
+                "8775",
+                "8776",
+                "8780",
+                "8791-N",
+                "8792-N",
+                "8792-ON-OFF-N",
+                "8792-P",
+                "8793-N",
+                "8793-ON-OFF-N",
+                "8794",
+                "8795",
+                "8796",
+                "8798",
+                "BB-87",
+                "DB-87-3IN-N",
+                "DB-87-3IN-ON-OFF-N",
+                "DB-87-H-N",
+                "DB-87-H-ON-OFF-N",
+                "DB-87-H-P",
+                "DB-87-N"
+              ]
+            }
+          ],
+          "products_affected": 44,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "laguna 93",
+          "spellings": [
+            {
+              "stored_spelling": "LAGUNA 93",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "9392-ON-OFF-P",
+                "DB-93-3 IN-N",
+                "DB-93-3 IN-ON-OFF-N",
+                "DB-93-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Laguna 93",
+              "products": 40,
+              "active_products": 40,
+              "exact_category_range_equal": 40,
+              "normalised_category_range_equal": 40,
+              "authoritative_marked": 40,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 40,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "9302",
+                "9306",
+                "9308",
+                "9310",
+                "9311",
+                "9312",
+                "9313",
+                "9314",
+                "9316",
+                "9318",
+                "9320",
+                "9350",
+                "9351",
+                "9352",
+                "9354",
+                "9355",
+                "9360",
+                "9365",
+                "9370",
+                "9371",
+                "9375",
+                "9376",
+                "9380",
+                "9391-N",
+                "9392-N",
+                "9392-ON-OFF-N",
+                "9392-P",
+                "9393-N",
+                "9393-ON-OFF-N",
+                "9394",
+                "9395",
+                "9396",
+                "9398",
+                "BB-93",
+                "DB-93-3IN-N",
+                "DB-93-3IN-ON-OFF-N",
+                "DB-93-H-N",
+                "DB-93-H-ON-OFF-N",
+                "DB-93-H-P",
+                "DB-93-N"
+              ]
+            }
+          ],
+          "products_affected": 44,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "macasa 76",
+          "spellings": [
+            {
+              "stored_spelling": "MACASA 76",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7692-ON-OFF-P",
+                "DB-76-3 IN-N",
+                "DB-76-3 IN-ON-OFF-N",
+                "DB-76-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Macasa 76",
+              "products": 41,
+              "active_products": 41,
+              "exact_category_range_equal": 41,
+              "normalised_category_range_equal": 41,
+              "authoritative_marked": 41,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 41,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7602",
+                "7603",
+                "7604",
+                "7606",
+                "7607",
+                "7608",
+                "7610",
+                "7611",
+                "7612",
+                "7614",
+                "7616",
+                "7618",
+                "7620",
+                "7650",
+                "7651",
+                "7652",
+                "7654",
+                "7655",
+                "7670",
+                "7671",
+                "7675",
+                "7676",
+                "7680",
+                "7691-N",
+                "7692-N",
+                "7692-ON-OFF-N",
+                "7692-P",
+                "7693-N",
+                "7693-ON-OFF-N",
+                "7694",
+                "7695",
+                "7696",
+                "7698",
+                "BB-76",
+                "CP-76",
+                "DB-76-3IN-N",
+                "DB-76-3IN-ON-OFF-N",
+                "DB-76-H-N",
+                "DB-76-H-ON-OFF-N",
+                "DB-76-H-P",
+                "DB-76-N"
+              ]
+            }
+          ],
+          "products_affected": 45,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "marcu 68",
+          "spellings": [
+            {
+              "stored_spelling": "MARCUS 68",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6892-ON-OFF-P",
+                "DB-68-3 IN-N",
+                "DB-68-3 IN-ON-OFF-N",
+                "DB-68-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Marcus 68",
+              "products": 42,
+              "active_products": 42,
+              "exact_category_range_equal": 42,
+              "normalised_category_range_equal": 42,
+              "authoritative_marked": 42,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 42,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6802",
+                "6803",
+                "6803-S",
+                "6804",
+                "6805",
+                "6806",
+                "6807",
+                "6808",
+                "6810",
+                "6811",
+                "6812",
+                "6813",
+                "6814",
+                "6816",
+                "6818",
+                "6820",
+                "6850",
+                "6851",
+                "6852",
+                "6854",
+                "6855",
+                "6865",
+                "6870",
+                "6875",
+                "6880",
+                "6891-N",
+                "6892-N",
+                "6892-ON-OFF-N",
+                "6892-P",
+                "6893-N",
+                "6893-ON-OFF-N",
+                "6895",
+                "6896",
+                "6898",
+                "BB-68",
+                "CP-68",
+                "DB-68-3IN-N",
+                "DB-68-3IN-ON-OFF-N",
+                "DB-68-H-N",
+                "DB-68-H-ON-OFF-N",
+                "DB-68-H-P",
+                "DB-68-N"
+              ]
+            }
+          ],
+          "products_affected": 46,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "niagara 81",
+          "spellings": [
+            {
+              "stored_spelling": "NIAGARA 81",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-81-3 IN-N",
+                "DB-81-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Niagara 81",
+              "products": 35,
+              "active_products": 35,
+              "exact_category_range_equal": 35,
+              "normalised_category_range_equal": 35,
+              "authoritative_marked": 35,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 35,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "8102",
+                "8103",
+                "8106",
+                "8108",
+                "8110",
+                "8111",
+                "8112",
+                "8114",
+                "8116",
+                "8118",
+                "8120",
+                "8151",
+                "8152",
+                "8154",
+                "8155",
+                "8156",
+                "8170",
+                "8171",
+                "8175",
+                "8176",
+                "8180",
+                "8191-N",
+                "8192-N",
+                "8192-ON-OFF-N",
+                "8193-N",
+                "8193-ON-OFF-N",
+                "8195",
+                "8196",
+                "8198",
+                "BB-81",
+                "DB-81-3IN-N",
+                "DB-81-3IN-ON-OFF-N",
+                "DB-81-H-N",
+                "DB-81-H-ON-OFF-N",
+                "DB-81-N"
+              ]
+            }
+          ],
+          "products_affected": 37,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "ocean 55",
+          "spellings": [
+            {
+              "stored_spelling": "OCEAN 55",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5592-ON-OFF-P",
+                "DB-55-3 IN-N",
+                "DB-55-3 IN-ON-OFF-N",
+                "DB-55-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Ocean 55",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5502",
+                "5504",
+                "5506",
+                "5507",
+                "5508",
+                "5510",
+                "5511",
+                "5512",
+                "5514",
+                "5516",
+                "5517",
+                "5518",
+                "5520",
+                "5550",
+                "5551",
+                "5554",
+                "5555",
+                "5570",
+                "5575",
+                "5580",
+                "5591-N",
+                "5592-N",
+                "5592-ON-OFF-N",
+                "5592-P",
+                "5593-N",
+                "5593-ON-OFF-N",
+                "5595",
+                "5596",
+                "5598",
+                "BB-55",
+                "CP-55",
+                "DB-55-3IN-N",
+                "DB-55-3IN-ON-OFF-N",
+                "DB-55-H-N",
+                "DB-55-H-ON-OFF-N",
+                "DB-55-H-P",
+                "DB-55-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "orbit 53",
+          "spellings": [
+            {
+              "stored_spelling": "ORBIT 53",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5392-ON-OFF-P",
+                "DB-53-3 IN-N",
+                "DB-53-3 IN-ON-OFF-N",
+                "DB-53-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Orbit 53",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5302",
+                "5306",
+                "5307",
+                "5308",
+                "5310",
+                "5311",
+                "5312",
+                "5314",
+                "5316",
+                "5317",
+                "5318",
+                "5320",
+                "5350",
+                "5351",
+                "5354-S",
+                "5355",
+                "5365",
+                "5370",
+                "5375",
+                "5380",
+                "5391-N",
+                "5392-N",
+                "5392-ON-OFF-N",
+                "5392-P",
+                "5393-N",
+                "5393-ON-OFF-N",
+                "5395",
+                "5396",
+                "5398",
+                "BB-53-S",
+                "CP-53",
+                "DB-53-3IN-N",
+                "DB-53-3IN-ON-OFF-N",
+                "DB-53-H-N",
+                "DB-53-H-ON-OFF-N",
+                "DB-53-H-P",
+                "DB-53-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "polo 60",
+          "spellings": [
+            {
+              "stored_spelling": "POLO 60",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6092-ON-OFF-P",
+                "DB-60-3 IN-N",
+                "DB-60-3 IN-ON-OFF-N",
+                "DB-60-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Polo 60",
+              "products": 36,
+              "active_products": 36,
+              "exact_category_range_equal": 36,
+              "normalised_category_range_equal": 36,
+              "authoritative_marked": 36,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 36,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6002",
+                "6004",
+                "6006",
+                "6007",
+                "6008",
+                "6010",
+                "6011",
+                "6012",
+                "6014",
+                "6016",
+                "6018",
+                "6020",
+                "6050",
+                "6051",
+                "6054",
+                "6055",
+                "6070",
+                "6075",
+                "6080",
+                "6091-N",
+                "6092-N",
+                "6092-ON-OFF-N",
+                "6092-P",
+                "6093-N",
+                "6093-ON-OFF-N",
+                "6095",
+                "6096",
+                "6098",
+                "BB-60",
+                "CP-60",
+                "DB-60-3IN-N",
+                "DB-60-3IN-ON-OFF-N",
+                "DB-60-H-N",
+                "DB-60-H-ON-OFF-N",
+                "DB-60-H-P",
+                "DB-60-N"
+              ]
+            }
+          ],
+          "products_affected": 40,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "saga 79f",
+          "spellings": [
+            {
+              "stored_spelling": "SAGA 79F",
+              "products": 11,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 11,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7991 F-N",
+                "7992 F-N",
+                "7992 F-ON-OFF-N",
+                "7993 F-N",
+                "7993 F-ON-OFF-N",
+                "BB-79 F",
+                "DB-79 F-3 IN-N",
+                "DB-79 F-3 IN-ON-OFF-N",
+                "DB-79 F-H-N",
+                "DB-79 F-H-ON-OFF-N",
+                "DB-79 F-N"
+              ]
+            },
+            {
+              "stored_spelling": "Saga 79F",
+              "products": 34,
+              "active_products": 34,
+              "exact_category_range_equal": 34,
+              "normalised_category_range_equal": 34,
+              "authoritative_marked": 34,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 34,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7902-F",
+                "7903-F",
+                "7904-F",
+                "7906-F",
+                "7908-F",
+                "7910-F",
+                "7911-F",
+                "7913-F",
+                "7914-F",
+                "7916-F",
+                "7918-F",
+                "7920-F",
+                "7950-F",
+                "7951-F",
+                "7952-F",
+                "7954-F",
+                "7955-F",
+                "7970-F",
+                "7975-F",
+                "7980-F",
+                "7991F-N",
+                "7992F-N",
+                "7992F-ON-OFF-N",
+                "7993F-N",
+                "7993F-ON-OFF-N",
+                "7995-F",
+                "7996-F",
+                "7998-F",
+                "BB-79F",
+                "DB-79F-3IN-N",
+                "DB-79F-3IN-ON-OFF-N",
+                "DB-79F-H-N",
+                "DB-79F-H-ON-OFF-N",
+                "DB-79F-N"
+              ]
+            }
+          ],
+          "products_affected": 45,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "urbona 78",
+          "spellings": [
+            {
+              "stored_spelling": "URBONA 78",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-78-3 IN-N",
+                "DB-78-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Urbona 78",
+              "products": 39,
+              "active_products": 39,
+              "exact_category_range_equal": 39,
+              "normalised_category_range_equal": 39,
+              "authoritative_marked": 39,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 39,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7802",
+                "7803",
+                "7804",
+                "7806",
+                "7807",
+                "7808",
+                "7810",
+                "7811",
+                "7812",
+                "7814",
+                "7816",
+                "7818",
+                "7820",
+                "7850",
+                "7851",
+                "7852",
+                "7854",
+                "7855",
+                "7870",
+                "7871",
+                "7875",
+                "7876",
+                "7880",
+                "7891-N",
+                "7892-N",
+                "7892-ON-OFF-N",
+                "7893-N",
+                "7893-ON-OFF-N",
+                "7894",
+                "7895",
+                "7896",
+                "7898",
+                "BB-78",
+                "CP-78",
+                "DB-78-3IN-N",
+                "DB-78-3IN-ON-OFF-N",
+                "DB-78-H-N",
+                "DB-78-H-ON-OFF-N",
+                "DB-78-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "vincent 66",
+          "spellings": [
+            {
+              "stored_spelling": "VINCENT 66",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-66-3 IN-N",
+                "DB-66-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Vincent 66",
+              "products": 40,
+              "active_products": 40,
+              "exact_category_range_equal": 40,
+              "normalised_category_range_equal": 40,
+              "authoritative_marked": 40,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 40,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6602",
+                "6603",
+                "6603-S",
+                "6604",
+                "6605",
+                "6606",
+                "6607",
+                "6608",
+                "6610",
+                "6611",
+                "6612",
+                "6613",
+                "6614",
+                "6616",
+                "6618",
+                "6620",
+                "6650",
+                "6651",
+                "6652",
+                "6654",
+                "6655",
+                "6665",
+                "6670",
+                "6675",
+                "6680",
+                "6691-N",
+                "6692-N",
+                "6692-ON-OFF-N",
+                "6693-N",
+                "6693-ON-OFF-N",
+                "6695",
+                "6696",
+                "6698",
+                "BB-66",
+                "CP-66",
+                "DB-66-3IN-N",
+                "DB-66-3IN-ON-OFF-N",
+                "DB-66-H-N",
+                "DB-66-H-ON-OFF-N",
+                "DB-66-N"
+              ]
+            }
+          ],
+          "products_affected": 42,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "virgo p66",
+          "spellings": [
+            {
+              "stored_spelling": "VIRGO P66",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-P66-3 IN-N",
+                "DB-P66-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Virgo P66",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "BB-P66",
+                "CP-P66",
+                "DB-P66-3IN-N",
+                "DB-P66-3IN-ON-OFF-N",
+                "DB-P66-H-N",
+                "DB-P66-H-ON-OFF-N",
+                "DB-P66-N",
+                "P6602",
+                "P6603",
+                "P6605",
+                "P6606",
+                "P6607",
+                "P6608",
+                "P6609",
+                "P6610",
+                "P6611",
+                "P6612",
+                "P6614",
+                "P6616",
+                "P6618",
+                "P6620",
+                "P6650",
+                "P6651",
+                "P6652",
+                "P6654",
+                "P6655",
+                "P6670",
+                "P6675",
+                "P6680",
+                "P6691-N",
+                "P6692-N",
+                "P6692-ON-OFF-N",
+                "P6693-N",
+                "P6693-ON-OFF-N",
+                "P6695",
+                "P6696",
+                "P6698"
+              ]
+            }
+          ],
+          "products_affected": 39,
+          "range_copy_hold": true
+        },
+        {
+          "division": "Pipes & Fittings",
+          "normalised_key": "silent fitting",
+          "spellings": [
+            {
+              "stored_spelling": "SILENT FITTINGS",
+              "products": 30,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 22,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                },
+                {
+                  "products": 8,
+                  "data_flag": "removed_by_authoritative_master_2026_09_01",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PD1106",
+                "PD1606",
+                "PD5157",
+                "PD5163",
+                "PD5171",
+                "PD5656",
+                "PD5657",
+                "PD5763",
+                "PD5771",
+                "PD7506",
+                "PS5656",
+                "PS5771",
+                "PSS1106",
+                "PSS1606",
+                "PSS5157",
+                "PSS5163",
+                "PSS5171",
+                "PSS5656",
+                "PSS5657",
+                "PSS5763",
+                "PSS5771",
+                "PSS7506",
+                "PS1106",
+                "PS1606",
+                "PS5157",
+                "PS5163",
+                "PS5171",
+                "PS5657",
+                "PS5763",
+                "PS7506"
+              ]
+            },
+            {
+              "stored_spelling": "Silent Fittings",
+              "products": 80,
+              "active_products": 79,
+              "exact_category_range_equal": 79,
+              "normalised_category_range_equal": 79,
+              "authoritative_marked": 79,
+              "first_product_created_ist": "2026-08-12 18:46:34",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 79,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                },
+                {
+                  "products": 1,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PD1110",
+                "PD1111",
+                "PD1121",
+                "PD1133",
+                "PD1141",
+                "PD1610",
+                "PD1611",
+                "PD1621",
+                "PD1633",
+                "PD1641",
+                "PD4010",
+                "PD4011",
+                "PD4021",
+                "PD4033",
+                "PD4041",
+                "PD5010",
+                "PD5011",
+                "PD5021",
+                "PD5033",
+                "PD5041",
+                "PD5151",
+                "PD5651",
+                "PD5751",
+                "PD7510",
+                "PD7511",
+                "PD7521",
+                "PD7533",
+                "PD7541",
+                "PS1110",
+                "PS1111",
+                "PS1121",
+                "PS1141",
+                "PS1610",
+                "PS1611",
+                "PS1621",
+                "PS1641",
+                "PS4010",
+                "PS4011",
+                "PS4021",
+                "PS4033",
+                "PS5010",
+                "PS5011",
+                "PS5021",
+                "PS5033",
+                "PS5151",
+                "PS5651",
+                "PS5751",
+                "PS7510",
+                "PS7511",
+                "PS7521",
+                "PS7533",
+                "PSS1110",
+                "PSS1111",
+                "PSS1121",
+                "PSS1133",
+                "PSS1141",
+                "PSS1610",
+                "PSS1611",
+                "PSS1621",
+                "PSS1633",
+                "PSS1641",
+                "PSS4010",
+                "PSS4011",
+                "PSS4021",
+                "PSS4033",
+                "PSS4041",
+                "PSS5010",
+                "PSS5011",
+                "PSS5021",
+                "PSS5033",
+                "PSS5041",
+                "PSS5151",
+                "PSS5651",
+                "PSS5751",
+                "PSS7510",
+                "PSS7511",
+                "PSS7521",
+                "PSS7533",
+                "PSS7541",
+                "ITEM CODE"
+              ]
+            }
+          ],
+          "products_affected": 110,
+          "range_copy_hold": true
+        },
+        {
+          "division": "Pipes & Fittings",
+          "normalised_key": "swr pipe",
+          "spellings": [
+            {
+              "stored_spelling": "SWR PIPE",
+              "products": 80,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 80,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PW 100",
+                "PW 11",
+                "PW 12",
+                "PW 13",
+                "PW 14",
+                "PW 15",
+                "PW 16",
+                "PW 17",
+                "PW 18",
+                "PW 19",
+                "PW 20",
+                "PW 21",
+                "PW 22",
+                "PW 23",
+                "PW 24",
+                "PW 25",
+                "PW 26",
+                "PW 27",
+                "PW 28",
+                "PW 29",
+                "PW 30",
+                "PW 31",
+                "PW 32",
+                "PW 33",
+                "PW 34",
+                "PW 35",
+                "PW 36",
+                "PW 37",
+                "PW 38",
+                "PW 39",
+                "PW 40",
+                "PW 51",
+                "PW 52",
+                "PW 53",
+                "PW 54",
+                "PW 55",
+                "PW 56",
+                "PW 57",
+                "PW 58",
+                "PW 59",
+                "PW 60",
+                "PW 61",
+                "PW 62",
+                "PW 63",
+                "PW 64",
+                "PW 65",
+                "PW 66",
+                "PW 67",
+                "PW 68",
+                "PW 69",
+                "PW 70",
+                "PW 71",
+                "PW 72",
+                "PW 73",
+                "PW 74",
+                "PW 75",
+                "PW 76",
+                "PW 77",
+                "PW 78",
+                "PW 79",
+                "PW 80",
+                "PW 81",
+                "PW 82",
+                "PW 83",
+                "PW 84",
+                "PW 85",
+                "PW 86",
+                "PW 87",
+                "PW 88",
+                "PW 89",
+                "PW 90",
+                "PW 91",
+                "PW 92",
+                "PW 93",
+                "PW 94",
+                "PW 95",
+                "PW 96",
+                "PW 97",
+                "PW 98",
+                "PW 99"
+              ]
+            },
+            {
+              "stored_spelling": "SWR Pipe",
+              "products": 160,
+              "active_products": 160,
+              "exact_category_range_equal": 160,
+              "normalised_category_range_equal": 160,
+              "authoritative_marked": 160,
+              "first_product_created_ist": "2026-08-12 18:46:34",
+              "last_product_created_ist": "2026-08-12 18:46:34",
+              "current_source_evidence": [
+                {
+                  "products": 160,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PW100",
+                "PW100S",
+                "PW11",
+                "PW11S",
+                "PW12",
+                "PW12S",
+                "PW13",
+                "PW13S",
+                "PW14",
+                "PW14S",
+                "PW15",
+                "PW15S",
+                "PW16",
+                "PW16S",
+                "PW17",
+                "PW17S",
+                "PW18",
+                "PW18S",
+                "PW19",
+                "PW19S",
+                "PW20",
+                "PW20S",
+                "PW21",
+                "PW21S",
+                "PW22",
+                "PW22S",
+                "PW23",
+                "PW23S",
+                "PW24",
+                "PW24S",
+                "PW25",
+                "PW25S",
+                "PW26",
+                "PW26S",
+                "PW27",
+                "PW27S",
+                "PW28",
+                "PW28S",
+                "PW29",
+                "PW29S",
+                "PW30",
+                "PW30S",
+                "PW31",
+                "PW31S",
+                "PW32",
+                "PW32S",
+                "PW33",
+                "PW33S",
+                "PW34",
+                "PW34S",
+                "PW35",
+                "PW35S",
+                "PW36",
+                "PW36S",
+                "PW37",
+                "PW37S",
+                "PW38",
+                "PW38S",
+                "PW39",
+                "PW39S",
+                "PW40",
+                "PW40S",
+                "PW51",
+                "PW51S",
+                "PW52",
+                "PW52S",
+                "PW53",
+                "PW53S",
+                "PW54",
+                "PW54S",
+                "PW55",
+                "PW55S",
+                "PW56",
+                "PW56S",
+                "PW57",
+                "PW57S",
+                "PW58",
+                "PW58S",
+                "PW59",
+                "PW59S",
+                "PW60",
+                "PW60S",
+                "PW61",
+                "PW61S",
+                "PW62",
+                "PW62S",
+                "PW63",
+                "PW63S",
+                "PW64",
+                "PW64S",
+                "PW65",
+                "PW65S",
+                "PW66",
+                "PW66S",
+                "PW67",
+                "PW67S",
+                "PW68",
+                "PW68S",
+                "PW69",
+                "PW69S",
+                "PW70",
+                "PW70S",
+                "PW71",
+                "PW71S",
+                "PW72",
+                "PW72S",
+                "PW73",
+                "PW73S",
+                "PW74",
+                "PW74S",
+                "PW75",
+                "PW75S",
+                "PW76",
+                "PW76S",
+                "PW77",
+                "PW77S",
+                "PW78",
+                "PW78S",
+                "PW79",
+                "PW79S",
+                "PW80",
+                "PW80S",
+                "PW81",
+                "PW81S",
+                "PW82",
+                "PW82S",
+                "PW83",
+                "PW83S",
+                "PW84",
+                "PW84S",
+                "PW85",
+                "PW85S",
+                "PW86",
+                "PW86S",
+                "PW87",
+                "PW87S",
+                "PW88",
+                "PW88S",
+                "PW89",
+                "PW89S",
+                "PW90",
+                "PW90S",
+                "PW91",
+                "PW91S",
+                "PW92",
+                "PW92S",
+                "PW93",
+                "PW93S",
+                "PW94",
+                "PW94S",
+                "PW95",
+                "PW95S",
+                "PW96",
+                "PW96S",
+                "PW97",
+                "PW97S",
+                "PW98",
+                "PW98S",
+                "PW99",
+                "PW99S"
+              ]
+            }
+          ],
+          "products_affected": 240,
+          "range_copy_hold": true
+        },
+        {
+          "division": "Pipes & Fittings",
+          "normalised_key": "upvc pipe",
+          "spellings": [
+            {
+              "stored_spelling": "UPVC PIPE",
+              "products": 12,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 12,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PU-1 T",
+                "PU-1 TS",
+                "PU-2 T",
+                "PU-2 TS",
+                "PU-3 T",
+                "PU-3 TS",
+                "PU-4 T",
+                "PU-4 TS",
+                "PU-5 T",
+                "PU-5 TS",
+                "PU-6 T",
+                "PU-6 TS"
+              ]
+            },
+            {
+              "stored_spelling": "UPVC Pipe",
+              "products": 52,
+              "active_products": 52,
+              "exact_category_range_equal": 52,
+              "normalised_category_range_equal": 52,
+              "authoritative_marked": 52,
+              "first_product_created_ist": "2026-08-12 18:46:34",
+              "last_product_created_ist": "2026-08-12 18:46:34",
+              "current_source_evidence": [
+                {
+                  "products": 52,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PU-1",
+                "PU-10",
+                "PU-10S",
+                "PU-11",
+                "PU-11S",
+                "PU-12",
+                "PU-12S",
+                "PU-13",
+                "PU-13S",
+                "PU-14",
+                "PU-14S",
+                "PU-15",
+                "PU-15S",
+                "PU-16",
+                "PU-16S",
+                "PU-17",
+                "PU-17S",
+                "PU-18",
+                "PU-18S",
+                "PU-19",
+                "PU-19S",
+                "PU-1S",
+                "PU-1T",
+                "PU-1TS",
+                "PU-2",
+                "PU-20",
+                "PU-20S",
+                "PU-2S",
+                "PU-2T",
+                "PU-2TS",
+                "PU-3",
+                "PU-3S",
+                "PU-3T",
+                "PU-3TS",
+                "PU-4",
+                "PU-4S",
+                "PU-4T",
+                "PU-4TS",
+                "PU-5",
+                "PU-5S",
+                "PU-5T",
+                "PU-5TS",
+                "PU-6",
+                "PU-6S",
+                "PU-6T",
+                "PU-6TS",
+                "PU-7",
+                "PU-7S",
+                "PU-8",
+                "PU-8S",
+                "PU-9",
+                "PU-9S"
+              ]
+            }
+          ],
+          "products_affected": 64,
+          "range_copy_hold": true
+        }
+      ],
+      "series_range": [],
+      "division": []
+    },
+    "globalContrasts": {
+      "category": [
+        {
+          "normalised_key": "aqua 54",
+          "spellings": [
+            {
+              "stored_spelling": "AQUA 54",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Aqua 54",
+              "products": 37,
+              "by_division": {
+                "CP Fittings / Faucets": 37
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "aspire 52",
+          "spellings": [
+            {
+              "stored_spelling": "ASPIRE 52",
+              "products": 8,
+              "by_division": {
+                "CP Fittings / Faucets": 8
+              }
+            },
+            {
+              "stored_spelling": "Aspire 52",
+              "products": 48,
+              "by_division": {
+                "CP Fittings / Faucets": 48
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "blaze 62",
+          "spellings": [
+            {
+              "stored_spelling": "BLAZE 62",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Blaze 62",
+              "products": 36,
+              "by_division": {
+                "CP Fittings / Faucets": 36
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "cygnu 71",
+          "spellings": [
+            {
+              "stored_spelling": "CYGNUS 71",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Cygnus 71",
+              "products": 34,
+              "by_division": {
+                "CP Fittings / Faucets": 34
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "europa 90",
+          "spellings": [
+            {
+              "stored_spelling": "EUROPA 90",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Europa 90",
+              "products": 36,
+              "by_division": {
+                "CP Fittings / Faucets": 36
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "evian 87",
+          "spellings": [
+            {
+              "stored_spelling": "EVIAN 87",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Evian 87",
+              "products": 40,
+              "by_division": {
+                "CP Fittings / Faucets": 40
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "laguna 93",
+          "spellings": [
+            {
+              "stored_spelling": "LAGUNA 93",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Laguna 93",
+              "products": 40,
+              "by_division": {
+                "CP Fittings / Faucets": 40
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "macasa 76",
+          "spellings": [
+            {
+              "stored_spelling": "MACASA 76",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Macasa 76",
+              "products": 41,
+              "by_division": {
+                "CP Fittings / Faucets": 41
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "marcu 68",
+          "spellings": [
+            {
+              "stored_spelling": "MARCUS 68",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Marcus 68",
+              "products": 42,
+              "by_division": {
+                "CP Fittings / Faucets": 42
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "niagara 81",
+          "spellings": [
+            {
+              "stored_spelling": "NIAGARA 81",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Niagara 81",
+              "products": 35,
+              "by_division": {
+                "CP Fittings / Faucets": 35
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "ocean 55",
+          "spellings": [
+            {
+              "stored_spelling": "OCEAN 55",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Ocean 55",
+              "products": 37,
+              "by_division": {
+                "CP Fittings / Faucets": 37
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "orbit 53",
+          "spellings": [
+            {
+              "stored_spelling": "ORBIT 53",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Orbit 53",
+              "products": 38,
+              "by_division": {
+                "CP Fittings / Faucets": 37,
+                "Ceramic Sanitaryware": 1
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "polo 60",
+          "spellings": [
+            {
+              "stored_spelling": "POLO 60",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Polo 60",
+              "products": 36,
+              "by_division": {
+                "CP Fittings / Faucets": 36
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "saga 79f",
+          "spellings": [
+            {
+              "stored_spelling": "SAGA 79F",
+              "products": 11,
+              "by_division": {
+                "CP Fittings / Faucets": 11
+              }
+            },
+            {
+              "stored_spelling": "Saga 79F",
+              "products": 34,
+              "by_division": {
+                "CP Fittings / Faucets": 34
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "urbona 78",
+          "spellings": [
+            {
+              "stored_spelling": "URBONA 78",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Urbona 78",
+              "products": 39,
+              "by_division": {
+                "CP Fittings / Faucets": 39
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "vincent 66",
+          "spellings": [
+            {
+              "stored_spelling": "VINCENT 66",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Vincent 66",
+              "products": 40,
+              "by_division": {
+                "CP Fittings / Faucets": 40
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "virgo p66",
+          "spellings": [
+            {
+              "stored_spelling": "VIRGO P66",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Virgo P66",
+              "products": 37,
+              "by_division": {
+                "CP Fittings / Faucets": 37
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "silent fitting",
+          "spellings": [
+            {
+              "stored_spelling": "SILENT FITTINGS",
+              "products": 30,
+              "by_division": {
+                "Pipes & Fittings": 30
+              }
+            },
+            {
+              "stored_spelling": "Silent Fittings",
+              "products": 80,
+              "by_division": {
+                "Pipes & Fittings": 80
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "swr pipe",
+          "spellings": [
+            {
+              "stored_spelling": "SWR PIPE",
+              "products": 80,
+              "by_division": {
+                "Pipes & Fittings": 80
+              }
+            },
+            {
+              "stored_spelling": "SWR Pipe",
+              "products": 160,
+              "by_division": {
+                "Pipes & Fittings": 160
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "upvc pipe",
+          "spellings": [
+            {
+              "stored_spelling": "UPVC PIPE",
+              "products": 12,
+              "by_division": {
+                "Pipes & Fittings": 12
+              }
+            },
+            {
+              "stored_spelling": "UPVC Pipe",
+              "products": 52,
+              "by_division": {
+                "Pipes & Fittings": 52
+              }
+            }
+          ]
+        }
+      ],
+      "series_range": [],
+      "division": []
+    }
+  },
+  "production": {
+    "environment": "production",
+    "auditIST": "2026-10-03 12:52:53",
+    "products": 7191,
+    "sourceMarkers": [
+      "authoritative_master_v2_2026_09_01",
+      "mrp_repair_2026",
+      "new_from_load",
+      null,
+      "manual_creation",
+      "removed_by_authoritative_master_2026_09_01",
+      "new_products_upload"
+    ],
+    "fields": {
+      "category": [
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "aqua 54",
+          "spellings": [
+            {
+              "stored_spelling": "AQUA 54",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5492-ON-OFF-P",
+                "DB-54-3 IN-N",
+                "DB-54-3 IN-ON-OFF-N",
+                "DB-54-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Aqua 54",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5402",
+                "5404",
+                "5406",
+                "5407",
+                "5408",
+                "5410",
+                "5411",
+                "5412",
+                "5414",
+                "5416",
+                "5417",
+                "5418",
+                "5420",
+                "5450",
+                "5451",
+                "5454",
+                "5455",
+                "5470",
+                "5475",
+                "5480",
+                "5491-N",
+                "5492-N",
+                "5492-ON-OFF-N",
+                "5492-P",
+                "5493-N",
+                "5493-ON-OFF-N",
+                "5495",
+                "5496",
+                "5498",
+                "BB-54",
+                "CP-54",
+                "DB-54-3IN-N",
+                "DB-54-3IN-ON-OFF-N",
+                "DB-54-H-N",
+                "DB-54-H-ON-OFF-N",
+                "DB-54-H-P",
+                "DB-54-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "aspire 52",
+          "spellings": [
+            {
+              "stored_spelling": "ASPIRE 52",
+              "products": 8,
+              "active_products": 3,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 8,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5292-ON-OFF-P",
+                "C 5211",
+                "DB-52-3 IN-N",
+                "DB-52-3 IN-ON-OFF-N",
+                "DB-52-H-ON-OFF-P",
+                "PD-3 IN-N",
+                "PD-3 IN-ON-OFF-N",
+                "PD-46-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Aspire 52",
+              "products": 48,
+              "active_products": 48,
+              "exact_category_range_equal": 48,
+              "normalised_category_range_equal": 48,
+              "authoritative_marked": 48,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 48,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5202",
+                "5203",
+                "5204",
+                "5206",
+                "5207",
+                "5208",
+                "5210",
+                "5212",
+                "5214",
+                "5216",
+                "5217",
+                "5218",
+                "5220",
+                "5250",
+                "5251",
+                "5252",
+                "5254-S",
+                "5255",
+                "5265",
+                "5270",
+                "5275",
+                "5280",
+                "5291-N",
+                "5292-N",
+                "5292-ON-OFF-N",
+                "5292-P",
+                "5293-N",
+                "5293-ON-OFF-N",
+                "5295",
+                "5296",
+                "5298",
+                "BB-52-S",
+                "BD-40",
+                "C5211",
+                "CP-07",
+                "CP-52",
+                "DB-52-3IN-N",
+                "DB-52-3IN-ON-OFF-N",
+                "DB-52-H-N",
+                "DB-52-H-ON-OFF-N",
+                "DB-52-H-P",
+                "DB-52-N",
+                "PD-3IN-N",
+                "PD-3IN-ON-OFF-N",
+                "PD-40-N",
+                "PD-46-H-N",
+                "PD-46-H-ON-OFF-N",
+                "PD-46-H-P"
+              ]
+            }
+          ],
+          "products_affected": 56,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "blaze 62",
+          "spellings": [
+            {
+              "stored_spelling": "BLAZE 62",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6292-ON-OFF-P",
+                "DB-62-3 IN-N",
+                "DB-62-3 IN-ON-OFF-N",
+                "DB-62-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Blaze 62",
+              "products": 36,
+              "active_products": 36,
+              "exact_category_range_equal": 36,
+              "normalised_category_range_equal": 36,
+              "authoritative_marked": 36,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 36,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6202",
+                "6204",
+                "6206",
+                "6207",
+                "6208",
+                "6210",
+                "6211",
+                "6212",
+                "6214",
+                "6216",
+                "6218",
+                "6220",
+                "6250",
+                "6251",
+                "6254",
+                "6255",
+                "6270",
+                "6275",
+                "6280",
+                "6291-N",
+                "6292-N",
+                "6292-ON-OFF-N",
+                "6292-P",
+                "6293-N",
+                "6293-ON-OFF-N",
+                "6295",
+                "6296",
+                "6298",
+                "BB-62",
+                "CP-62",
+                "DB-62-3IN-N",
+                "DB-62-3IN-ON-OFF-N",
+                "DB-62-H-N",
+                "DB-62-H-ON-OFF-N",
+                "DB-62-H-P",
+                "DB-62-N"
+              ]
+            }
+          ],
+          "products_affected": 40,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "cygnu 71",
+          "spellings": [
+            {
+              "stored_spelling": "CYGNUS 71",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-71-3 IN-N",
+                "DB-71-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Cygnus 71",
+              "products": 34,
+              "active_products": 34,
+              "exact_category_range_equal": 34,
+              "normalised_category_range_equal": 34,
+              "authoritative_marked": 34,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 34,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7102",
+                "7103",
+                "7104",
+                "7106",
+                "7108",
+                "7110",
+                "7111",
+                "7113",
+                "7114",
+                "7116",
+                "7118",
+                "7120",
+                "7151",
+                "7152",
+                "7154",
+                "7155",
+                "7170",
+                "7175",
+                "7180",
+                "7191-N",
+                "7192-N",
+                "7192-ON-OFF-N",
+                "7193-N",
+                "7193-ON-OFF-N",
+                "7194",
+                "7195",
+                "7196",
+                "7198",
+                "BB-71",
+                "DB-71-3IN-N",
+                "DB-71-3IN-ON-OFF-N",
+                "DB-71-H-N",
+                "DB-71-H-ON-OFF-N",
+                "DB-71-N"
+              ]
+            }
+          ],
+          "products_affected": 36,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "europa 90",
+          "spellings": [
+            {
+              "stored_spelling": "EUROPA 90",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-90-3 IN-N",
+                "DB-90-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Europa 90",
+              "products": 36,
+              "active_products": 36,
+              "exact_category_range_equal": 36,
+              "normalised_category_range_equal": 36,
+              "authoritative_marked": 36,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 36,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "9002",
+                "9003",
+                "9004",
+                "9006",
+                "9008",
+                "9010",
+                "9011",
+                "9013",
+                "9014",
+                "9016",
+                "9018",
+                "9020",
+                "9051",
+                "9052",
+                "9054",
+                "9055",
+                "9061",
+                "9070",
+                "9071",
+                "9075",
+                "9076",
+                "9080",
+                "9091-N",
+                "9092-N",
+                "9092-ON-OFF-N",
+                "9093-N",
+                "9093-ON-OFF-N",
+                "9095",
+                "9096",
+                "9098",
+                "BB-90",
+                "DB-90-3IN-N",
+                "DB-90-3IN-ON-OFF-N",
+                "DB-90-H-N",
+                "DB-90-H-ON-OFF-N",
+                "DB-90-N"
+              ]
+            }
+          ],
+          "products_affected": 38,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "evian 87",
+          "spellings": [
+            {
+              "stored_spelling": "EVIAN 87",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "8792-ON-OFF-P",
+                "DB-87-3 IN-N",
+                "DB-87-3 IN-ON-OFF-N",
+                "DB-87-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Evian 87",
+              "products": 40,
+              "active_products": 40,
+              "exact_category_range_equal": 40,
+              "normalised_category_range_equal": 40,
+              "authoritative_marked": 40,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 40,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "8702",
+                "8703",
+                "8704",
+                "8706",
+                "8708",
+                "8710",
+                "8711",
+                "8712",
+                "8714",
+                "8716",
+                "8718",
+                "8720",
+                "8750",
+                "8751",
+                "8752",
+                "8754",
+                "8755",
+                "8756",
+                "8770",
+                "8771",
+                "8775",
+                "8776",
+                "8780",
+                "8791-N",
+                "8792-N",
+                "8792-ON-OFF-N",
+                "8792-P",
+                "8793-N",
+                "8793-ON-OFF-N",
+                "8794",
+                "8795",
+                "8796",
+                "8798",
+                "BB-87",
+                "DB-87-3IN-N",
+                "DB-87-3IN-ON-OFF-N",
+                "DB-87-H-N",
+                "DB-87-H-ON-OFF-N",
+                "DB-87-H-P",
+                "DB-87-N"
+              ]
+            }
+          ],
+          "products_affected": 44,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "laguna 93",
+          "spellings": [
+            {
+              "stored_spelling": "LAGUNA 93",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "9392-ON-OFF-P",
+                "DB-93-3 IN-N",
+                "DB-93-3 IN-ON-OFF-N",
+                "DB-93-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Laguna 93",
+              "products": 40,
+              "active_products": 40,
+              "exact_category_range_equal": 40,
+              "normalised_category_range_equal": 40,
+              "authoritative_marked": 40,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 40,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "9302",
+                "9306",
+                "9308",
+                "9310",
+                "9311",
+                "9312",
+                "9313",
+                "9314",
+                "9316",
+                "9318",
+                "9320",
+                "9350",
+                "9351",
+                "9352",
+                "9354",
+                "9355",
+                "9360",
+                "9365",
+                "9370",
+                "9371",
+                "9375",
+                "9376",
+                "9380",
+                "9391-N",
+                "9392-N",
+                "9392-ON-OFF-N",
+                "9392-P",
+                "9393-N",
+                "9393-ON-OFF-N",
+                "9394",
+                "9395",
+                "9396",
+                "9398",
+                "BB-93",
+                "DB-93-3IN-N",
+                "DB-93-3IN-ON-OFF-N",
+                "DB-93-H-N",
+                "DB-93-H-ON-OFF-N",
+                "DB-93-H-P",
+                "DB-93-N"
+              ]
+            }
+          ],
+          "products_affected": 44,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "macasa 76",
+          "spellings": [
+            {
+              "stored_spelling": "MACASA 76",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7692-ON-OFF-P",
+                "DB-76-3 IN-N",
+                "DB-76-3 IN-ON-OFF-N",
+                "DB-76-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Macasa 76",
+              "products": 41,
+              "active_products": 41,
+              "exact_category_range_equal": 41,
+              "normalised_category_range_equal": 41,
+              "authoritative_marked": 41,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 41,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7602",
+                "7603",
+                "7604",
+                "7606",
+                "7607",
+                "7608",
+                "7610",
+                "7611",
+                "7612",
+                "7614",
+                "7616",
+                "7618",
+                "7620",
+                "7650",
+                "7651",
+                "7652",
+                "7654",
+                "7655",
+                "7670",
+                "7671",
+                "7675",
+                "7676",
+                "7680",
+                "7691-N",
+                "7692-N",
+                "7692-ON-OFF-N",
+                "7692-P",
+                "7693-N",
+                "7693-ON-OFF-N",
+                "7694",
+                "7695",
+                "7696",
+                "7698",
+                "BB-76",
+                "CP-76",
+                "DB-76-3IN-N",
+                "DB-76-3IN-ON-OFF-N",
+                "DB-76-H-N",
+                "DB-76-H-ON-OFF-N",
+                "DB-76-H-P",
+                "DB-76-N"
+              ]
+            }
+          ],
+          "products_affected": 45,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "marcu 68",
+          "spellings": [
+            {
+              "stored_spelling": "MARCUS 68",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6892-ON-OFF-P",
+                "DB-68-3 IN-N",
+                "DB-68-3 IN-ON-OFF-N",
+                "DB-68-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Marcus 68",
+              "products": 42,
+              "active_products": 42,
+              "exact_category_range_equal": 42,
+              "normalised_category_range_equal": 42,
+              "authoritative_marked": 42,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 42,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6802",
+                "6803",
+                "6803-S",
+                "6804",
+                "6805",
+                "6806",
+                "6807",
+                "6808",
+                "6810",
+                "6811",
+                "6812",
+                "6813",
+                "6814",
+                "6816",
+                "6818",
+                "6820",
+                "6850",
+                "6851",
+                "6852",
+                "6854",
+                "6855",
+                "6865",
+                "6870",
+                "6875",
+                "6880",
+                "6891-N",
+                "6892-N",
+                "6892-ON-OFF-N",
+                "6892-P",
+                "6893-N",
+                "6893-ON-OFF-N",
+                "6895",
+                "6896",
+                "6898",
+                "BB-68",
+                "CP-68",
+                "DB-68-3IN-N",
+                "DB-68-3IN-ON-OFF-N",
+                "DB-68-H-N",
+                "DB-68-H-ON-OFF-N",
+                "DB-68-H-P",
+                "DB-68-N"
+              ]
+            }
+          ],
+          "products_affected": 46,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "niagara 81",
+          "spellings": [
+            {
+              "stored_spelling": "NIAGARA 81",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-81-3 IN-N",
+                "DB-81-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Niagara 81",
+              "products": 35,
+              "active_products": 35,
+              "exact_category_range_equal": 35,
+              "normalised_category_range_equal": 35,
+              "authoritative_marked": 35,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 35,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "8102",
+                "8103",
+                "8106",
+                "8108",
+                "8110",
+                "8111",
+                "8112",
+                "8114",
+                "8116",
+                "8118",
+                "8120",
+                "8151",
+                "8152",
+                "8154",
+                "8155",
+                "8156",
+                "8170",
+                "8171",
+                "8175",
+                "8176",
+                "8180",
+                "8191-N",
+                "8192-N",
+                "8192-ON-OFF-N",
+                "8193-N",
+                "8193-ON-OFF-N",
+                "8195",
+                "8196",
+                "8198",
+                "BB-81",
+                "DB-81-3IN-N",
+                "DB-81-3IN-ON-OFF-N",
+                "DB-81-H-N",
+                "DB-81-H-ON-OFF-N",
+                "DB-81-N"
+              ]
+            }
+          ],
+          "products_affected": 37,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "ocean 55",
+          "spellings": [
+            {
+              "stored_spelling": "OCEAN 55",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5592-ON-OFF-P",
+                "DB-55-3 IN-N",
+                "DB-55-3 IN-ON-OFF-N",
+                "DB-55-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Ocean 55",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5502",
+                "5504",
+                "5506",
+                "5507",
+                "5508",
+                "5510",
+                "5511",
+                "5512",
+                "5514",
+                "5516",
+                "5517",
+                "5518",
+                "5520",
+                "5550",
+                "5551",
+                "5554",
+                "5555",
+                "5570",
+                "5575",
+                "5580",
+                "5591-N",
+                "5592-N",
+                "5592-ON-OFF-N",
+                "5592-P",
+                "5593-N",
+                "5593-ON-OFF-N",
+                "5595",
+                "5596",
+                "5598",
+                "BB-55",
+                "CP-55",
+                "DB-55-3IN-N",
+                "DB-55-3IN-ON-OFF-N",
+                "DB-55-H-N",
+                "DB-55-H-ON-OFF-N",
+                "DB-55-H-P",
+                "DB-55-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "orbit 53",
+          "spellings": [
+            {
+              "stored_spelling": "ORBIT 53",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5392-ON-OFF-P",
+                "DB-53-3 IN-N",
+                "DB-53-3 IN-ON-OFF-N",
+                "DB-53-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Orbit 53",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "5302",
+                "5306",
+                "5307",
+                "5308",
+                "5310",
+                "5311",
+                "5312",
+                "5314",
+                "5316",
+                "5317",
+                "5318",
+                "5320",
+                "5350",
+                "5351",
+                "5354-S",
+                "5355",
+                "5365",
+                "5370",
+                "5375",
+                "5380",
+                "5391-N",
+                "5392-N",
+                "5392-ON-OFF-N",
+                "5392-P",
+                "5393-N",
+                "5393-ON-OFF-N",
+                "5395",
+                "5396",
+                "5398",
+                "BB-53-S",
+                "CP-53",
+                "DB-53-3IN-N",
+                "DB-53-3IN-ON-OFF-N",
+                "DB-53-H-N",
+                "DB-53-H-ON-OFF-N",
+                "DB-53-H-P",
+                "DB-53-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "polo 60",
+          "spellings": [
+            {
+              "stored_spelling": "POLO 60",
+              "products": 4,
+              "active_products": 2,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 4,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6092-ON-OFF-P",
+                "DB-60-3 IN-N",
+                "DB-60-3 IN-ON-OFF-N",
+                "DB-60-H-ON-OFF-P"
+              ]
+            },
+            {
+              "stored_spelling": "Polo 60",
+              "products": 36,
+              "active_products": 36,
+              "exact_category_range_equal": 36,
+              "normalised_category_range_equal": 36,
+              "authoritative_marked": 36,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 36,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6002",
+                "6004",
+                "6006",
+                "6007",
+                "6008",
+                "6010",
+                "6011",
+                "6012",
+                "6014",
+                "6016",
+                "6018",
+                "6020",
+                "6050",
+                "6051",
+                "6054",
+                "6055",
+                "6070",
+                "6075",
+                "6080",
+                "6091-N",
+                "6092-N",
+                "6092-ON-OFF-N",
+                "6092-P",
+                "6093-N",
+                "6093-ON-OFF-N",
+                "6095",
+                "6096",
+                "6098",
+                "BB-60",
+                "CP-60",
+                "DB-60-3IN-N",
+                "DB-60-3IN-ON-OFF-N",
+                "DB-60-H-N",
+                "DB-60-H-ON-OFF-N",
+                "DB-60-H-P",
+                "DB-60-N"
+              ]
+            }
+          ],
+          "products_affected": 40,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "saga 79f",
+          "spellings": [
+            {
+              "stored_spelling": "SAGA 79F",
+              "products": 11,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 11,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7991 F-N",
+                "7992 F-N",
+                "7992 F-ON-OFF-N",
+                "7993 F-N",
+                "7993 F-ON-OFF-N",
+                "BB-79 F",
+                "DB-79 F-3 IN-N",
+                "DB-79 F-3 IN-ON-OFF-N",
+                "DB-79 F-H-N",
+                "DB-79 F-H-ON-OFF-N",
+                "DB-79 F-N"
+              ]
+            },
+            {
+              "stored_spelling": "Saga 79F",
+              "products": 34,
+              "active_products": 34,
+              "exact_category_range_equal": 34,
+              "normalised_category_range_equal": 34,
+              "authoritative_marked": 34,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 34,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7902-F",
+                "7903-F",
+                "7904-F",
+                "7906-F",
+                "7908-F",
+                "7910-F",
+                "7911-F",
+                "7913-F",
+                "7914-F",
+                "7916-F",
+                "7918-F",
+                "7920-F",
+                "7950-F",
+                "7951-F",
+                "7952-F",
+                "7954-F",
+                "7955-F",
+                "7970-F",
+                "7975-F",
+                "7980-F",
+                "7991F-N",
+                "7992F-N",
+                "7992F-ON-OFF-N",
+                "7993F-N",
+                "7993F-ON-OFF-N",
+                "7995-F",
+                "7996-F",
+                "7998-F",
+                "BB-79F",
+                "DB-79F-3IN-N",
+                "DB-79F-3IN-ON-OFF-N",
+                "DB-79F-H-N",
+                "DB-79F-H-ON-OFF-N",
+                "DB-79F-N"
+              ]
+            }
+          ],
+          "products_affected": 45,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "urbona 78",
+          "spellings": [
+            {
+              "stored_spelling": "URBONA 78",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-78-3 IN-N",
+                "DB-78-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Urbona 78",
+              "products": 39,
+              "active_products": 39,
+              "exact_category_range_equal": 39,
+              "normalised_category_range_equal": 39,
+              "authoritative_marked": 39,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 39,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "7802",
+                "7803",
+                "7804",
+                "7806",
+                "7807",
+                "7808",
+                "7810",
+                "7811",
+                "7812",
+                "7814",
+                "7816",
+                "7818",
+                "7820",
+                "7850",
+                "7851",
+                "7852",
+                "7854",
+                "7855",
+                "7870",
+                "7871",
+                "7875",
+                "7876",
+                "7880",
+                "7891-N",
+                "7892-N",
+                "7892-ON-OFF-N",
+                "7893-N",
+                "7893-ON-OFF-N",
+                "7894",
+                "7895",
+                "7896",
+                "7898",
+                "BB-78",
+                "CP-78",
+                "DB-78-3IN-N",
+                "DB-78-3IN-ON-OFF-N",
+                "DB-78-H-N",
+                "DB-78-H-ON-OFF-N",
+                "DB-78-N"
+              ]
+            }
+          ],
+          "products_affected": 41,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "vincent 66",
+          "spellings": [
+            {
+              "stored_spelling": "VINCENT 66",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-66-3 IN-N",
+                "DB-66-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Vincent 66",
+              "products": 40,
+              "active_products": 40,
+              "exact_category_range_equal": 40,
+              "normalised_category_range_equal": 40,
+              "authoritative_marked": 40,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 40,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "6602",
+                "6603",
+                "6603-S",
+                "6604",
+                "6605",
+                "6606",
+                "6607",
+                "6608",
+                "6610",
+                "6611",
+                "6612",
+                "6613",
+                "6614",
+                "6616",
+                "6618",
+                "6620",
+                "6650",
+                "6651",
+                "6652",
+                "6654",
+                "6655",
+                "6665",
+                "6670",
+                "6675",
+                "6680",
+                "6691-N",
+                "6692-N",
+                "6692-ON-OFF-N",
+                "6693-N",
+                "6693-ON-OFF-N",
+                "6695",
+                "6696",
+                "6698",
+                "BB-66",
+                "CP-66",
+                "DB-66-3IN-N",
+                "DB-66-3IN-ON-OFF-N",
+                "DB-66-H-N",
+                "DB-66-H-ON-OFF-N",
+                "DB-66-N"
+              ]
+            }
+          ],
+          "products_affected": 42,
+          "range_copy_hold": true
+        },
+        {
+          "division": "CP Fittings / Faucets",
+          "normalised_key": "virgo p66",
+          "spellings": [
+            {
+              "stored_spelling": "VIRGO P66",
+              "products": 2,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 2,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "DB-P66-3 IN-N",
+                "DB-P66-3 IN-ON-OFF-N"
+              ]
+            },
+            {
+              "stored_spelling": "Virgo P66",
+              "products": 37,
+              "active_products": 37,
+              "exact_category_range_equal": 37,
+              "normalised_category_range_equal": 37,
+              "authoritative_marked": 37,
+              "first_product_created_ist": "2026-08-12 18:46:36",
+              "last_product_created_ist": "2026-08-12 18:46:36",
+              "current_source_evidence": [
+                {
+                  "products": 37,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "BB-P66",
+                "CP-P66",
+                "DB-P66-3IN-N",
+                "DB-P66-3IN-ON-OFF-N",
+                "DB-P66-H-N",
+                "DB-P66-H-ON-OFF-N",
+                "DB-P66-N",
+                "P6602",
+                "P6603",
+                "P6605",
+                "P6606",
+                "P6607",
+                "P6608",
+                "P6609",
+                "P6610",
+                "P6611",
+                "P6612",
+                "P6614",
+                "P6616",
+                "P6618",
+                "P6620",
+                "P6650",
+                "P6651",
+                "P6652",
+                "P6654",
+                "P6655",
+                "P6670",
+                "P6675",
+                "P6680",
+                "P6691-N",
+                "P6692-N",
+                "P6692-ON-OFF-N",
+                "P6693-N",
+                "P6693-ON-OFF-N",
+                "P6695",
+                "P6696",
+                "P6698"
+              ]
+            }
+          ],
+          "products_affected": 39,
+          "range_copy_hold": true
+        },
+        {
+          "division": "Pipes & Fittings",
+          "normalised_key": "silent fitting",
+          "spellings": [
+            {
+              "stored_spelling": "SILENT FITTINGS",
+              "products": 30,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 22,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                },
+                {
+                  "products": 8,
+                  "data_flag": "removed_by_authoritative_master_2026_09_01",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PD1106",
+                "PD1606",
+                "PD5157",
+                "PD5163",
+                "PD5171",
+                "PD5656",
+                "PD5657",
+                "PD5763",
+                "PD5771",
+                "PD7506",
+                "PS5656",
+                "PS5771",
+                "PSS1106",
+                "PSS1606",
+                "PSS5157",
+                "PSS5163",
+                "PSS5171",
+                "PSS5656",
+                "PSS5657",
+                "PSS5763",
+                "PSS5771",
+                "PSS7506",
+                "PS1106",
+                "PS1606",
+                "PS5157",
+                "PS5163",
+                "PS5171",
+                "PS5657",
+                "PS5763",
+                "PS7506"
+              ]
+            },
+            {
+              "stored_spelling": "Silent Fittings",
+              "products": 80,
+              "active_products": 79,
+              "exact_category_range_equal": 79,
+              "normalised_category_range_equal": 79,
+              "authoritative_marked": 79,
+              "first_product_created_ist": "2026-08-12 18:46:34",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 79,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                },
+                {
+                  "products": 1,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PD1110",
+                "PD1111",
+                "PD1121",
+                "PD1133",
+                "PD1141",
+                "PD1610",
+                "PD1611",
+                "PD1621",
+                "PD1633",
+                "PD1641",
+                "PD4010",
+                "PD4011",
+                "PD4021",
+                "PD4033",
+                "PD4041",
+                "PD5010",
+                "PD5011",
+                "PD5021",
+                "PD5033",
+                "PD5041",
+                "PD5151",
+                "PD5651",
+                "PD5751",
+                "PD7510",
+                "PD7511",
+                "PD7521",
+                "PD7533",
+                "PD7541",
+                "PS1110",
+                "PS1111",
+                "PS1121",
+                "PS1141",
+                "PS1610",
+                "PS1611",
+                "PS1621",
+                "PS1641",
+                "PS4010",
+                "PS4011",
+                "PS4021",
+                "PS4033",
+                "PS5010",
+                "PS5011",
+                "PS5021",
+                "PS5033",
+                "PS5151",
+                "PS5651",
+                "PS5751",
+                "PS7510",
+                "PS7511",
+                "PS7521",
+                "PS7533",
+                "PSS1110",
+                "PSS1111",
+                "PSS1121",
+                "PSS1133",
+                "PSS1141",
+                "PSS1610",
+                "PSS1611",
+                "PSS1621",
+                "PSS1633",
+                "PSS1641",
+                "PSS4010",
+                "PSS4011",
+                "PSS4021",
+                "PSS4033",
+                "PSS4041",
+                "PSS5010",
+                "PSS5011",
+                "PSS5021",
+                "PSS5033",
+                "PSS5041",
+                "PSS5151",
+                "PSS5651",
+                "PSS5751",
+                "PSS7510",
+                "PSS7511",
+                "PSS7521",
+                "PSS7533",
+                "PSS7541",
+                "ITEM CODE"
+              ]
+            }
+          ],
+          "products_affected": 110,
+          "range_copy_hold": true
+        },
+        {
+          "division": "Pipes & Fittings",
+          "normalised_key": "swr pipe",
+          "spellings": [
+            {
+              "stored_spelling": "SWR PIPE",
+              "products": 80,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 80,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PW 100",
+                "PW 11",
+                "PW 12",
+                "PW 13",
+                "PW 14",
+                "PW 15",
+                "PW 16",
+                "PW 17",
+                "PW 18",
+                "PW 19",
+                "PW 20",
+                "PW 21",
+                "PW 22",
+                "PW 23",
+                "PW 24",
+                "PW 25",
+                "PW 26",
+                "PW 27",
+                "PW 28",
+                "PW 29",
+                "PW 30",
+                "PW 31",
+                "PW 32",
+                "PW 33",
+                "PW 34",
+                "PW 35",
+                "PW 36",
+                "PW 37",
+                "PW 38",
+                "PW 39",
+                "PW 40",
+                "PW 51",
+                "PW 52",
+                "PW 53",
+                "PW 54",
+                "PW 55",
+                "PW 56",
+                "PW 57",
+                "PW 58",
+                "PW 59",
+                "PW 60",
+                "PW 61",
+                "PW 62",
+                "PW 63",
+                "PW 64",
+                "PW 65",
+                "PW 66",
+                "PW 67",
+                "PW 68",
+                "PW 69",
+                "PW 70",
+                "PW 71",
+                "PW 72",
+                "PW 73",
+                "PW 74",
+                "PW 75",
+                "PW 76",
+                "PW 77",
+                "PW 78",
+                "PW 79",
+                "PW 80",
+                "PW 81",
+                "PW 82",
+                "PW 83",
+                "PW 84",
+                "PW 85",
+                "PW 86",
+                "PW 87",
+                "PW 88",
+                "PW 89",
+                "PW 90",
+                "PW 91",
+                "PW 92",
+                "PW 93",
+                "PW 94",
+                "PW 95",
+                "PW 96",
+                "PW 97",
+                "PW 98",
+                "PW 99"
+              ]
+            },
+            {
+              "stored_spelling": "SWR Pipe",
+              "products": 160,
+              "active_products": 160,
+              "exact_category_range_equal": 160,
+              "normalised_category_range_equal": 160,
+              "authoritative_marked": 160,
+              "first_product_created_ist": "2026-08-12 18:46:34",
+              "last_product_created_ist": "2026-08-12 18:46:34",
+              "current_source_evidence": [
+                {
+                  "products": 160,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PW100",
+                "PW100S",
+                "PW11",
+                "PW11S",
+                "PW12",
+                "PW12S",
+                "PW13",
+                "PW13S",
+                "PW14",
+                "PW14S",
+                "PW15",
+                "PW15S",
+                "PW16",
+                "PW16S",
+                "PW17",
+                "PW17S",
+                "PW18",
+                "PW18S",
+                "PW19",
+                "PW19S",
+                "PW20",
+                "PW20S",
+                "PW21",
+                "PW21S",
+                "PW22",
+                "PW22S",
+                "PW23",
+                "PW23S",
+                "PW24",
+                "PW24S",
+                "PW25",
+                "PW25S",
+                "PW26",
+                "PW26S",
+                "PW27",
+                "PW27S",
+                "PW28",
+                "PW28S",
+                "PW29",
+                "PW29S",
+                "PW30",
+                "PW30S",
+                "PW31",
+                "PW31S",
+                "PW32",
+                "PW32S",
+                "PW33",
+                "PW33S",
+                "PW34",
+                "PW34S",
+                "PW35",
+                "PW35S",
+                "PW36",
+                "PW36S",
+                "PW37",
+                "PW37S",
+                "PW38",
+                "PW38S",
+                "PW39",
+                "PW39S",
+                "PW40",
+                "PW40S",
+                "PW51",
+                "PW51S",
+                "PW52",
+                "PW52S",
+                "PW53",
+                "PW53S",
+                "PW54",
+                "PW54S",
+                "PW55",
+                "PW55S",
+                "PW56",
+                "PW56S",
+                "PW57",
+                "PW57S",
+                "PW58",
+                "PW58S",
+                "PW59",
+                "PW59S",
+                "PW60",
+                "PW60S",
+                "PW61",
+                "PW61S",
+                "PW62",
+                "PW62S",
+                "PW63",
+                "PW63S",
+                "PW64",
+                "PW64S",
+                "PW65",
+                "PW65S",
+                "PW66",
+                "PW66S",
+                "PW67",
+                "PW67S",
+                "PW68",
+                "PW68S",
+                "PW69",
+                "PW69S",
+                "PW70",
+                "PW70S",
+                "PW71",
+                "PW71S",
+                "PW72",
+                "PW72S",
+                "PW73",
+                "PW73S",
+                "PW74",
+                "PW74S",
+                "PW75",
+                "PW75S",
+                "PW76",
+                "PW76S",
+                "PW77",
+                "PW77S",
+                "PW78",
+                "PW78S",
+                "PW79",
+                "PW79S",
+                "PW80",
+                "PW80S",
+                "PW81",
+                "PW81S",
+                "PW82",
+                "PW82S",
+                "PW83",
+                "PW83S",
+                "PW84",
+                "PW84S",
+                "PW85",
+                "PW85S",
+                "PW86",
+                "PW86S",
+                "PW87",
+                "PW87S",
+                "PW88",
+                "PW88S",
+                "PW89",
+                "PW89S",
+                "PW90",
+                "PW90S",
+                "PW91",
+                "PW91S",
+                "PW92",
+                "PW92S",
+                "PW93",
+                "PW93S",
+                "PW94",
+                "PW94S",
+                "PW95",
+                "PW95S",
+                "PW96",
+                "PW96S",
+                "PW97",
+                "PW97S",
+                "PW98",
+                "PW98S",
+                "PW99",
+                "PW99S"
+              ]
+            }
+          ],
+          "products_affected": 240,
+          "range_copy_hold": true
+        },
+        {
+          "division": "Pipes & Fittings",
+          "normalised_key": "upvc pipe",
+          "spellings": [
+            {
+              "stored_spelling": "UPVC PIPE",
+              "products": 12,
+              "active_products": 0,
+              "exact_category_range_equal": 0,
+              "normalised_category_range_equal": 0,
+              "authoritative_marked": 0,
+              "first_product_created_ist": "2026-08-18 10:07:33",
+              "last_product_created_ist": "2026-08-18 10:07:33",
+              "current_source_evidence": [
+                {
+                  "products": 12,
+                  "data_flag": "mrp_repair_2026",
+                  "source_files": null
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PU-1 T",
+                "PU-1 TS",
+                "PU-2 T",
+                "PU-2 TS",
+                "PU-3 T",
+                "PU-3 TS",
+                "PU-4 T",
+                "PU-4 TS",
+                "PU-5 T",
+                "PU-5 TS",
+                "PU-6 T",
+                "PU-6 TS"
+              ]
+            },
+            {
+              "stored_spelling": "UPVC Pipe",
+              "products": 52,
+              "active_products": 52,
+              "exact_category_range_equal": 52,
+              "normalised_category_range_equal": 52,
+              "authoritative_marked": 52,
+              "first_product_created_ist": "2026-08-12 18:46:34",
+              "last_product_created_ist": "2026-08-12 18:46:34",
+              "current_source_evidence": [
+                {
+                  "products": 52,
+                  "data_flag": "authoritative_master_v2_2026_09_01",
+                  "source_files": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx"
+                }
+              ],
+              "local_option_evidence": [],
+              "codes": [
+                "PU-1",
+                "PU-10",
+                "PU-10S",
+                "PU-11",
+                "PU-11S",
+                "PU-12",
+                "PU-12S",
+                "PU-13",
+                "PU-13S",
+                "PU-14",
+                "PU-14S",
+                "PU-15",
+                "PU-15S",
+                "PU-16",
+                "PU-16S",
+                "PU-17",
+                "PU-17S",
+                "PU-18",
+                "PU-18S",
+                "PU-19",
+                "PU-19S",
+                "PU-1S",
+                "PU-1T",
+                "PU-1TS",
+                "PU-2",
+                "PU-20",
+                "PU-20S",
+                "PU-2S",
+                "PU-2T",
+                "PU-2TS",
+                "PU-3",
+                "PU-3S",
+                "PU-3T",
+                "PU-3TS",
+                "PU-4",
+                "PU-4S",
+                "PU-4T",
+                "PU-4TS",
+                "PU-5",
+                "PU-5S",
+                "PU-5T",
+                "PU-5TS",
+                "PU-6",
+                "PU-6S",
+                "PU-6T",
+                "PU-6TS",
+                "PU-7",
+                "PU-7S",
+                "PU-8",
+                "PU-8S",
+                "PU-9",
+                "PU-9S"
+              ]
+            }
+          ],
+          "products_affected": 64,
+          "range_copy_hold": true
+        }
+      ],
+      "series_range": [],
+      "division": []
+    },
+    "globalContrasts": {
+      "category": [
+        {
+          "normalised_key": "aqua 54",
+          "spellings": [
+            {
+              "stored_spelling": "AQUA 54",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Aqua 54",
+              "products": 37,
+              "by_division": {
+                "CP Fittings / Faucets": 37
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "aspire 52",
+          "spellings": [
+            {
+              "stored_spelling": "ASPIRE 52",
+              "products": 8,
+              "by_division": {
+                "CP Fittings / Faucets": 8
+              }
+            },
+            {
+              "stored_spelling": "Aspire 52",
+              "products": 48,
+              "by_division": {
+                "CP Fittings / Faucets": 48
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "blaze 62",
+          "spellings": [
+            {
+              "stored_spelling": "BLAZE 62",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Blaze 62",
+              "products": 36,
+              "by_division": {
+                "CP Fittings / Faucets": 36
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "cygnu 71",
+          "spellings": [
+            {
+              "stored_spelling": "CYGNUS 71",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Cygnus 71",
+              "products": 34,
+              "by_division": {
+                "CP Fittings / Faucets": 34
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "europa 90",
+          "spellings": [
+            {
+              "stored_spelling": "EUROPA 90",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Europa 90",
+              "products": 36,
+              "by_division": {
+                "CP Fittings / Faucets": 36
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "evian 87",
+          "spellings": [
+            {
+              "stored_spelling": "EVIAN 87",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Evian 87",
+              "products": 40,
+              "by_division": {
+                "CP Fittings / Faucets": 40
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "laguna 93",
+          "spellings": [
+            {
+              "stored_spelling": "LAGUNA 93",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Laguna 93",
+              "products": 40,
+              "by_division": {
+                "CP Fittings / Faucets": 40
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "macasa 76",
+          "spellings": [
+            {
+              "stored_spelling": "MACASA 76",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Macasa 76",
+              "products": 41,
+              "by_division": {
+                "CP Fittings / Faucets": 41
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "marcu 68",
+          "spellings": [
+            {
+              "stored_spelling": "MARCUS 68",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Marcus 68",
+              "products": 42,
+              "by_division": {
+                "CP Fittings / Faucets": 42
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "niagara 81",
+          "spellings": [
+            {
+              "stored_spelling": "NIAGARA 81",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Niagara 81",
+              "products": 35,
+              "by_division": {
+                "CP Fittings / Faucets": 35
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "ocean 55",
+          "spellings": [
+            {
+              "stored_spelling": "OCEAN 55",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Ocean 55",
+              "products": 37,
+              "by_division": {
+                "CP Fittings / Faucets": 37
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "orbit 53",
+          "spellings": [
+            {
+              "stored_spelling": "ORBIT 53",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Orbit 53",
+              "products": 38,
+              "by_division": {
+                "CP Fittings / Faucets": 37,
+                "Ceramic Sanitaryware": 1
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "polo 60",
+          "spellings": [
+            {
+              "stored_spelling": "POLO 60",
+              "products": 4,
+              "by_division": {
+                "CP Fittings / Faucets": 4
+              }
+            },
+            {
+              "stored_spelling": "Polo 60",
+              "products": 36,
+              "by_division": {
+                "CP Fittings / Faucets": 36
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "saga 79f",
+          "spellings": [
+            {
+              "stored_spelling": "SAGA 79F",
+              "products": 11,
+              "by_division": {
+                "CP Fittings / Faucets": 11
+              }
+            },
+            {
+              "stored_spelling": "Saga 79F",
+              "products": 34,
+              "by_division": {
+                "CP Fittings / Faucets": 34
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "urbona 78",
+          "spellings": [
+            {
+              "stored_spelling": "URBONA 78",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Urbona 78",
+              "products": 39,
+              "by_division": {
+                "CP Fittings / Faucets": 39
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "vincent 66",
+          "spellings": [
+            {
+              "stored_spelling": "VINCENT 66",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Vincent 66",
+              "products": 40,
+              "by_division": {
+                "CP Fittings / Faucets": 40
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "virgo p66",
+          "spellings": [
+            {
+              "stored_spelling": "VIRGO P66",
+              "products": 2,
+              "by_division": {
+                "CP Fittings / Faucets": 2
+              }
+            },
+            {
+              "stored_spelling": "Virgo P66",
+              "products": 37,
+              "by_division": {
+                "CP Fittings / Faucets": 37
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "silent fitting",
+          "spellings": [
+            {
+              "stored_spelling": "SILENT FITTINGS",
+              "products": 30,
+              "by_division": {
+                "Pipes & Fittings": 30
+              }
+            },
+            {
+              "stored_spelling": "Silent Fittings",
+              "products": 80,
+              "by_division": {
+                "Pipes & Fittings": 80
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "swr pipe",
+          "spellings": [
+            {
+              "stored_spelling": "SWR PIPE",
+              "products": 80,
+              "by_division": {
+                "Pipes & Fittings": 80
+              }
+            },
+            {
+              "stored_spelling": "SWR Pipe",
+              "products": 160,
+              "by_division": {
+                "Pipes & Fittings": 160
+              }
+            }
+          ]
+        },
+        {
+          "normalised_key": "upvc pipe",
+          "spellings": [
+            {
+              "stored_spelling": "UPVC PIPE",
+              "products": 12,
+              "by_division": {
+                "Pipes & Fittings": 12
+              }
+            },
+            {
+              "stored_spelling": "UPVC Pipe",
+              "products": 52,
+              "by_division": {
+                "Pipes & Fittings": 52
+              }
+            }
+          ]
+        }
+      ],
+      "series_range": [],
+      "division": []
+    }
+  }
+}

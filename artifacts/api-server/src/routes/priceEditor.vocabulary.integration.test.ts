@@ -221,41 +221,47 @@ describe("P048 price editor vocabulary", () => {
     }));
     expect(updatedOptions.body.salesKnownDivisions).toContain("QUAA & FERN");
     const seriesName = `${token} Local Series`;
+    const rangeDivision = "CP Fittings / Faucets";
+    const rangeDivisionTwo = "PTMT & Plastic Fittings";
+    const forbiddenRange = await admin.post("/catalog/price-editor/series").send({
+      division: divisionName, name: seriesName, reason: "out of scope fixture",
+    });
+    expect(forbiddenRange.status).toBe(400);
     const seriesResponse = await admin.post("/catalog/price-editor/series").send({
-      division: divisionName, name: seriesName, reason: "local series audit reason",
+      division: rangeDivision, name: seriesName, reason: "local series audit reason",
     });
     expect(seriesResponse.status).toBe(201);
     expect(seriesResponse.body).toMatchObject({
-      division: divisionName, name: seriesName, actor: "admin@p048.example.test",
+      division: rangeDivision, name: seriesName, actor: "admin@p048.example.test",
       reason: "local series audit reason",
     });
     expect(seriesResponse.body.createdAt).toBeTruthy();
-    createdSeriesNames.push({ division: divisionName, name: seriesName });
+    createdSeriesNames.push({ division: rangeDivision, name: seriesName });
     const seriesAudit = await db.select().from(locallyAddedSeriesTable).where(and(
-      eq(locallyAddedSeriesTable.division, divisionName),
+      eq(locallyAddedSeriesTable.division, rangeDivision),
       eq(locallyAddedSeriesTable.name, seriesName),
     )).limit(1);
     expect(seriesAudit[0]).toMatchObject({
-      division: divisionName, name: seriesName, actor: "admin@p048.example.test",
+      division: rangeDivision, name: seriesName, actor: "admin@p048.example.test",
       reason: "local series audit reason",
     });
     const localSeriesCollision = await admin.post("/catalog/price-editor/series").send({
-      division: divisionName, name: seriesName.toLocaleLowerCase("en"), reason: "normalized collision test",
+      division: rangeDivision, name: seriesName.toLocaleLowerCase("en"), reason: "normalized collision test",
     });
     expect(localSeriesCollision.status).toBe(409);
     expect(localSeriesCollision.body).toEqual({ code: "VOCABULARY_DUPLICATE", existingValue: seriesName });
     const separatelyScopedSeries = await admin.post("/catalog/price-editor/series").send({
-      division: divisionTwo, name: seriesName, reason: "separate division scope test",
+      division: rangeDivisionTwo, name: seriesName, reason: "separate division scope test",
     });
     expect(separatelyScopedSeries.status).toBe(201);
-    createdSeriesNames.push({ division: divisionTwo, name: seriesName });
+    createdSeriesNames.push({ division: rangeDivisionTwo, name: seriesName });
     const seriesOptions = await admin.get("/catalog/price-editor/new-product/options");
     expect(seriesOptions.body.series).toContain(seriesName);
     expect(seriesOptions.body.byDivision).toContainEqual(expect.objectContaining({
-      division: divisionName, series: [seriesName],
+      division: rangeDivision, series: expect.arrayContaining([seriesName]),
     }));
     expect(seriesOptions.body.locallyAddedSeries).toContainEqual(expect.objectContaining({
-      division: divisionName, name: seriesName, actor: "admin@p048.example.test",
+      division: rangeDivision, name: seriesName, actor: "admin@p048.example.test",
       reason: "local series audit reason",
     }));
     const emptyVocabularyPreview = await admin.post("/catalog/price-editor/new-product/preview").send({

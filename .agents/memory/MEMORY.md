@@ -37,8 +37,11 @@
 - [Public Price Finder history boundary](public-price-history.md) — current prices stay anonymous; full MRP history requires sign-in and reuses the protected Analysis contract.
 - [PPR pipe unit restatement](ppr-pipe-unit-restatement.md) — PPR pipe history keeps Feb and Aug per-pipe periods; the spurious May period is deleted, not restated.
 - [Prince duplicate-code decisions](prince-duplicate-code-decisions.md) — exclusions are pair-keyed and confirmations suppress duplicate anomalies; P034r2 keeps A-414, never A-464.
-- [P042 Sales deletion proof](p042-sales-deletion-proof.md) — a fiscal-year sales snapshot cannot prove a product was never sold; keep delete unavailable without verified all-time sales and catalogue absence.
+- [Sales deletion proof](p042-sales-deletion-proof.md) — fiscal-year snapshots cannot prove never sold; header/spacing artefacts need separate checks; retirement preserves history.
 - [Apollo pipe provenance](apollo-pipe-provenance.md) — internal Apollo handles are not supplier SKUs; workbook identity uses sheet category, Prayag code, and size; hold PDF pipe matches without codes.
 - [Apollo PDF size evidence](apollo-pdf-size-evidence.md) — recheck the printed code row before trusting an earlier transcribed size; a filled PDF size is not proof of product identity.
-- [Catalogue baseline fingerprint](catalogue-baseline-fingerprint.md) — historical P045 MD5 uses full product-row JSON joined by pipe in ID order; other MD5 recipes are incomparable.
+- [Catalogue baseline fingerprint](catalogue-baseline-fingerprint.md) — full-row catalogue MD5 differs from value-only MRP SHA; reuse exact canonicalization, never guess a checksum recipe.
 - [Local vocabulary Sales boundary](local-vocabulary-sales-boundary.md) — new divisions warn and remain visible if unmapped; Sales mapping is an explicit separate approval.
+- [Approved Range scope](catalog-range-scope.md) — optional CP/PTMT-only Range; existing master products are prices-only; non-Range master series supplies Category.
+- [Category merge boundary](category-merge-boundary.md) — Category merges require reviewed approval and a Sales-side effect check; prevention guards never merge stored spellings.
+- [Disposable SQL advisory locks](disposable-advisory-lock-tests.md) — private schemas share database-wide application locks; serialize suites that exercise the same locks.

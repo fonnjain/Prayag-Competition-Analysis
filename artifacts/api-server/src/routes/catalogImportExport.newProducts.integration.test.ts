@@ -72,7 +72,7 @@ describe("P019 new-products upload", () => {
     expect(parsed.rows[0]).toMatchObject({ itemCode: "U-DEC", mrp: 2987.5, effectiveDate: EFFECTIVE_DATE });
     expect(() => parseNewProductsWorkbook(workbookBuffer([
       ["U-BAD", "Pipes & Fittings", "UGD Pipe", "Missing size header", "100", EFFECTIVE_DATE],
-    ], ["item_code", "division", "series", "product_name", "mrp", "effective_date"]))).toThrow(/all seven/i);
+    ], ["item_code", "division", "series", "product_name", "mrp", "effective_date"]))).toThrow(/must contain/i);
   });
 
   it("previews counts, rejects existing codes, and applies only accepted rows", async () => {
@@ -93,7 +93,8 @@ describe("P019 new-products upload", () => {
       catalogAfter: expect.any(Number),
       immediateCount: 1,
     });
-    expect(response.body.preview.willCreate[0]).toMatchObject({ itemCode: NEW_CODE, seriesRange: "UGD Pipe" });
+    expect(response.body.preview.willCreate[0]).toMatchObject({ itemCode: NEW_CODE, seriesRange: null });
+    expect(response.body.preview.rangeWarnings.length).toBeGreaterThan(0);
     expect(response.body.preview.rejectedRows[0].reason).toMatch(/MRP revision upload/i);
     expect(response.body.preview.periods[0]).toMatchObject({
       effectiveDate: EFFECTIVE_DATE,
@@ -110,7 +111,7 @@ describe("P019 new-products upload", () => {
     loadBatchId = apply.body.result.loadBatchId;
     const [product] = await db.select().from(catalogProductsTable).where(eq(catalogProductsTable.itemCode, NEW_CODE));
     const [history] = await db.select().from(mrpPriceHistoryTable).where(eq(mrpPriceHistoryTable.itemCode, NEW_CODE));
-    expect(product).toMatchObject({ itemCode: NEW_CODE, seriesRange: "UGD Pipe" });
+    expect(product).toMatchObject({ itemCode: NEW_CODE, seriesRange: null });
     expect(history).toMatchObject({ itemCode: NEW_CODE, mrp: 1234, variant: "Standard", loadBatchId });
     expect(history?.loadBatchId).toBeTruthy();
   });

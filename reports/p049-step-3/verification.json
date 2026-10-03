@@ -1,0 +1,266 @@
+{
+  "reportedIST": "2026-10-03 13:52:52",
+  "publication": "NOT published; publish Steps 2 and 3 together",
+  "productionFeatureConfirmation": "Pending user publication; production data checks are not new-code UI confirmation",
+  "loaderPolicy": [
+    "Existing product: prices only; category, series_range, division and all other existing catalogue fields are preserved.",
+    "New product outside the three exact Range divisions: master series -> category; series_range omitted.",
+    "New CP/PTMT product without Category: new CP/PTMT product needs a category: create it in the product editor.",
+    "Classification differences are informational: classification differs \u2014 not changed."
+  ],
+  "masterPreview": {
+    "development": {
+      "environment": "development",
+      "auditIST": "2026-10-03 13:34:06",
+      "sourceFile": "Prayag_MRP_Authoritative_v2_01Sep2026_1788783858192.xlsx",
+      "sourceSHA256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+      "masterRows": 6106,
+      "priceRows": 6256,
+      "classificationCounts": {
+        "existingProducts": 6106,
+        "newNonRangeProducts": 0,
+        "refusedNewRangeProducts": 0
+      },
+      "rejectedRows": [],
+      "classificationDifferences": [
+        {
+          "itemCode": "EP-Ganesha",
+          "message": "classification differs \u2014 not changed",
+          "differingFields": [
+            "category"
+          ],
+          "stored": {
+            "division": "Hardware",
+            "category": "HW Trading",
+            "seriesRange": null
+          },
+          "file": {
+            "division": "Hardware",
+            "category": "SET",
+            "seriesRange": null,
+            "categoryProvided": true,
+            "rangeProvided": false
+          }
+        }
+      ],
+      "sourceSnapshot": "development-classification-before.csv",
+      "liveApplyPerformed": false
+    },
+    "production": {
+      "environment": "production",
+      "auditIST": "2026-10-03 13:34:06",
+      "sourceFile": "Prayag_MRP_Authoritative_v2_01Sep2026_1788783858192.xlsx",
+      "sourceSHA256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+      "masterRows": 6106,
+      "priceRows": 6256,
+      "classificationCounts": {
+        "existingProducts": 6106,
+        "newNonRangeProducts": 0,
+        "refusedNewRangeProducts": 0
+      },
+      "rejectedRows": [],
+      "classificationDifferences": [
+        {
+          "itemCode": "EP-Ganesha",
+          "message": "classification differs \u2014 not changed",
+          "differingFields": [
+            "category"
+          ],
+          "stored": {
+            "division": "Hardware",
+            "category": "HW Trading",
+            "seriesRange": null
+          },
+          "file": {
+            "division": "Hardware",
+            "category": "SET",
+            "seriesRange": null,
+            "categoryProvided": true,
+            "rangeProvided": false
+          }
+        }
+      ],
+      "sourceSnapshot": "production-classification-before.csv",
+      "liveApplyPerformed": false
+    }
+  },
+  "mrp": {
+    "development": {
+      "before": {
+        "environment": "development",
+        "audit_ist": "2026-10-03 13:06:38",
+        "history_rows": "14012",
+        "value_sha256": "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2"
+      },
+      "after": {
+        "environment": "development",
+        "audit_ist": "2026-10-03 13:30:56",
+        "history_rows": "14012",
+        "value_sha256": "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2"
+      },
+      "unchanged": true
+    },
+    "production": {
+      "before": {
+        "environment": "production",
+        "audit_ist": "2026-10-03 13:06:50",
+        "history_rows": "14302",
+        "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+      },
+      "after": {
+        "environment": "production",
+        "audit_ist": "2026-10-03 13:31:00",
+        "history_rows": "14302",
+        "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+      },
+      "unchanged": true
+    }
+  },
+  "classification": {
+    "development": {
+      "comparedIST": "2026-10-03 13:52:52",
+      "products": 6948,
+      "byteIdentical": true,
+      "snapshotSHA256": "96f32a6aee9c850e6265ef56f56b81288e63887cc05e0fed681aa4c935306989",
+      "fields": [
+        "item_code",
+        "category",
+        "series_range",
+        "division"
+      ]
+    },
+    "production": {
+      "comparedIST": "2026-10-03 13:52:52",
+      "products": 7191,
+      "byteIdentical": true,
+      "snapshotSHA256": "5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2",
+      "fields": [
+        "item_code",
+        "category",
+        "series_range",
+        "division"
+      ]
+    }
+  },
+  "review": {
+    "development": {
+      "clockIST": "2026-10-03 13:52:52",
+      "candidates": 3293,
+      "byDivision": {
+        "CP Fittings / Faucets": 1061,
+        "CP (QUAA / FERN)": 161,
+        "PTMT & Plastic Fittings": 2071
+      },
+      "originalEqualCategoryRangeCandidates": 3272,
+      "additionalActiveCapitalisedCP": 21,
+      "looksLikeCounts": {
+        "range": 2509,
+        "category": 784
+      },
+      "combinedHeld": 57
+    },
+    "production": {
+      "clockIST": "2026-10-03 13:52:52",
+      "candidates": 3293,
+      "byDivision": {
+        "CP Fittings / Faucets": 1061,
+        "CP (QUAA / FERN)": 161,
+        "PTMT & Plastic Fittings": 2071
+      },
+      "originalEqualCategoryRangeCandidates": 3272,
+      "additionalActiveCapitalisedCP": 21,
+      "looksLikeCounts": {
+        "range": 2509,
+        "category": 784
+      },
+      "combinedHeld": 57
+    }
+  },
+  "tests": {
+    "environment": "development, isolated SQL schemas with private sequences",
+    "originalStep2Checks": 32,
+    "additionalStep3Checks": 8,
+    "totalPassed": 40,
+    "apiPassed": 37,
+    "formattingPassed": 3,
+    "clockISTStart": "2026-10-03 13:24:16",
+    "clockISTEnd": "2026-10-03 13:24:33",
+    "typeChecks": "API server and Product Database passed",
+    "note": "Superseded refusal/upsert/lifecycle expectations were updated to the Step 3 prices-only instruction. Original suites retained. Shared database advisory-lock tests were run serially."
+  },
+  "v4": "No attached authoritative v4 workbook found",
+  "salesContract": {
+    "environment": "development workspace source",
+    "clockIST": "2026-10-03 13:52:52",
+    "files": [
+      {
+        "path": "lib/db/src/schema/catalog.ts",
+        "sha256": "4412e6b86e43a323c4fa34f3c44bf5d5bb8ab2872c45f443b0fa94b5267868b0",
+        "byteIdenticalToStep2Baseline": true
+      },
+      {
+        "path": "artifacts/api-server/src/lib/catalogSync.ts",
+        "sha256": "cfe68c4b3ee203972abaae196a40435faec3b6cfb861a4af56020291f72911b6",
+        "byteIdenticalToStep2Baseline": true
+      },
+      {
+        "path": "artifacts/api-server/src/routes/catalogSync.ts",
+        "sha256": "5457c4a50f155d6704e4985fb21902f8aee56b9f16903674682b838f4ef508ee",
+        "byteIdenticalToStep2Baseline": true
+      },
+      {
+        "path": "lib/api-spec/openapi.yaml",
+        "sha256": "5a6bfa221e86d4145a052be6c0902825fa8e7ec1767c6ee0a54b38ab80e0421a",
+        "byteIdenticalToStep2Baseline": true
+      }
+    ],
+    "unchanged": true
+  },
+  "browser": {
+    "environment": "development",
+    "clockIST": "2026-10-03 13:37:36",
+    "mode": "UI-only fixture verification; synthetic admin session and intercepted HTTP 409; NOT authenticated end-to-end or production verification",
+    "passed": true,
+    "authenticatedEndToEndVerified": false,
+    "previewCounts": {
+      "existingProducts": 6106,
+      "newNonRangeProducts": 0,
+      "newCPPTMTRefused": 0,
+      "priceRows": 6256,
+      "rejectedRows": 0
+    },
+    "classificationDifferences": 1,
+    "difference": {
+      "itemCode": "EP-Ganesha",
+      "storedCategory": "HW Trading",
+      "fileCategory": "SET",
+      "message": "classification differs \u2014 not changed"
+    },
+    "CSV": {
+      "dataRows": 1,
+      "headers": 11,
+      "completeBothValues": true
+    },
+    "applyDisabled": true,
+    "applyPosts": 0,
+    "realDatabaseWrites": false,
+    "priceDeltasTested": false,
+    "editorScopeBrowserRetested": false,
+    "console": "Expected fixture 409, blocked telemetry 403 and initial metadata 401; no uncaught JS exception",
+    "screenshots": [
+      {
+        "description": "Fixture-backed duplicate warning dialog after the loader request was intercepted with HTTP 409.",
+        "id": "2vfsp2"
+      },
+      {
+        "description": "Expanded one-row classification difference showing the EP-Ganesha stored and file categories and preview counts.",
+        "id": "diul6c"
+      },
+      {
+        "description": "Bottom of duplicate preview showing Rejected rows (0), duplicate no-Apply text, and disabled Apply/Discard controls.",
+        "id": "lv6b29"
+      }
+    ],
+    "limitation": "Real sign-in could not be completed with available runtime credentials. No password reset or authentication code change was made. Production Range-screen and loader-preview confirmation remains pending publication and authenticated access."
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "environment": "development",
+  "clockIST": "2026-10-03 13:37:36",
+  "mode": "UI-only fixture verification; synthetic admin session and intercepted HTTP 409; NOT authenticated end-to-end or production verification",
+  "passed": true,
+  "authenticatedEndToEndVerified": false,
+  "previewCounts": {
+    "existingProducts": 6106,
+    "newNonRangeProducts": 0,
+    "newCPPTMTRefused": 0,
+    "priceRows": 6256,
+    "rejectedRows": 0
+  },
+  "classificationDifferences": 1,
+  "difference": {
+    "itemCode": "EP-Ganesha",
+    "storedCategory": "HW Trading",
+    "fileCategory": "SET",
+    "message": "classification differs — not changed"
+  },
+  "CSV": {
+    "dataRows": 1,
+    "headers": 11,
+    "completeBothValues": true
+  },
+  "applyDisabled": true,
+  "applyPosts": 0,
+  "realDatabaseWrites": false,
+  "priceDeltasTested": false,
+  "editorScopeBrowserRetested": false,
+  "console": "Expected fixture 409, blocked telemetry 403 and initial metadata 401; no uncaught JS exception",
+  "screenshots": [
+    {
+      "description": "Fixture-backed duplicate warning dialog after the loader request was intercepted with HTTP 409.",
+      "id": "2vfsp2"
+    },
+    {
+      "description": "Expanded one-row classification difference showing the EP-Ganesha stored and file categories and preview counts.",
+      "id": "diul6c"
+    },
+    {
+      "description": "Bottom of duplicate preview showing Rejected rows (0), duplicate no-Apply text, and disabled Apply/Discard controls.",
+      "id": "lv6b29"
+    }
+  ],
+  "limitation": "Real sign-in could not be completed with available runtime credentials. No password reset or authentication code change was made. Production Range-screen and loader-preview confirmation remains pending publication and authenticated access."
+}

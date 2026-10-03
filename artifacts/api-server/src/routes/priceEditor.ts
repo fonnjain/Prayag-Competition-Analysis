@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
+import { supportsCatalogRange } from "@workspace/formatting";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
@@ -150,7 +151,7 @@ router.post("/catalog/price-editor/preview", requireAdmin, async (req, res): Pro
   const value = Number(req.body?.value);
   const effectiveDate = String(req.body?.effectiveDate ?? "");
   if (!code || !series || !Number.isFinite(value) || value <= 0 || !iso(effectiveDate)) {
-    return res.status(400).json({ error: "itemCode, series, positive value, and valid effectiveDate are required." });
+    return res.status(400).json({ error: "Product code, price source, positive value, and a valid effective date are required." });
   }
   const p = await product(code);
   if (!p) return res.status(404).json({ error: "Product not found." });
@@ -531,6 +532,7 @@ router.post("/catalog/price-editor/series", requireAdmin, async (req, res): Prom
   const reason = vocabularyReason(req.body);
   if (!reason) return res.status(400).json({ error: "Reason is required." });
   if (!divisionInput) return res.status(400).json({ error: "Division is required." });
+  if (!supportsCatalogRange(divisionInput)) return res.status(400).json({ error: "Range is available only for the approved CP and PTMT divisions." });
   if (!name) return res.status(400).json({ error: "Name is required." });
   const divisionKey = normalizeVocabularyKey(divisionInput);
   const normalizedKey = normalizeVocabularyKey(name);
@@ -583,7 +585,7 @@ router.post("/catalog/price-editor/series", requireAdmin, async (req, res): Prom
       if (existing) return res.status(409).json(duplicateVocabulary(existing.name));
     }
     req.log.error({ err: e }, "local series creation failed");
-    return res.status(409).json({ error: "Could not add series." });
+    return res.status(409).json({ error: "Could not add Range." });
   }
 });
 
@@ -623,7 +625,7 @@ function newProductInput(body: any) {
   const itemCode = normalizeNewCode(body?.itemCode);
   const productName = String(body?.productName ?? "").trim();
   const division = String(body?.division ?? "").trim();
-  const series = String(body?.series ?? "").trim();
+  const series = supportsCatalogRange(division) ? String(body?.series ?? "").trim() : "";
   const category = String(body?.category ?? "").trim();
   const size = String(body?.size ?? "").trim() || null;
   const mrp = Number(body?.mrp);
@@ -649,9 +651,9 @@ async function creationReferences(q: any, code: string, auditId: number) {
 }
 
 async function validateNewProductInput(input: ReturnType<typeof newProductInput>) {
-  if (!input.itemCode || !input.productName || !input.division || !input.series || !input.category ||
+  if (!input.itemCode || !input.productName || !input.division || !input.category ||
       !Number.isFinite(input.mrp) || input.mrp <= 0 || !iso(input.effectiveDate) || !input.reason) {
-    return "Code, product name, division, series, category, positive MRP, effective date, and reason are required.";
+    return "Code, product name, division, category, positive MRP, effective date, and reason are required. Range is optional.";
   }
   const products = await db.select().from(catalogProductsTable).where(eq(catalogProductsTable.isActive, true));
   const addedDivisions = await db.select({ name: locallyAddedDivisionsTable.name }).from(locallyAddedDivisionsTable);
@@ -678,7 +680,7 @@ async function validateNewProductInput(input: ReturnType<typeof newProductInput>
     normalizeVocabularyKey(p.seriesRange) === seriesKey) ||
     addedSeries.some((series) => series.divisionKey === normalizeVocabularyKey(input.division) &&
       series.normalizedKey === seriesKey);
-  if (!matchingSeries && !input.newSeriesConfirmed) return `Series "${input.series}" is new in ${input.division}; explicit confirmation is required.`;
+  if (input.series && !matchingSeries && !input.newSeriesConfirmed) return `Range "${input.series}" is new in ${input.division}; explicit confirmation is required.`;
   return null;
 }
 
@@ -761,7 +763,7 @@ router.post("/catalog/price-editor/new-product/apply", requireAdmin, async (req,
       }).returning({ id: mrpLoadBatchesTable.id });
       const productRows = await tx.insert(catalogProductsTable).values({
         itemCode: input.itemCode, productName: input.productName, division: input.division,
-        seriesRange: input.series, category: input.category, size: input.size,
+        seriesRange: input.series || null, category: input.category, size: input.size,
         sourceFiles: "single-product-editor", dataFlag: "manual_creation",
       }).returning();
       const historyRows = await tx.insert(mrpPriceHistoryTable).values({

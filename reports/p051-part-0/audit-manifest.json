@@ -1,0 +1,54 @@
+{
+  "generatedIST": "2026-10-03 13:02:43",
+  "scope": "P051 Part 0, read-only",
+  "applicationCodeChanged": false,
+  "storedClassificationsChanged": false,
+  "mergeApplied": false,
+  "groupCounts": [
+    [
+      "development",
+      "2026-10-03 12:50:55",
+      6948,
+      20,
+      1130,
+      20,
+      0,
+      0
+    ],
+    [
+      "production",
+      "2026-10-03 12:52:53",
+      7191,
+      20,
+      1130,
+      20,
+      0,
+      0
+    ]
+  ],
+  "mrpBeforeAfter": [
+    [
+      "development",
+      "2026-10-03 12:51:03",
+      "14012",
+      "2026-10-03 12:59:53",
+      "14012",
+      "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2",
+      "Unchanged"
+    ],
+    [
+      "production",
+      "2026-10-03 12:53:02",
+      "14302",
+      "2026-10-03 13:00:04",
+      "14302",
+      "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458",
+      "Unchanged"
+    ]
+  ],
+  "allCurrentGroupsHeld": true,
+  "proposedMerges": 0,
+  "salesConsumerVerified": false,
+  "guardsImplemented": false,
+  "mergeWorkflowImplemented": false
+}

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { supportsCatalogRange } from "@workspace/formatting";
 import { createHash, randomUUID } from "node:crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -40,6 +41,7 @@ import {
   isAuthoritativeMasterBuffer,
   loadAuthoritativeMaster,
   parseAuthoritativeMasterBuffer,
+  planAuthoritativeClassifications,
   type ParsedAuthoritativeMaster,
 } from "../lib/authoritativeMrpMaster";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
@@ -156,10 +158,12 @@ function newProductDate(value: unknown): string | null {
 export function parseNewProductsWorkbook(buffer: Buffer): {
   rows: NewProductRow[];
   rejectedRows: Array<{ row: number; itemCode: string | null; reason: string }>;
+  rangeWarnings: Array<{ row: number; itemCode: string | null; reason: string }>;
 } {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const rows: NewProductRow[] = [];
   const rejectedRows: Array<{ row: number; itemCode: string | null; reason: string }> = [];
+  const rangeWarnings: Array<{ row: number; itemCode: string | null; reason: string }> = [];
   let foundHeaders = false;
   const aliases: Record<string, string[]> = {
     itemCode: ["itemcode", "catno", "catnumber", "productcode"],
@@ -190,7 +194,7 @@ export function parseNewProductsWorkbook(buffer: Buffer): {
         }
       });
       if (
-        ["itemCode", "division", "series", "productName", "size", "mrp", "effectiveDate"]
+        ["itemCode", "division", "productName", "size", "mrp", "effectiveDate"]
           .every((name) => candidate.has(name))
       ) {
         headerRow = index;
@@ -206,6 +210,9 @@ export function parseNewProductsWorkbook(buffer: Buffer): {
       const itemCode = norm(input[columns.get("itemCode")!]) || null;
       const division = norm(input[columns.get("division")!]);
       const series = norm(input[columns.get("series")!]) || null;
+      if (series && !supportsCatalogRange(division)) {
+        rangeWarnings.push({ row: index + 1, itemCode, reason: `Range "${series}" was supplied for ${division}, which is outside the approved Range divisions. The product is not refused; Range will not be stored.` });
+      }
       const productName = norm(input[columns.get("productName")!]);
       const size = norm(input[columns.get("size")!]) || null;
       const rawMrp = input[columns.get("mrp")!];
@@ -221,12 +228,12 @@ export function parseNewProductsWorkbook(buffer: Buffer): {
       if (reason) {
         rejectedRows.push({ row: index + 1, itemCode, reason });
       } else {
-        rows.push({ itemCode: itemCode!, division, series, seriesRange: series, productName, size, mrp, effectiveDate: effectiveDate!, row: index + 1 });
+        rows.push({ itemCode: itemCode!, division, series: supportsCatalogRange(division) ? series : null, seriesRange: supportsCatalogRange(division) ? series : null, productName, size, mrp, effectiveDate: effectiveDate!, row: index + 1 });
       }
     }
   }
-  if (!foundHeaders) throw new Error("Workbook must contain all seven columns: item_code, division, series, product_name, size, mrp, and effective_date.");
-  return { rows, rejectedRows };
+  if (!foundHeaders) throw new Error("Workbook must contain item_code, division, product_name, size, mrp, and effective_date. Range is optional.");
+  return { rows, rejectedRows, rangeWarnings };
 }
 
 function newProductsResponse(batch: typeof mrpPendingBatchesTable.$inferSelect) {
@@ -371,10 +378,16 @@ export async function applyP019PrinceRematch(
 
 export function pendingAuthoritativePreview(
   parsed: ParsedAuthoritativeMaster,
-  products: { itemCode: string; productName: string | null; discontinuedFrom: string | null }[],
+  products: { itemCode: string; productName: string | null; discontinuedFrom: string | null;
+    division?: string | null; category?: string | null; seriesRange?: string | null }[],
   history: { itemCode: string; effectiveDate: string; mrp: number | null; variant: string }[],
 ) {
   const today = new Date().toISOString().slice(0, 10);
+  const classification = planAuthoritativeClassifications(parsed.productRows, products.map(row => ({
+    ...row, division: row.division ?? null, category: row.category ?? null, seriesRange: row.seriesRange ?? null,
+  })));
+  const acceptedProducts = parsed.productRows.filter(row => classification.acceptedCodes.has(normCode(row.itemCode)));
+  const acceptedPrices = parsed.priceRows.filter(row => classification.acceptedCodes.has(normCode(row.itemCode)));
   const productsByCode = new Map(products.map((row) => [normCode(row.itemCode), row]));
   const fileCodes = new Set(parsed.productRows.map((row) => normCode(row.itemCode)));
   const knownPeriods = new Set(history.map((row) => row.effectiveDate));
@@ -387,7 +400,7 @@ export function pendingAuthoritativePreview(
       currentByCode.set(code, { mrp: row.mrp, effectiveDate: row.effectiveDate });
     }
   }
-  const allPastPriceChanges = parsed.productRows
+  const allPastPriceChanges = acceptedProducts
     .filter((row) => productsByCode.has(normCode(row.itemCode)) && row.effectiveDate <= today)
     .flatMap((row) => {
       const old = currentByCode.get(normCode(row.itemCode));
@@ -406,42 +419,39 @@ export function pendingAuthoritativePreview(
       currentByCode.get(normCode(row.itemCode))?.effectiveDate ===
       row.effectiveDate,
   );
-  const periods = Object.entries(parsed.periodCounts)
+  const acceptedPeriodCounts: Record<string, number> = {};
+  for (const row of acceptedProducts) acceptedPeriodCounts[row.effectiveDate] = (acceptedPeriodCounts[row.effectiveDate] ?? 0) + 1;
+  const periods = Object.entries(acceptedPeriodCounts)
     .map(([effectiveDate, rowCount]) => ({
       effectiveDate, rowCount, isNew: !knownPeriods.has(effectiveDate),
-      movedInCount: parsed.productRows.filter((row) => row.effectiveDate === effectiveDate && currentByCode.get(normCode(row.itemCode))?.effectiveDate !== effectiveDate).length,
+      movedInCount: acceptedProducts.filter((row) => row.effectiveDate === effectiveDate && currentByCode.get(normCode(row.itemCode))?.effectiveDate !== effectiveDate).length,
     }))
     .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate));
   const rejectedReasonSummary: Record<string, number> = {};
+  for (const row of classification.rejectedRows) rejectedReasonSummary[row.reason] = (rejectedReasonSummary[row.reason] ?? 0) + 1;
   return {
     kind: "authoritative-master",
-    rowsToWrite: parsed.priceRows.length,
+    rowsToWrite: acceptedPrices.length,
     productRows: parsed.productRows.length,
-    priceRows: parsed.priceRows.length,
+    priceRows: acceptedPrices.length,
+    classificationCounts: classification.counts,
+    classificationDifferences: classification.classificationDifferences,
+    classificationDifferenceCount: classification.classificationDifferences.length,
+    classificationPolicy: "Existing products: prices only. classification differs — not changed. New non-Range products: master series → Category; no Range. New CP/PTMT products without Category: create in the product editor.",
     periods,
     immediatePriceChanges,
     immediatePriceChangeCount: immediatePriceChanges.length,
     existingPeriodPriceRevisions,
     existingPeriodPriceRevisionCount: existingPeriodPriceRevisions.length,
-    newProducts: parsed.productRows.filter((row) => !productsByCode.has(normCode(row.itemCode))).map((row) => ({ itemCode: row.itemCode, productName: row.productName })),
+    newProducts: acceptedProducts.filter((row) => !productsByCode.has(normCode(row.itemCode))).map((row) => ({ itemCode: row.itemCode, productName: row.productName })),
     catalogueProductsAbsentFromFile: products.filter((row) => !fileCodes.has(normCode(row.itemCode))).map((row) => row.itemCode),
-    discontinuations: (() => {
-      const changed = parsed.discontinuedRows.filter(
-        (row) =>
-          productsByCode.get(normCode(row.itemCode))?.discontinuedFrom !==
-          row.discontinuedFrom,
-      );
-      return {
-        total: changed.length,
-        immediate: changed.filter((row) => row.discontinuedFrom <= today).length,
-        future: changed.filter((row) => row.discontinuedFrom > today).length,
-      };
-    })(),
+    discontinuations: { total: 0, immediate: 0, future: 0 },
+    lifecyclePolicy: "Existing activation and discontinuation state is preserved — not changed by a price-only load.",
     protectedNameConflicts: parsed.preservedNameDisagreements,
-    rejectedRows: [],
+    rejectedRows: classification.rejectedRows,
     rejectedReasonSummary,
-    canApply: parsed.priceRows.length > 0,
-    noChangeReason: parsed.priceRows.length ? null : "No valid rows would be written.",
+    canApply: acceptedPrices.length > 0,
+    noChangeReason: acceptedPrices.length ? null : classification.rejectedRows[0]?.reason ?? "No valid rows would be written.",
   };
 }
 
@@ -1680,7 +1690,7 @@ router.post("/catalog/new-products/preview", requireAdmin, upload.single("file")
       reason: req.body.reason.trim(),
       fileName: file.originalname,
       fileSha256,
-      willCreate: accepted, rejectedRows, rowsToCreate: accepted.length,
+      willCreate: accepted, rejectedRows, rangeWarnings: parsed.rangeWarnings, rowsToCreate: accepted.length,
       willCreateCount: accepted.length,
       rejectedCount: rejectedRows.length,
       catalogBeforeCount: existing.length, catalogAfterCount: existing.length + accepted.length,
@@ -1769,7 +1779,7 @@ router.post("/catalog/new-products/:batchId/apply", requireAdmin, async (req, re
       if (!load) throw new Error("Could not create load provenance batch.");
       const today = new Date().toISOString().slice(0, 10);
       await tx.insert(catalogProductsTable).values(payload.rows.map((row) => ({
-        itemCode: row.itemCode, productName: row.productName, division: row.division, seriesRange: row.series, size: row.size,
+        itemCode: row.itemCode, productName: row.productName, division: row.division, seriesRange: supportsCatalogRange(row.division) ? row.series : null, size: row.size,
         sourceFiles: batch.fileName, dataFlag: "new_products_upload",
       })));
       const insertedHistory = await tx.insert(mrpPriceHistoryTable).values(payload.rows.map((row) => ({
@@ -1913,6 +1923,9 @@ router.post("/catalog/mrp-loads/:batchId/apply", requireAdmin, async (req, res):
           transaction: tx,
         });
         if (authoritative.duplicate) throw new Error("This source snapshot was already applied.");
+        if (authoritative.priceRows !== preview.rowsToWrite) {
+          throw new Error("Catalogue membership changed since preview. Discard this batch and preview again before applying.");
+        }
         appliedLoadBatchId = authoritative.loadBatchId;
         result = authoritative;
       }
@@ -2020,15 +2033,17 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         return;
       }
       const parsed = parseAuthoritativeMasterBuffer(file.buffer);
-      await db
-        .insert(mrpSourcesTable)
-        .values(AUTHORITATIVE_MASTER_SOURCE)
-        .onConflictDoNothing({ target: mrpSourcesTable.sheetId });
-      const [source] = await db
+      let [source] = await db
         .select({ id: mrpSourcesTable.id })
         .from(mrpSourcesTable)
         .where(eq(mrpSourcesTable.sheetId, AUTHORITATIVE_MASTER_SOURCE.sheetId))
         .limit(1);
+      if (!source) {
+        await db.insert(mrpSourcesTable).values(AUTHORITATIVE_MASTER_SOURCE)
+          .onConflictDoNothing({ target: mrpSourcesTable.sheetId });
+        [source] = await db.select({ id: mrpSourcesTable.id }).from(mrpSourcesTable)
+          .where(eq(mrpSourcesTable.sheetId, AUTHORITATIVE_MASTER_SOURCE.sheetId)).limit(1);
+      }
       if (!source) throw new Error("Authoritative MRP provenance source could not be created.");
       // This precheck intentionally happens before the pending record exists.
       const existingBatches = await db
@@ -2049,11 +2064,30 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
           gt(mrpPendingBatchesTable.expiresAt, new Date()),
         ))
         .limit(1);
+      const products = await db.select({
+        itemCode: catalogProductsTable.itemCode,
+        productName: catalogProductsTable.productName,
+        discontinuedFrom: catalogProductsTable.discontinuedFrom,
+        division: catalogProductsTable.division,
+        category: catalogProductsTable.category,
+        seriesRange: catalogProductsTable.seriesRange,
+      }).from(catalogProductsTable);
+      const history = await db.select({
+        itemCode: mrpPriceHistoryTable.itemCode,
+        effectiveDate: mrpPriceHistoryTable.effectiveDate,
+        mrp: mrpPriceHistoryTable.mrp,
+        variant: mrpPriceHistoryTable.variant,
+      }).from(mrpPriceHistoryTable);
+      const preview = pendingAuthoritativePreview(parsed, products, history);
       if (existingBatches.length || pendingMatch.length) {
         res.status(409).json({
           error: pendingMatch.length
             ? "This authoritative master is already awaiting review."
             : "This authoritative master has already been loaded.",
+          // Identical snapshots still cannot be applied twice, but the current
+          // classification/price preview remains inspectable without staging.
+          preview: { ...preview, canApply: false,
+            noChangeReason: pendingMatch.length ? "Review the existing pending batch." : "This identical source was already loaded; no duplicate Apply is allowed." },
           duplicate: {
             sourceDivision: "Authoritative multi-division master",
             fileSha256: parsed.fileSha256,
@@ -2066,18 +2100,6 @@ router.post("/catalog/load-mrp", requireAdmin, upload.single("file"), async (req
         });
         return;
       }
-      const products = await db.select({
-        itemCode: catalogProductsTable.itemCode,
-        productName: catalogProductsTable.productName,
-        discontinuedFrom: catalogProductsTable.discontinuedFrom,
-      }).from(catalogProductsTable);
-      const history = await db.select({
-        itemCode: mrpPriceHistoryTable.itemCode,
-        effectiveDate: mrpPriceHistoryTable.effectiveDate,
-        mrp: mrpPriceHistoryTable.mrp,
-        variant: mrpPriceHistoryTable.variant,
-      }).from(mrpPriceHistoryTable);
-      const preview = pendingAuthoritativePreview(parsed, products, history);
       const [pending] = await db.insert(mrpPendingBatchesTable).values({
         sourceId: source.id,
         fileName: file.originalname,
@@ -2531,7 +2553,7 @@ router.get("/catalog/export", async (req, res) => {
       "Product Name",
       "Division",
       "Category",
-      "Series/Range",
+      "Range",
       "Size",
       "UOM",
       scope === "revisions" ? "Revised MRP" : "MRP In Force",

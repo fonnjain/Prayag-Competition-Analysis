@@ -1,0 +1,76 @@
+{
+  "development": {
+    "environment": "development",
+    "auditIST": "2026-10-03 13:34:06",
+    "sourceFile": "Prayag_MRP_Authoritative_v2_01Sep2026_1788783858192.xlsx",
+    "sourceSHA256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+    "masterRows": 6106,
+    "priceRows": 6256,
+    "classificationCounts": {
+      "existingProducts": 6106,
+      "newNonRangeProducts": 0,
+      "refusedNewRangeProducts": 0
+    },
+    "rejectedRows": [],
+    "classificationDifferences": [
+      {
+        "itemCode": "EP-Ganesha",
+        "message": "classification differs — not changed",
+        "differingFields": [
+          "category"
+        ],
+        "stored": {
+          "division": "Hardware",
+          "category": "HW Trading",
+          "seriesRange": null
+        },
+        "file": {
+          "division": "Hardware",
+          "category": "SET",
+          "seriesRange": null,
+          "categoryProvided": true,
+          "rangeProvided": false
+        }
+      }
+    ],
+    "sourceSnapshot": "development-classification-before.csv",
+    "liveApplyPerformed": false
+  },
+  "production": {
+    "environment": "production",
+    "auditIST": "2026-10-03 13:34:06",
+    "sourceFile": "Prayag_MRP_Authoritative_v2_01Sep2026_1788783858192.xlsx",
+    "sourceSHA256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+    "masterRows": 6106,
+    "priceRows": 6256,
+    "classificationCounts": {
+      "existingProducts": 6106,
+      "newNonRangeProducts": 0,
+      "refusedNewRangeProducts": 0
+    },
+    "rejectedRows": [],
+    "classificationDifferences": [
+      {
+        "itemCode": "EP-Ganesha",
+        "message": "classification differs — not changed",
+        "differingFields": [
+          "category"
+        ],
+        "stored": {
+          "division": "Hardware",
+          "category": "HW Trading",
+          "seriesRange": null
+        },
+        "file": {
+          "division": "Hardware",
+          "category": "SET",
+          "seriesRange": null,
+          "categoryProvided": true,
+          "rangeProvided": false
+        }
+      }
+    ],
+    "sourceSnapshot": "production-classification-before.csv",
+    "liveApplyPerformed": false
+  }
+}

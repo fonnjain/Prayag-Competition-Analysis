@@ -1,0 +1,31 @@
+{
+  "environment": "workspace source inspection; revised development loader, not yet published",
+  "clockIST": "2026-10-03 12:43:25",
+  "file": "Prayag_MRP_Authoritative_v2_01Sep2026.xlsx",
+  "sha256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+  "sourceSheet": "products",
+  "headers": [
+    "item_code",
+    "division",
+    "series",
+    "product_name",
+    "size",
+    "mrp",
+    "effective_date",
+    "previous_mrp",
+    "mrp_ivory",
+    "mrp_white_with_jet",
+    "mrp_pink_green_blue",
+    "checked_by",
+    "status_note"
+  ],
+  "productRows": 6106,
+  "refusedMissingCategory": 6106,
+  "firstRefusedCodes": [
+    "F-51",
+    "F-61",
+    "F-70",
+    "F-71",
+    "F-72"
+  ]
+}

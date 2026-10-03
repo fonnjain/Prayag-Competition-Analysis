@@ -1,0 +1,80 @@
+{
+  "development": {
+    "auditIST": "2026-10-03 13:48:36",
+    "pipes": 122,
+    "spacedCodes": 92,
+    "twinsFound": 92,
+    "unspacedRepairCodes": 30,
+    "activeRepairProducts": 0,
+    "currentDataFlags": {
+      "mrp_repair_2026": 114,
+      "removed_by_authoritative_master_2026_09_01": 8
+    },
+    "currentRemovedMarkerCodes": [
+      "PS1106",
+      "PS1606",
+      "PS5157",
+      "PS5163",
+      "PS5171",
+      "PS5657",
+      "PS5763",
+      "PS7506"
+    ],
+    "additionalActiveCP": 21,
+    "headerPriceRows": 0,
+    "mrp": {
+      "rows": 14012,
+      "value_sha256": "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2"
+    },
+    "classificationBefore": {
+      "rows": 6948,
+      "sha256": "7c5086c7df253fbcaf06dcffa69b3569803118f3e4b3b4f50070f0e5e751c577"
+    },
+    "afterIST": "2026-10-03 13:53:33",
+    "mrpAndClassificationsUnchanged": true
+  },
+  "production": {
+    "auditIST": "2026-10-03 13:48:39",
+    "pipes": 122,
+    "spacedCodes": 92,
+    "twinsFound": 92,
+    "unspacedRepairCodes": 30,
+    "activeRepairProducts": 0,
+    "currentDataFlags": {
+      "mrp_repair_2026": 114,
+      "removed_by_authoritative_master_2026_09_01": 8
+    },
+    "currentRemovedMarkerCodes": [
+      "PS1106",
+      "PS1606",
+      "PS5157",
+      "PS5163",
+      "PS5171",
+      "PS5657",
+      "PS5763",
+      "PS7506"
+    ],
+    "additionalActiveCP": 21,
+    "headerPriceRows": 0,
+    "mrp": {
+      "rows": 14302,
+      "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+    },
+    "classificationBefore": {
+      "rows": 7191,
+      "sha256": "b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376"
+    },
+    "afterIST": "2026-10-03 13:53:38",
+    "mrpAndClassificationsUnchanged": true
+  },
+  "status": {
+    "reportedIST": "2026-10-03 13:56:10",
+    "guardBuilt": false,
+    "mergeWorkflowBuilt": false,
+    "storedWrites": false,
+    "publicationBlock": "P049 Step 3 was absent from the checked production frontend bundle. Publish it first, then implement/publish the Part 1 guard.",
+    "salesMergeBlock": "No future category merge until an explicit reviewed approval and Sales-side check confirm its effect.",
+    "rangeReview": "21 flagged ACTIVE CP products appended per environment to P049 Step 3; 3272 original + 21 additions = 3293.",
+    "pairing": "Remove whitespace only; exact case and punctuation retained; same stored division. This is not an identity/Sales verification."
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "environment": "development workspace versus pre-change Git HEAD",
+  "clockIST": "2026-10-03 12:43:25",
+  "files": [
+    {
+      "path": "lib/db/src/schema/catalog.ts",
+      "byteForByteUnchanged": true,
+      "sha256": "4412e6b86e43a323c4fa34f3c44bf5d5bb8ab2872c45f443b0fa94b5267868b0"
+    },
+    {
+      "path": "artifacts/api-server/src/lib/catalogSync.ts",
+      "byteForByteUnchanged": true,
+      "sha256": "cfe68c4b3ee203972abaae196a40435faec3b6cfb861a4af56020291f72911b6"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/catalogSync.ts",
+      "byteForByteUnchanged": true,
+      "sha256": "5457c4a50f155d6704e4985fb21902f8aee56b9f16903674682b838f4ef508ee"
+    },
+    {
+      "path": "lib/api-spec/openapi.yaml",
+      "byteForByteUnchanged": true,
+      "sha256": "5a6bfa221e86d4145a052be6c0902825fa8e7ec1767c6ee0a54b38ab80e0421a"
+    }
+  ],
+  "salesContractTestPassed": true
+}

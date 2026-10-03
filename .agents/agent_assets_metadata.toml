@@ -473,3 +473,199 @@ mtime_ms = 1790328142328
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9f577be4-1e98-4a5f-b238-b71f1d8fb5a8/299b6ebe-b6a5-4148-891c-cba6d1952ec6"
 storage_version_token = "1790328143791077"
 content_type = "text/html"
+
+[[outputs]]
+id = "muO44jLeFaBIcjPTdc0Ef"
+uri = "file://reports/p049-step-2/P049-Step-2-Report.html"
+type = "html"
+title = "P049 Step 2 — Full timestamped report"
+description = "Self-contained report with division/sink audits, label inventory, test evidence, checksum preservation and embedded review CSV downloads. Development complete; production UI confirmation awaits publishing."
+logical_id = "988fb99a-092e-4bb5-a77d-5e691f6bc2b7"
+content_hash = "sha256:d2ffee6996add7cfa21bffaa0abe5a3ab6f399a983b4f807ae8496251b58a68e"
+size = 1551951
+mtime_ms = 1791011781458
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/988fb99a-092e-4bb5-a77d-5e691f6bc2b7/4911cc1c-cc28-438c-a0f3-ec03cb539888"
+storage_version_token = "1791011848204122"
+content_type = "text/html"
+
+[[outputs]]
+id = "Qt0o4qGQokI6C9-I1MVxV"
+uri = "file://reports/p049-step-2/P049-Step-2-Audit.zip"
+type = "unspecified"
+title = "P049 Step 2 — Complete audit downloads"
+description = "All development/production CSV snapshots, category-review lists, extra-50 provenance audit, historical checksum proof, Sales contract verification and test manifest."
+logical_id = "f3935298-1326-4bcf-a823-b088c5bbb9ea"
+content_hash = "sha256:859df7180cf269deb0eae5b5a7e8f7968a530d90499cef3ede8ef5f3176f686c"
+size = 391481
+mtime_ms = 1791011781934
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/f3935298-1326-4bcf-a823-b088c5bbb9ea/5d92c5d7-34de-4bfa-be2e-143a5c8680e8"
+storage_version_token = "1791011849672274"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "qqqITwDhPgfB1MwhPkAdI"
+uri = "file://reports/p049-step-2/production-category-range-review.csv"
+type = "table"
+title = "Production Category/Range review list"
+description = "6,361 candidates at the 3 October 2026 production audit; code, name, division, current category and current series_range. Review only—no corrections applied."
+logical_id = "fa578940-71b1-4108-9675-03132779dfbb"
+content_hash = "sha256:be054b733091b8c5b962090c4e2a224885f3f5183dae711134045ad6b769d638"
+size = 567998
+mtime_ms = 1791011301826
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/fa578940-71b1-4108-9675-03132779dfbb/5e66cdec-cbc1-4413-8884-6c60784b1e2e"
+storage_version_token = "1791011851051971"
+content_type = "text/csv"
+
+[[outputs]]
+id = "WOSOvmr0gIWb43nzA6TlQ"
+uri = "file://reports/p051-part-0/P051-Part-0-Report.html"
+type = "html"
+title = "P051 — Part 0 read-only report"
+description = "Both-environment duplicate audits, Range-copy holds, exact current write-path quotations, provenance limitations, Sales-feed caveat and unchanged MRP checksums."
+logical_id = "c44e8830-b81d-4b2a-9145-b4b1b3b0e50a"
+content_hash = "sha256:616973724f94e597afa2c2adbb56d6018f1d925cdce0a7ab3e10475610206915"
+size = 196260
+mtime_ms = 1791012764318
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c44e8830-b81d-4b2a-9145-b4b1b3b0e50a/8b3bd949-26d3-4c05-b7c6-bc27cc24a986"
+storage_version_token = "1791012843532207"
+content_type = "text/html"
+
+[[outputs]]
+id = "VhyCOPGjQinXsOnjSf4jt"
+uri = "file://reports/p051-part-0/P051-Draft-Decision-List.csv"
+type = "table"
+title = "P051 — Draft Prayag decision list"
+description = "One row per group per environment. All 40 rows wait for Range correction; proposed spellings and Prayag decision cells are blank."
+logical_id = "0a5aa8a8-a8fd-43a1-b875-2b3d23efe884"
+content_hash = "sha256:f86d3c9360a377bc2c29f7af8fec00f9b78828464c8eaa558b30db4677d677af"
+size = 9986
+mtime_ms = 1791012764086
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/0a5aa8a8-a8fd-43a1-b875-2b3d23efe884/e38d21b2-1411-4faf-b64a-0cb4406dcc86"
+storage_version_token = "1791012844881027"
+content_type = "text/csv"
+
+[[outputs]]
+id = "0nsKa68mPt_bD8U-c9nbQ"
+uri = "file://reports/p051-part-0/P051-Part-0-Audit.zip"
+type = "unspecified"
+title = "P051 — Full audit evidence"
+description = "Spelling/provenance CSVs, source groups, local-option scans, Category/Range/Division before-after snapshots, code quotes and exact checksum evidence."
+logical_id = "38cc6d59-25e1-4c6e-ae3d-86b25bb9eb4c"
+content_hash = "sha256:b3e96ef0c35b2c01ac3c4346882e4fed9e44c755cc5830d38f101e5ea9984428"
+size = 229857
+mtime_ms = 1791012764754
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/38cc6d59-25e1-4c6e-ae3d-86b25bb9eb4c/3d2eb167-5e56-47e8-b644-ae12cca9dfdf"
+storage_version_token = "1791012846182396"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "jPoQqSvHE_v6RT2VEIUIE"
+uri = "file://reports/p049-step-3/P049-Step-3-Report.html"
+type = "html"
+title = "P049 Step 3 — Report"
+description = "Loader rules, environment/time-stamped counts, tests, unchanged MRP proofs, and browser/publication limitations."
+logical_id = "1e0d6166-6dff-4e8d-80a2-43a54564153a"
+content_hash = "sha256:f5585fe4550b7250bd1db905be68d15bcfe99a9b1ec383c147756b08eab2d40c"
+size = 13280
+mtime_ms = 1791015181858
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1e0d6166-6dff-4e8d-80a2-43a54564153a/2e41195a-7fa6-43a8-bcfc-84a87426647d"
+storage_version_token = "1791015288245915"
+content_type = "text/html"
+
+[[outputs]]
+id = "8mHvFD7cVUmvGZ0Q32kZ4"
+uri = "file://reports/p049-step-3/P049-Step-3-Downloads.zip"
+type = "unspecified"
+title = "P049 Step 3 — All review downloads"
+description = "Both environments: classification differences, scoped Category/Range reviews, separate combined-division files, and MRP before/after checksum proofs."
+logical_id = "7f0226c0-fbac-42f8-95d7-ca38e5e5fc99"
+content_hash = "sha256:bacb1eaee5ec8df747b79294c494cf59ccccdab17a22f11f49ac7033330386c4"
+size = 50327
+mtime_ms = 1791015181869
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/7f0226c0-fbac-42f8-95d7-ca38e5e5fc99/c9811862-6e7d-4390-8bae-f58faeae207b"
+storage_version_token = "1791015289580664"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "T0otqP7AGv71HQ1I3VC8U"
+uri = "file://reports/p049-step-3/production-category-range-review.csv"
+type = "table"
+title = "P049 expanded range-correction review — production"
+description = "3,293 rows: original 3,272 plus 21 ACTIVE CP products flagged capitalised range in category, Range empty. Development version is in the bundle."
+logical_id = "97181ee6-d810-49e5-b8c6-71fa60f64d1c"
+content_hash = "sha256:eca743954ca69a74cb2075a2ffe32fa00d1e2ed0b8b033dda79df67e68502214"
+size = 911106
+mtime_ms = 1791015773229
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/97181ee6-d810-49e5-b8c6-71fa60f64d1c/26c6c0eb-41d7-4b4b-b445-5e6e935af203"
+storage_version_token = "1791016015839159"
+content_type = "text/csv"
+
+[[outputs]]
+id = "yM828YIrOmbFDU8MDHUoJ"
+uri = "file://reports/p049-step-3/production-combined-division-review.csv"
+type = "table"
+title = "Production — combined divisions, held separately"
+description = "Combined-division products awaiting their own prompt; no changes made."
+logical_id = "6bc339ea-275a-4592-8064-16f6ae9840cc"
+content_hash = "sha256:79ad8cecb616dccf8b21d32e379c75587a13743fcc837f55219444553b4e555a"
+size = 9752
+mtime_ms = 1791014647081
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/6bc339ea-275a-4592-8064-16f6ae9840cc/424e6324-caff-47a5-bbaf-e47e3373c3e4"
+storage_version_token = "1791015292299977"
+content_type = "text/csv"
+
+[[outputs]]
+id = "AatCWSB8a1tG3Nela8xIe"
+uri = "file://reports/p051-decision/Pipes-Spacing-Twins-Both-Environments.csv"
+type = "table"
+title = "Pipes — code/twin retirement inputs"
+description = "Both environments: all 122 inactive group members, including 92 whitespace-only twins each, with both active flags and latest Standard MRP values. No action taken."
+logical_id = "dffe0b71-52c3-4799-be05-3229fb60dc68"
+content_hash = "sha256:effd4c4afdb1aa9b1bfe79492707b3f7a29b8c6bad8274e5fee956785bdb8726"
+size = 92883
+mtime_ms = 1791015970991
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/dffe0b71-52c3-4799-be05-3229fb60dc68/448bbb0c-46a6-49d7-bccb-f52c8fb0136b"
+storage_version_token = "1791016014554494"
+content_type = "text/csv"
+
+[[outputs]]
+id = "TRKloHr5AQwxgtbjUUa7N"
+uri = "file://reports/p051-decision/ITEM-CODE-Price-Rows-Both-Environments.csv"
+type = "table"
+title = "ITEM CODE — price-history report"
+description = "Inactive header product retained; exact-code lookup across all variants found no price rows in either environment."
+logical_id = "44453ce1-fd94-4b9c-adcd-2c1f9436fed6"
+content_hash = "sha256:60d8dbf0c9e9f87005c866576d1f69f44724a346fd572f493cab349c68604d00"
+size = 510
+mtime_ms = 1791015970993
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/44453ce1-fd94-4b9c-adcd-2c1f9436fed6/127c2fad-3337-443c-906d-931a99162000"
+storage_version_token = "1791016017088714"
+content_type = "text/csv"
+
+[[outputs]]
+id = "TLJp_XDZ29NlTl37iMJj-"
+uri = "file://reports/p051-decision/P051-Decision-Read-Only-Report.html"
+type = "html"
+title = "P051 decision — findings and publication blocker"
+description = "Read-only downloads, unchanged database proofs, Sales merge blocker, and Part 1 status: pending P049 publication."
+logical_id = "dcabc720-0301-447e-be23-4a11d9ac11da"
+content_hash = "sha256:bcb98c037158f03e85d536ca78ff798aede9d636415e1cc638122b8540a9a00e"
+size = 5304
+mtime_ms = 1791015970994
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/dcabc720-0301-447e-be23-4a11d9ac11da/f01f2834-0ec9-431f-8004-2d025ba107b1"
+storage_version_token = "1791016018347035"
+content_type = "text/html"
+
+[[outputs]]
+id = "g36t7mAUXzVszSzjTqMgI"
+uri = "file://reports/p051-decision/P051-Decision-Downloads.zip"
+type = "unspecified"
+title = "P051 decision — all downloads"
+description = "Pipe pairing file, expanded P049 reviews for both environments, header report, before/after proofs and checksum definition."
+logical_id = "356f9549-6589-43c1-a1df-52b215ccb113"
+content_hash = "sha256:85e3244f14912f36235ef431761132ff862d8351af3b0b7b7e90542c71e4a6b6"
+size = 54778
+mtime_ms = 1791015971009
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/356f9549-6589-43c1-a1df-52b215ccb113/89639191-1ea4-448e-8ced-b7ddeb912916"
+storage_version_token = "1791016019669402"
+content_type = "application/octet-stream"

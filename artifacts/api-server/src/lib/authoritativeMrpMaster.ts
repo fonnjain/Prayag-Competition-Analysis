@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { masterClassification, supportsCatalogRange } from "@workspace/formatting";
+import { and, eq, sql } from "drizzle-orm";
 import {
   catalogProductsTable,
   db,
@@ -127,16 +128,6 @@ const AUTHORITATIVE_MASTER_PROFILES: readonly AuthoritativeMasterProfile[] = [
     namePreservationExceptions: V2_NAME_PRESERVATION_EXCEPTIONS,
   },
 ] as const;
-const DEACTIVATED_CODES = [
-  "PS1106",
-  "PS1606",
-  "PS5157",
-  "PS5163",
-  "PS5171",
-  "PS5657",
-  "PS5763",
-  "PS7506",
-] as const;
 
 type Variant = "Standard" | "Ivory" | "White with Jet" | "Pink / Green / Blue";
 
@@ -144,6 +135,7 @@ export interface AuthoritativePriceRow {
   itemCode: string;
   division: string;
   series: string | null;
+  category?: string | null;
   productName: string;
   size: string | null;
   mrp: number;
@@ -366,6 +358,7 @@ export function parseAuthoritativeMasterBuffer(
       itemCode,
       division,
       series: nullableText(row.series),
+      category: nullableText(row.category),
       productName,
       size: nullableText(row.size),
       mrp: positiveNumber(row.mrp, `products row ${rowNumber} mrp`),
@@ -479,6 +472,75 @@ export function parseAuthoritativeMasterBuffer(
   };
 }
 
+export interface StoredMasterClassification {
+  itemCode: string;
+  division: string | null;
+  category: string | null;
+  seriesRange: string | null;
+}
+
+/** P049 Step 3: classify against the catalogue, never against a guessed alias. */
+export function planAuthoritativeClassifications(
+  rows: AuthoritativePriceRow[],
+  products: StoredMasterClassification[],
+) {
+  const existing = new Map(products.map(row => [authoritativeCode(row.itemCode), row]));
+  const acceptedCodes = new Set<string>();
+  const newProducts: Array<{ itemCode: string; category: string; seriesRange?: string | null }> = [];
+  const rejectedRows: Array<{ itemCode: string; row: number; reason: string }> = [];
+  const classificationDifferences: Array<{
+    itemCode: string; message: string; differingFields: string[];
+    stored: { division: string | null; category: string | null; seriesRange: string | null };
+    file: { division: string; category: string | null; seriesRange: string | null; categoryProvided: boolean; rangeProvided: boolean };
+  }> = [];
+  let existingProducts = 0;
+  let newNonRangeProducts = 0;
+  let refusedNewRangeProducts = 0;
+  rows.forEach((row, index) => {
+    const code = authoritativeCode(row.itemCode);
+    const rangeDivision = supportsCatalogRange(row.division);
+    const file = {
+      division: row.division,
+      category: rangeDivision ? row.category?.trim() || null : row.series?.trim() || null,
+      seriesRange: rangeDivision ? row.series : null,
+      categoryProvided: !rangeDivision || !!row.category?.trim(),
+      rangeProvided: rangeDivision,
+    };
+    const stored = existing.get(code);
+    if (stored) {
+      existingProducts++;
+      acceptedCodes.add(code);
+      const differingFields = [
+        ...(stored.division !== file.division ? ["division"] : []),
+        ...(file.categoryProvided && stored.category !== file.category ? ["category"] : []),
+        ...(file.rangeProvided && stored.seriesRange !== file.seriesRange ? ["series_range"] : []),
+      ];
+      if (differingFields.length) classificationDifferences.push({
+        itemCode: stored.itemCode, message: "classification differs — not changed",
+        differingFields, stored: { division: stored.division, category: stored.category, seriesRange: stored.seriesRange }, file,
+      });
+      return;
+    }
+    if (rangeDivision && !row.category?.trim()) {
+      refusedNewRangeProducts++;
+      rejectedRows.push({ itemCode: row.itemCode, row: index + 2,
+        reason: "new CP/PTMT product needs a category: create it in the product editor" });
+      return;
+    }
+    if (!rangeDivision && !file.category) {
+      rejectedRows.push({ itemCode: row.itemCode, row: index + 2,
+        reason: "new product needs a category in the master series column" });
+      return;
+    }
+    const classification = masterClassification({ ...row, category: file.category });
+    newProducts.push({ itemCode: row.itemCode, ...classification });
+    if (!rangeDivision) newNonRangeProducts++;
+    acceptedCodes.add(code);
+  });
+  return { acceptedCodes, newProducts, rejectedRows, classificationDifferences,
+    counts: { existingProducts, newNonRangeProducts, refusedNewRangeProducts } };
+}
+
 export async function loadAuthoritativeMaster(input: {
   buffer?: Buffer;
   // Pending MRP batches retain this validated payload.  Supplying it prevents
@@ -515,6 +577,9 @@ export async function loadAuthoritativeMaster(input: {
 
   const load = async (tx: DatabaseTransaction) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(917_901)`);
+    // Serialize catalogue membership with concurrent product creation. Existing
+    // rows are price-only; a new-code race must never become a classification upsert.
+    await tx.execute(sql`LOCK TABLE catalog_products IN SHARE ROW EXCLUSIVE MODE`);
     await tx
       .insert(mrpSourcesTable)
       .values(AUTHORITATIVE_MASTER_SOURCE)
@@ -575,54 +640,27 @@ export async function loadAuthoritativeMaster(input: {
       .select({
         itemCode: catalogProductsTable.itemCode,
         productName: catalogProductsTable.productName,
+        division: catalogProductsTable.division,
+        category: catalogProductsTable.category,
+        seriesRange: catalogProductsTable.seriesRange,
       })
       .from(catalogProductsTable);
-    const existingCodes = new Set(
-      existingProducts.map((row) => authoritativeCode(row.itemCode)),
-    );
-    const missingDiscontinued = parsed.discontinuedRows
-      .map((row) => row.itemCode)
-      .filter((code) => !existingCodes.has(code));
-    if (missingDiscontinued.length) {
-      throw new Error(
-        `Discontinued codes are missing from the catalog: ${missingDiscontinued.join(", ")}.`,
-      );
+    const classificationPlan = planAuthoritativeClassifications(parsed.productRows, existingProducts);
+    const canonicalCodes = new Map(existingProducts.map(row => [authoritativeCode(row.itemCode), row.itemCode]));
+    const eligiblePriceRows = parsed.priceRows
+      .filter(row => classificationPlan.acceptedCodes.has(authoritativeCode(row.itemCode)))
+      .map(row => ({ ...row, itemCode: canonicalCodes.get(authoritativeCode(row.itemCode)) ?? row.itemCode }));
+    if (!eligiblePriceRows.length) throw new Error(classificationPlan.rejectedRows[0]?.reason ?? "No valid price rows would be written.");
+    const periodCounts: Record<string, number> = {};
+    const periodDivisionCounts: Record<string, number> = {};
+    const variantCounts: Record<Variant, number> = { Standard: 0, Ivory: 0, "White with Jet": 0, "Pink / Green / Blue": 0 };
+    for (const row of parsed.productRows.filter(row => classificationPlan.acceptedCodes.has(authoritativeCode(row.itemCode)))) {
+      periodCounts[row.effectiveDate] = (periodCounts[row.effectiveDate] ?? 0) + 1;
+      const key = `${row.effectiveDate} — ${row.division}`;
+      periodDivisionCounts[key] = (periodDivisionCounts[key] ?? 0) + 1;
     }
-    const missingDeactivated = DEACTIVATED_CODES.filter(
-      (code) => !existingCodes.has(code),
-    );
-    if (missingDeactivated.length) {
-      throw new Error(
-        `Expected removed Prayag codes are missing from the catalog: ${missingDeactivated.join(", ")}.`,
-      );
-    }
-    const existingNames = new Map(
-      existingProducts.map((row) => [row.itemCode, row.productName] as const),
-    );
-    const unexpectedPreservedNames =
-      parsed.preservedNameDisagreements.filter(
-        (row) => {
-          const exception = profileForHash(parsed.fileSha256)
-            .namePreservationExceptions.find(
-              (candidate) => candidate.itemCode === row.itemCode,
-            );
-          const currentName = existingNames.get(row.itemCode);
-          return (
-            currentName !== row.preservedName &&
-            !exception?.allowedCurrentNames?.includes(currentName ?? "")
-          );
-        },
-      );
-    if (unexpectedPreservedNames.length) {
-      throw new Error(
-        `Named product-name exceptions do not match the audited catalog: ${unexpectedPreservedNames
-          .map(
-            (row) =>
-              `${row.itemCode} is "${existingNames.get(row.itemCode) ?? "<missing>"}", expected "${row.preservedName}"`,
-          )
-          .join("; ")}.`,
-      );
-    }
+    for (const row of eligiblePriceRows) variantCounts[row.variant]++;
+    const newClassifications = new Map(classificationPlan.newProducts.map(row => [authoritativeCode(row.itemCode), row]));
 
     const batch = await tx
       .insert(mrpLoadBatchesTable)
@@ -633,19 +671,18 @@ export async function loadAuthoritativeMaster(input: {
         fileSizeBytes: input.buffer?.length ?? input.fileSizeBytes ?? 0,
         downloadedAt: input.downloadedAt,
         loadedBy: input.loadedBy,
-        rowCount: parsed.priceRows.length,
+        rowCount: eligiblePriceRows.length,
         notes: loadNotes,
       })
       .returning({ id: mrpLoadBatchesTable.id });
     const loadBatchId = batch[0]!.id;
 
-    for (let index = 0; index < parsed.productRows.length; index += 500) {
-      const values = parsed.productRows.slice(index, index + 500).map((row) => ({
-        itemCode: row.itemCode,
+    const newProductRows = parsed.productRows.filter(row => newClassifications.has(authoritativeCode(row.itemCode)));
+    for (let index = 0; index < newProductRows.length; index += 500) {
+      const values = newProductRows.slice(index, index + 500).map((row) => ({
         productName: preservedNamesByCode.get(row.itemCode) ?? row.productName,
         division: row.division,
-        category: row.series,
-        seriesRange: row.series,
+        ...newClassifications.get(authoritativeCode(row.itemCode))!,
         size: row.size,
         uom: "NOS",
         isActive: true,
@@ -658,24 +695,7 @@ export async function loadAuthoritativeMaster(input: {
       }));
       await tx
         .insert(catalogProductsTable)
-        .values(values)
-        .onConflictDoUpdate({
-          target: catalogProductsTable.itemCode,
-          set: {
-            productName: sql`excluded.product_name`,
-            division: sql`excluded.division`,
-            category: sql`excluded.category`,
-            seriesRange: sql`excluded.series_range`,
-            size: sql`excluded.size`,
-            isActive: true,
-            discontinuedFrom: null,
-            discontinuedCheckedBy: null,
-            discontinuedStatusNote: null,
-            sourceFiles: parsed.fileName,
-            dataFlag: parsed.dataFlag,
-            updatedAt: new Date(),
-          },
-        });
+        .values(values);
     }
 
     const loadedHistory: {
@@ -685,8 +705,8 @@ export async function loadAuthoritativeMaster(input: {
       mrp: number | null;
     }[] = [];
     const loadDate = new Date().toISOString().slice(0, 10);
-    for (let index = 0; index < parsed.priceRows.length; index += 500) {
-      const values = parsed.priceRows.slice(index, index + 500).map((row) => ({
+    for (let index = 0; index < eligiblePriceRows.length; index += 500) {
+      const values = eligiblePriceRows.slice(index, index + 500).map((row) => ({
         itemCode: row.itemCode,
         mrp: row.mrp,
         netPrice: null,
@@ -753,37 +773,8 @@ export async function loadAuthoritativeMaster(input: {
       );
     }
 
-    // The authoritative list is complete. Clear every previous withdrawal and
-    // reapply exactly the 233 signed-off rows from this workbook.
-    await tx
-      .update(catalogProductsTable)
-      .set({
-        discontinuedFrom: null,
-        discontinuedCheckedBy: null,
-        discontinuedStatusNote: null,
-        updatedAt: new Date(),
-      });
-    for (let index = 0; index < parsed.discontinuedRows.length; index += 250) {
-      for (const row of parsed.discontinuedRows.slice(index, index + 250)) {
-        await tx
-          .update(catalogProductsTable)
-          .set({
-            discontinuedFrom: row.discontinuedFrom,
-            discontinuedCheckedBy: row.checkedBy,
-            discontinuedStatusNote: row.statusNote,
-            updatedAt: new Date(),
-          })
-          .where(eq(catalogProductsTable.itemCode, row.itemCode));
-      }
-    }
-    await tx
-      .update(catalogProductsTable)
-      .set({
-        isActive: false,
-        dataFlag: "removed_by_authoritative_master_2026_09_01",
-        updatedAt: new Date(),
-      })
-      .where(inArray(catalogProductsTable.itemCode, [...DEACTIVATED_CODES]));
+    // P049 Step 3: existing catalogue rows are never updated by a price load,
+    // including names, hidden Range, division, activation and withdrawal state.
     await recomputeCurrentFlagsInTransaction(tx);
 
     const after = await tx.execute<{
@@ -811,18 +802,20 @@ export async function loadAuthoritativeMaster(input: {
       before: before.rows[0]!,
       after: after.rows[0]!,
       productRows: parsed.productRows.length,
-      priceRows: parsed.priceRows.length,
+      priceRows: eligiblePriceRows.length,
+      classificationCounts: classificationPlan.counts,
+      classificationDifferences: classificationPlan.classificationDifferences,
+      rejectedRows: classificationPlan.rejectedRows,
       newCodes,
-      deactivatedCodes: [...DEACTIVATED_CODES],
-      discontinuedRows: parsed.discontinuedRows.length,
-      immediatelyWithdrawn: parsed.discontinuedRows.filter(
-        (row) => row.discontinuedFrom <= loadDate,
-      ).length,
+      deactivatedCodes: [],
+      discontinuedRows: 0,
+      immediatelyWithdrawn: 0,
+      sourceDiscontinuedRows: parsed.discontinuedRows.length,
       excludedRows: parsed.excludedRows,
       invalidExcludedCodes: parsed.invalidExcludedCodes,
-      periodCounts: parsed.periodCounts,
-      periodDivisionCounts: parsed.periodDivisionCounts,
-      variantCounts: parsed.variantCounts,
+      periodCounts,
+      periodDivisionCounts,
+      variantCounts,
       preservedNameDisagreements: parsed.preservedNameDisagreements,
     };
   };

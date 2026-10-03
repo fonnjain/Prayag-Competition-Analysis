@@ -247,11 +247,11 @@ export default function MrpGeneratorRun() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               <div className="bg-muted/40 p-3 rounded-lg border border-border/50 text-center">
                 <div className="text-2xl font-bold">{historicalSeries.filter((s: any) => s.usable).length}</div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wide">Usable Series</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">Usable Ranges</div>
               </div>
               <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
                 <div className="text-2xl font-bold text-red-700">{historicalSeries.filter((s: any) => !s.usable).length}</div>
-                <div className="text-xs text-red-600/80 uppercase tracking-wide">Unusable Series</div>
+                <div className="text-xs text-red-600/80 uppercase tracking-wide">Unusable Ranges</div>
               </div>
               <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
                 <div className="text-2xl font-bold text-emerald-700">{results.filter((r) => r.historicalEvidence?.status === "DUE" || r.historicalEvidence?.status === "OVERDUE").length}</div>
@@ -620,13 +620,13 @@ export default function MrpGeneratorRun() {
         {/* Historical Series Analysis */}
         {isHistorical && historicalSeries.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Historical Series Analysis</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Historical Range Analysis</h2>
             <div className="bg-card border rounded-lg overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-muted/40 text-muted-foreground uppercase tracking-wider">
                     <tr className="border-b">
-                      <th className="p-3 font-semibold">Series</th>
+                      <th className="p-3 font-semibold">Range</th>
                       <th className="p-3 font-semibold text-right">Products</th>
                       <th className="p-3 font-semibold text-right">Revisions</th>
                       <th className="p-3 font-semibold text-right">Cadence</th>
@@ -911,7 +911,7 @@ export default function MrpGeneratorRun() {
                                 <div className="mt-3 space-y-1">
                                   <h5 className="text-[10px] uppercase font-semibold text-muted-foreground">Historical Evidence</h5>
                                   <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs bg-muted/20 p-2 border rounded">
-                                    <span className="text-muted-foreground">Series:</span>
+                                    <span className="text-muted-foreground">Range:</span>
                                     <span className="text-right font-medium">{historicalEvidence.series || "None"}</span>
                                     <span className="text-muted-foreground">Revision Count:</span>
                                     <span className="text-right">{historicalEvidence.revisionDates?.length || 0}</span>

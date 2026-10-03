@@ -359,9 +359,9 @@ export default function MrpGeneratorCompare() {
 
                                         {val.historicalEvidence ? (
                                           <div className="mt-2 space-y-1 bg-muted/20 p-2 border rounded text-xs">
-                                            <div className="font-semibold text-[10px] uppercase text-muted-foreground mb-1">Historical Series</div>
+                                            <div className="font-semibold text-[10px] uppercase text-muted-foreground mb-1">Historical Range</div>
                                             <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                                              <span className="text-muted-foreground">Series:</span>
+                                              <span className="text-muted-foreground">Range:</span>
                                               <span className="text-right font-medium">{val.historicalEvidence.series || "None"}</span>
                                               <span className="text-muted-foreground">Reason/Status:</span>
                                               <span className="text-right">{val.historicalEvidence.status || val.reason || "-"}</span>

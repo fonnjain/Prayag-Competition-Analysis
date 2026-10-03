@@ -1,0 +1,100 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P049 Step 3 — Loader correction and scoped review</title>
+<style>body{font:15px/1.6 system-ui,sans-serif;margin:0;background:#f4f6f8;color:#172431}main{max-width:1150px;margin:32px auto;background:white;padding:36px;border-radius:12px}h1,h2{line-height:1.25}h2{margin-top:35px}table{border-collapse:collapse;width:100%;font-size:12px;margin:16px 0}td,th{padding:10px;border:1px solid #dce2e8;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eef3f7}.notice{border-left:4px solid #b57400;padding:15px;background:#fff7e6}blockquote{background:#edf7ef;padding:16px;border-left:4px solid #39814c}code,pre{font-family:ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.muted{color:#5b6b79}@media(max-width:700px){main{margin:0;padding:18px}table{display:block;overflow:auto}}@media print{main{margin:0;padding:0}body{background:white}}</style>
+<main><p class="muted">COMPETITION · Development implementation · Reported 2026-10-03 13:52:52 IST</p>
+<h1>P049 Step 3</h1><p class="notice"><strong>Not published.</strong> Steps 2 and 3 must be published together.
+The production figures below verify unchanged stored data, not the new production screens. Post-publication Range-screen and loader-preview confirmation remains pending.</p>
+<h2>1. Loader rule as built</h2><blockquote>Existing product: <strong>prices only</strong>. The loader never writes Category, Range or division for an existing product.
+All existing catalogue fields, including names and lifecycle state, remain untouched. File differences are informational: <strong>classification differs — not changed</strong>, with both values.
+<br>New product outside the three exact Range divisions: master <code>series → category</code>; <code>series_range</code> is omitted.
+<br>New CP/PTMT product without Category: <strong>new CP/PTMT product needs a category: create it in the product editor</strong>. Only that product and its colour prices are refused; accepted rows remain eligible.</blockquote>
+<p>Classification is re-evaluated under a catalogue-membership lock at Apply. An existing product's exact stored item code is retained for its price rows.
+If eligible price-row count changes since preview, Apply rolls back and requires a fresh preview.
+An already-loaded identical source can now show a read-only preview; it cannot be staged or applied twice.</p>
+<h2>2. Current master counts</h2><p>Source: <code>Prayag_MRP_Authoritative_v2_01Sep2026_1788783858192.xlsx</code>.
+SHA-256: <code>e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e</code>. No attached authoritative v4 workbook was found.
+These calculations run development code against each environment's saved catalogue; no real master Apply was run.</p>
+<table><thead><tr><th>Environment / basis</th><th>Planner clock IST</th><th>Master products</th><th>1.1 Existing</th><th>1.2 New non-Range</th><th>1.3 New CP/PTMT refused</th><th>Differences</th></tr></thead><tbody><tr><td>development snapshot / development planner</td><td>2026-10-03 13:34:06</td><td>6106</td><td>6106</td><td>0</td><td>0</td><td>1</td></tr><tr><td>production snapshot / development planner</td><td>2026-10-03 13:34:06</td><td>6106</td><td>6106</td><td>0</td><td>0</td><td>1</td></tr></tbody></table>
+<p>Both environments: zero refusals. The missing Category column no longer blocks existing products.
+For CP/PTMT, an absent Category is “not supplied”, not a request to erase an existing Category.
+Outside the scope, an absent file Range is not a request to clear hidden Range.</p>
+<h2>3. Every classification difference</h2>
+<table><thead><tr><th>Environment / basis</th><th>Clock IST</th><th>Code</th><th>Message</th><th>Fields</th><th>Stored — kept</th><th>File — not applied</th></tr></thead><tbody><tr><td>development snapshot / development planner</td><td>2026-10-03 13:34:06</td><td>EP-Ganesha</td><td>classification differs — not changed</td><td>[&#x27;category&#x27;]</td><td>{&quot;division&quot;: &quot;Hardware&quot;, &quot;category&quot;: &quot;HW Trading&quot;, &quot;seriesRange&quot;: null}</td><td>{&quot;division&quot;: &quot;Hardware&quot;, &quot;category&quot;: &quot;SET&quot;, &quot;seriesRange&quot;: null, &quot;categoryProvided&quot;: true, &quot;rangeProvided&quot;: false}</td></tr><tr><td>production snapshot / development planner</td><td>2026-10-03 13:34:06</td><td>EP-Ganesha</td><td>classification differs — not changed</td><td>[&#x27;category&#x27;]</td><td>{&quot;division&quot;: &quot;Hardware&quot;, &quot;category&quot;: &quot;HW Trading&quot;, &quot;seriesRange&quot;: null}</td><td>{&quot;division&quot;: &quot;Hardware&quot;, &quot;category&quot;: &quot;SET&quot;, &quot;seriesRange&quot;: null, &quot;categoryProvided&quot;: true, &quot;rangeProvided&quot;: false}</td></tr></tbody></table>
+<p>One row per environment. <code>EP-Ganesha</code> keeps <code>HW Trading</code>; file Category <code>SET</code> does not overwrite it.
+The development screen includes the full table and an all-differences CSV download. Separate CSVs are included in the bundle.</p>
+<h2>4. Narrowed Category / Range review</h2>
+<table><thead><tr><th>Environment</th><th>Reading clock IST</th><th>Exact division / status</th><th>Candidates</th></tr></thead><tbody><tr><td>development</td><td>2026-10-03 13:52:52</td><td>CP Fittings / Faucets</td><td>1061</td></tr><tr><td>development</td><td>2026-10-03 13:52:52</td><td>CP (QUAA / FERN)</td><td>161</td></tr><tr><td>development</td><td>2026-10-03 13:52:52</td><td>PTMT &amp; Plastic Fittings</td><td>2071</td></tr><tr><td>development</td><td>2026-10-03 13:52:52</td><td>TOTAL, three approved divisions</td><td>3293</td></tr><tr><td>development</td><td>2026-10-03 13:52:52</td><td>Combined divisions — separate, held</td><td>57</td></tr><tr><td>production</td><td>2026-10-03 13:52:52</td><td>CP Fittings / Faucets</td><td>1061</td></tr><tr><td>production</td><td>2026-10-03 13:52:52</td><td>CP (QUAA / FERN)</td><td>161</td></tr><tr><td>production</td><td>2026-10-03 13:52:52</td><td>PTMT &amp; Plastic Fittings</td><td>2071</td></tr><tr><td>production</td><td>2026-10-03 13:52:52</td><td>TOTAL, three approved divisions</td><td>3293</td></tr><tr><td>production</td><td>2026-10-03 13:52:52</td><td>Combined divisions — separate, held</td><td>57</td></tr></tbody></table>
+<p>Original candidate rule: non-empty Category exactly equals stored Range, in one of the three exact approved divisions.
+The expanded files also include the explicitly identified active CP products with a capitalised range name in Category and empty Range, flagged
+<strong>capitalised range in category, Range empty</strong>. This is a separate review basis, not equality evidence and not a stored correction.
+Outside these three, Category = Range is correct under the master's meaning and is not treated as loader-copy evidence.
+Combined divisions are excluded from this review and remain in their own file. Nothing is normalized, merged or relabeled.</p>
+<p><strong>How looks_like was decided:</strong> an explicit semantic reading of the labels.
+Functional product groups, accessory groups and grade/thickness-only descriptions are <code>category</code> (e.g. Accessories, Ball Cocks, Waste Coupling).
+Named families, numbered collections and their colour variants are <code>range</code> (e.g. Marcus 68, Aspire 52).
+Allied is provisionally read as an accessory umbrella category; Standard handle generations and explicit numbered steel series are provisionally read as ranges.
+Each row includes its reason. These are review recommendations, not approval or stored corrections.</p>
+<h2>5. Tests and unchanged data</h2><p>Development isolated-schema tests: <strong>40 passed</strong> —
+the original 32 Step 2 checks plus 8 Step 3 checks.
+API tests ran 2026-10-03 13:24:16 to 2026-10-03 13:24:33 IST.
+API and Product Database type checks passed. Original suites were retained; superseded expectations were updated to the requested prices-only policy.</p>
+<p>Coverage includes exact scope/no aliases, optional Range, hidden-value preservation, admin-only audited Add Range,
+unchanged master acceptance, full differences, new pipe insertion, per-row CP refusal including colour prices,
+mixed accepted/refused imports, exact stored code casing, all existing catalogue fields unchanged, rollback/serialization and price provenance.</p>
+<table><thead><tr><th>Environment</th><th>Before clock IST</th><th>After clock IST</th><th>MRP rows</th><th>Unchanged value SHA-256</th><th>Result</th></tr></thead><tbody><tr><td>development</td><td>2026-10-03 13:06:38</td><td>2026-10-03 13:30:56</td><td>14012 → 14012</td><td>4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2</td><td>identical</td></tr><tr><td>production</td><td>2026-10-03 13:06:50</td><td>2026-10-03 13:31:00</td><td>14302 → 14302</td><td>e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458</td><td>identical</td></tr></tbody></table>
+<table><thead><tr><th>Environment</th><th>Comparison clock IST</th><th>Catalogue rows</th><th>Category / Range / division snapshot</th></tr></thead><tbody><tr><td>development</td><td>2026-10-03 13:52:52</td><td>6948</td><td>byte-for-byte identical before / after</td></tr><tr><td>production</td><td>2026-10-03 13:52:52</td><td>7191</td><td>byte-for-byte identical before / after</td></tr></tbody></table>
+<p>Sales field names and contract definitions remain byte-identical to the Step 2 baseline, checked in development source at 2026-10-03 13:52:52 IST:</p>
+<table><thead><tr><th>Unchanged file</th><th>SHA-256</th></tr></thead><tbody><tr><td>lib/db/src/schema/catalog.ts</td><td>4412e6b86e43a323c4fa34f3c44bf5d5bb8ab2872c45f443b0fa94b5267868b0</td></tr><tr><td>artifacts/api-server/src/lib/catalogSync.ts</td><td>cfe68c4b3ee203972abaae196a40435faec3b6cfb861a4af56020291f72911b6</td></tr><tr><td>artifacts/api-server/src/routes/catalogSync.ts</td><td>5457c4a50f155d6704e4985fb21902f8aee56b9f16903674682b838f4ef508ee</td></tr><tr><td>lib/api-spec/openapi.yaml</td><td>5a6bfa221e86d4145a052be6c0902825fa8e7ec1767c6ee0a54b38ab80e0421a</td></tr></tbody></table>
+<p>The checksum uses the exact Step 2 value-only definition: stored floating-point bits, JSONB row arrays, bytewise sort, LF joins, UTF-8 SHA-256.
+It includes all history rows and variants and excludes provenance/current flags. The definition and before/after CSV proofs are in the bundle.</p>
+<h2>6. Browser and publication status</h2><pre>{
+  &quot;environment&quot;: &quot;development&quot;,
+  &quot;clockIST&quot;: &quot;2026-10-03 13:37:36&quot;,
+  &quot;mode&quot;: &quot;UI-only fixture verification; synthetic admin session and intercepted HTTP 409; NOT authenticated end-to-end or production verification&quot;,
+  &quot;passed&quot;: true,
+  &quot;authenticatedEndToEndVerified&quot;: false,
+  &quot;previewCounts&quot;: {
+    &quot;existingProducts&quot;: 6106,
+    &quot;newNonRangeProducts&quot;: 0,
+    &quot;newCPPTMTRefused&quot;: 0,
+    &quot;priceRows&quot;: 6256,
+    &quot;rejectedRows&quot;: 0
+  },
+  &quot;classificationDifferences&quot;: 1,
+  &quot;difference&quot;: {
+    &quot;itemCode&quot;: &quot;EP-Ganesha&quot;,
+    &quot;storedCategory&quot;: &quot;HW Trading&quot;,
+    &quot;fileCategory&quot;: &quot;SET&quot;,
+    &quot;message&quot;: &quot;classification differs — not changed&quot;
+  },
+  &quot;CSV&quot;: {
+    &quot;dataRows&quot;: 1,
+    &quot;headers&quot;: 11,
+    &quot;completeBothValues&quot;: true
+  },
+  &quot;applyDisabled&quot;: true,
+  &quot;applyPosts&quot;: 0,
+  &quot;realDatabaseWrites&quot;: false,
+  &quot;priceDeltasTested&quot;: false,
+  &quot;editorScopeBrowserRetested&quot;: false,
+  &quot;console&quot;: &quot;Expected fixture 409, blocked telemetry 403 and initial metadata 401; no uncaught JS exception&quot;,
+  &quot;screenshots&quot;: [
+    {
+      &quot;description&quot;: &quot;Fixture-backed duplicate warning dialog after the loader request was intercepted with HTTP 409.&quot;,
+      &quot;id&quot;: &quot;2vfsp2&quot;
+    },
+    {
+      &quot;description&quot;: &quot;Expanded one-row classification difference showing the EP-Ganesha stored and file categories and preview counts.&quot;,
+      &quot;id&quot;: &quot;diul6c&quot;
+    },
+    {
+      &quot;description&quot;: &quot;Bottom of duplicate preview showing Rejected rows (0), duplicate no-Apply text, and disabled Apply/Discard controls.&quot;,
+      &quot;id&quot;: &quot;lv6b29&quot;
+    }
+  ],
+  &quot;limitation&quot;: &quot;Real sign-in could not be completed with available runtime credentials. No password reset or authentication code change was made. Production Range-screen and loader-preview confirmation remains pending publication and authenticated access.&quot;
+}</pre>
+<p>No catalogue or price Apply was performed in either live environment.
+The code and downloads are ready for Steps 2 + 3 together. After user publication, verify the real production Range screen and duplicate-loader preview, record their IST clock times, and repeat the production count/checksum check.</p>
+<h2>Downloads in the bundle</h2><ul><li>development-category-range-review.csv</li><li>development-combined-division-review.csv</li><li>development-classification-differences.csv</li><li>production-category-range-review.csv</li><li>production-combined-division-review.csv</li><li>production-classification-differences.csv</li></ul>
+<p class="muted">All clock times are IST (Asia/Kolkata). The reviewed values remain unchanged.</p></main></html>
