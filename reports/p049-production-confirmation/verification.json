@@ -1,0 +1,124 @@
+{
+  "environment": "production",
+  "reportedIST": "2026-10-03 14:24:13",
+  "readOnlyProductAndPriceChecks": true,
+  "build": {
+    "environment": "production",
+    "auditIST": "2026-10-03 14:03:18",
+    "primaryURL": "https://prayag-price.com/product-db/",
+    "httpStatus": 200,
+    "headers": {
+      "Date": "Sat, 03 Oct 2026 08:33:18 GMT",
+      "Last-Modified": "Sat, 03 Oct 2026 08:19:02 GMT"
+    },
+    "scripts": [
+      {
+        "url": "https://prayag-price.com/product-db/assets/index-vW6wdPD0.js",
+        "bytes": 1136954,
+        "sha256": "1bb55ac80189b399d541bcada6ba0aeb46dcd73fbef495b5c6d1aaf8736460f5",
+        "P049Step3Markers": {
+          "classification differs \u2014 not changed": true,
+          "classificationCounts": true,
+          "master-classification-differs-not-changed.csv": true,
+          "new CP/PTMT product needs a category": false
+        }
+      }
+    ],
+    "gitCommit": "Not exposed by live endpoint or available deployment metadata; workspace HEAD is not proof of deployed commit."
+  },
+  "createProduct": [
+    {
+      "division": "CP Fittings / Faucets",
+      "clockIST": "2026-10-03 14:04:50",
+      "rangeVisible": true,
+      "addVisible": true,
+      "rangeRequired": false
+    },
+    {
+      "division": "CP (QUAA / FERN)",
+      "clockIST": "2026-10-03 14:05:10",
+      "rangeVisible": true,
+      "addVisible": true,
+      "rangeRequired": false
+    },
+    {
+      "division": "PTMT & Plastic Fittings",
+      "clockIST": "2026-10-03 14:05:27",
+      "rangeVisible": true,
+      "addVisible": true,
+      "rangeRequired": false
+    },
+    {
+      "division": "Pipes & Fittings",
+      "clockIST": "2026-10-03 14:05:55",
+      "rangeVisible": false,
+      "addVisible": false,
+      "rangeRequired": false
+    },
+    {
+      "division": "Hardware",
+      "clockIST": "2026-10-03 14:06:14",
+      "rangeVisible": false,
+      "addVisible": false,
+      "rangeRequired": false
+    },
+    {
+      "division": "Ceramic Sanitaryware",
+      "clockIST": "2026-10-03 14:06:32",
+      "rangeVisible": false,
+      "addVisible": false,
+      "rangeRequired": false
+    }
+  ],
+  "visibleCreateLabels": "Range (Optional); no Series field/UI label on tested visible forms. Closed native Category option contents are not displayed labels; their stored names are untouched.",
+  "pipeOpenAndLeave": {
+    "itemCode": "4507",
+    "storedRangeBefore": "SWR Fittings",
+    "storedRangeAfter": "SWR Fittings",
+    "leaveClockIST": "2026-10-03 14:08:59",
+    "afterReadClockIST": "2026-10-03 14:20:49",
+    "changed": false,
+    "leaveAction": "Page-level Back; this form has no Cancel button; all inputs left untouched"
+  },
+  "masterPreview": {
+    "clockIST": "2026-10-03 14:16:36",
+    "existingProducts": 6106,
+    "newProducts": 0,
+    "refusedProducts": 0,
+    "classificationDifferences": 1,
+    "itemCode": "EP-Ganesha",
+    "storedCategory": "HW Trading",
+    "fileCategory": "SET",
+    "message": "classification differs \u2014 not changed",
+    "httpStatus": 409,
+    "applyDisabled": true,
+    "discardDisabled": true,
+    "applyRequests": 0,
+    "normalUIVerified": true,
+    "fixtureUsed": false,
+    "staged": false,
+    "sourceSelectorNote": "Selected available Pipes & Fittings source. The verified workbook hash/sheets identify the authoritative source automatically; the dropdown omits the separate master entry."
+  },
+  "mrpAfterUI": {
+    "audit_ist": "2026-10-03 14:20:49",
+    "rows": "14302",
+    "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+  },
+  "classificationAfterUI": {
+    "clockIST": "2026-10-03 14:20:49",
+    "rows": 7191,
+    "bytes": 360958,
+    "sha256": "5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2",
+    "byteIdentical": true,
+    "baseline": "reports/p049-step-3/production-classification-after.csv",
+    "baselineClockIST": "2026-10-03 13:31:10",
+    "columns": [
+      "item_code",
+      "category",
+      "series_range",
+      "division"
+    ]
+  },
+  "writeActions": "No Apply, Save, Create, Add, Review, Discard or catalogue/price write. Genuine login creates a normal authentication session; telemetry mutation requests were blocked.",
+  "authHandoff": "Temporary session file removed; no credentials or authentication tokens in report/bundle"
+}

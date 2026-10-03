@@ -1,0 +1,67 @@
+{
+  "environment": "production",
+  "genuineAdmin": true,
+  "syntheticAuth": false,
+  "initialPass": {
+    "assignmentId": "a988f178-21cf-4b5d-8f12-1b281c2ff26b",
+    "jobId": "p049-step3-ui:147",
+    "kind": "testing",
+    "name": "p049-step3-ui",
+    "screenshots": [
+      {
+        "description": "PTMT & Plastic Fittings selected in the genuine production Create product form; the visible field caption is Range (Optional) with an Add button, and no Series label is shown.",
+        "id": "uflspd"
+      },
+      {
+        "description": "Production Catalog search confirms code 4507 is Back Flow Valve in SWR Fittings, ₹78.00.",
+        "id": "760x42"
+      },
+      {
+        "description": "Genuine production correction form for selected pipe 4507; fields were left untouched before leaving with Back.",
+        "id": "pci99s"
+      },
+      {
+        "description": "Production Official source dropdown exposes only six division sources and omits the authoritative-master source.",
+        "id": "a0cmaf"
+      },
+      {
+        "description": "After the actual duplicate-safe POST, the production loader form still has the workbook selected, source placeholder unchanged, and Preview upload disabled; no UI duplicate-preview panel rendered.",
+        "id": "1rk086"
+      }
+    ],
+    "status": "completed",
+    "text": "**Production verification mostly completed, but the loader UI flow is blocked by missing source metadata.** This was a genuine production session: the real cookie-authenticated `/api/auth/user` returned HTTP 200, `role: admin`, `mustChangePassword: false`. No auth response was mocked, no credentials were exposed, and no application code or database was changed.\n\n**Range checks (IST, 3 Oct 2026):**\n- CP Fittings / Faucets — Range and its Add control visible; Range optional; 2:04:50 pm.\n- CP (QUAA / FERN) — Range and Add visible; optional; 2:05:10 pm.\n- PTMT & Plastic Fittings — Range and Add visible; optional; 2:05:27 pm.\n- Pipes & Fittings — Range input/Add/label absent; Review and confirm disabled; 2:05:55 pm.\n- Hardware — Range input/Add/label absent; Review and confirm disabled; 2:06:14 pm.\n- Ceramic Sanitaryware — Range input/Add/label absent; Review and confirm disabled; 2:06:32 pm.\n\nThe visible caption is **Range (Optional)**, not “Series”; the PTMT screenshot shows the Range control and Add button. A broad body-text search matched “Series” from Category option text in the closed native selector, not the displayed Range field label.\n\n**Pipe check:** Catalog search found code **4507**, Back Flow Valve, Pipes & Fittings · SWR Fittings, ₹78.00. The correction form showed blank new-price and remarks fields, disabled Review, and no Range field; no input was changed. There was no form-level Cancel control, so I left unchanged using the page-level Back control at **2:08:59 pm IST** (form state recorded at 2:08:49 pm). No save/preview occurred.\n\n**Duplicate endpoint check:** The selected workbook’s browser-computed SHA matched `e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e`; both dates were `2026-10-03`. One real production POST to `/api/catalog/load-mrp` using the parent-confirmed source ID 428 returned **409**: “This authoritative master has already been loaded.” The response reported one duplicate match and a preview with **6,106 product rows, 6,256 price rows, 0 new non-Range products, 0 refused CP/PTMT products, 1 classification difference, and 0 rejected rows**. The difference was EP-Ganesha, stored `HW Trading`, file `SET`, exact message `classification differs — not changed`. The response also reported 13 immediate price changes; I did not inspect individual price deltas.\n\n**Blocking production UI issue:** The cookie-authenticated `GET /api/catalog/mrp-sources` returned 200 but only six source entries; none matched ID 428 or sheet ID `authoritative-master-2026-09-01`. The visible Official source selector likewise offers only the six division-specific sources, omitting the authoritative master. With the correct workbook attached, **Preview upload remained disabled**, so the actual 409 could not be produced through the normal form and the page did not render its duplicate-preview panel. I used the one parent-authorized, guarded direct POST to verify the real endpoint; this does **not** verify the frontend 409 branch in production. Apply was absent (button count 0); no Apply POST occurred (guard log 0). All other mutation requests were blocked; only blocked `/api/activity/events` telemetry POSTs were observed (403). No Save/Create/Add/Discard action was taken and the duplicate response did not stage a batch.\n\nBrowser console errors were expected 403s from blocked telemetry and the expected 409 duplicate response; earlier unauthenticated raw GETs returned 401 before the genuine `sid` cookie was installed, after which auth and metadata GETs returned 200. No uncaught JavaScript error was observed. The direct preview was recorded at **2:12:07 pm IST**; final no-Apply audit at **2:12:27 pm IST**. Parent’s private session file was not read with a content-printing tool or deleted.",
+    "verdict": "failure"
+  },
+  "focusedFollowup": {
+    "assignmentId": "06cf1eed-0ba7-4e36-b1bc-ea861f872210",
+    "jobId": "p049-step3-ui:151",
+    "kind": "testing",
+    "name": "p049-step3-ui",
+    "screenshots": [
+      {
+        "description": "Expanded real production classification panel after the standard UI POST: counters 6,106 / 0 / 0 and the sole EP-Ganesha row, stored HW Trading versus file SET, marked not changed.",
+        "id": "7ht4v0"
+      },
+      {
+        "description": "After closing only the duplicate warning, the real preview notice is visible and both Discard preview and Apply preview are disabled.",
+        "id": "fnuuuj"
+      },
+      {
+        "description": "Separate unsubmitted Pipes & Fittings / SWR Fittings form: no Range control, temporary test-only values, and Review and confirm enabled; it was not clicked.",
+        "id": "ykann1"
+      },
+      {
+        "description": "Range-capable PTMT form visibly labels the optional control Range (Optional) and shows Add; no Series field label is visible.",
+        "id": "uflspd"
+      },
+      {
+        "description": "Earlier unchanged pipe-4507 correction view; fields were left blank and the page-level Back control was used to leave.",
+        "id": "pci99s"
+      }
+    ],
+    "status": "completed",
+    "text": "**Follow-up passed: the normal production UI completed the duplicate-safe preview using an available source.** In the retained genuine admin context, I selected the existing `Pipes & Fittings` source (sourceId 1), kept the same v2 workbook and `2026-10-03` dates, reverified its SHA-256, and clicked **Preview upload once**. The standard form POST returned **409** at **3 Oct 2026, 2:16:36 pm IST**. The page rendered “Identical file detected”; I closed only that warning.\n\nThe expanded rendered classification panel showed **6,106 existing products / 0 new non-Range products / 0 refused new CP/PTMT products**, with exactly **one** difference: `EP-Ganesha category`, exact status **“classification differs — not changed”**; stored Category `HW Trading`, file Category `SET`. Stored Division was Hardware; the file had no Range, so the hidden value remained kept. `Apply preview` and `Discard preview` were disabled; no Apply/Discard request was sent. The guarded-request log contains exactly one allowed MRP loader POST (the form POST with sourceId 1), and zero Apply requests.\n\nThis resolves the apparent blocker: the Official source list still omits master source 428, but using the regular, existing Pipes & Fittings selection lets the normal form proceed; per the supplied handler inspection, the master is recognized by workbook hash/sheets, not that selected sourceId. I therefore regard the missing master option as a **source-selector UX limitation, not a blocker**. The expected duplicate-before-staging response was rendered in the UI. Parent can proceed with the planned fresh catalogue/MRP comparison; I did not perform it.\n\nI also completed the conditional non-Range check on a separate page in the same session: selected Pipes & Fittings / existing SWR Fittings, entered only clearly temporary `UI-ONLY-NOSUBMIT-20261003` form values, and confirmed **Review and confirm becomes enabled with no Range control**. I did not click Review; the values remain only as unsaved form state, and no product was created. The visible form label on Range-capable divisions is `Range (Optional)`; I checked rendered UI, not the contents of closed native options, and made no category/name changes.\n\nThe earlier pipe-4507 check remains unchanged: Back Flow Valve / SWR Fittings, current MRP ₹78, blank correction fields, and no form-level Cancel; I exited using the page-level **Back** control at **2:08:59 pm IST**. No price was changed. No Save, Add, Review, Apply, or Discard action was taken. Browser resource errors were 403s from blocked `/api/activity/events` telemetry, plus the expected 409 duplicate response; no uncaught JavaScript error was observed. No app/database/workflow changes were made.",
+    "verdict": "success"
+  }
+}

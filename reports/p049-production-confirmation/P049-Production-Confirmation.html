@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P049 Steps 2 + 3 — production confirmation</title>
+<style>body{font:15px/1.6 system-ui,sans-serif;color:#172431;background:#f4f6f8}main{max-width:1050px;margin:30px auto;padding:32px;background:white;border-radius:12px}table{border-collapse:collapse;width:100%;font-size:13px;margin:18px 0}th,td{border:1px solid #dce2e8;padding:10px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#edf3f6}.notice{padding:15px;border-left:4px solid #267648;background:#edf7ef}code{overflow-wrap:anywhere}h2{margin-top:30px}@media(max-width:700px){main{margin:0;padding:16px}table{display:block;overflow:auto}}</style>
+<main><p>PRODUCTION · 3 October 2026 · All times IST · Reported 2026-10-03 14:24:13</p>
+<h1>P049 Steps 2 + 3 — production confirmation</h1>
+<p class="notice">Real signed-in admin browser verification. No synthetic authentication, mock preview or Apply.
+No product, classification or price was saved. The before/after catalogue bytes and exact MRP value checksum match.</p>
+<h2>1. Live build/version</h2><p>At 2026-10-03 14:03:18 IST, <code>https://prayag-price.com/product-db/</code> returned HTTP 200.
+Live frontend build version: <strong>index-vW6wdPD0.js</strong>.</p>
+<p>Asset SHA-256: <code>1bb55ac80189b399d541bcada6ba0aeb46dcd73fbef495b5c6d1aaf8736460f5</code>. The live bundle contains the Step 3 classification-preview markers.
+The deployment service reports a successful live build. A deployed Git commit is not exposed by the available live endpoint/metadata;
+workspace HEAD is not substituted for a verified deployed commit. This asset fingerprint identifies the checked live frontend version.</p>
+<h2>2. Genuine admin Create New Product</h2>
+<table><thead><tr><th>Exact division</th><th>Check clock IST</th><th>Range</th><th>Range Add</th><th>Required</th></tr></thead><tbody><tr><td>CP Fittings / Faucets</td><td>2026-10-03 14:04:50</td><td>visible</td><td>visible</td><td>no</td></tr><tr><td>CP (QUAA / FERN)</td><td>2026-10-03 14:05:10</td><td>visible</td><td>visible</td><td>no</td></tr><tr><td>PTMT &amp; Plastic Fittings</td><td>2026-10-03 14:05:27</td><td>visible</td><td>visible</td><td>no</td></tr><tr><td>Pipes &amp; Fittings</td><td>2026-10-03 14:05:55</td><td>hidden</td><td>hidden</td><td>no</td></tr><tr><td>Hardware</td><td>2026-10-03 14:06:14</td><td>hidden</td><td>hidden</td><td>no</td></tr><tr><td>Ceramic Sanitaryware</td><td>2026-10-03 14:06:32</td><td>hidden</td><td>hidden</td><td>no</td></tr></tbody></table>
+<p>The displayed field is <strong>Range (Optional)</strong>; no Series UI label appeared on the tested visible create forms.
+Closed native Category option text can contain existing catalogue names; those unshown names were not renamed.
+An unsubmitted Pipes &amp; Fittings form also enabled Review with no Range, confirming it did not require Range.
+Review was not clicked and no product was created.</p>
+<h2>Existing pipe — unchanged</h2><p>Code <strong>4507</strong> was opened with its stored <code>series_range = SWR Fittings</code>.
+All inputs were left untouched. The form has no Cancel control, so the page-level <strong>Back</strong> control was used to leave at
+<strong>14:08:59 IST</strong>. At 2026-10-03 14:20:49 IST the stored value was still <code>SWR Fittings</code>,
+and the entire catalogue snapshot matched the pre-check and 13:31:10 baseline.</p>
+<h2>3. Real current-master UI preview — no Apply</h2><p>At <strong>14:16:36 IST</strong>, the standard production form uploaded the unchanged v2 workbook and received the
+duplicate-before-staging HTTP 409 response. Closing only the warning exposed the real classification panel.</p>
+<table><thead><tr><th>Environment</th><th>Clock IST</th><th>Existing</th><th>New</th><th>Refused</th><th>Classification differences</th></tr></thead><tbody><tr><td>production</td><td>2026-10-03 14:16:36</td><td>6106</td><td>0</td><td>0</td><td>1</td></tr></tbody></table>
+<p>The sole difference is <strong>EP-Ganesha</strong>: stored Category <strong>HW Trading</strong>, file Category <strong>SET</strong>;
+exact status <strong>classification differs — not changed</strong>. Apply and Discard were disabled and no Apply request was sent.
+The master source is absent from the source dropdown, but choosing the existing Pipes &amp; Fittings option permits the actual standard flow;
+the backend recognizes the authoritative workbook itself. No source was added or form/response mocked.</p>
+<h2>4. Production MRP after all browser checks</h2>
+<table><thead><tr><th>Environment</th><th>Read clock IST</th><th>History rows</th><th>Value SHA-256</th></tr></thead><tbody><tr><td>production</td><td>2026-10-03 14:20:49</td><td>14302</td><td>e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458</td></tr></tbody></table>
+<p>Exact Step 2 value-only definition, including every variant. Count and checksum also matched before the browser checks.</p>
+<h2>5. Byte-identical catalogue snapshot</h2>
+<table><thead><tr><th>Environment</th><th>Post-browser clock IST</th><th>Baseline clock IST</th><th>Rows</th><th>Bytes</th><th>Result</th></tr></thead><tbody><tr><td>production</td><td>2026-10-03 14:20:49</td><td>2026-10-03 13:31:10</td><td>7191</td><td>360958</td><td>byte-identical</td></tr></tbody></table>
+<p>Snapshot SHA-256: <code>5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2</code>.
+Comparison covers item_code, category, series_range and division in the identical CSV field order and bytewise code order.
+The bundle includes the exact baseline, before-browser and after-browser snapshots.</p>
+<p>No application code, workflow or database schema was changed. The private temporary authentication handoff file was removed;
+the bundle contains no authentication tokens or credentials. Normal login/session handling is separate from product/price writes.</p></main></html>

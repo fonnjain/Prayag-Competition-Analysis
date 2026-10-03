@@ -1,0 +1,24 @@
+{
+  "environment": "production",
+  "auditIST": "2026-10-03 14:03:18",
+  "primaryURL": "https://prayag-price.com/product-db/",
+  "httpStatus": 200,
+  "headers": {
+    "Date": "Sat, 03 Oct 2026 08:33:18 GMT",
+    "Last-Modified": "Sat, 03 Oct 2026 08:19:02 GMT"
+  },
+  "scripts": [
+    {
+      "url": "https://prayag-price.com/product-db/assets/index-vW6wdPD0.js",
+      "bytes": 1136954,
+      "sha256": "1bb55ac80189b399d541bcada6ba0aeb46dcd73fbef495b5c6d1aaf8736460f5",
+      "P049Step3Markers": {
+        "classification differs \u2014 not changed": true,
+        "classificationCounts": true,
+        "master-classification-differs-not-changed.csv": true,
+        "new CP/PTMT product needs a category": false
+      }
+    }
+  ],
+  "gitCommit": "Not exposed by live endpoint or available deployment metadata; workspace HEAD is not proof of deployed commit."
+}

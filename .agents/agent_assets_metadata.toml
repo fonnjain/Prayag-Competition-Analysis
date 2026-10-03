@@ -669,3 +669,31 @@ mtime_ms = 1791015971009
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/356f9549-6589-43c1-a1df-52b215ccb113/89639191-1ea4-448e-8ced-b7ddeb912916"
 storage_version_token = "1791016019669402"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "83A_L2CIK8jaiULQ4Lshl"
+uri = "file://reports/p049-production-confirmation/P049-Production-Confirmation.html"
+type = "html"
+title = "P049 Steps 2 + 3 — production confirmation"
+description = "Real admin UI checks with IST times, live build fingerprint, duplicate-only preview, unchanged pipe value and exact catalogue/MRP proofs."
+logical_id = "f43331a7-4166-4c8d-a246-9a0a50195e5f"
+content_hash = "sha256:4296043eecf9919faddb34d65f0e3ba1d825602294dba59e37db839faea9a6e9"
+size = 5954
+mtime_ms = 1791017653836
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/f43331a7-4166-4c8d-a246-9a0a50195e5f/7d3b2fe4-9e11-49c9-9f37-ed6f72b53dbc"
+storage_version_token = "1791017675416166"
+content_type = "text/html"
+
+[[outputs]]
+id = "Xvx_QVHiUVxg4QQmI4HTN"
+uri = "file://reports/p049-production-confirmation/P049-Production-Confirmation.zip"
+type = "unspecified"
+title = "P049 production — evidence bundle"
+description = "13:31 baseline and post-browser catalogue snapshots, MRP checksum results, live version fingerprint and genuine browser verification. No credentials or tokens."
+logical_id = "36b36c39-3c3e-4169-82de-b1237942d426"
+content_hash = "sha256:932d95c3ce6f0b35d838d198f9fc4a731b901622604e025baf48d4954cbe0e29"
+size = 97113
+mtime_ms = 1791017653848
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/36b36c39-3c3e-4169-82de-b1237942d426/61ad948c-4748-48af-8b8b-fd42308fc969"
+storage_version_token = "1791017676807436"
+content_type = "application/octet-stream"
