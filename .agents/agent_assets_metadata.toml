@@ -823,3 +823,45 @@ mtime_ms = 1791029256189
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/3f64823c-0dec-4911-b10b-ce5465fca482/14ee19e0-e11b-4830-aa8e-4f4b29e2cdd7"
 storage_version_token = "1791029260521809"
 content_type = "text/csv"
+
+[[outputs]]
+id = "kPLB4RUg9UasNXLe1I8ap"
+uri = "file://reports/p052/price-period-followups/P052-Price-Period-Report.txt"
+type = "text"
+title = "P052 price-period follow-up report"
+description = "63 fitting codes compared with the authoritative master; every PEXI and Silent period and source, with no changes or flag clearing."
+logical_id = "8eab968e-f0ed-4244-9478-a447b8404d84"
+content_hash = "sha256:adbe652d026dbed89c43da9c98375ebec5f99d6a934dd2753b0ca43499b302c8"
+size = 9454
+mtime_ms = 1791029772916
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8eab968e-f0ed-4244-9478-a447b8404d84/01a3e390-1c40-499e-b026-e947b93c2ba6"
+storage_version_token = "1791029774838671"
+content_type = "text/plain"
+
+[[outputs]]
+id = "Fhz6KyM1nh10c6jyqYNN6"
+uri = "file://reports/p052/price-period-followups/fitting-63-price-period-check.csv"
+type = "table"
+title = "All 63 fittings — August row and master comparison"
+description = "58 have August rows; five have only February-dated history but already quote the revised amounts."
+logical_id = "8279fa40-7918-4881-9761-3ee1b64bb1a1"
+content_hash = "sha256:fc68395b48dae87c6f2c082ba8b42b90bc53546775a24f8595975751fed93a04"
+size = 21720
+mtime_ms = 1791029773028
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8279fa40-7918-4881-9761-3ee1b64bb1a1/5f096b1d-718a-4611-8f0f-f03e33c8049a"
+storage_version_token = "1791029776181219"
+content_type = "text/csv"
+
+[[outputs]]
+id = "hvEKEcuUgep0ssSkWBfzD"
+uri = "file://reports/p052/price-period-followups/pexi-and-silent-all-stored-history.csv"
+type = "table"
+title = "PEXI and Silent Fittings — complete stored history"
+description = "All 25 stored rows for the ten codes, including prices, periods, full source filenames and load-batch provenance."
+logical_id = "509fc430-d41f-4aa5-b816-26a1089a6ee6"
+content_hash = "sha256:72b025727fc374978abb096019c59900e7ea8035b39b0160c867c21001eee302"
+size = 8459
+mtime_ms = 1791029773162
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/509fc430-d41f-4aa5-b816-26a1089a6ee6/5ef0acf4-ab92-4879-947b-4a1738b8d9f0"
+storage_version_token = "1791029777689032"
+content_type = "text/csv"

@@ -47,3 +47,4 @@
 - [Disposable SQL advisory locks](disposable-advisory-lock-tests.md) — private schemas share database-wide application locks; serialize suites that exercise the same locks.
 - [Production browser authentication](production-browser-auth-handoff.md) — notebook secrets may be unavailable; use a genuine private ephemeral session handoff, never synthetic auth.
 - [Production catalogue safety](production-catalogue-safety.md) — seed/reset prohibition is a production acceptance requirement; distinguish real no-write previews from staging, replay and fixtures.
+- [Source-price conflict interpretation](source-price-conflict-interpretation.md) — legacy flags can compare old/new revisions; PEXI unit changes require an explicit Prayag ruling.

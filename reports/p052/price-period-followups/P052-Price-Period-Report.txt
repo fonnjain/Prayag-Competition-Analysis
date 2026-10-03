@@ -1,0 +1,116 @@
+P052 — PRODUCTION PRICE-PERIOD FOLLOW-UPS (READ-ONLY)
+Production snapshot: 2026-10-03 17:43:58 IST, 3 October 2026.
+No application or database changes, imports, corrections, price-unit conversions or flag clearing. The conflict register was read only and contains 74 records.
+Master comparison source: attached_assets/Prayag_MRP_Authoritative_v2_01Sep2026_1788789774300.xlsx, products sheet. The row's mrp, effective_date, previous_mrp and status_note were compared separately. No assumption that the status-note revision date equals the structured effective_date.
+
+1. THE 63 UPVC / PE-AL-PE CONFLICT CODES
+Scope: 58 UPVC Fittings codes and 5 PE-AL-PE Fittings codes from the original conflict list. All 63 currently quote the authoritative master's revised MRP amount.
+- All 58 UPVC codes hold approved Standard rows dated 2026-08-10. Their August-row MRP and current quoted MRP match the master. All 58 current effective dates are 2026-08-10.
+- All 5 PE-AL-PE codes have no 2026-08-10 row and no history row of any variant/status/date after 2026-02-01. Their current effective date is 2026-02-01.
+- IMPORTANT: these five are NOT quoting the superseded previous amounts today. Their February-dated rows already contain the master's revised August figures. They are missing a separate August period, not the revised amount.
+The authoritative workbook itself dates these five rows 2026-02-01 while its status note says "Revised on 10th Aug, 2026". This is an explicit source-date inconsistency, not evidence that today's price is old. Nothing was corrected or re-dated.
+
+No-row-after-Feb list:
+Code | Current effective date | Current MRP | Master's August revision figure | Master's previous MRP | Master sheet row
+PEA-45B | 2026-02-01 | 2640 | 2640 | 1549 | 4755
+PEA-46B | 2026-02-01 | 4440 | 4440 | 3199 | 4757
+PEA-55B | 2026-02-01 | 3440 | 3440 | 1744 | 4776
+PEA-56B | 2026-02-01 | 6460 | 6460 | 3878 | 4778
+PEA-65B | 2026-02-01 | 4460 | 4460 | 2424 | 4786
+Each of these five current rows is approved Standard and linked to load batch 17, source Prayag_MRP_Authoritative_v2_01Sep2026.xlsx.
+Full 63-code result is in fitting-63-price-period-check.csv, including exact August-row presence, post-February presence, current price/date, master row/date/note and comparison result.
+
+2. PEXI — ALL STORED PERIODS AND PRICES
+Every requested PEXI code has EXACTLY ONE stored history row. All are approved Standard, current, price_basis=MRP, net_price=NULL, effective date 2026-02-01. Product name is "6 METER". Each row is sourced to Prayag_MRP_Authoritative_v2_01Sep2026.xlsx, load batch 17. The latest authoritative master carries the same amounts/date and calls them unchanged.
+Code | Stored effective date | Stored MRP | Rejected value in historical conflict | Rejected / stored
+XPET20 | 2026-02-01 | 62 | 456 | 7.3548
+XPET25 | 2026-02-01 | 84 | 552 | 6.5714
+XPET32 | 2026-02-01 | 114 | 798 | 7.0000
+XPET40 | 2026-02-01 | 164 | 996 | 6.0732
+XPET50 | 2026-02-01 | 212 | 1272 | 6.0000
+The stored source_file and batch file_name are both Prayag_MRP_Authoritative_v2_01Sep2026.xlsx. Batch 17 was loaded 2026-09-07 18:23:07.820378 IST; its downloaded_at is 2026-09-07. These are batch provenance clocks, not effective-price dates or proof of row creation time.
+No other stored PEXI period exists for these five codes. Ratios are not uniformly six: only XPET50 is exactly 6x. The product name and conflicting values cannot establish whether the quotation unit is per metre or per pipe. A Prayag ruling is required; no conversion, adjustment or unit relabeling was performed.
+
+3. SILENT FITTINGS — ALL STORED PERIODS
+Each requested Silent Fittings code has EXACTLY FOUR stored rows, all approved Standard MRP with net_price=NULL. The latest/current period for each is 2026-05-01.
+Code | 2025-04-01 | 2025-07-01 | 2026-02-01 | 2026-05-01 (current)
+PSS1133 | 901 | 453 | 727.64 | 940.8
+PSS1633 | 2600 | 1210 | 1375.24 | 1671.6
+PSS4041 | 228 | 78 | 116.3 | 164.6
+PSS5041 | 325 | 98 | 169.2 | 230.6
+PSS7541 | 582 | 242 | 311.44 | 416.6
+All five fall from April to July 2025, then rise in February and May 2026. The July drop ranges from approximately 49.7% to 69.8%; it is not uniformly a halving. No inference that any period is incorrect is made.
+Source provenance for every code follows the same pattern:
+- 2025-04-01 and 2025-07-01: source_file Prayag_MRP_AllPeriods_Rebuild.xlsx::MRP w.e.f. 01st Feb, 2026 Pipe & Fitting.xlsx::SILENT FITTINGS; load batch 1.
+- 2026-02-01: source_file Prayag_MRP_AllPeriods_Rebuild.xlsx::MRP w.e.f. 01st Feb, 2026 Pipe & Fitting.xlsx::MASTER; load batch 1.
+- 2026-05-01: source_file Prayag_MRP_Authoritative_v2_01Sep2026.xlsx; load batch 17.
+Batch 1 file_name: MRP w.e.f. 01st Feb, 2026 Pipe & Fitting.xlsx. Downloaded 2026-08-19; loaded 2026-08-19 15:43:08.619 IST. These batch timestamps do not change the historical effective dates.
+The complete 25-row PEXI/Silent history export contains every stored row, full source_file and batch_file_name, provenance, prices, status and current flags.
+
+4. COMPLETE FITTING CODE LIST
+Code | Category | Current effective date | Current MRP | August 10 row? | Master revision MRP | Master structured effective date
+PEA-45B | PE-AL-PE Fittings | 2026-02-01 | 2640 | NO | 2640 | 2026-02-01
+PEA-46B | PE-AL-PE Fittings | 2026-02-01 | 4440 | NO | 4440 | 2026-02-01
+PEA-55B | PE-AL-PE Fittings | 2026-02-01 | 3440 | NO | 3440 | 2026-02-01
+PEA-56B | PE-AL-PE Fittings | 2026-02-01 | 6460 | NO | 6460 | 2026-02-01
+PEA-65B | PE-AL-PE Fittings | 2026-02-01 | 4460 | NO | 4460 | 2026-02-01
+U321 | UPVC Fittings | 2026-08-10 | 98 | YES | 98 | 2026-08-10
+U323 | UPVC Fittings | 2026-08-10 | 138 | YES | 138 | 2026-08-10
+U521 | UPVC Fittings | 2026-08-10 | 98 | YES | 98 | 2026-08-10
+U524 | UPVC Fittings | 2026-08-10 | 196 | YES | 196 | 2026-08-10
+U526 | UPVC Fittings | 2026-08-10 | 94 | YES | 94 | 2026-08-10
+U527 | UPVC Fittings | 2026-08-10 | 196 | YES | 196 | 2026-08-10
+U70 | UPVC Fittings | 2026-08-10 | 178 | YES | 178 | 2026-08-10
+U71 | UPVC Fittings | 2026-08-10 | 178 | YES | 178 | 2026-08-10
+U72 | UPVC Fittings | 2026-08-10 | 278 | YES | 278 | 2026-08-10
+U73 | UPVC Fittings | 2026-08-10 | 388 | YES | 388 | 2026-08-10
+U731 | UPVC Fittings | 2026-08-10 | 184 | YES | 184 | 2026-08-10
+U74 | UPVC Fittings | 2026-08-10 | 648 | YES | 648 | 2026-08-10
+U75 | UPVC Fittings | 2026-08-10 | 726 | YES | 726 | 2026-08-10
+U76 | UPVC Fittings | 2026-08-10 | 1320 | YES | 1320 | 2026-08-10
+U81 | UPVC Fittings | 2026-08-10 | 86 | YES | 86 | 2026-08-10
+U82 | UPVC Fittings | 2026-08-10 | 184 | YES | 184 | 2026-08-10
+U83 | UPVC Fittings | 2026-08-10 | 258 | YES | 258 | 2026-08-10
+U84 | UPVC Fittings | 2026-08-10 | 468 | YES | 468 | 2026-08-10
+U85 | UPVC Fittings | 2026-08-10 | 764 | YES | 764 | 2026-08-10
+U86 | UPVC Fittings | 2026-08-10 | 1048 | YES | 1048 | 2026-08-10
+U920 | UPVC Fittings | 2026-08-10 | 88 | YES | 88 | 2026-08-10
+U930 | UPVC Fittings | 2026-08-10 | 92 | YES | 92 | 2026-08-10
+UH-72 | UPVC Fittings | 2026-08-10 | 920 | YES | 920 | 2026-08-10
+UH-74 | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH-76 | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH-78 | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH-79 | UPVC Fittings | 2026-08-10 | 930 | YES | 930 | 2026-08-10
+UH-80 | UPVC Fittings | 2026-08-10 | 915 | YES | 915 | 2026-08-10
+UH72-S | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH74-S | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH76-S | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH78-S | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH79-S | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH80-S | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH82 | UPVC Fittings | 2026-08-10 | 920 | YES | 920 | 2026-08-10
+UH82-F | UPVC Fittings | 2026-08-10 | 1570 | YES | 1570 | 2026-08-10
+UH82-L | UPVC Fittings | 2026-08-10 | 1560 | YES | 1560 | 2026-08-10
+UH82-S | UPVC Fittings | 2026-08-10 | 915 | YES | 915 | 2026-08-10
+UH84 | UPVC Fittings | 2026-08-10 | 960 | YES | 960 | 2026-08-10
+UH84-F | UPVC Fittings | 2026-08-10 | 1460 | YES | 1460 | 2026-08-10
+UH84-L | UPVC Fittings | 2026-08-10 | 1440 | YES | 1440 | 2026-08-10
+UH84-S | UPVC Fittings | 2026-08-10 | 925 | YES | 925 | 2026-08-10
+UH86 | UPVC Fittings | 2026-08-10 | 960 | YES | 960 | 2026-08-10
+UH86-F | UPVC Fittings | 2026-08-10 | 1540 | YES | 1540 | 2026-08-10
+UH86-L | UPVC Fittings | 2026-08-10 | 1520 | YES | 1520 | 2026-08-10
+UH86-S | UPVC Fittings | 2026-08-10 | 915 | YES | 915 | 2026-08-10
+UH88 | UPVC Fittings | 2026-08-10 | 960 | YES | 960 | 2026-08-10
+UH88-F | UPVC Fittings | 2026-08-10 | 1460 | YES | 1460 | 2026-08-10
+UH88-L | UPVC Fittings | 2026-08-10 | 1440 | YES | 1440 | 2026-08-10
+UH88-S | UPVC Fittings | 2026-08-10 | 915 | YES | 915 | 2026-08-10
+UH89 | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH89-F | UPVC Fittings | 2026-08-10 | 1460 | YES | 1460 | 2026-08-10
+UH89-L | UPVC Fittings | 2026-08-10 | 1440 | YES | 1440 | 2026-08-10
+UH89-S | UPVC Fittings | 2026-08-10 | 915 | YES | 915 | 2026-08-10
+UH90 | UPVC Fittings | 2026-08-10 | 940 | YES | 940 | 2026-08-10
+UH90-F | UPVC Fittings | 2026-08-10 | 1540 | YES | 1540 | 2026-08-10
+UH90-L | UPVC Fittings | 2026-08-10 | 1520 | YES | 1520 | 2026-08-10
+UH90-S | UPVC Fittings | 2026-08-10 | 910 | YES | 910 | 2026-08-10
+
+All findings above are report-only. All 74 conflict records stay as they are.
