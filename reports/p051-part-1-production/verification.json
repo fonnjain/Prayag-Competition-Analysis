@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-03",
+  "timezone": "Asia/Kolkata (IST, UTC+05:30)",
+  "mode": "Read-only production inspection; no Apply, Save, Create, reset, merge or Discard mutation",
+  "overall": "Not a clean confirmation: live admin previews blocked and production reset/seed prohibition absent",
+  "liveBuild": {
+    "bytes": 1140162,
+    "clockIST": "2026-10-03 15:50:10",
+    "containsSpellingPreview": false,
+    "file": "/product-db/assets/index-DYlg6lvu.js",
+    "htmlStatus": 200,
+    "sha256": "a9606cc16eac14e7c6f80bebf4b570216f25ca09c0f88447ed0233713c9ea3ea",
+    "status": 200,
+    "url": "https://prayag-price.com/product-db/assets/index-DYlg6lvu.js"
+  },
+  "clientMarkers": {
+    "categorySpellingFingerprint": true,
+    "categorySpellings": true,
+    "clockIST": "2026-10-03 15:50:43",
+    "previewChunks": [],
+    "willWrite": true
+  },
+  "adminAuth": {
+    "loginClockIST": "2026-10-03 15:52:28",
+    "loginHTTP": 401,
+    "browserClockIST": "2026-10-03 15:54:19",
+    "authenticated": false,
+    "admin": false,
+    "syntheticAuthUsed": false
+  },
+  "categoryPreview": {
+    "status": "NOT performed",
+    "reason": "No genuine admin session; single preview persists newProductPreviewStatesTable and bulk preview persists mrpPendingBatchesTable. Single preview also requires a registered Category, so a novel Category cannot be previewed on that path without registration.",
+    "candidateEvidenceClockIST": "2026-10-03 15:50:13",
+    "division": "CP Fittings / Faucets",
+    "input": "blaze 62",
+    "candidates": [
+      {
+        "category": "Blaze 62",
+        "activeProducts": 36,
+        "totalProducts": 36
+      },
+      {
+        "category": "BLAZE 62",
+        "activeProducts": 2,
+        "totalProducts": 4
+      }
+    ],
+    "policyPreferredSpelling": "Blaze 62",
+    "renderedPreviewVerified": false,
+    "newCategoryRenderedVerified": false
+  },
+  "master": {
+    "clockIST": "2026-10-03 15:56:52",
+    "mode": "Offline pure planner over production read-only CSV; NOT a live admin/API preview",
+    "sourceSHA256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+    "existing": 6106,
+    "newProducts": 0,
+    "refused": 0,
+    "classificationDifferences": [
+      {
+        "itemCode": "EP-Ganesha",
+        "message": "classification differs — not changed",
+        "differingFields": [
+          "category"
+        ],
+        "stored": {
+          "division": "Hardware",
+          "category": "HW Trading",
+          "seriesRange": null
+        },
+        "file": {
+          "division": "Hardware",
+          "category": "SET",
+          "seriesRange": null,
+          "categoryProvided": true,
+          "rangeProvided": false
+        }
+      }
+    ]
+  },
+  "masterLivePreview": {
+    "status": "NOT performed",
+    "reason": "No genuine admin session",
+    "browserReport": "Cannot proceed to a production preview because no genuine production admin session is available. I removed the prior fixture route interception and checked the only open browser page; it was the Product Database development artifact, not `prayag-price.com`. The real read-only request to `https://prayag-price.com/api/auth/user` returned HTTP 200 with no authenticated user (`authenticated: false`, `admin: false`) at **15:54:19 IST**. I did not retry credentials, inspect session storage/DB, create or reset an account, or issue any preview or mutation request. Therefore I could not verify the production duplicate-preview response or capture the requested production screenshot.",
+    "verifiedSourceClockIST": "2026-10-03 15:52:29",
+    "sheetId": "authoritative-master-2026-09-01",
+    "sourceExists": true,
+    "alreadyAppliedHash": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e"
+  },
+  "seedReset": {
+    "sourceInspectionClockIST": "2026-10-03 15:54:52",
+    "status": "Production-specific block NOT present",
+    "resetRoute": "artifacts/api-server/src/routes/catalog.ts: POST /catalog/reset",
+    "existingGates": [
+      "requireAdmin",
+      "categorySpellingFingerprint"
+    ],
+    "gatesDoNotProhibitProduction": true,
+    "seedFunction": "artifacts/api-server/src/lib/catalogSeed.ts: loadCatalogSeed",
+    "startupCaller": "artifacts/api-server/src/index.ts -> seedCatalogIfEmpty -> loadCatalogSeed when catalogue empty",
+    "resetScreen": "artifacts/prayag-product-db/src/pages/data-health.tsx",
+    "resetInvoked": false,
+    "seedInvoked": false,
+    "notes": "Current non-empty catalogue skips startup seed; this is not an environment-level production prohibition. The pre-existing duplicate competitor seed failure is not a reliable production guard."
+  },
+  "disabledHelpers": {
+    "inspectionClockIST": "2026-10-03 15:54:52",
+    "files": [
+      {
+        "file": ".local/reload-verified.mjs",
+        "mechanism": "Top-level Error before module requirements/database work",
+        "configuredJobOrScreenCaller": "None found; only guard-test/gitignore references"
+      },
+      {
+        "file": ".local/erase_and_load_sparsh.py",
+        "mechanism": "Top-level RuntimeError before reading rows or emitting destructive SQL",
+        "configuredJobOrScreenCaller": "None found; only guard-test/gitignore references"
+      }
+    ],
+    "productionPackaging": ".replitignore excludes .local; deployment commands do not invoke these scripts",
+    "historicalCalls": "Not established by this source/configuration audit",
+    "otherRemovedBehavior": "Existing-product metadata backfill removed from persistParsedRows in artifacts/api-server/src/routes/catalogImportExport.ts; the generic loader itself was not disabled."
+  },
+  "data": {
+    "mrpClockIST": "2026-10-03 15:48:44",
+    "mrpRows": 14302,
+    "mrpSHA256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458",
+    "classificationReadStartedIST": "2026-10-03 15:48:48",
+    "catalogueRows": 7191,
+    "classificationBytes": 360958,
+    "classificationSHA256": "5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2",
+    "classificationBaselineClockIST": "2026-10-03 14:20:49",
+    "classificationBaseline": "reports/p049-production-confirmation/production-classification-after-ui.csv",
+    "classificationByteIdentical": true
+  },
+  "requestSafety": "All production database operations were SELECT queries. Only one unsuccessful authentication POST was attempted; no business/staging mutations or production preview POSTs were issued."
+}

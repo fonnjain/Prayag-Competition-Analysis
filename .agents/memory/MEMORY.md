@@ -46,3 +46,4 @@
 - [Category merge boundary](category-merge-boundary.md) — Category merges require reviewed approval and a Sales-side effect check; prevention guards never merge stored spellings.
 - [Disposable SQL advisory locks](disposable-advisory-lock-tests.md) — private schemas share database-wide application locks; serialize suites that exercise the same locks.
 - [Production browser authentication](production-browser-auth-handoff.md) — notebook secrets may be unavailable; use a genuine private ephemeral session handoff, never synthetic auth.
+- [Production catalogue safety](production-catalogue-safety.md) — seed/reset prohibition is a production acceptance requirement; distinguish real no-write previews from staging, replay and fixtures.

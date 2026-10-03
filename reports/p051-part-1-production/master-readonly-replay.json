@@ -1,0 +1,29 @@
+{
+  "clockIST": "2026-10-03 15:56:52",
+  "mode": "Offline pure planner over production read-only CSV; NOT a live admin/API preview",
+  "sourceSHA256": "e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e",
+  "existing": 6106,
+  "newProducts": 0,
+  "refused": 0,
+  "classificationDifferences": [
+    {
+      "itemCode": "EP-Ganesha",
+      "message": "classification differs — not changed",
+      "differingFields": [
+        "category"
+      ],
+      "stored": {
+        "division": "Hardware",
+        "category": "HW Trading",
+        "seriesRange": null
+      },
+      "file": {
+        "division": "Hardware",
+        "category": "SET",
+        "seriesRange": null,
+        "categoryProvided": true,
+        "rangeProvided": false
+      }
+    }
+  ]
+}

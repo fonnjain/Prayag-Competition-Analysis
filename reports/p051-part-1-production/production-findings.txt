@@ -1,0 +1,47 @@
+P051 Part 1 — production read-only findings
+Date: 2026-10-03. All clocks IST (UTC+05:30).
+Overall: NOT a clean confirmation. Data preserved; live admin previews blocked; production seed/reset prohibition missing.
+
+1. Live Product Database build — fetched 15:50:10 IST
+File: /product-db/assets/index-DYlg6lvu.js
+HTTP: 200
+SHA-256: a9606cc16eac14e7c6f80bebf4b570216f25ca09c0f88447ed0233713c9ea3ea
+P051 categorySpellings/categorySpellingFingerprint client markers observed at 15:50:43 IST.
+This is the publicly fetched frontend build, not a claimed server executable checksum.
+
+2. Genuine admin spelling previews — NOT performed
+Configured credentials returned HTTP 401 at 15:52:28 IST.
+Real browser auth-user request returned no authenticated user at 15:54:19 IST; no fixture/synthetic authentication used.
+Production data at 15:50:13 IST: exact division CP Fittings / Faucets; Blaze 62 = 36 active / 36 total; BLAZE 62 = 2 active / 4 total. The policy prefers Blaze 62 for input blaze 62, but its rendered live preview was NOT verified.
+Made-up Category/new rendered preview: NOT verified.
+Single new-product preview inserts approval-token state and rejects an unregistered Category. Bulk new-products preview inserts a pending batch. These were not invoked under the read-only instruction. No stage existed to discard; no Discard mutation was sent.
+
+3. Current master — offline read-only replay at 15:56:52 IST
+6106 existing / 0 new / 0 refused / 1 classification difference.
+Difference: EP-Ganesha; stored HW Trading versus file SET; classification differs — not changed.
+Workbook SHA-256: e4463266dffdb44b5ae0c10ba5150cc786f6ea21e65619fab2dd57846e4fe23e.
+Current planner ran only over the production CSV snapshot read starting 15:48:48 IST. This is NOT a live admin/API preview.
+Read-only preflight at 15:52:29 IST confirmed the existing authoritative source and applied source hash, so the duplicate preview branch would return before staging. No POST was issued because no genuine admin session was available.
+
+4. Production seed/reset prohibition — NOT enforced; source inspection 15:54:52 IST
+artifacts/api-server/src/routes/catalog.ts: POST /catalog/reset requires admin plus categorySpellingFingerprint, but no production-specific rejection.
+artifacts/api-server/src/lib/catalogSeed.ts: loadCatalogSeed has no production prohibition.
+artifacts/api-server/src/index.ts invokes seedCatalogIfEmpty; it can seed when the catalogue is empty. The non-empty current catalogue only prevents this startup condition now; it is not a production safety block.
+artifacts/prayag-product-db/src/pages/data-health.tsx still supplies the Reset Catalog screen action.
+A duplicate competitor seed error is not a reliable environment guard. No reset/seed was invoked to test this.
+
+5. Disabled helpers — inspected 15:54:52 IST
+.local/reload-verified.mjs: top-level Unsupported Error before database work.
+.local/erase_and_load_sparsh.py: top-level Unsupported RuntimeError before input reading or SQL generation.
+No configured workflow, scheduled job, application screen or deployment command caller was found for either helper; references are the guard test and narrow gitignore exceptions. Historical execution was not established by this source/configuration audit.
+.replitignore excludes .local from publishing.
+Separately, the existing-product metadata-backfill branch in persistParsedRows (artifacts/api-server/src/routes/catalogImportExport.ts) was removed. The normal loader remains enabled; it is not a disabled helper.
+
+6. Production data
+MRP query at 15:48:44 IST: 14302 rows; expected SHA-256 matched exactly:
+e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458
+Catalogue snapshot read started 15:48:48 IST: 7191 catalogue rows, 360958 bytes, byte-identical to reports/p049-production-confirmation/production-classification-after-ui.csv (14:20:49 IST).
+Columns: item_code, category, series_range, division; deterministic C ordering by item_code.
+Snapshot SHA-256: 5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2
+
+All production SQL operations were SELECT-only. Only one unsuccessful login POST was attempted. No Apply, Save, Create, reset, merge, new-product staging, or Discard mutation was executed. No application code/configuration was changed during this audit.

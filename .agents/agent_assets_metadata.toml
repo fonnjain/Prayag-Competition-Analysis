@@ -725,3 +725,17 @@ mtime_ms = 1791020905416
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/5c0fef6b-833a-479a-bbbf-6505d836a946/a39c59e3-b014-490d-a59c-19c827930e79"
 storage_version_token = "1791020908381424"
 content_type = "text/plain"
+
+[[outputs]]
+id = "IixldB3AuE3q4afHU4kCT"
+uri = "file://reports/p051-part-1-production/production-findings.txt"
+type = "text"
+title = "P051 production read-only findings"
+description = "Live build/hash and preserved data confirmed. Admin previews blocked; production seed/reset restriction is missing. Every figure includes its IST clock."
+logical_id = "a8adafc5-efe0-49bd-acd3-33a553f4fafa"
+content_hash = "sha256:a19ede562ec5951d80de9c6e01bfbff1763b839aa56c37f70ab0ca4ca7a5841d"
+size = 4311
+mtime_ms = 1791023424135
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/a8adafc5-efe0-49bd-acd3-33a553f4fafa/d7d8515a-e2f0-4428-89ad-ffd908e056c5"
+storage_version_token = "1791023425809163"
+content_type = "text/plain"
