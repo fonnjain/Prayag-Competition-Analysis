@@ -26,6 +26,7 @@ import { productDetailHref } from "@/lib/product-links";
 import { AlertTriangle, CheckCircle2, Undo2, XCircle } from "lucide-react";
 import { useEditorInvalidate } from "./price-editor";
 import { CategorySpellingPreview } from "@/components/category-spelling-preview";
+import { ReadOnlyCategoryCheck } from "@/components/read-only-category-check";
 import { useAuth } from "@workspace/replit-auth-web";
 import {
   AlertDialog,
@@ -395,6 +396,7 @@ export function ProductCreationTab() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyCategoryCheck division={division} />
       {saved && <SavedResult result={saved} onClear={() => setSaved(null)} invalidate={invalidate} />}
       {formError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Could not complete request</AlertTitle><AlertDescription>{formError}</AlertDescription></Alert>}
       {classificationError && <Alert variant="destructive" role="alert"><AlertTriangle className="h-4 w-4" /><AlertTitle>Could not add classification</AlertTitle><AlertDescription>{classificationError}</AlertDescription></Alert>}

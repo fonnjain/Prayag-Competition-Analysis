@@ -1,0 +1,140 @@
+{
+  "request": "P052",
+  "date": "2026-10-03",
+  "timezone": "IST (UTC+05:30)",
+  "status": "Development implemented and tested; publication and genuine signed-in verification pending",
+  "serverEnvironmentCheck": "process.env.NODE_ENV === \"production\" || process.env.REPLIT_DEPLOYMENT === \"1\"",
+  "scope": "Reset, seed and full-catalogue replacement only; targeted corrections, retirement, deletion, normal loaders and undo retain existing permissions",
+  "tests": {
+    "fullRegression": {
+      "environment": "Development disposable schemas",
+      "startClockIST": "2026-10-03 16:15:19",
+      "suites": 9,
+      "testsPassed": 96
+    },
+    "finalPolicy": {
+      "environment": "Development disposable schema with production-like environment configuration",
+      "startClockIST": "2026-10-03 16:31:47",
+      "testsPassed": 10,
+      "twentyReadOnlyRequestsCreatedRows": 0,
+      "successfulProductionLikeUndo": true
+    },
+    "typecheck": {
+      "environment": "development",
+      "clockIST": "2026-10-03 16:33:36",
+      "passed": true
+    },
+    "frontendBuild": {
+      "environment": "development",
+      "clockIST": "2026-10-03 16:39:13",
+      "passed": true
+    }
+  },
+  "data": {
+    "development": {
+      "beforeMRP": {
+        "audit_ist": "2026-10-03 16:08:11",
+        "rows": "14012",
+        "value_sha256": "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2"
+      },
+      "afterMRP": {
+        "audit_ist": "2026-10-03 16:34:33",
+        "rows": "14012",
+        "value_sha256": "4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2"
+      },
+      "mrpUnchanged": true,
+      "beforeCounts": {
+        "audit_ist": "2026-10-03 16:08:14",
+        "catalog_rows": "6948",
+        "token_rows": "75",
+        "usable_tokens": "0",
+        "expired_unused_tokens": "9",
+        "batch_rows": "45",
+        "usable_batches": "0",
+        "expired_unused_batches": "42"
+      },
+      "afterCounts": {
+        "audit_ist": "2026-10-03 16:34:36",
+        "catalog_rows": "6948",
+        "token_rows": "75",
+        "usable_tokens": "0",
+        "expired_unused_tokens": "9",
+        "batch_rows": "45",
+        "usable_batches": "0",
+        "expired_unused_batches": "42"
+      },
+      "classification": {
+        "afterSHA256": "96f32a6aee9c850e6265ef56f56b81288e63887cc05e0fed681aa4c935306989",
+        "beforeSHA256": "96f32a6aee9c850e6265ef56f56b81288e63887cc05e0fed681aa4c935306989",
+        "bytes": 350026,
+        "byteIdentical": true,
+        "columns": [
+          "item_code",
+          "category",
+          "series_range",
+          "division"
+        ],
+        "clockNote": "Classification CSV was read immediately after the environment count query; its clock is the capture-start reference, not an embedded clock in the CSV."
+      }
+    },
+    "production": {
+      "beforeMRP": {
+        "audit_ist": "2026-10-03 16:08:24",
+        "rows": "14302",
+        "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+      },
+      "afterMRP": {
+        "audit_ist": "2026-10-03 16:34:46",
+        "rows": "14302",
+        "value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458"
+      },
+      "mrpUnchanged": true,
+      "beforeCounts": {
+        "audit_ist": "2026-10-03 16:08:28",
+        "catalog_rows": "7191",
+        "token_rows": "281",
+        "usable_tokens": "0",
+        "expired_unused_tokens": "0",
+        "batch_rows": "3",
+        "usable_batches": "0",
+        "expired_unused_batches": "1"
+      },
+      "afterCounts": {
+        "audit_ist": "2026-10-03 16:34:51",
+        "catalog_rows": "7191",
+        "token_rows": "281",
+        "usable_tokens": "0",
+        "expired_unused_tokens": "0",
+        "batch_rows": "3",
+        "usable_batches": "0",
+        "expired_unused_batches": "1"
+      },
+      "classification": {
+        "afterSHA256": "5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2",
+        "beforeSHA256": "5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2",
+        "bytes": 360958,
+        "byteIdentical": true,
+        "columns": [
+          "item_code",
+          "category",
+          "series_range",
+          "division"
+        ],
+        "clockNote": "Classification CSV was read immediately after the environment count query; its clock is the capture-start reference, not an embedded clock in the CSV."
+      }
+    }
+  },
+  "auth": {
+    "developmentClockIST": "2026-10-03 16:19:46",
+    "developmentLoginHTTP": 401,
+    "genuineSignedInScreenVerified": false,
+    "syntheticProductionAuthUsed": false
+  },
+  "publication": {
+    "verifiedExistingURL": "https://prayag-price.com",
+    "p052PublishConfirmed": false,
+    "liveProductionScreenVerified": false,
+    "liveProductionReadOnlyCheckVerified": false
+  },
+  "retention": "No retention changes. Tokens expire after 10 minutes and remain stored. Pending batches expire after 24 hours, may be marked expired on attempted Apply or discarded explicitly, and remain stored. No automatic delete/purge found."
+}

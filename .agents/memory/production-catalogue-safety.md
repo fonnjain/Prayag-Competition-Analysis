@@ -6,6 +6,18 @@ description: User-required production seed/reset prohibition and strict read-onl
 Production catalogue seed/reset must not be runnable through normal application
 paths, even with an administrator session.
 
+The scope includes reset, automatic catalogue seeding and full-catalogue sync.
+Keep targeted product deletion/retirement, single-price and period corrections,
+normal loaders and all undo paths available in production. Other broad-scope
+operations discovered during an audit are candidates to report, not permission
+to disable additional workflows.
+
+**Why:** The user explicitly wants mistake-correction workflows preserved;
+blocking them pushes operators toward direct database edits.
+
+**How to apply:** Scope guards to whole-catalogue replacement entrypoints. Audit
+other endpoints' permissions and affected rows without altering those permissions.
+
 **Why:** The user's production acceptance check explicitly requires this
 prohibition. Admin permission and a spelling-preview fingerprint are not an
 environment-level prohibition.

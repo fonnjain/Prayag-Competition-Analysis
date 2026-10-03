@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { earlyCatalogueReplacementBoundary } from "./lib/catalogueMaintenancePolicy";
 
 const app: Express = express();
 
@@ -28,6 +29,7 @@ app.use(
   }),
 );
 app.use(cors({ credentials: true, origin: true }));
+app.use(earlyCatalogueReplacementBoundary);
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -16,6 +16,7 @@ import {
   verifyCatalogSyncPreflightToken,
 } from "../lib/catalogSync";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { isProductionCatalogueRuntime, refuseProductionCatalogueReplacement } from "../lib/catalogueMaintenancePolicy";
 
 const router: IRouter = Router();
 const upload = multer({
@@ -23,11 +24,8 @@ const upload = multer({
   limits: { fileSize: 30 * 1024 * 1024, files: 1 },
 });
 
-function isProduction(req: Request): boolean {
-  if (process.env.NODE_ENV === "test") {
-    return req.header("x-catalog-sync-test-environment") === "production";
-  }
-  return process.env.NODE_ENV === "production";
+function isProduction(_req: Request): boolean {
+  return isProductionCatalogueRuntime();
 }
 
 router.use("/catalog/sync", requireAdmin);
@@ -40,6 +38,7 @@ router.get("/catalog/sync/status", async (req, res) => {
     .limit(5);
   res.json({
     environment: isProduction(req) ? "production" : "development",
+    availableActions: isProductionCatalogueRuntime() ? [] : ["export", "replace"],
     confirmationPhrase: CATALOG_SYNC_CONFIRMATION,
     current: await getCurrentCatalogSyncSummary(),
     recentAudits,
@@ -59,11 +58,7 @@ router.get("/catalog/sync/export", async (req, res) => {
   res.send(JSON.stringify(bundle));
 });
 
-router.post("/catalog/sync/preflight", upload.single("file"), async (req, res) => {
-  if (!isProduction(req)) {
-    res.status(403).json({ error: "Catalog bundles can only be imported in production." });
-    return;
-  }
+router.post("/catalog/sync/preflight", refuseProductionCatalogueReplacement, upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Select a catalog sync bundle." });
     return;
@@ -92,11 +87,7 @@ router.post("/catalog/sync/preflight", upload.single("file"), async (req, res) =
   }
 });
 
-router.post("/catalog/sync/apply", upload.single("file"), async (req, res) => {
-  if (!isProduction(req)) {
-    res.status(403).json({ error: "Catalog bundles can only be imported in production." });
-    return;
-  }
+router.post("/catalog/sync/apply", refuseProductionCatalogueReplacement, upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Select a catalog sync bundle." });
     return;

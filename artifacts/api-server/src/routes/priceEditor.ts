@@ -42,6 +42,20 @@ import {
 } from "../lib/priceEditorVocabulary";
 
 const router: IRouter = Router();
+// P052: resolution only. No approval token, batch, vocabulary registration or audit.
+router.get("/catalog/price-editor/category-spelling-check", requireAdmin, async (req, res): Promise<void> => {
+  if (typeof req.query.division !== "string" || !req.query.division.trim() ||
+      typeof req.query.category !== "string" || !req.query.category.trim()) {
+    res.status(400).json({ error: "One division and one non-empty category are required." });
+    return;
+  }
+  const plan = planCategorySpellings(
+    [{ division: req.query.division, category: req.query.category.trim() }],
+    await readCategoryCatalogue(),
+  );
+  res.setHeader("Cache-Control", "no-store");
+  res.json(plan.categorySpellings[0]);
+});
 const iso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const today = () => new Date().toISOString().slice(0, 10);
 const actor = (req: Request) => priceEditorActor(req);

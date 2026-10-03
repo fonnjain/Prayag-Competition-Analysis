@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedCatalogIfEmpty, backfillCatalogSizes, seedVariantPricesIfEmpty } from "./lib/catalogSeed";
 import { seedAdminUser } from "./lib/adminSeed";
 import { applyChValveNameCorrections } from "./lib/chValveNameCorrections";
+import { isProductionCatalogueRuntime } from "./lib/catalogueMaintenancePolicy";
 
 const rawPort = process.env["PORT"];
 
@@ -26,7 +27,9 @@ async function prepareCatalog() {
   }
 
   try {
-    await seedCatalogIfEmpty();
+    if (!isProductionCatalogueRuntime()) {
+      await seedCatalogIfEmpty();
+    }
     await backfillCatalogSizes();
   } catch (seedErr) {
     logger.error({ err: seedErr }, "Failed to seed product catalog");

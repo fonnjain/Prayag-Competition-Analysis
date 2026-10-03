@@ -33,7 +33,7 @@ beforeAll(async () => {
   const tables = await client.query<{ table_name: string }>(`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema='public' AND table_type='BASE TABLE'
-      AND (table_name ~ '^(catalog_|mrp_|competitor_|locally_added_|product_|price_)'
+      AND (table_name ~ '^(catalog_|mrp_|competitor_|locally_added_|product_|price_|new_product_)'
         OR table_name IN ('code_conflicts', 'import_batches'))
     ORDER BY table_name
   `);

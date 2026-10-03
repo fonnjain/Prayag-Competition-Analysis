@@ -72,6 +72,7 @@ interface CatalogSyncSummary {
 
 interface CatalogSyncStatus {
   environment: "development" | "production";
+  availableActions: Array<"export" | "replace">;
   confirmationPhrase: string;
   current: CatalogSyncSummary;
   recentAudits: Array<{
@@ -200,7 +201,7 @@ function CatalogSyncPanel({
         title: "Catalog bundle downloaded",
         description: checksum
           ? `Checksum ${checksum.slice(0, 12)}…`
-          : "Keep this file private until it is imported in production.",
+          : "Keep this file private. Whole-catalogue imports are development-only.",
       });
     } catch (error) {
       toast({
@@ -254,7 +255,7 @@ function CatalogSyncPanel({
         body: form,
       });
       if (!response.ok) {
-        throw new Error(await readError(response, "Production catalog replacement failed."));
+        throw new Error(await readError(response, "Development catalog replacement failed."));
       }
       const result = (await response.json()) as {
         auditId: number;
@@ -268,7 +269,7 @@ function CatalogSyncPanel({
       await statusQuery.refetch();
       onApplied();
       toast({
-        title: "Production catalog replaced",
+        title: "Development catalog replaced",
         description: `Audit #${result.auditId} recorded successfully.`,
       });
     } catch (error) {
@@ -277,7 +278,7 @@ function CatalogSyncPanel({
         description:
           error instanceof Error
             ? error.message
-            : "Production data was not changed.",
+            : "Development data was not changed.",
         variant: "destructive",
       });
     } finally {
@@ -290,7 +291,7 @@ function CatalogSyncPanel({
       <div className="flex items-start gap-3 border-b border-blue-200 px-5 py-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 text-blue-700" />
         <div>
-          <h2 className="font-semibold">Verified catalog production sync</h2>
+          <h2 className="font-semibold">Verified catalog snapshot</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Administrator-only transfer of catalog records. Accounts, sessions,
             API keys, and application settings are never included.
@@ -308,11 +309,12 @@ function CatalogSyncPanel({
           summary={status.current}
         />
 
-        {status.environment === "development" ? (
+        {!status.availableActions?.length && <p className="text-sm" role="status">Whole-catalogue replacement is disabled by the production server. Targeted corrections, loaders and undo remain available.</p>}
+        {status.availableActions?.includes("export") && (
           <div className="space-y-3">
             <p className="text-sm">
-              Download a signed snapshot after verifying the counts above. Import
-              this exact file from the published Data Health page.
+              Download a signed snapshot after verifying the counts above.
+              Whole-catalogue import is development-only.
             </p>
             <Button onClick={exportBundle} disabled={isExporting}>
               {isExporting ? (
@@ -328,7 +330,8 @@ function CatalogSyncPanel({
               </p>
             )}
           </div>
-        ) : (
+        )}
+        {status.availableActions?.includes("replace") && (
           <div className="space-y-5">
             <div className="space-y-2">
               <label className="block text-sm font-medium" htmlFor="catalog-sync-file">
@@ -365,7 +368,7 @@ function CatalogSyncPanel({
               <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4">
                 <div>
                   <h3 className="font-semibold text-red-900">
-                    Production replacement preview
+                    Development replacement preview
                   </h3>
                   <p className="mt-2 text-sm">Existing products keep their Category, Range and division. The spelling check applies only to new product codes.</p>
                   <CategorySpellingPreview decisions={preview.categorySpellings} />
@@ -374,7 +377,7 @@ function CatalogSyncPanel({
                   </p>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <SyncSummary title="Current production" summary={preview.current} />
+                  <SyncSummary title="Current development" summary={preview.current} />
                   <SyncSummary title="Incoming development" summary={preview.incoming} />
                 </div>
                 <div className="space-y-2">
@@ -402,7 +405,7 @@ function CatalogSyncPanel({
                   {isApplying && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {isApplying ? "Replacing production catalog…" : "Replace production catalog"}
+                  {isApplying ? "Replacing development catalog…" : "Replace development catalog"}
                 </Button>
               </div>
             )}
@@ -411,7 +414,7 @@ function CatalogSyncPanel({
               <div className="space-y-3 rounded-lg border border-green-200 bg-green-50 p-4 text-green-950">
                 <div className="flex items-center gap-2 font-semibold">
                   <CheckCircle2 className="h-5 w-5" />
-                  Production catalog sync completed
+                  Development catalog replacement completed
                 </div>
                 <p className="text-sm">
                   Audit reference <span className="font-mono">#{completed.auditId}</span>
@@ -421,7 +424,7 @@ function CatalogSyncPanel({
                 <p className="break-all font-mono text-xs">
                   Source SHA-256: {completed.checksum}
                 </p>
-                <SyncSummary title="Resulting production catalog" summary={completed.after} />
+                <SyncSummary title="Resulting development catalog" summary={completed.after} />
               </div>
             )}
 
@@ -465,15 +468,15 @@ function CatalogSyncPanel({
 
 export default function DataHealthPage() {
   const [resetOpen, setResetOpen] = useState(false);
+  const { data, isLoading } = useGetCatalogDataHealth();
   const resetPreview = useQuery({
-    queryKey: ["catalog", "reset", "category-spelling-preview"], enabled: resetOpen, staleTime: 0,
+    queryKey: ["catalog", "reset", "category-spelling-preview"], enabled: resetOpen && !!data?.maintenanceActions?.includes("resetCatalog"), staleTime: 0,
     queryFn: async (): Promise<{ categorySpellings: CategorySpellingDecision[]; categorySpellingFingerprint: string }> => {
       const response = await fetch("/api/catalog/reset/preview");
       if (!response.ok) throw new Error((await response.json()).error ?? "Could not preview Category spellings.");
       return response.json();
     },
   });
-  const { data, isLoading } = useGetCatalogDataHealth();
   const { data: provenance } = useQuery<{ sources: MrpSourceHealth[] }>({
     queryKey: ["catalog", "mrp-provenance"],
     queryFn: async () => {
@@ -559,7 +562,7 @@ export default function DataHealthPage() {
             Monitor catalog integrity and identify missing information.
           </p>
         </div>
-        <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+        {data.maintenanceActions?.map(action => action === "resetCatalog" && <AlertDialog key={action} open={resetOpen} onOpenChange={setResetOpen}>
           <AlertDialogTrigger asChild>
             <Button variant="outline" disabled={resetMutation.isPending}>
               <RotateCcw className="w-4 h-4 mr-2" />
@@ -587,7 +590,7 @@ export default function DataHealthPage() {
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>
+        </AlertDialog>)}
       </div>
 
       <CatalogSyncPanel onApplied={invalidateCatalog} />

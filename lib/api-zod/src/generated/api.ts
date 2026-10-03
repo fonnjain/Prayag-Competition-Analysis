@@ -573,9 +573,36 @@ export const GetCatalogFiltersResponse = zod.object({
 
 
 /**
+ * @summary Admin-only read-only category resolution; creates no token, batch or audit
+ */
+
+
+
+
+export const CheckCatalogCategorySpellingQueryParams = zod.object({
+  "division": zod.coerce.string().min(1),
+  "category": zod.coerce.string().min(1)
+})
+
+export const CheckCatalogCategorySpellingResponse = zod.object({
+  "itemCode": zod.string().optional(),
+  "division": zod.string().nullable(),
+  "inputCategory": zod.string(),
+  "selectedCategory": zod.string().nullable(),
+  "status": zod.enum(['matched existing spelling', 'new', 'ambiguous']),
+  "selectionReason": zod.string(),
+  "candidates": zod.array(zod.object({
+  "category": zod.string(),
+  "activeProducts": zod.number()
+}))
+})
+
+
+/**
  * @summary Data health report (conflicts, missing prices, duplicate sources)
  */
 export const GetCatalogDataHealthResponse = zod.object({
+  "maintenanceActions": zod.array(zod.enum(['resetCatalog'])).describe('Server-authorized controls; production never offers whole-catalogue replacement'),
   "totalProducts": zod.number(),
   "pricedProducts": zod.number(),
   "pendingProducts": zod.number(),

@@ -612,6 +612,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CatalogFilters"
+  /catalog/price-editor/category-spelling-check:
+    get:
+      operationId: checkCatalogCategorySpelling
+      tags: [catalog]
+      summary: Admin-only read-only category resolution; creates no token, batch or audit
+      parameters:
+        - name: division
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: category
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Resolution, including ambiguity; never authorizes a write
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CategorySpellingDecision" }
+        "400":
+          description: Invalid query
+        "403":
+          description: Administrator required
   /catalog/data-health:
     get:
       operationId: getCatalogDataHealth
@@ -5207,6 +5231,7 @@ components:
       type: object
       required:
         [
+          maintenanceActions,
           totalProducts,
           pricedProducts,
           pendingProducts,
@@ -5222,6 +5247,10 @@ components:
           untracedMrpRows,
         ]
       properties:
+        maintenanceActions:
+          type: array
+          description: Server-authorized controls; production never offers whole-catalogue replacement
+          items: { type: string, enum: [resetCatalog] }
         totalProducts:
           type: integer
         pricedProducts:

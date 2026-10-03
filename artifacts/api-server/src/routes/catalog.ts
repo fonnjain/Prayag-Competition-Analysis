@@ -19,6 +19,7 @@ import {
   sha256ForManualCorrection,
 } from "../lib/mrpProvenance";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
+import { catalogueMaintenanceActions, refuseProductionCatalogueReplacement } from "../lib/catalogueMaintenancePolicy";
 
 const router: IRouter = Router();
 const VARIANT_BACKFILL_CONFIRMATION = "ATTACH 148 JANUARY COLOUR ROWS";
@@ -291,7 +292,7 @@ router.get("/catalog/mrp-provenance", async (_req, res) => {
 });
 
 // GET /catalog/data-health — conflicts, missing prices, and untraceable history.
-router.get("/catalog/data-health", async (_req, res) => {
+router.get("/catalog/data-health", async (req, res) => {
   const totalRow = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
     .from(catalogProductsTable);
@@ -398,6 +399,7 @@ router.get("/catalog/data-health", async (_req, res) => {
   const mrpSources = await getMrpSourceHealth();
 
   res.json({
+    maintenanceActions: catalogueMaintenanceActions(req.user?.role),
     totalProducts,
     pricedProducts,
     pendingProducts,
@@ -728,11 +730,11 @@ router.post("/catalog/seed-variant-prices", requireAdmin, async (req, res) => {
 });
 
 // POST /catalog/reset — restore catalog to the original clean import.
-router.get("/catalog/reset/preview", requireAdmin, async (_req, res) => {
+router.get("/catalog/reset/preview", refuseProductionCatalogueReplacement, requireAdmin, async (_req, res) => {
   try { res.json(await previewCatalogSeedCategories()); }
   catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : "Could not preview Category spellings." }); }
 });
-router.post("/catalog/reset", requireAdmin, async (req, res) => {
+router.post("/catalog/reset", refuseProductionCatalogueReplacement, requireAdmin, async (req, res) => {
   try {
     if (typeof req.body?.categorySpellingFingerprint !== "string") {
       res.status(409).json({ error: "Preview Category spellings before the normal admin reset approval." });

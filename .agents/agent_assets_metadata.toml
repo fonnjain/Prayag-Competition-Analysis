@@ -739,3 +739,17 @@ mtime_ms = 1791023424135
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/a8adafc5-efe0-49bd-acd3-33a553f4fafa/d7d8515a-e2f0-4428-89ad-ffd908e056c5"
 storage_version_token = "1791023425809163"
 content_type = "text/plain"
+
+[[outputs]]
+id = "fr-iUo0Vg2D3I5uem4EVJ"
+uri = "file://reports/p052/P052-Development-Report.txt"
+type = "text"
+title = "P052 report: implementation, audit and unchanged data"
+description = "Complete endpoint inventory, server authority, preserved undo, no-write proof, retention counts and timestamped before/after checks. Publication and genuine signed-in confirmation remain pending."
+logical_id = "d8a0bffd-de6c-4ff3-9ed3-9866d76d0f31"
+content_hash = "sha256:07f78bcd65acdfcf831efc3c90126360bae142a900c48f68a2c61d941cca92c0"
+size = 13076
+mtime_ms = 1791025794909
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d8a0bffd-de6c-4ff3-9ed3-9866d76d0f31/d8950a25-e135-4618-a5c8-19fc684a2b5f"
+storage_version_token = "1791025795819495"
+content_type = "text/plain"

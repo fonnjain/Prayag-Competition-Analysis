@@ -1,4 +1,5 @@
 import { planNewProductCategories, assertCategorySpellingPlan, lockCategorySpellings } from "./categorySpellingGuard";
+import { assertCatalogueReplacementAllowed } from "./catalogueMaintenancePolicy";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { asc, sql } from "drizzle-orm";
 import {
@@ -779,6 +780,7 @@ export async function applyCatalogSyncBundle(
   before: CatalogSyncSummary;
   after: CatalogSyncSummary;
 }> {
+  assertCatalogueReplacementAllowed("Whole-catalogue sync");
   const [audit] = await db
     .insert(catalogSyncAuditsTable)
     .values({

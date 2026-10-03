@@ -1,8 +1,9 @@
 import { planNewProductCategories, assertCategorySpellingPlan, assertCategorySpellingPreview, lockCategorySpellings } from "./categorySpellingGuard";
+import { assertCatalogueReplacementAllowed } from "./catalogueMaintenancePolicy";
 import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import {
+import { 
   catalogProductsTable,
   mrpPriceHistoryTable,
   mrpHistoryProvenanceEventsTable,
@@ -93,11 +94,13 @@ async function chunkedInsert<T>(
 }
 
 export async function previewCatalogSeedCategories() {
+  assertCatalogueReplacementAllowed("Catalogue seed preview");
   const plan = planNewProductCategories(data.products, await db.select().from(catalogProductsTable));
   assertCategorySpellingPlan(plan);
   return { categorySpellings: plan.categorySpellings, categorySpellingFingerprint: plan.categorySpellingFingerprint };
 }
 export async function loadCatalogSeed(expectedSpellingFingerprint?: string): Promise<void> {
+  assertCatalogueReplacementAllowed("Catalogue seed");
   await db.transaction(async (tx) => {
     await lockCategorySpellings(tx);
     const storedProducts = await tx.select().from(catalogProductsTable);
@@ -273,6 +276,7 @@ export async function loadCatalogSeed(expectedSpellingFingerprint?: string): Pro
 }
 
 export async function seedCatalogIfEmpty(): Promise<void> {
+  assertCatalogueReplacementAllowed("Automatic catalogue seed");
   const existing = await db.select().from(catalogProductsTable).limit(1);
   if (existing.length === 0) {
     logger.info("Seeding Prayag product catalog from clean import file...");

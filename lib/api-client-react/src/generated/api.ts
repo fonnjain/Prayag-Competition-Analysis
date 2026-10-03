@@ -66,6 +66,8 @@ import type {
   CatalogNameChangeUndoResponse,
   CatalogProductDetail,
   CatalogProductList,
+  CategorySpellingDecision,
+  CheckCatalogCategorySpellingParams,
   CheckPriceEditorNewProductCodeParams,
   CompareMrpGeneratorRunsParams,
   ComparisonFilters,
@@ -1678,6 +1680,90 @@ export function useGetCatalogFilters<TData = Awaited<ReturnType<typeof getCatalo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCatalogFiltersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCheckCatalogCategorySpellingUrl = (params: CheckCatalogCategorySpellingParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/catalog/price-editor/category-spelling-check?${stringifiedParams}` : `/api/catalog/price-editor/category-spelling-check`
+}
+
+/**
+ * @summary Admin-only read-only category resolution; creates no token, batch or audit
+ */
+export const checkCatalogCategorySpelling = async (params: CheckCatalogCategorySpellingParams, options?: RequestInit): Promise<CategorySpellingDecision> => {
+
+  return customFetch<CategorySpellingDecision>(getCheckCatalogCategorySpellingUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckCatalogCategorySpellingQueryKey = (params?: CheckCatalogCategorySpellingParams,) => {
+    return [
+    `/api/catalog/price-editor/category-spelling-check`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCheckCatalogCategorySpellingQueryOptions = <TData = Awaited<ReturnType<typeof checkCatalogCategorySpelling>>, TError = ErrorType<void>>(params: CheckCatalogCategorySpellingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkCatalogCategorySpelling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckCatalogCategorySpellingQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkCatalogCategorySpelling>>> = ({ signal }) => checkCatalogCategorySpelling(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkCatalogCategorySpelling>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckCatalogCategorySpellingQueryResult = NonNullable<Awaited<ReturnType<typeof checkCatalogCategorySpelling>>>
+export type CheckCatalogCategorySpellingQueryError = ErrorType<void>
+
+
+/**
+ * @summary Admin-only read-only category resolution; creates no token, batch or audit
+ */
+
+export function useCheckCatalogCategorySpelling<TData = Awaited<ReturnType<typeof checkCatalogCategorySpelling>>, TError = ErrorType<void>>(
+ params: CheckCatalogCategorySpellingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkCatalogCategorySpelling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckCatalogCategorySpellingQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

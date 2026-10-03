@@ -1,0 +1,106 @@
+P052 — DEVELOPMENT IMPLEMENTATION AND READ-ONLY DATA CONFIRMATION
+2026-10-03. All clocks IST (UTC+05:30).
+Status: Code implemented; production publication and genuine signed-in UI confirmation are still pending.
+
+SERVER AUTHORITY
+Quoted production decision: process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1".
+NODE_ENV=production is configured by the production artifact runner. No header, query parameter or request body participates. The old sync test-environment header override was removed.
+app.ts installs the refusal before cookie/body/authentication middleware, so blocked requests cannot even load a database-backed session. Route-level and internal function guards provide additional enforcement.
+POST /api/catalog/reset, POST /api/catalog/sync/apply, POST /api/catalog/sync/preflight and GET/HEAD /api/catalog/reset/preview return HTTP 403 with PRODUCTION_CATALOGUE_REPLACEMENT_DISABLED in production.
+loadCatalogSeed, seedCatalogIfEmpty and applyCatalogSyncBundle assert the policy at the top, before inputs or database work. Production startup does not invoke automatic catalogue seeding.
+Development retains admin reset and signed snapshot export/preflight/apply. The old sync confirmation phrase is retained for protocol compatibility; the UI labels replacement as development-only.
+data-health.tsx renders reset from the server's maintenanceActions list, never from a client environment flag. The production list is empty. Sync controls likewise render from server availableActions, empty in production. Direct calls remain refused even if a client fabricates its own controls.
+
+READ-ONLY SPELLING CHECK
+GET /api/catalog/price-editor/category-spelling-check?division=...&category=...
+Admin only. Requires scalar, non-empty inputs; reuses P051 exact-division/P048-normalizer resolution. Returns input, selected spelling, matched existing/new/ambiguous status, every candidate and active count, and selection reason. Ambiguity does not authorize a write.
+No token, fingerprint, batch ID, category registration, vocabulary audit or other database write. Only a catalogue SELECT. Cache-Control: no-store. Ordinary HTTP console access logging is not a persisted preview/audit record requiring cleanup.
+UI: Price Editor > new-product creation > Read-only Category spelling check. Pick a division, type any Category and press Check spelling — no save. The old single-product and bulk staging previews remain unchanged.
+
+DESTRUCTIVE ENDPOINT / SCREEN INVENTORY
+Source/configuration inspection: development workspace, 16:36:09 IST. Every endpoint below is admin-only. Except the explicitly blocked reset/seed/sync paths above, existing permissions and behavior are unchanged. No live destructive action was exercised.
+
+catalog.ts / data-health.tsx:
+- POST /catalog/reset: replaces catalogue/MRP and associated seed data — BLOCKED in production.
+- POST /catalog/variant-provenance/reconcile: bounded audited sanitaryware provenance reconciliation and associated competitor links; retained. Not full-catalogue replacement.
+catalogSync.ts / data-health.tsx:
+- POST /catalog/sync/apply: unscoped replacement of catalogue, MRP history, source/load metadata, competitor prices/aliases and conflicts — BLOCKED in production, including internal function.
+- POST /catalog/sync/preflight: preparatory sync preview — also blocked in production; no replacement action offered.
+productLifecycle.ts / product-sales-check-dialog.tsx:
+- POST /admin/product-lifecycle/retire: one named product's lifecycle fields; history retained.
+- POST /admin/product-lifecycle/delete: one item code and its MRP rows, subject to existing evidence/reference checks; retained.
+productRetirement.ts / product-retirement-dialog.tsx:
+- POST /admin/product-retirement/apply; POST /admin/product-retirement/undo/:batchId: reviewed product-code lists/lifecycle fields, price history preserved; retained.
+priceEditor.ts / price-editor-correction.tsx, price-editor-creation.tsx:
+- POST /catalog/price-editor/save: one product/series/date price insertion or replacement; retained.
+- POST /catalog/price-editor/undo/:auditId: restores/deletes only the unchanged audited price target; retained.
+- POST /catalog/price-editor/new-product/undo/:auditId: the unchanged created product and its own initial MRP, with original reference checks; retained.
+- POST /catalog/price-editor/new-product/deactivate/:auditId: created product's active flag; retained.
+mrpRevision.ts / mrp-revisions.tsx:
+- POST /catalog/mrp-revisions/:batchId/apply; POST /catalog/mrp-revisions/:batchId/rollback: reviewed product/period price targets, including displaced rows and linked competitor corrections; retained.
+catalogImportExport.ts / load-mrp.tsx:
+- POST /catalog/mrp-loads/:batchId/apply and POST /catalog/new-products/:batchId/apply: normal reviewed loaders, bounded by validated rows/source periods. Existing classification preservation and P051 spelling checks unchanged; retained.
+- POST /catalog/mrp-review-batches/:batchId/approve: that batch's review/current-price status; retained.
+- POST /catalog/mrp-review-batches/:batchId/cancel: that batch's imported MRP rows and original reversal/provenance behavior; retained.
+- DELETE /catalog/mrp-period/:date: date-scoped MRP period deletion; retained.
+- PATCH /catalog/mrp-period-date: selected MRP period date; retained.
+- POST /catalog/ugd-classification/:correctionKey/apply and /undo: fixed signed correction-code list and exact historical restoration; retained. Not an unscoped whole-catalogue replacement.
+catalogNameChanges.ts / name-changes.tsx:
+- POST /catalog/name-changes/:batchId/apply and /undo: explicit reviewed product-name targets only; classifications/prices preserved; retained.
+comparison.ts / mapping-review.tsx, import-competitor.tsx:
+- PATCH /catalog/competitor-prices/bulk: selected competitor price/mapping rows; retained.
+- PATCH /catalog/competitor-prices/:id: one competitor price row; retained.
+- POST /catalog/mapping-review/auto-accept: eligible staged competitor mapping targets; retained.
+- DELETE /catalog/competitors/:competitor: all rows of one competitor brand; retained.
+- DELETE /catalog/competitors/:competitor/periods/:effectiveDate: one brand and period; retained.
+catalogImportExport.ts / import-competitor.tsx:
+- POST /catalog/load-competitor: source-specific brand/period replacement (including trusted Prince/Apollo paths), with existing validated-period rules; retained.
+- PATCH /catalog/competitor-period-date: selected competitor/period; retained.
+importBatches.ts / import-review.tsx:
+- POST /catalog/import-batches/:id/approve: approved source batch can replace competitor/date rows and update that batch's mappings/prices; retained. Raw DELETE is scoped by competitor plus effective_date.
+apolloStagedLoad.ts / staged import review:
+- POST /catalog/apollo-load/:batchId/apply and /undo: explicit staged row/price targets and audited restoration/removal; retained.
+p034r2.ts / mapping-decision review:
+- POST /catalog/competitor-mapping-decisions/p034r2/:batchId/apply and /rollback: approved fixed pair-keyed duplicate/exclusion decisions; retained.
+Provenance-only maintenance:
+- POST /admin/mrp-provenance-backfill/apply and /undo/:runId: provenance links/audits, not price values; existing admin permissions retained.
+Non-HTTP helpers:
+- catalogSeed.ts loadCatalogSeed and seedCatalogIfEmpty: whole-catalogue seed — BLOCKED in production.
+- catalogSync.ts applyCatalogSyncBundle: whole-catalogue replacement — BLOCKED in production before creating a sync audit.
+- backfillCatalogSizes: fills only missing sizes; original startup behavior retained. If every size is missing it may affect every product; broad-scope candidate, not additionally blocked.
+- seedVariantPricesIfEmpty: bounded audited sanitaryware colour series handling; retained, not whole-catalogue replacement.
+- applyChValveNameCorrections: bounded audited valve-name corrections; retained.
+- .local/reload-verified.mjs and .local/erase_and_load_sparsh.py: already fail closed at their top; unchanged and not mounted by any screen/job.
+
+BROAD-SCOPE CANDIDATES, REPORTED NOT ADDITIONALLY BLOCKED
+A date deletion can remove all MRP history if the dataset consists of one period. A brand deletion can remove all competitor prices if there is one brand. Explicit bulk/name-change/revision batches can span many or potentially all eligible targets. Missing-size backfill can reach every missing-size product. These remain scoped correction paths per your clarification, not permission to add more production restrictions.
+The actual unscoped catalogue/MRP replacement calls found are seed/reset and full-catalogue sync; both are now server-blocked. No other unscoped catalogue/MRP DELETE or TRUNCATE was found in runtime code. Test-only fixture helpers are not mounted as application endpoints.
+
+UNDO
+Explicitly preserved in production. No P052 replacement guard is placed on targeted undo/rollback/cancel routes. A successful single-price save followed by successful undo ran with NODE_ENV=production against the disposable schema. Existing P029 undo regressions also passed. No live price correction or undo was invoked.
+
+RETENTION — REPORTED, NOT CHANGED
+Source inspection 16:36:09 IST: unused single-product approval tokens expire after 10 minutes but rows are retained. Consumption marks consumed. No automatic token deletion found.
+Pending MRP/new-product batches expire after 24 hours. Apply can mark an expired addressed batch expired, and Discard changes its status. These are not deletes. No automatic purge was found; unused expired pending rows can accumulate.
+
+DEVELOPMENT — retention/count query 2026-10-03 16:34:36 IST:
+Catalogue rows 6948; token rows 75, usable 0, expired-unused 9; pending-batch table rows 45, usable 0, expired-unused 42. Counts equal the before query at 2026-10-03 16:08:14 IST.
+MRP before 2026-10-03 16:08:11 IST: 14012 rows. After 2026-10-03 16:34:33 IST: 14012 rows. SHA-256 before/after identical: 4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2.
+Classification CSV captured immediately after those environment count queries: byte-identical, 350026 bytes; SHA-256 96f32a6aee9c850e6265ef56f56b81288e63887cc05e0fed681aa4c935306989. Columns item_code/category/series_range/division; C ordering by item_code. The count-query clock is the snapshot capture-start reference.
+
+PRODUCTION — retention/count query 2026-10-03 16:34:51 IST:
+Catalogue rows 7191; token rows 281, usable 0, expired-unused 0; pending-batch table rows 3, usable 0, expired-unused 1. Counts equal the before query at 2026-10-03 16:08:28 IST.
+MRP before 2026-10-03 16:08:24 IST: 14302 rows. After 2026-10-03 16:34:46 IST: 14302 rows. SHA-256 before/after identical: e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458.
+Classification CSV captured immediately after those environment count queries: byte-identical, 360958 bytes; SHA-256 5a6a7e1e101a34151058bf3bddc88090e6186228d1128f3d50396aa8ca5619e2. Columns item_code/category/series_range/division; C ordering by item_code. The count-query clock is the snapshot capture-start reference.
+
+TESTS / BUILD
+Development disposable-schema regression run started 16:15:19 IST: 9 suites, 96 tests passed (P048/P049/P051, P029 and P052 baseline).
+Final focused P052 run started 16:31:47 IST: 10 tests passed, including the additional pre-auth refusal and successful production-like undo. This overlaps the earlier P052 tests; do not add the totals as separate tests.
+Twenty read-only checks in that final disposable-schema run: correct Blaze 62 decision with 36 active versus BLAZE 62 with 2 active; made-up Category returned new; zero INSERT/UPDATE/DELETE calls; every private table count unchanged. No public fixtures were created or modified.
+Workspace typecheck passed after codegen; final API typecheck passed at 16:33:36 IST. Final frontend production build succeeded at 16:39:13 IST. API workflow built and started successfully.
+Signed-out development screen renders. Genuine development admin login returned HTTP 401 at 16:19:46 IST; signed-in UI is NOT claimed verified. No auth fixture was substituted for production evidence.
+
+PUBLICATION / REMAINING CONFIRMATION
+Verified existing production URL: https://prayag-price.com. P052 publication is not yet confirmed. Publishing is a user action. The current production data reads above are preservation checks, not a claim that P052 guards are live.
+After publishing, verify the live build, server-authored empty maintenance/actions lists, absence of Reset Catalog/replacement DOM controls, and genuine admin read-only Category checks. Do not issue a production POST reset/seed/sync request to test refusal; POST refusal is tested in the disposable schema, and the guarded GET reset preview can provide live non-mutating boundary evidence. Recheck checksums and catalogue snapshots after the live read-only checks.
+Working genuine admin credentials are required for the signed-in screen and resolution checks. No account creation, password reset or synthetic session is authorized.

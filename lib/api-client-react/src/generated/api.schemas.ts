@@ -3098,6 +3098,13 @@ export interface CatalogDuplicateSource {
   count: number;
 }
 
+export type CatalogDataHealthMaintenanceActionsItem = typeof CatalogDataHealthMaintenanceActionsItem[keyof typeof CatalogDataHealthMaintenanceActionsItem];
+
+
+export const CatalogDataHealthMaintenanceActionsItem = {
+  resetCatalog: 'resetCatalog',
+} as const;
+
 export interface CatalogUntracedMrp {
   itemCode: string;
   /** @nullable */
@@ -3110,6 +3117,8 @@ export interface CatalogUntracedMrp {
 }
 
 export interface CatalogDataHealth {
+  /** Server-authorized controls; production never offers whole-catalogue replacement */
+  maintenanceActions: CatalogDataHealthMaintenanceActionsItem[];
   totalProducts: number;
   pricedProducts: number;
   pendingProducts: number;
@@ -4834,6 +4843,17 @@ export type PatchCatalogProductMrp200 = {
   itemCode: string;
   mrp: number;
   effectiveDate: string;
+};
+
+export type CheckCatalogCategorySpellingParams = {
+/**
+ * @minLength 1
+ */
+division: string;
+/**
+ * @minLength 1
+ */
+category: string;
 };
 
 export type ReconcileSanitarywareVariantProvenanceBody = {
