@@ -1,0 +1,207 @@
+P052 — CURRENT PRODUCTION READ-ONLY REPORT
+Main production snapshot: 2026-10-03 17:35:13 IST on 3 October 2026.
+Flagged-period corroboration: 2026-10-03 17:36:04 IST.
+Database date: 2026-10-03. Database timezone GMT; IST date is also 3 October 2026.
+Only SELECT queries against the production read replica were used. No application code, database rows, price periods, schema, workflows or publishing configuration were changed. Report outputs only.
+
+ACCEPTED HISTORICAL CONTEXT
+The user accepts the 19 August provenance rebuild and its deliberate unsourced-period exclusions. No lost-history reconstruction was undertaken.
+The saved incoming snapshot's recomputed payload SHA-256 matches the production success audit: 2af927e902f83ed6533203cc48459a8119c3232c20b4414f5988bf074a205703. The historical cohorts were taken from that exact snapshot: 98 products with discontinuedFrom set and 74 code_conflicts records. No assumption was made that today's discontinued-product list is the original cohort.
+
+1. ACTIVE PRODUCTS WITH NO MRP HISTORY AT ALL
+Result: ZERO.
+Definition: catalog_products.is_active IS TRUE and NOT EXISTS any mrp_price_history row with the same item_code, with no date, variant or review-status restriction on that existence test. This catches literal absence of all history, rather than absence of a current price. No code/name/division/category rows qualify.
+Result remains zero under the stricter live-today definition: is_active true AND discontinued_from is null or later than today.
+This is not a claim that every active product has a current approved non-null Standard price; that is a different check. There are no missing-all-history candidates to classify against Sales in this requested check.
+
+2. THE ORIGINAL 98 DISCONTINUED PRODUCTS TODAY
+All 98 still exist and all 98 retain is_active=true. That raw boolean alone does NOT mean a product is live: the application also enforces discontinued_from.
+8 have discontinued_from cleared and are live today. All 8 have a current flagged price row and are priced in the live master. All are Pipes & Fittings / Water Tank. Their original discontinuation date was 2026-02-01; their approved Standard MRP date is also 2026-02-01.
+The other 90 remain effectively discontinued: 72 from 2026-08-01 and 18 from 2026-09-01. None of these 90 has an is_current history row or a live-master price. All retain historical price records, which is not a live-master listing.
+No judgment that the 8 reactivations are erroneous is implied; this report confirms their present state, not the authorization or reason for the earlier change.
+
+Code | Name | Current Standard MRP
+WT-3LH-05 | WATER TANK 3 LAYER LIGHT 500 LTR | Rs 10000
+WT-3LH-07 | WATER TANK 3 LAYER LIGHT 750 LTR | Rs 15000
+WT-3LH-10 | WATER TANK 3 LAYER LIGHT 1000 LTR | Rs 20000
+WT-3LH-15 | WATER TANK 3 LAYER LIGHT 1500 LTR | Rs 30000
+WT-3LH-20 | WATER TANK 3 LAYER LIGHT 2000 LTR | Rs 40000
+WT-3LH-30 | WATER TANK 3 LAYER LIGHT 3000 LTR | Rs 60000
+WT-3LH-50 | WATER TANK 3 LAYER LIGHT 5000 LTR | Rs 100000
+WT-4LH-05 | WATER TANK 4 LAYER LIGHT 500 LTR | Rs 10000
+
+Current master pricing was computed using the latest approved Standard history row effective on or before today, combined with the live-product gate. This does not rely solely on is_current; the stored flags agree for the eight live products and are absent for the other ninety.
+Companion original-98-status.csv contains the complete original cohort and today's status, dates, history counts and current/latest price fields.
+
+3. THE ORIGINAL 74 CONFLICT FLAGS
+All 74 original code_conflicts records still exist. Their descriptions and source-value strings are byte-for-byte unchanged. No additional conflict records exist. All 74 corresponding products are live today.
+They are same-code/same-effective-period SOURCE PRICE conflicts, not 74 duplicate catalogue rows. The stored description says differing finish/brass/black variants are a usual cause; that generic wording is not independent proof of the cause of each individual conflict.
+Current category breakdown:
+- UPVC Fittings: 58.
+- PE-AL-PE Fittings: 5.
+- Silent Fittings: 5.
+- PEXI Pipe: 5.
+- Toilet Seat Covers: 1.
+
+The source strings describe 79 product/date observations across the 74 flags, because each of the 5 Silent Fittings flags references 2 periods. All 79 dated Standard rows still exist. 74 dated rows retain the originally selected MRP. The following 5 PE-AL-PE flags are demonstrably stale about their selected MRP, though their alternative source observations remain recorded:
+Code | Flag says selected | Current stored MRP for flagged 2026-02-01 period
+PEA-45B | Rs 1549 | Rs 2640
+PEA-46B | Rs 3199 | Rs 4440
+PEA-55B | Rs 1744 | Rs 3440
+PEA-56B | Rs 3878 | Rs 6460
+PEA-65B | Rs 2424 | Rs 4460
+These five current rows are approved and linked to load batch 17, source file Prayag_MRP_Authoritative_v2_01Sep2026.xlsx. The five current prices equal alternatives already listed in the old flags. This is not authorization to clear or rewrite those flags.
+There are zero duplicate stored (item_code, effective_date, variant) history keys. The continued existence of a historical flag is not proof that multiple conflicting price rows currently coexist or that all 74 represent unresolved present-day errors.
+
+COMPLETE CONFLICT LIST — CURRENT NAMES/CATEGORIES AND UNCHANGED SOURCE OBSERVATIONS
+513 | Standard | Ceramic Sanitaryware | PTMT & Plastic Fittings | Toilet Seat Covers
+  2026-01-15: using ₹690; other source value(s): 540.00
+PEA-45B | Composite Fittings (Brass) Union Coupler | Pipes & Fittings | PE-AL-PE Fittings
+  2026-02-01: using ₹1549; other source value(s): 2,640.00
+PEA-46B | Composite Fittings (Brass) Union Coupler | Pipes & Fittings | PE-AL-PE Fittings
+  2026-02-01: using ₹3199; other source value(s): 4,440.00
+PEA-55B | Composite Fittings (Brass) Equal Elbow 90⁰ | Pipes & Fittings | PE-AL-PE Fittings
+  2026-02-01: using ₹1744; other source value(s): 3,440.00
+PEA-56B | Composite Fittings (Brass) Equal Elbow 90⁰ | Pipes & Fittings | PE-AL-PE Fittings
+  2026-02-01: using ₹3878; other source value(s): 6,460.00
+PEA-65B | Composite Fittings (Brass) Equal Tee | Pipes & Fittings | PE-AL-PE Fittings
+  2026-02-01: using ₹2424; other source value(s): 4,460.00, 5,624.00, 7,860.00
+PSS1133 | PP SILENT TEE | Pipes & Fittings | Silent Fittings
+  2025-04-01: using ₹901; other source value(s): 898.00 | 2025-07-01: using ₹453; other source value(s): 1,034.00
+PSS1633 | PP SILENT TEE | Pipes & Fittings | Silent Fittings
+  2025-04-01: using ₹2600; other source value(s): 3,122.00 | 2025-07-01: using ₹1210; other source value(s): 3,003.00
+PSS4041 | PP SILENT Y-TEE | Pipes & Fittings | Silent Fittings
+  2025-04-01: using ₹228; other source value(s): 274.00 | 2025-07-01: using ₹78; other source value(s): 502.00
+PSS5041 | PP SILENT Y-TEE | Pipes & Fittings | Silent Fittings
+  2025-04-01: using ₹325; other source value(s): 390.00 | 2025-07-01: using ₹98; other source value(s): 559.00
+PSS7541 | PP SILENT Y-TEE | Pipes & Fittings | Silent Fittings
+  2025-04-01: using ₹582; other source value(s): 698.00 | 2025-07-01: using ₹242; other source value(s): 766.00
+U321 | Reducer Brass Tee (SCH-80) 1⁄2 x 1⁄2 x 1⁄2 inch 15x15x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹94; other source value(s): 98.00
+U323 | Reducer Brass Tee (SCH-80) 1 x 1 x 1⁄2 inch 25x25x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹144; other source value(s): 138.00
+U521 | Reducer Brass Elbow (SCH-80) 3⁄4 x 1⁄2 inch 20x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹96; other source value(s): 98.00
+U524 | Reducer Brass Elbow (SCH-80) 1 x 3⁄4 inch 25x20 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹174; other source value(s): 196.00
+U526 | Reducer Brass Elbow (SCH-80) 1⁄2 x 1⁄2 inch 15x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹88; other source value(s): 94.00
+U527 | Reducer Brass Elbow (SCH-80) 3⁄4 x 3⁄4 inch 20x20 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹168; other source value(s): 196.00
+U70 | Male Adapter Brass Threads (SCH-80) 3⁄4 x 1⁄2 inch 20x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹128; other source value(s): 178.00
+U71 | Male Adapter Brass Threads (SCH-80) 1⁄2 inch 15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹126; other source value(s): 178.00
+U72 | Male Adapter Brass Threads (SCH-80) 3⁄4 inch 20 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹196; other source value(s): 278.00
+U73 | Male Adapter Brass Threads (SCH-80) 1 inch 25 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹274; other source value(s): 388.00
+U731 | Male Adapter Brass Threads (SCH-80) 1 x 1⁄2 inch 25x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹128; other source value(s): 184.00
+U74 | Male Adapter Brass Threads (SCH-80) 1 1⁄4 inch 32 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹448; other source value(s): 648.00
+U75 | Male Adapter Brass Threads (SCH-80) 1 1⁄2 inch 40 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹546; other source value(s): 726.00
+U76 | Male Adapter Brass Threads (SCH-80) 2 inch 50 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹896; other source value(s): 1,320.00
+U81 | Female Adapter Brass Threads (SCH-80) 1⁄2 inch 15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹66; other source value(s): 86.00
+U82 | Female Adapter Brass Threads (SCH-80) 3⁄4 inch 20 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹128; other source value(s): 184.00
+U83 | Female Adapter Brass Threads (SCH-80) 1 inch 25 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹196; other source value(s): 258.00
+U84 | Female Adapter Brass Threads (SCH-80) 1 1⁄4 inch 32 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹338; other source value(s): 468.00
+U85 | Female Adapter Brass Threads (SCH-80) 1 1⁄2 inch 40 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹534; other source value(s): 764.00
+U86 | Female Adapter Brass Threads (SCH-80) 2 inch 50 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹748; other source value(s): 1,048.00
+U920 | Female Adapter Brass Threads (SCH-80) 3⁄4 x 1⁄2 inch 20x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹78; other source value(s): 88.00
+U930 | Female Adapter Brass Threads (SCH-80) 1 x 1⁄2 inch 25x15 mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹82.8; other source value(s): 92.00
+UH-72 | Long Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹820; other source value(s): 920.00
+UH-74 | Long Concealed Valve (Quarter Turn) 3⁄4 inch GRACIA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH-76 | Long Concealed Valve (Quarter Turn) 3⁄4 inch MACASA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH-78 | Long Concealed Valve (Quarter Turn) 3⁄4 inch URBONA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH-79 | Long Concealed Valve (Quarter Turn) 3⁄4 inch SPA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹830; other source value(s): 930.00
+UH-80 | Long Concealed Valve (Quarter Turn) 3⁄4 inch VIVA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹815; other source value(s): 915.00
+UH72-S | Short Concealed Valve (Quarter Turn) 3⁄4 inch TRIANGULAR mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH74-S | Short Concealed Valve (Quarter Turn) 3⁄4 inch GRACIA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH76-S | Short Concealed Valve (Quarter Turn) 3⁄4 inch MACASA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH78-S | Short Concealed Valve (Quarter Turn) 3⁄4 inch URBONA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH79-S | Short Concealed Valve (Quarter Turn) 3⁄4 inch SPA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH80-S | Short Concealed Valve (Quarter Turn) 3⁄4 inch VIVA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH82 | Long Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹820; other source value(s): 920.00
+UH82-F | Full Turn Concealed Valve 1 inch TRIANGULAR | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1407; other source value(s): 1,570.00
+UH82-L | Long Concealed Valve (Quarter Turn) 1 inch TRIANGULAR | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1388; other source value(s): 1,560.00
+UH82-S | Short Concealed Valve (Quarter Turn) 1⁄2 inch TRIANGULAR mm | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹815; other source value(s): 915.00
+UH84 | Long Concealed Valve (Quarter Turn) 1⁄2 inch GRACIA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹860; other source value(s): 960.00
+UH84-F | Full Turn Concealed Valve 1 inch GRACIA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1299; other source value(s): 1,460.00
+UH84-L | Long Concealed Valve (Quarter Turn) 1 inch GRACIA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1280; other source value(s): 1,440.00
+UH84-S | Short Concealed Valve (Quarter Turn) 1⁄2 inch GRACIA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹825; other source value(s): 925.00
+UH86 | Long Concealed Valve (Quarter Turn) 1⁄2 inch MACASA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹860; other source value(s): 960.00
+UH86-F | Full Turn Concealed Valve 1 inch MACASA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1377; other source value(s): 1,540.00
+UH86-L | Long Concealed Valve (Quarter Turn) 1 inch MACASA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1358; other source value(s): 1,520.00
+UH86-S | Short Concealed Valve (Quarter Turn) 1⁄2 inch MACASA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹815; other source value(s): 915.00
+UH88 | Long Concealed Valve (Quarter Turn) 1⁄2 inch URBONA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹860; other source value(s): 960.00
+UH88-F | Full Turn Concealed Valve 1 inch URBONA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1299; other source value(s): 1,460.00
+UH88-L | Long Concealed Valve (Quarter Turn) 1 inch URBONA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1280; other source value(s): 1,440.00
+UH88-S | Short Concealed Valve (Quarter Turn) 1⁄2 inch URBONA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹815; other source value(s): 915.00
+UH89 | Long Concealed Valve (Quarter Turn) 1⁄2 inch SPA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH89-F | Full Turn Concealed Valve 1 inch SAGA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1299; other source value(s): 1,460.00
+UH89-L | Long Concealed Valve (Quarter Turn) 1 inch SAGA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1280; other source value(s): 1,440.00
+UH89-S | Short Concealed Valve (Quarter Turn) 1⁄2 inch SPA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹815; other source value(s): 915.00
+UH90 | Long Concealed Valve (Quarter Turn) 1⁄2 inch VIVA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹840; other source value(s): 940.00
+UH90-F | Full Turn Concealed Valve 1 inch VIVA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1377; other source value(s): 1,540.00
+UH90-L | Long Concealed Valve (Quarter Turn) 1 inch VIVA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹1358; other source value(s): 1,520.00
+UH90-S | Short Concealed Valve (Quarter Turn) 1⁄2 inch VIVA | Pipes & Fittings | UPVC Fittings
+  2026-02-01: using ₹810; other source value(s): 910.00
+XPET20 | 6 METER | Pipes & Fittings | PEXI Pipe
+  2026-02-01: using ₹62; other source value(s): 456.00
+XPET25 | 6 METER | Pipes & Fittings | PEXI Pipe
+  2026-02-01: using ₹84; other source value(s): 552.00
+XPET32 | 6 METER | Pipes & Fittings | PEXI Pipe
+  2026-02-01: using ₹114; other source value(s): 798.00
+XPET40 | 6 METER | Pipes & Fittings | PEXI Pipe
+  2026-02-01: using ₹164; other source value(s): 996.00
+XPET50 | 6 METER | Pipes & Fittings | PEXI Pipe
+  2026-02-01: using ₹212; other source value(s): 1,272.00
+
+Companion original-74-conflicts.csv includes all 74 codes, current names/divisions/categories, original and current conflict text, lifecycle state and dated-price comparisons.
+No repair, retirement, reactivation, price correction, flag clearance or other write was performed.

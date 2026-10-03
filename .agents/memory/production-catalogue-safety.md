@@ -23,9 +23,11 @@ confirmed: "Retired. Do not keep a production transfer path." If promotion is
 needed again, it must be separately reviewed and additive, with preview, apply
 and undo like the price loaders—not a replacement.
 
-**Why:** Whole-snapshot replacement can erase production-only price periods.
-The user treats the historical replacement as the reason to retire the workflow,
-not a reason to preserve it.
+**Why:** Whole-snapshot replacement can erase production-only price periods;
+the workflow is permanently retired regardless of the historical event's outcome.
+The user accepts the 2026-08-19 event as an intentional provenance rebuild, not
+a loss, including the deliberate exclusion of unsourced dates. Do not reopen
+lost-history reconstruction without a new request.
 
 **How to apply:** Never relax the production replacement prohibition for publishing
 or manual data promotion. Do not design or implement a new transfer route without

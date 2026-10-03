@@ -781,3 +781,45 @@ mtime_ms = 1791027915777
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9c36fbaa-1e19-4212-97a0-27d015f0baf7/1a3575d0-5a1e-43b3-b093-cd79bd60f634"
 storage_version_token = "1791027963160497"
 content_type = "text/csv"
+
+[[outputs]]
+id = "zwcKTbvc2B6SBKwlmhBdj"
+uri = "file://reports/p052/current-production-check/P052-Current-Production-Report.txt"
+type = "text"
+title = "P052 current production report"
+description = "Zero active products without history; eight original discontinued tanks live and priced; all 74 historical flags remain, including five stale selected-price descriptions."
+logical_id = "4b976767-d3c1-4ad7-a0c6-5161eafcb7b2"
+content_hash = "sha256:8ad42e03a57f562633aef52fcd873ea49d8bdb5b64038bdc4ab30d7861c77aa4"
+size = 16945
+mtime_ms = 1791029255944
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4b976767-d3c1-4ad7-a0c6-5161eafcb7b2/f0a36952-b432-4817-b1a3-e8a50f7a2ea8"
+storage_version_token = "1791029257884183"
+content_type = "text/plain"
+
+[[outputs]]
+id = "DWVClHyEBV8_52abdipfS"
+uri = "file://reports/p052/current-production-check/original-98-status.csv"
+type = "table"
+title = "Original 98 — current production status"
+description = "Complete original discontinued cohort compared with current production lifecycle and price state."
+logical_id = "fbcc6e6c-bb75-4848-b460-4927a0deff0e"
+content_hash = "sha256:4b7d49c53b0d983cb1c00365d698856a9dee8084eea0fd79df0e41a34a52f7de"
+size = 18282
+mtime_ms = 1791029256066
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/fbcc6e6c-bb75-4848-b460-4927a0deff0e/f2771fbd-ccb2-4598-ba21-56d2985239b1"
+storage_version_token = "1791029259185933"
+content_type = "text/csv"
+
+[[outputs]]
+id = "URFppgS_TAyUI9IzIYDCI"
+uri = "file://reports/p052/current-production-check/original-74-conflicts.csv"
+type = "table"
+title = "Original 74 — complete conflict list"
+description = "Codes, names, categories, competing source prices, unchanged flags and current dated-price comparisons."
+logical_id = "3f64823c-0dec-4911-b10b-ce5465fca482"
+content_hash = "sha256:56e21a9df43687ae98cae8d94060dd646aa4c56357d61ec01cbfb68f1f0dc582"
+size = 57309
+mtime_ms = 1791029256189
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/3f64823c-0dec-4911-b10b-ce5465fca482/14ee19e0-e11b-4830-aa8e-4f4b29e2cdd7"
+storage_version_token = "1791029260521809"
+content_type = "text/csv"
