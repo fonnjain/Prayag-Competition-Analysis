@@ -865,3 +865,17 @@ mtime_ms = 1791029773162
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/509fc430-d41f-4aa5-b816-26a1089a6ee6/5ef0acf4-ab92-4879-947b-4a1738b8d9f0"
 storage_version_token = "1791029777689032"
 content_type = "text/csv"
+
+[[outputs]]
+id = "wJ27ZZGdToZYbyM8yNQ55"
+uri = "file://reports/p053/P053-Part-0-Read-Only-Inventory.txt"
+type = "text"
+title = "P053 — Part 0 read-only inventory"
+description = "Exact roles and counts, product/report/export routes, existing saved scopes, catalogue picker source, shared helpers and per-user identity/storage findings. No feature code or data changed."
+logical_id = "80985acd-adfe-4b64-9db1-de2ed9bb80ae"
+content_hash = "sha256:a522543c754c68a698db282802108a1bc53ec47cb4b0c6e3695d68ba7a777ba3"
+size = 14629
+mtime_ms = 1791106216975
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/80985acd-adfe-4b64-9db1-de2ed9bb80ae/17bad53e-52de-4304-8884-0851869f4e16"
+storage_version_token = "1791106218848491"
+content_type = "text/plain"

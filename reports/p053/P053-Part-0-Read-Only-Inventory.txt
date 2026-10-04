@@ -1,0 +1,110 @@
+P053 — PART 0: READ-ONLY INVENTORY BEFORE IMPLEMENTATION
+Database checks: 4 October 2026, IST. Workspace/code inventory completed during this read-only phase.
+No feature code, schema, application settings, workflow or catalogue/price data was changed. No Head Office list was seeded. This is Part 0 only, not a completion report for the feature.
+
+0.1 EXACT STORED ROLES AND ADMIN CHECK
+Environment | Check clock IST | admin | user | counter | Total accounts | MRP history rows
+Development | 2026-10-04 14:53:53 | 3 | 181 | 0 | 184 | 14,012
+Production  | 2026-10-04 14:53:59 | 3 | 181 | 0 | 184 | 14,302
+Only admin and user are present in stored accounts. counter is a recognized role in the existing user-management code but has zero stored accounts. No new role is needed or proposed.
+Reuse artifacts/api-server/src/middlewares/authMiddleware.ts: requireAdmin, already used by the existing P048 vocabulary administration endpoints in priceEditor.ts.
+Its production behavior: unsigned requests get 401; users requiring password replacement get 403 PASSWORD_CHANGE_REQUIRED; then:
+  if (req.user.role !== "admin") {
+    res.status(403).json({ error: "Admin access required." });
+    return;
+  }
+Existing administrator-only examples include POST /api/catalog/price-editor/categories and POST /api/catalog/price-editor/series. The category-spelling read-only check also uses the same guard.
+New private-list writes need explicit ownership authorization, not a blanket requireAdmin, because non-admins must be able to create/edit/delete their own lists. Setting everyone visibility must reuse the real admin role check. No product/price write permission is implied.
+
+ACCESS DIFFERENCE THAT NEEDS A PAGE-PLACEMENT DECISION
+The server's internal read routers are behind requireAuth and requireWorkspaceReadAccess, which permit all signed-in roles after password replacement. The Product Database UI in App.tsx, however, blocks user/counter and directs them to Price Finder. Admin-only maintenance routes retain their separate requireAdmin checks.
+The two bucket pages therefore must either be narrow authenticated exceptions in Product Database, without opening the rest of that UI to non-admins, or live in Price Finder with sign-in required for list management. Existing anonymous Price Finder prices can remain anonymous; anonymous visitors have no user preference to retrieve. A personal active-list selection must never leak into anonymous or another user's results.
+
+0.2 PRODUCT/COMPARISON SURFACES ENUMERATED FROM CODE
+Actual artifact prefixes: Product Database /product-db/, Price Finder /price-finder/, Analysis /analysis/, Home /.
+
+CORE BROWSE / COMPARISON / REPORT SURFACES
+A. /product-db/ — catalogue table. GET /api/catalog/products and /api/catalog/filters.
+   Exports: /api/catalog/export, including MRP In Force and Today's Revisions. Server supports CSV and XLSX, catalog/history scopes and XLSX summary worksheets.
+B. /product-db/product and /product-db/product/:itemCode — single product and full MRP history. GET /api/catalog/product or /api/catalog/products/:itemCode.
+   Export History uses /api/catalog/export with type=history, itemCode and format=xlsx.
+C. /product-db/comparison — By Product and By Competitor views, product-detail/history drilldowns and comparison matrix/summary data.
+   GET /api/catalog/comparison, /comparison/by-product, /comparison/matrix, /comparison/summary and /comparison/filters.
+   Exports: GET /api/catalog/comparison/export, CSV/XLSX.
+D. /product-db/mapping-review — matched/unmatched competitor rows and Prayag suggestions.
+   GET /api/catalog/mapping-review, /mapping-review/auto-accept-preview and accept-batch history.
+   Exports: GET /api/catalog/mapping-review/export, CSV/XLSX.
+E. /price-finder/ — search results, hierarchical browse results, selected product rows, product detail and protected full-history dialog.
+   GET /api/price-finder/search, /browse, /product and /product/:itemCode; protected history uses the Analysis history contract. No separate general search/browse file-export handler was found.
+F. /price-finder/comparison — selected Prayag products and their competitor comparisons.
+   GET /api/price-finder/comparison. Export: /api/price-finder/comparison/export, XLSX.
+G. /analysis/ — Competition Analysis dashboard: overview, by-brand/by-category breakdowns, positioning, coverage matrix, opportunities, MRP increases and price-history drilldowns.
+   GET /api/analysis/overview, /by-brand, /by-category, /positioning, /coverage-matrix, /opportunities, /mrp-increases and /price-history, plus filter/period metadata.
+   Export: GET /api/analysis/export, CSV/XLSX. The filter must affect the source population before aggregates, ranking and pagination; merely hiding rendered rows would give inconsistent totals.
+H. /analysis/mrp-generator — scenario list/editor, selected scope previews and matched-candidate preview sentences. Saved scope may contain product selections/rules.
+   GET /api/mrp-generator/scopes and scenario reads; scenario preview is a POST and was NOT invoked for this inventory.
+I. /analysis/mrp-generator/matching — candidate product/competitor match workbench, GET /api/mrp-generator/matching.
+J. /analysis/mrp-generator/runs/:id — immutable run summary/results, GET /api/mrp-generator/runs/:runId and /results.
+   Export: browser-generated CSV in src/pages/mrp-generator/run.tsx. This is a separate export path from server CSV/XLSX exports and must not be missed.
+K. /analysis/mrp-generator/compare — run-comparison product results, GET /api/mrp-generator/compare.
+
+PRODUCT-BEARING MAINTENANCE / AUDIT SURFACES (ALSO INVENTORIED)
+L. /product-db/data-health — conflict, unpriced and discontinued product lists, source/provenance diagnostics and maintenance previews; GET /api/catalog/data-health and /catalog/mrp-provenance. A signed full-catalogue JSON export exists in development at /api/catalog/sync/export; production transfer remains retired/blocked.
+M. /product-db/load-mrp — uploaded MRP product-row preview/results, POST preview and GET /api/catalog/mrp-loads/:batchId. Preview was not called: it stages data.
+N. /product-db/new-products — product-upload preview/results, POST /api/catalog/new-products/preview and GET /api/catalog/new-products/:batchId. Preview was not called: it stages data.
+O. /product-db/import-competitor — extraction/preflight results and product suggestions; no saved bucket should alter parser input or upload membership silently.
+P. /product-db/import-review/:id — staged competitor/product rows, matches, proposed new products and validation details, GET /api/catalog/import-batches/:id.
+   Export: GET /api/catalog/import-batches/:id/export, XLSX, including the new-product worksheet.
+Q. /product-db/mrp-revisions — revision preview and prior-batch rows, GET /api/catalog/mrp-revisions/:batchId. Any filtered display must remain separate from the original Apply/undo scope.
+R. /product-db/price-editor — product picker, single-product/current/history rows and correction audit, /api/catalog/price-editor/product and /edits.
+S. /product-db/name-changes — product picker, single/bulk rename preview, audit and batch rows, /api/catalog/name-changes/products, /audit and /:batchId.
+T. /product-db/mrp-provenance-backfill — provenance candidate/history rows and audit, administrator preview route /api/admin/mrp-provenance-backfill/preview. This endpoint was not called.
+
+NON-PRODUCT SCREENS / MACHINE OUTPUTS
+Home / is an application launcher, not a product list. /admin is accounts/activity; its activity PDF is an account audit, not a product/comparison export. /product-db/api-keys and /analysis/settings/discounts are administration/settings, not product lists.
+The API-key authenticated /api/v1/products, /products/:itemCode, /product, /comparison and /analysis/overview return machine JSON. They are not signed-in user screens. Do not inject a user's private active bucket into these feeds or alter Sales behavior.
+The retired production snapshot path must not be re-enabled. A signed development catalogue snapshot is a full integrity/transfer object, not an ordinary filtered business report; filtering or rewriting that signed payload would change its meaning.
+
+EXPORT DISCLOSURE REQUIREMENTS IDENTIFIED (NOT IMPLEMENTED YET)
+Ordinary report paths requiring explicit active-list context: catalogue/current/revision/history CSV/XLSX; comparison CSV/XLSX; mapping-review CSV/XLSX; import-review XLSX; Price Finder comparison XLSX; Analysis CSV/XLSX; browser-generated MRP Generator CSV.
+XLSX needs visible top-of-sheet disclosure on every product/comparison worksheet, including secondary sheets. CSV needs a visible opening metadata/banner record, not just a filename or hidden query parameter. Existing importer header detection must tolerate that metadata if an exported file is intended for re-upload.
+The active filter must remove the whole comparison row and all its competitor values. Server-direct downloads require the same owner/visibility checks and resolved membership as the screen. Browser-only filtering is insufficient.
+For immutable runs, audit snapshots and loader previews, display filtering must never rewrite stored results, membership of Apply/undo, signed payloads or complete system-health baselines. Keep full-scope audit totals distinguishable from filtered display counts. Any export that is deliberately a full snapshot must visibly say that the bucket is not applied; it must never silently masquerade as a filtered report.
+
+0.3 EXISTING SAVED FILTERS / RELATED FEATURES
+No bucket-list, favourites or saved-view model was found in application code or the inspected production schema.
+Price Finder does have persistent-in-the-URL comparison selection: repeated code query parameters, implemented in useSelection.ts/selectionState.ts. The coded limit is 50. It survives a reload of that URL and can be shared/bookmarked, but is not a named, owned, private or inherited list, and does not persist as a user's global preference.
+Price Finder browse selection is React/context state. Speech-enabled preference is browser localStorage, not server per-user storage. Import recovery uses sessionStorage; authentication uses cookie/bearer session handling. These are not saved product sets.
+MRP Generator has persisted scenarios in mrp_generator_scenarios: name, description, scope, rules, version, created_by, timestamps. They are administrator pricing-policy scenarios, not owned everyone/only_me included/excluded lists. Their GET list endpoint may ensure default scenarios, so it was not invoked during this read-only inventory. Their scopes/picker patterns may be reused, but repurposing the scenario model would couple bucket filtering to pricing policy and immutable generator history.
+Recommendation: add a dedicated bucket model rather than redefine pricing scenarios or URL comparison selections.
+
+0.4 PICKER SOURCE / REUSE
+Use existing catalog_products:
+- item_code, product_name for identity and display;
+- division;
+- category;
+- series_range for optional Range;
+- is_active and discontinued_from for live/inactive status.
+This is the existing source retained by P049 Step 3, not a new source or a reclassification table. The master parser/planner already preserves existing classifications and uses the approved Range helper for new-product classification. No picker action should update these columns.
+Reuse lib/formatting/src/index.ts: RANGE_DIVISIONS and supportsCatalogRange. Exactly three approved divisions: CP Fittings / Faucets, CP (QUAA / FERN), PTMT & Plastic Fittings. Do not create another division list.
+Reuse artifacts/api-server/src/lib/priceEditorVocabulary.ts: normalizeVocabularyKey, already shared by vocabulary/category safety work. It handles NFKC, whitespace, case, punctuation/symbol spacing and the established simple singularisation. Rule matching must use this actual function, not a second approximation in SQL/client code. Resolve rules server-side against unchanged raw catalogue values.
+Explicit case example:
+Development at 2026-10-04 14:56:58 IST: CP Fittings / Faucets has 36 category Blaze 62 rows and 4 BLAZE 62 rows.
+Production at 2026-10-04 14:57:03 IST: the same 36 + 4 rows.
+A normalised Blaze 62 category rule therefore covers all 40; exact matching would miss 4. The BLAZE 62 rows have no Range; category matching must not require Range.
+No HO rules have been created. The number of affected HO rules must be measured from the actual rules at the later seeding step, not invented now.
+
+0.5 PER-USER STORAGE / SERVER IDENTITY
+No dedicated per-user preferences/settings or active-list table/column was found in source or inspected production schema. discount_settings is a global scope/discount table, not per-user preferences. Activity tables have user_id but are telemetry, not settings. Do not repurpose session or activity records as durable list preferences.
+Current identity is req.user.id, obtained by authMiddleware from the server-backed sessions table. getSessionId reads the sid cookie or Bearer session header; getSession loads the stored AuthUser. users.id is the stable ownership key. Do not use client-supplied owner IDs or mutable email as the ownership authority.
+A new per-user active-list record will be needed for one global remembered selection, with server-side list visibility/ownership validation. Personal lists require sign-in; public anonymous pricing need not be removed.
+
+ATTACHED HEAD OFFICE WORKBOOK — HELD FOR STEP 2
+Workbook: HO_Plumbing_Excluded_List_04Oct2026_1791105772521.xlsx. Workspace read only, 4 October 2026.
+Upload has 186 item-code rows; Items has 186 product rows. Its Read me reports 170 direct matches plus 16 space-normalised matches, 0 not-found and 0 duplicate codes. These are workbook claims, not a performed production import/validation.
+The two pending supplier rulings are A-464 and PW55S: only competitor cells were pink, so a bad competitor pairing may have been marked rather than the Prayag item being excluded.
+Nothing was imported or seeded. Step 2 stays deferred until those rulings and separate seeding approval.
+
+NEXT DECISION BEFORE FEATURE CODE
+Choose where signed-in non-admins access the two new pages: narrow bucket-only pages in Product Database while preserving its existing general gate, or authenticated bucket pages in Price Finder. Both can use the same server model and global active-list preference.
+Feature implementation, tests, screenshots, before/after checksums/classification snapshots, publication and genuine production confirmation remain future work; none is claimed complete by Part 0.

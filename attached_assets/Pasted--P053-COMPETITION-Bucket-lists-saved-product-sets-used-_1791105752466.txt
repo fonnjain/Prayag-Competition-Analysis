@@ -1,0 +1,240 @@
+# P053 — COMPETITION — Bucket lists: saved product sets used as a filter
+
+> **P053** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** New feature, two new pages.
+> **It changes no product, price, category, range or division.**
+> Quote `P053` when reporting back.
+
+A **bucket list** is a named, saved set of products that can be switched on as a filter anywhere products are shown. Two kinds:
+
+```
+Included list    the screen shows ONLY these products
+Excluded list    the screen shows everything EXCEPT these products
+```
+
+Head Office keeps shared lists for everyone. Each user can keep their own, and can start from a Head Office list and adapt it.
+
+**Build Part 0 first and report it before writing any code.** Several decisions below depend on what you find.
+
+---
+
+# PART 0 — Read-only. Report before building.
+
+**0.1 User roles.** What roles exist, exactly as stored, with the number of accounts in each? Which are admin? P048 built an admin-only check — quote it; this feature reuses it. **Do not invent a new role.**
+
+**0.2 Where products are listed.** Every screen, report and export that lists Prayag products or competitor comparisons, with its route. This is where the filter has to appear. **Enumerate from the code.**
+
+**0.3 Existing saved filters.** Does anything like this already exist — a saved view, a favourites list, a selection that persists? If so, report it. We may extend rather than add.
+
+**0.4 The product list for the picker.** Which table and columns give division, category and range today? Confirm it is the same source P049 Step 3 left in place.
+
+**0.5 Existing per-user storage.** Is there a per-user settings or preferences table, and how is the current user identified server-side?
+
+---
+
+# PART 1 — What a bucket list is made of
+
+**1.1** A list has: a **name** (required), an optional description, a **type** (`included` / `excluded`), an **owner**, a **visibility** (`everyone` / `only_me`), and a **parent list** (optional).
+
+**1.2 Membership is resolved from three things, in this order:**
+
+```
+1. rules          division / category / range selections, resolved when the list is used
+2. added codes    item codes added individually or by upload
+3. removed codes  item codes explicitly taken out — these always win
+```
+
+So a list can say "every End Cap, plus these 6 codes, minus this 1 code", and it stays correct when new End Caps are created later.
+
+**1.3** When a user picks a **whole category**, store the **rule**, and tell them plainly: *"New products added to this category later will be included automatically."* Offer a second option, **Add as a fixed list of 150 codes**, which stores the codes instead. Picking individual rows always stores codes.
+
+**1.4 Category matching uses the P051 normalised comparison, not the exact string.** A rule on `Blaze 62` must also catch the 4 products stored as `BLAZE 62`. If it matched exactly, the rule would silently miss them. Report how many rules this affects when the Head Office lists are created.
+
+**1.5 Range** is offered in the picker **only** for the three divisions P049 Step 2 established: CP Fittings / Faucets, CP (QUAA / FERN), PTMT & Plastic Fittings. Reuse that single list of divisions; do not write a second copy.
+
+---
+
+# PART 2 — Ownership and Head Office lists
+
+**2.1** Admin can set visibility to **everyone**. These are the Head Office lists. Only an admin can change one.
+
+**2.2** A non-admin's lists are visible **only to that user**. The visibility control is shown to them, explained, and fixed.
+
+**2.3 Starting from an existing list.** Any user can start from any list they can see. The new list records the original as its **parent** and keeps its own added and removed codes on top.
+
+**It stays linked.** If Head Office later adds items to the parent, the user's list picks them up, with their own additions and removals still applied. The editor says so:
+
+> *Based on **HO (Plumbing) — Excluded**. 12 items added, 3 removed.*
+
+**2.4** Offer **Detach from the original**, which copies the resolved members in and clears the parent. Once detached it never changes again on its own. Make this reversible only by starting again.
+
+**2.5** If a parent list is deleted, every child is **detached automatically**, keeping its members, and the user is told. **A child is never deleted with its parent.**
+
+**2.6** A user may not edit a list they do not own. The buttons are not shown, and the endpoint returns 403.
+
+---
+
+# PART 3 — Page one: Bucket Lists (browse)
+
+**3.1** A table of every list the current user can see. Filter chips across the top: **All · HO lists · My lists**. A search box on name.
+
+**3.2** Each row: name, a **type badge** (Included / Excluded, clearly different colours), an **HO** or **Mine** badge, item count, the divisions covered, and who last changed it when.
+
+**3.3** Row actions: **Use as filter**, **View items**, **Copy and edit**, **Export to Excel**. **Edit**, **Rename** and **Delete** appear only on lists the user owns.
+
+**3.4** Deleting a list deletes **no product and no price**. Say so in the confirmation. The confirmation names the list and its item count.
+
+**3.5** An empty state that explains in two lines what a bucket list is and offers **New bucket list**.
+
+---
+
+# PART 4 — Page two: Create or edit
+
+One page, three blocks down the left, with a **summary panel pinned to the right** that updates as the user works.
+
+## 4.1 Block one — Name and type
+
+- **Name** — required. Trim and collapse whitespace. Refuse a name that normalises to one the **same owner** already uses, and offer the existing list. Two different users may use the same name.
+- **Description** — optional.
+- **Type** — two large clickable cards, not a dropdown:
+
+```
+Included        Excluded
+Show only       Hide these
+these items     items
+```
+
+- **Visibility** — admin only; everyone else sees "Only me", fixed, with one line of explanation.
+- **Start from** — *Blank*, or any list the user can see.
+
+## 4.2 Block two — Add items, two tabs
+
+**Tab A — Pick from the catalogue**
+
+Division → Category → Range (where it applies). Each dropdown narrows the next. Then a product table with checkboxes, a search box, and **Select all N matching**.
+
+Every filter applied shows as a **removable chip**, so the user can see what they picked and undo one piece without starting over.
+
+**Tab B — Upload from Excel**
+
+- **Download template** — one column, `item_code`, with three example rows.
+- Accept .xlsx and .csv. Read the codes from the file, never from the file name or a brief.
+- **Show a preview before anything is saved**, with counts and the actual rows behind each:
+
+```
+matched                       n
+matched after removing a space  n   e.g. "U21 T" matched to "U21T"
+already in this list            n
+not found in the catalogue      n
+no longer active                n
+```
+
+- **Nothing is added until the user presses Add these.** **No code is ever dropped silently.** The not-found rows are listed on screen and downloadable.
+- Spaced-code matching is **shown, never silent**. This is the P051 problem; the user must see that `U21 T` became `U21T`.
+
+## 4.3 Block three — Review, in the right-hand panel
+
+- One sentence in plain English, updating live:
+  > *This list will hide **186** of **7,191** products from every comparison.*
+  > *This list will show only **42** products.*
+- A breakdown by division.
+- The resolved item list, each with an **×**, plus **Remove all from this category**.
+- Rule-based entries shown as a chip — *All End Caps (29 products, updates automatically)* — so the user can tell a rule from a fixed list.
+
+**4.4** Save is disabled until there is a name and at least one item. If an **Included** list would resolve to zero products, warn before saving: it would make every screen empty.
+
+**4.5** Record actor and timestamp on create and on every edit.
+
+---
+
+# PART 5 — Using a bucket list as a filter
+
+**5.1 One list at a time.** Choosing another replaces it. Do not stack two lists.
+
+**5.2** While a list is active, a banner sits above the results, on every screen in 0.2:
+
+> **Showing: HO (Plumbing) — Excluded** · 186 items hidden · **Clear**
+
+**5.3 The banner text goes into every export**, in the file, at the top. A report that quietly omits 186 products is the thing this feature must never cause. State in your report how you put it into each export format.
+
+**5.4** An **excluded** product removes the **whole comparison row**, competitor prices and all. An **included** list shows only those rows. Confirm this for every screen in 0.2.
+
+**5.5** The active list is remembered per user between visits, and the banner makes it obvious. It is never remembered per screen.
+
+**5.6** A bucket list **never changes any product, price, category, range, division or competitor row**. It is display only.
+
+---
+
+# PART 6 — Edge cases to handle explicitly
+
+**6.1** A code in a list that is later retired or deleted: **keep it**, and show *"3 items are no longer in the catalogue"* in the editor, with a way to clear them. Do not drop them silently.
+
+**6.2** Two lists may hold the same products. That is fine.
+
+**6.3** A rule that currently resolves to zero products: keep it, show it as zero, do not delete it.
+
+**6.4** Report the behaviour when a user's own list and a Head Office list share a name.
+
+---
+
+# Rules
+
+1. **No product, price, category, range, division or competitor row changes.** This feature only decides what is shown.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums, before and after.
+3. The catalogue snapshot (code, category, series_range, division) is byte-identical before and after, both environments.
+4. Admin check reuses what P048 built. The division and range scope reuses what P049 Step 2 built. The normalised comparison reuses the single shared function from P048 and P051. **No second copy of any of them.**
+5. No Sales application change.
+6. Nothing is seeded in this prompt. The Head Office lists come in Step 2.
+7. Development first, then publish, then confirm in production.
+
+# Tests
+
+```
+ 1. A non-admin cannot set visibility to everyone; the endpoint returns 403
+ 2. A non-admin cannot edit or delete an HO list; the endpoint returns 403
+ 3. A user cannot see another user's private list anywhere, including by direct URL
+ 4. Saving without a name is refused
+ 5. A name that normalises to one the same owner has is refused and offers the existing list
+ 6. The same name under two different owners is allowed
+ 7. A category rule on "Blaze 62" also catches products stored as "BLAZE 62"
+ 8. A rule picks up a product created in that category afterwards; a fixed list does not
+ 9. Upload: matched, space-matched, duplicate, not-found and inactive are each counted
+    and listed, and nothing is added before Add these is pressed
+10. A child list picks up items added to its parent afterwards, with its own
+    additions and removals still applied
+11. Detaching freezes the list; later parent changes do not reach it
+12. Deleting a parent detaches its children and deletes none of them
+13. Deleting a list deletes no product and no price row
+14. An excluded list removes the whole comparison row, competitor prices included
+15. An included list resolving to zero products warns before saving
+16. The banner appears on every screen from 0.2 and in every export file
+17. Only one list can be active at a time
+18. Range appears in the picker only for the three P049 divisions
+19. mrp_price_history count and checksum unchanged, both environments
+20. Catalogue classification snapshot byte-identical, both environments
+```
+
+**Test 16 is the one that matters most.** Everything else is convenience; a silently filtered export is a wrong number sent to someone.
+
+# Report
+
+1. Parts 0.1 to 0.5.
+2. The data model, with the three-part membership resolution quoted.
+3. Which screens and exports now carry the filter and the banner, and how the banner is written into each export format.
+4. What you reused from P048, P049 and P051, and anything that had to differ.
+5. Screenshots of both pages, including the upload preview and the active-filter banner.
+6. Test results.
+7. `mrp_price_history` and catalogue snapshot, before and after, both environments.
+8. Production confirmation after publish, with clock times.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Step 2, after this works
+
+Head Office lists get seeded, starting with **HO (Plumbing) — Excluded**: 186 products taken from the pink-marked rows of the plumbing competitor master. The file is ready. Two of its rows need a ruling from Prayag first, so the seeding waits for that.
+
+## The one thing to get right
+
+Someone will switch a list on, forget, and export a report a week later. The banner on screen and in the file is what stops that becoming a wrong number in somebody's inbox. Build that before the convenience features.

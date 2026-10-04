@@ -48,3 +48,4 @@
 - [Production browser authentication](production-browser-auth-handoff.md) — notebook secrets may be unavailable; use a genuine private ephemeral session handoff, never synthetic auth.
 - [Production catalogue safety](production-catalogue-safety.md) — seed/reset prohibition is a production acceptance requirement; distinguish real no-write previews from staging, replay and fixtures.
 - [Source-price conflict interpretation](source-price-conflict-interpretation.md) — legacy flags can compare old/new revisions; PEXI unit changes require an explicit Prayag ruling.
+- [Bucket-list safety](bucket-list-safety-boundary.md) — display-only sets require visible export disclosure; HO plumbing seeding awaits separate Prayag rulings.
