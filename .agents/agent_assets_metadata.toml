@@ -1061,3 +1061,17 @@ mtime_ms = 1791120032463
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/694ab76a-12dd-45e0-80ff-980f6cc9c4ff/5025c430-ba1c-43aa-ac9f-30c39e37b71b"
 storage_version_token = "1791120049629517"
 content_type = "text/plain"
+
+[[outputs]]
+id = "Qbqmd56_b28_iAs1U6amg"
+uri = "file://reports/P053-Step-2-Evidence.zip"
+type = "unspecified"
+title = "P053 Step 2 — Evidence ZIP"
+description = "21 files: screenshots, exact exported CSV, acceptance report, screenshot timestamps and protected-data before/after checks. Archive integrity verified."
+logical_id = "b1f8623f-0eac-4580-b96a-b38d863fb94c"
+content_hash = "sha256:ad5cb3f28cddb9756b60184f2b5a9d3938e402439f65f19354d8597839f83265"
+size = 2363325
+mtime_ms = 1791120154031
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b1f8623f-0eac-4580-b96a-b38d863fb94c/4f64d0b6-e6ba-4046-bb8d-b64f62128760"
+storage_version_token = "1791120162470084"
+content_type = "application/octet-stream"
