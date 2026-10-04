@@ -448,7 +448,13 @@ export function parseAndValidateCatalogSyncBundle(buffer: Buffer): CatalogSyncBu
   if (!isRecord(raw) || !isRecord(raw.manifest) || !isRecord(raw.data)) {
     throw new Error("Catalog sync bundle is missing its manifest or data.");
   }
-  assertExactKeys(raw, ["manifest", "data"], "Catalog sync bundle");
+  const notice = "Bucket lists do not apply here. Full unfiltered signed snapshot.";
+  if (raw.bucketFilterNotice !== undefined && raw.bucketFilterNotice !== notice) {
+    throw new Error("Invalid snapshot bucket disclosure.");
+  }
+  // Disclosure is outside the signed manifest and data; old bundles remain
+  // valid and the existing payload/signature verification is unchanged.
+  assertExactKeys(raw, raw.bucketFilterNotice === undefined ? ["manifest", "data"] : ["bucketFilterNotice", "manifest", "data"], "Catalog sync bundle");
   const manifest = raw.manifest;
   const manifestCreatedAt = manifest.createdAt;
   assertExactKeys(

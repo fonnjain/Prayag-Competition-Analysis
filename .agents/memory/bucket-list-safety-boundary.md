@@ -17,6 +17,35 @@ guard, normalised vocabulary comparison and approved Range division helper.
 Capture and preserve catalogue classifications and MRP fingerprints in both
 environments when implementing.
 
+The approved scope is inventory A–K only. Maintenance/audit surfaces L–T stay
+unfiltered and say “Bucket lists do not apply here.” Machine APIs and signed
+full-catalogue snapshots also remain unfiltered.
+
+**Why:** The user explicitly narrowed filtering to browse/comparison/report
+surfaces; maintenance membership must not silently shrink.
+
+**How to apply:** Keep the boundary explicit when adding routes or exports.
+Distinguish immutable full-scope audit counts from filtered display totals.
+
+Bucket browse/editor pages belong in Price Finder and both require sign-in.
+Anonymous Price Finder prices remain public, without an active bucket. Do not
+carve a bucket exception into the Product Database access gate.
+
+**Why:** This was the user's explicit page-placement and access decision.
+
+**How to apply:** Preserve that separation in navigation, route guards and
+future authentication changes.
+
+Membership archives must never resurrect a parent removal in a linked child.
+Saved pricing runs may be projected for display but must not be repriced or
+rewritten when a bucket changes.
+
+**Why:** Inheritance follows current parent membership; buckets are display-only,
+not a second pricing-policy or historical-run writer.
+
+**How to apply:** Treat inherited membership as inherited, preserve immutable
+run evidence, and aggregate visible frozen results without reevaluating prices.
+
 Head Office seeding is a separate step, not authorized by the supplied exclusion
 workbook. The initial plumbing exclusions await Prayag rulings on A-464 and
 PW55S before seeding.

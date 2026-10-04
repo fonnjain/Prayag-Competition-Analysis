@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { deleteBucketDataForAccount } from "../lib/bucketLists";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import { db, usersTable } from "@workspace/db";
@@ -287,10 +288,13 @@ router.delete("/admin/users/:id", async (req, res) => {
     return;
   }
 
-  const [deleted] = await db
-    .delete(usersTable)
-    .where(eq(usersTable.id, id))
-    .returning({ id: usersTable.id });
+  const deleted = await db.transaction(async tx => {
+    const [existing] = await tx.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, id));
+    if (!existing) return undefined;
+    await deleteBucketDataForAccount(id, req.user?.email ?? req.user?.id ?? "Administrator", tx);
+    const [removed] = await tx.delete(usersTable).where(eq(usersTable.id, id)).returning({ id: usersTable.id });
+    return removed;
+  });
 
   if (!deleted) {
     res.status(404).json({ error: "User not found." });

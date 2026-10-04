@@ -16,6 +16,9 @@ import { BrowseProvider } from '@/lib/browseContext';
 import PriceFinderPage from '@/pages/home';
 import ComparisonPage from '@/pages/comparison';
 
+import BucketListsPage from '@/pages/bucket-lists';
+import BucketEditorPage from '@/pages/bucket-editor';
+
 const queryClient = new QueryClient();
 
 function Router() {
@@ -26,6 +29,8 @@ function Router() {
           <Switch>
             <Route path="/" component={PriceFinderPage} />
             <Route path="/comparison" component={ComparisonPage} />
+            <Route path="/bucket-lists" component={BucketListsPage} />
+            <Route path="/bucket-lists/edit" component={BucketEditorPage} />
             <Route component={NotFound} />
           </Switch>
         </Layout>

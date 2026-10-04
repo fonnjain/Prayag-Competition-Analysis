@@ -879,3 +879,17 @@ mtime_ms = 1791106216975
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/80985acd-adfe-4b64-9db1-de2ed9bb80ae/17bad53e-52de-4304-8884-0851869f4e16"
 storage_version_token = "1791106218848491"
 content_type = "text/plain"
+
+[[outputs]]
+id = "NXzuM3n8XadlcM67x0w5F"
+uri = "file://reports/p053/P053-Development-Verification.txt"
+type = "text"
+title = "P053 development verification"
+description = "Delivered scope, passing checks, unchanged-data evidence and the production confirmation still pending publication."
+logical_id = "4be09f96-9361-4b5e-b2db-7a684d72d98f"
+content_hash = "sha256:3ef8149bdf7332efcb6f4425b220a61bfddcc02252858e0617150415d40f7050"
+size = 5647
+mtime_ms = 1791111094995
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4be09f96-9361-4b5e-b2db-7a684d72d98f/799aa128-fd1f-4357-8adc-afc7faf84021"
+storage_version_token = "1791111096673142"
+content_type = "text/plain"

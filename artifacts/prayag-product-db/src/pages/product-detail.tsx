@@ -1,6 +1,7 @@
 import { formatMoney } from "@workspace/formatting";
 import { useRoute } from "wouter";
-import { useGetCatalogProduct, getGetCatalogProductQueryKey } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
+import { BucketFilteredNotice, isBucketFiltered, useGetCatalogProduct, getGetCatalogProductQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -21,7 +22,8 @@ export default function ProductDetailPage() {
   const itemCode = itemCodeFromLocation(window.location.search, params?.itemCode);
   const productParams = { itemCode };
   
-  const { data, isLoading } = useGetCatalogProduct(productParams, {
+  const { user } = useAuth();
+  const { data, isLoading, error } = useGetCatalogProduct(productParams, {
     query: {
       enabled: !!itemCode,
       queryKey: getGetCatalogProductQueryKey(productParams),
@@ -30,6 +32,10 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return <div className="p-4 sm:p-6 text-center">Loading product...</div>;
+  }
+
+  if (!data && isBucketFiltered(error)) {
+    return <div className="p-4 sm:p-6 max-w-xl mx-auto"><BucketFilteredNotice userId={user?.id} /></div>;
   }
 
   if (!data) {

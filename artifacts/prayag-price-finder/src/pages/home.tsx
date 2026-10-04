@@ -45,6 +45,7 @@ import {
   type PriceFinderSearchResult,
 } from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
+import { BucketFilteredNotice, isBucketFiltered } from "@workspace/api-client-react";
 
 /** Compact one-line competitor price indicator for list rows */
 function CompetitorLine({
@@ -1098,8 +1099,8 @@ function formatHistoryChange(
 }
 
 function ProductPriceHistory({ itemCode }: { itemCode: string }) {
-  const { isAuthenticated } = useAuth();
-  const { data, isLoading, isError } = useGetPriceHistory(
+  const { isAuthenticated, user: histUser } = useAuth();
+  const { data, isLoading, isError, error: histError } = useGetPriceHistory(
     { itemCode },
     {
       query: {
@@ -1134,6 +1135,8 @@ function ProductPriceHistory({ itemCode }: { itemCode: string }) {
       <div className="mt-2 overflow-x-auto rounded-lg border">
         {isLoading ? (
           <p className="p-4 text-sm text-muted-foreground">Loading price history…</p>
+        ) : isError && isBucketFiltered(histError) ? (
+          <div className="p-3"><BucketFilteredNotice userId={histUser?.id} /></div>
         ) : isError ? (
           <p className="p-4 text-sm text-destructive">Price history could not be loaded.</p>
         ) : (
@@ -1178,7 +1181,8 @@ function ProductView({
   isSelected: boolean;
   onToggleSelection: (itemCode: string) => void;
 }) {
-  const { data, isLoading, isError } = useGetPriceFinderProduct({ itemCode }, {
+  const { user: detailUser } = useAuth();
+  const { data, isLoading, isError, error: detailError } = useGetPriceFinderProduct({ itemCode }, {
     query: {
       queryKey: ["price-finder-product", itemCode],
       enabled: !!itemCode,
@@ -1214,6 +1218,10 @@ function ProductView({
         <div className="h-4 w-1/4 bg-muted rounded" />
       </div>
     );
+  }
+
+  if (isError && isBucketFiltered(detailError)) {
+    return <div className="mt-4"><BucketFilteredNotice userId={detailUser?.id} /></div>;
   }
 
   if (isError || !data?.product) {

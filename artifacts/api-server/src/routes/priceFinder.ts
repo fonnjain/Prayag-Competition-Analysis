@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import XLSX from "xlsx";
+import { bucketCodeAllowed, bucketSql, bucketExportRows } from "../lib/bucketFilter";
 import {
   priceChangePct,
   validToFromNextDate,
@@ -74,7 +75,8 @@ async function buildPriceFinderComparison(
   competitors: PriceFinderCompetitor[],
   asOf: string,
 ) {
-  const codeList = sqlList(codes);
+  codes = codes.filter(bucketCodeAllowed);
+  const codeList = codes.length ? sqlList(codes) : sql`NULL`;
   const productResult = await db.execute<ComparisonProductRow>(sql`
     SELECT
       p.item_code,
@@ -553,6 +555,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       LIMIT 1
     ) best_comp ON true
     WHERE p.is_active IS TRUE
+      AND ${bucketSql(sql`p.item_code`)}
       AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       AND ${sql.join(filterConditions, sql` AND `)}
   `);
@@ -648,6 +651,7 @@ router.get("/price-finder/browse", async (req, res) => {
       count(*)::int AS count
     FROM catalog_products p
     WHERE p.is_active IS TRUE
+      AND ${bucketSql(sql`p.item_code`)}
       AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
       AND EXISTS (
         SELECT 1
@@ -672,6 +676,7 @@ router.get("/price-finder/browse", async (req, res) => {
         count(*)::int AS count
       FROM catalog_products p
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
+        AND ${bucketSql(sql`p.item_code`)}
         AND p.is_active IS TRUE
         AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
         AND EXISTS (
@@ -774,6 +779,7 @@ router.get("/price-finder/browse", async (req, res) => {
         LIMIT 1
       ) best_comp ON true
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
+        AND ${bucketSql(sql`p.item_code`)}
         AND ${categoryCondition}
         AND p.is_active IS TRUE
         AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
@@ -1129,7 +1135,10 @@ router.get("/price-finder/comparison/export", async (req, res) => {
       })),
     );
     const workbook = XLSX.utils.book_new();
-    const sheet = XLSX.utils.json_to_sheet(exportRows);
+    const originalSheet = XLSX.utils.json_to_sheet(exportRows);
+    const sheet = XLSX.utils.aoa_to_sheet(bucketExportRows(
+      XLSX.utils.sheet_to_json<(string | number | null)[]>(originalSheet, { header: 1 }),
+    ));
     XLSX.utils.book_append_sheet(workbook, sheet, "Price comparison");
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     res.setHeader(

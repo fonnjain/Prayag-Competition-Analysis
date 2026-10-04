@@ -5,6 +5,67 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export interface BucketRule {
+  division?: string;
+  category?: string;
+  range?: string;
+}
+
+export type BucketDraftType = typeof BucketDraftType[keyof typeof BucketDraftType];
+
+
+export const BucketDraftType = {
+  included: 'included',
+  excluded: 'excluded',
+} as const;
+
+export type BucketDraftVisibility = typeof BucketDraftVisibility[keyof typeof BucketDraftVisibility];
+
+
+export const BucketDraftVisibility = {
+  everyone: 'everyone',
+  only_me: 'only_me',
+} as const;
+
+export interface BucketDraft {
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+  type?: BucketDraftType;
+  visibility?: BucketDraftVisibility;
+  /** @nullable */
+  parentId?: string | null;
+  rules?: BucketRule[];
+  addedCodes?: string[];
+  removedCodes?: string[];
+}
+
+export type BucketListMembersItem = { [key: string]: unknown };
+
+export type BucketListDivisionsItem = { [key: string]: unknown };
+
+export type BucketListRuleCountsItem = { [key: string]: unknown };
+
+export type BucketList = BucketDraft & ({
+  id: string;
+  ownerId?: string;
+  /** @nullable */
+  parentName?: string | null;
+  count: number;
+  activeCount?: number;
+  missingCount?: number;
+  totalProducts?: number;
+  canEdit: boolean;
+  members: BucketListMembersItem[];
+  divisions?: BucketListDivisionsItem[];
+  ruleCounts?: BucketListRuleCountsItem[];
+  createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  /** @nullable */
+  detachedNotice?: string | null;
+});
+
 export type P029UgdClassificationPreviewStatus = typeof P029UgdClassificationPreviewStatus[keyof typeof P029UgdClassificationPreviewStatus];
 
 
@@ -5370,4 +5431,25 @@ export type PreflightCataloguePdfBody = {
   effectiveDate?: string;
   extractionPath?: ExtractionPath;
 };
+
+export type GetBucketCatalogue200 = { [key: string]: unknown };
+
+export type PreviewBucketUploadBody = {
+  file: Blob;
+  /** JSON-encoded BucketDraft */
+  draft: string;
+};
+
+export type PreviewBucketUpload200 = { [key: string]: unknown };
+
+export type GetActiveBucketList200 = { [key: string]: unknown };
+
+export type SetActiveBucketListBody = {
+  /** @nullable */
+  listId: string | null;
+};
+
+export type SetActiveBucketList200 = { [key: string]: unknown };
+
+export type DeleteBucketList200 = { [key: string]: unknown };
 

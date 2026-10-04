@@ -20,6 +20,7 @@ import {
 } from "../lib/mrpProvenance";
 import { derivePriceHistoryStatuses } from "../lib/priceHistoryStatus";
 import { catalogueMaintenanceActions, refuseProductionCatalogueReplacement } from "../lib/catalogueMaintenancePolicy";
+import { bucketSql } from "../lib/bucketFilter";
 
 const router: IRouter = Router();
 const VARIANT_BACKFILL_CONFIRMATION = "ATTACH 148 JANUARY COLOUR ROWS";
@@ -174,7 +175,7 @@ router.get("/catalog/products", async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
-  const conditions = [];
+  const conditions = [bucketSql(sql`${catalogProductsTable.itemCode}`)];
   if (division) conditions.push(eq(catalogProductsTable.division, division));
   if (category) conditions.push(eq(catalogProductsTable.category, category));
   if (search) {
@@ -249,7 +250,7 @@ router.get("/catalog/filters", async (_req, res) => {
     .selectDistinct({ division: catalogProductsTable.division })
     .from(catalogProductsTable)
     .where(
-      sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`,
+      sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date) and ${bucketSql(sql`${catalogProductsTable.itemCode}`)}`,
     )
     .orderBy(asc(catalogProductsTable.division));
   const catRows = await db
@@ -259,7 +260,7 @@ router.get("/catalog/filters", async (_req, res) => {
     })
     .from(catalogProductsTable)
     .where(
-      sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date)`,
+      sql`${catalogProductsTable.isActive} is true and (${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > current_date) and ${bucketSql(sql`${catalogProductsTable.itemCode}`)}`,
     )
     .orderBy(asc(catalogProductsTable.category));
 

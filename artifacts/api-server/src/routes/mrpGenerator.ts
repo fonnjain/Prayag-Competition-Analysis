@@ -13,6 +13,8 @@ import {
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import { getCompetitorRowsForPeriod, getPrayagCatalogMapForPeriod } from "./analysis";
+import { bucketSql, filterBucketRows } from "../lib/bucketFilter";
+import { bucketRunSummary, bucketRunSnapshot } from "../lib/bucketGeneratorView";
 import { effectivePrice } from "../lib/analysis";
 import {
   evaluateProduct,
@@ -572,6 +574,7 @@ router.get("/mrp-generator/scopes", requireAdmin, async (_req, res) => {
         nullif(trim(p.category), '') AS category
       FROM catalog_products p
       WHERE p.is_active IS TRUE
+        AND ${bucketSql(sql`p.item_code`)}
         AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
         AND EXISTS (
           SELECT 1
@@ -1787,12 +1790,14 @@ router.get("/mrp-generator/runs", requireAdmin, async (req, res) => {
     .where(scenarioId == null ? undefined : eq(mrpGeneratorRunsTable.scenarioId, scenarioId))
     .orderBy(desc(mrpGeneratorRunsTable.createdAt))
     .limit(limit);
+  const visibleResults = rows.length ? await db.select().from(mrpGeneratorResultsTable)
+    .where(and(inArray(mrpGeneratorResultsTable.runId, rows.map(row => row.run.id)), bucketSql(sql`${mrpGeneratorResultsTable.itemCode}`))) : [];
   res.json({
     runs: rows.map(({ run, scenarioName }) => ({
       ...run,
       scenarioName: scenarioName ?? (snapshotRunType(parsed(run.inputSnapshot, { modelKind: run.modelKind })) === "matching" ? "Matching Scenario" : null),
       inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
-      summary: parsed(run.summary, {}),
+      summary: bucketRunSummary(run, visibleResults.filter(result => result.runId === run.id)),
       sourceFreshness: parsed(run.sourceFreshness, {}),
       policyVersion: run.modelKind === "historical" ? null : snapshotPolicyVersion(parsed(run.inputSnapshot, {})),
       modelKind: run.modelKind ?? snapshotModelKind(parsed(run.inputSnapshot, {})),
@@ -1808,7 +1813,7 @@ function exposedInputSnapshot(
   raw: string | null | undefined,
   persistedModelKind?: string | null,
 ) {
-  const snapshot = parsed<{ modelKind?: unknown }>(raw ?? "{}", {});
+  const snapshot = bucketRunSnapshot(raw);
   return {
     ...snapshot,
     modelKind: persistedModelKind === "historical" || snapshot.modelKind === "historical"
@@ -1817,12 +1822,12 @@ function exposedInputSnapshot(
   };
 }
 
-function exposedRun(run: typeof mrpGeneratorRunsTable.$inferSelect) {
+function exposedRun(run: typeof mrpGeneratorRunsTable.$inferSelect, results: typeof mrpGeneratorResultsTable.$inferSelect[] = []) {
   return {
     ...run,
     scenarioName: snapshotRunType(parsed(run.inputSnapshot, { modelKind: run.modelKind })) === "matching"
       ? "Matching Scenario" : null,
-    summary: parsed(run.summary, {}),
+    summary: bucketRunSummary(run, results),
     sourceFreshness: parsed(run.sourceFreshness, {}),
     inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
   };
@@ -1889,7 +1894,8 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
   if (!run) { res.status(404).json({ error: "Run not found." }); return; }
   const scenario = run.scenarioId == null ? undefined :
     (await db.select().from(mrpGeneratorScenariosTable).where(eq(mrpGeneratorScenariosTable.id, run.scenarioId)).limit(1))[0];
-  const results = await db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)).orderBy(asc(mrpGeneratorResultsTable.itemCode));
+  const results = await db.select().from(mrpGeneratorResultsTable).where(and(eq(mrpGeneratorResultsTable.runId, id),
+    bucketSql(sql`${mrpGeneratorResultsTable.itemCode}`))).orderBy(asc(mrpGeneratorResultsTable.itemCode));
   const snapshot = parsed<{
     modelKind?: "competitive" | "historical";
     policyVersion?: number;
@@ -1929,7 +1935,7 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
     ? { ...scenarioView, policyVersion, policy }
     : null;
   res.json({
-    run: exposedRun(run),
+    run: exposedRun(run, results),
     policyVersion,
     modelKind,
     runType,
@@ -1943,7 +1949,8 @@ router.get("/mrp-generator/runs/:runId", requireAdmin, async (req, res) => {
 
 router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) => {
   const id = Number(req.params.runId);
-  const rows = await db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)).orderBy(asc(mrpGeneratorResultsTable.itemCode));
+  const rows = await db.select().from(mrpGeneratorResultsTable).where(and(eq(mrpGeneratorResultsTable.runId, id),
+    bucketSql(sql`${mrpGeneratorResultsTable.itemCode}`))).orderBy(asc(mrpGeneratorResultsTable.itemCode));
   if (!rows.length && !(await db.select({ id: mrpGeneratorRunsTable.id }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0]) { res.status(404).json({ error: "Run not found." }); return; }
   const run = (await db.select({
     inputSnapshot: mrpGeneratorRunsTable.inputSnapshot,
@@ -1992,7 +1999,7 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
   const resultSets = await Promise.all(runIds.map((id) =>
     db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)),
   ));
-  const resultRows = resultSets.flat();
+  const resultRows = filterBucketRows(resultSets.flat(), row => row.itemCode);
   const byRun = new Map<number, typeof resultRows>();
   for (const row of resultRows) byRun.set(row.runId, [...(byRun.get(row.runId) ?? []), row]);
   const runById = new Map(runs.map((run) => [run.id, run]));
@@ -2072,7 +2079,7 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
       modelKind: runById.get(id)!.modelKind,
     }),
     inputSnapshot: exposedInputSnapshot(runById.get(id)!.inputSnapshot, runById.get(id)!.modelKind),
-    summary: parsed(runById.get(id)!.summary, {}),
+    summary: bucketRunSummary(runById.get(id)!, byRun.get(id) ?? []),
     policyVersion: (runById.get(id)!.modelKind ?? "competitive") === "historical" ? null : snapshotPolicyVersion(parsed(runById.get(id)!.inputSnapshot, {})),
     collectiveMargin: (() => {
       const snapshot = parsed<{
@@ -2084,7 +2091,7 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
       );
       const evidence = new Map((snapshot.products ?? []).map((product) => [canonicalItemCode(product.itemCode ?? ""), product]));
       const resultByCode = new Map((byRun.get(id) ?? []).map((row) => [canonicalItemCode(row.itemCode), row]));
-      const values = (snapshot.products ?? []).map((product) => {
+      const values = filterBucketRows(snapshot.products ?? [], product => product.itemCode).map((product) => {
         const code = canonicalItemCode(product.itemCode ?? "");
         const row = resultByCode.get(code);
         const persisted = parsed<{ salesEvidence?: unknown; marginEvidence?: unknown }>(row?.evidence ?? "{}", {});

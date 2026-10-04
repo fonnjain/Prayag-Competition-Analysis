@@ -116,13 +116,13 @@ export function AuthProvider({
     [],
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     clearStoredSid();
     deactivateBearer();
     setUser(null);
-    fetch('/api/logout', { credentials: 'include' }).catch(() => {});
+    await fetch('/api/logout', { credentials: 'include' }).catch(() => {});
     const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL)
-      ? import.meta.env.BASE_URL.replace(/\/+$/, '') || '/'
+      ? import.meta.env.BASE_URL
       : '/';
     window.location.href = base;
   }, []);

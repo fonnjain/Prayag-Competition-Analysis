@@ -55,7 +55,7 @@ router.get("/catalog/sync/export", async (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   res.setHeader("X-Catalog-Sync-Sha256", bundle.manifest.payloadSha256);
-  res.send(JSON.stringify(bundle));
+  res.send(JSON.stringify({ bucketFilterNotice: "Bucket lists do not apply here. Full unfiltered signed snapshot.", ...bundle }, null, 2));
 });
 
 router.post("/catalog/sync/preflight", refuseProductionCatalogueReplacement, upload.single("file"), async (req, res) => {

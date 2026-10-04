@@ -1,0 +1,18 @@
+{
+  "checks": [
+    {
+      "environment": "development",
+      "output": "checked_at_ist,mrp_count,mrp_value_sha256,catalogue_count,catalogue_full_md5,classification_sha256\n2026-10-04 16:16:41,14012,4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2,6948,6be775f28feaa7cc55eb86a1d67d183f,7c5086c7df253fbcaf06dcffa69b3569803118f3e4b3b4f50070f0e5e751c577\n",
+      "identical": true,
+      "classificationCsvBytesIdentical": true
+    },
+    {
+      "environment": "production",
+      "output": "checked_at_ist,mrp_count,mrp_value_sha256,catalogue_count,catalogue_full_md5,classification_sha256\n2026-10-04 16:16:51,14302,e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458,7191,63b7a4ec2434846a0b6e880773770abb,b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376\n",
+      "identical": true,
+      "classificationCsvBytesIdentical": true
+    }
+  ],
+  "sql": "SELECT to_char(now() AT TIME ZONE 'Asia/Kolkata','YYYY-MM-DD HH24:MI:SS') AS checked_at_ist,(SELECT count(*) FROM mrp_price_history) AS mrp_count,(SELECT encode(sha256(convert_to(coalesce(string_agg(row_text,E'\n' ORDER BY row_text COLLATE \"C\"),''),'UTF8')),'hex') FROM (SELECT jsonb_build_array(item_code,to_char(effective_date,'YYYY-MM-DD'),variant,encode(float8send(mrp),'hex'),encode(float8send(net_price),'hex'),encode(float8send(discount_pct),'hex'),price_basis)::text AS row_text FROM mrp_price_history) v) AS mrp_value_sha256,(SELECT count(*) FROM catalog_products) AS catalogue_count,(SELECT md5(string_agg(row_to_json(p)::text,'|' ORDER BY id)) FROM catalog_products p) AS catalogue_full_md5,(SELECT encode(sha256(convert_to(coalesce(string_agg(jsonb_build_array(item_code,category,series_range,division)::text,E'\n' ORDER BY item_code COLLATE \"C\"),''),'UTF8')),'hex') FROM catalog_products) AS classification_sha256",
+  "note": "Pre-code checksums prove unchanged data. Raw classification baseline CSVs were archived after implementation, anchored by those matching pre-code hashes; subsequent raw CSV archives are byte-identical. Production feature behavior remains pending user publication."
+}

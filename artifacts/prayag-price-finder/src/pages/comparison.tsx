@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useSelection } from "@/lib/useSelection";
 import { formatPriceDate, UpcomingGapDetails } from "@/components/price-window";
 import {
@@ -23,6 +24,7 @@ export default function ComparisonPage() {
   const searchString = useSearch();
   const [, setLocation] = useLocation();
   const { codes, removeCode } = useSelection();
+  const { user } = useAuth();
   const params = new URLSearchParams(searchString);
   const { competitors: activeCompetitors, asOf } = comparisonStateFromParams(params);
   const normalizedParams = normalizePriceFinderParams(params, "comparison");
@@ -128,6 +130,13 @@ export default function ComparisonPage() {
                 className="h-8 w-[132px] bg-slate-950/50 border-white/10 text-white focus-visible:ring-indigo-500 font-medium text-xs"
               />
             </div>
+            <Link
+              href={`/bucket-lists/edit?${codes.map((c) => `code=${encodeURIComponent(c)}`).join("&")}`}
+              data-testid="link-save-as-bucket"
+              className="inline-flex items-center gap-1.5 border border-white/30 text-white px-3 h-8 rounded-md text-xs font-bold hover:bg-white/10"
+            >
+              Save these {codes.length} products as a bucket list
+            </Link>
             <a 
               href={exportUrl}
               download

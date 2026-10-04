@@ -595,7 +595,7 @@ export default function MappingReviewPage() {
         <div className="mb-6 rounded-md border bg-muted/20 p-4">
           <div className="mb-3 flex items-center gap-2">
             <History className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-medium">Recent accept batches</h2>
+            <h2 className="text-sm font-medium">Recent accept batches — full-scope audit counts</h2>
             <span className="text-xs text-muted-foreground">
               Sent matches back to review even after the toast is gone.
             </span>

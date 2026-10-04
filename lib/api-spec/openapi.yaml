@@ -2772,6 +2772,174 @@ paths:
         "409": { description: Current classification changed or already undone }
         "403": { description: Administrator access required }
 
+  /bucket-lists:
+    get:
+      operationId: getBucketLists
+      summary: Lists visible to the signed-in user
+      responses:
+        '200':
+          description: Visible lists with resolved membership
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/BucketList'}}
+    post:
+      operationId: createBucketList
+      summary: Create an owned bucket list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BucketDraft'}
+      responses:
+        '201':
+          description: Created list
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketList'}
+  /bucket-lists/catalogue:
+    get:
+      operationId: getBucketCatalogue
+      summary: Unfiltered catalogue for the bucket picker
+      responses:
+        '200':
+          description: Catalogue and approved range divisions
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+  /bucket-lists/preview:
+    post:
+      operationId: previewBucketList
+      summary: Resolve a draft without saving anything
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BucketDraft'}
+      responses:
+        '200':
+          description: Resolved preview
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketList'}
+  /bucket-lists/upload-preview:
+    post:
+      operationId: previewBucketUpload
+      summary: Stateless Excel or CSV code preview; does not add or save codes
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, draft]
+              properties:
+                file: {type: string, format: binary}
+                draft: {type: string, description: JSON-encoded BucketDraft}
+      responses:
+        '200':
+          description: Every uploaded row classified, with original and matched codes
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+  /bucket-lists/template:
+    get:
+      operationId: downloadBucketTemplate
+      responses:
+        '200':
+          description: One-column Excel template
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+  /bucket-lists/active:
+    get:
+      operationId: getActiveBucketList
+      summary: Current user's global active bucket; anonymous always has none
+      responses:
+        '200':
+          description: Active selection and disclosure
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+    put:
+      operationId: setActiveBucketList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listId]
+              properties:
+                listId: {type: [string, 'null']}
+      responses:
+        '200':
+          description: Replaced or cleared selection
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+  /bucket-lists/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      operationId: getBucketList
+      responses:
+        '200':
+          description: Visible list and resolved items
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketList'}
+    patch:
+      operationId: updateBucketList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BucketDraft'}
+      responses:
+        '200':
+          description: Updated list
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketList'}
+    delete:
+      operationId: deleteBucketList
+      responses:
+        '200':
+          description: Deleted only the list; children detached
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: true}
+  /bucket-lists/{id}/detach:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      operationId: detachBucketList
+      responses:
+        '200':
+          description: Resolved members frozen, parent and live rules cleared
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketList'}
+  /bucket-lists/{id}/export:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      operationId: exportBucketList
+      responses:
+        '200':
+          description: Excel list with visible disclosure
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
 components:
   parameters:
     AuthorizationSessionHeader:
@@ -2848,6 +3016,44 @@ components:
         type: string
         format: date
   schemas:
+    BucketRule:
+      type: object
+      properties:
+        division: {type: string}
+        category: {type: string}
+        range: {type: string}
+    BucketDraft:
+      type: object
+      properties:
+        name: {type: string}
+        description: {type: [string, 'null']}
+        type: {type: string, enum: [included, excluded]}
+        visibility: {type: string, enum: [everyone, only_me]}
+        parentId: {type: [string, 'null']}
+        rules: {type: array, items: {$ref: '#/components/schemas/BucketRule'}}
+        addedCodes: {type: array, items: {type: string}}
+        removedCodes: {type: array, items: {type: string}}
+    BucketList:
+      allOf:
+        - $ref: '#/components/schemas/BucketDraft'
+        - type: object
+          required: [id, name, type, visibility, count, members, canEdit]
+          properties:
+            id: {type: string}
+            ownerId: {type: string}
+            parentName: {type: [string, 'null']}
+            count: {type: integer}
+            activeCount: {type: integer}
+            missingCount: {type: integer}
+            totalProducts: {type: integer}
+            canEdit: {type: boolean}
+            members: {type: array, items: {type: object, additionalProperties: true}}
+            divisions: {type: array, items: {type: object, additionalProperties: true}}
+            ruleCounts: {type: array, items: {type: object, additionalProperties: true}}
+            createdAt: {type: string}
+            updatedAt: {type: string}
+            updatedBy: {type: string}
+            detachedNotice: {type: [string, 'null']}
     P029UgdClassificationPreview:
       type: object
       required: [correctionKey, status, rows, priceChecks, copiedFields, sizeAction, canApply]

@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { bucketSql, filterBucketRows, bucketExportRows } from "../lib/bucketFilter";
 import { sql, eq, ne, asc, desc, and, inArray } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { applyIndianNumberFormats } from "@workspace/formatting";
@@ -43,7 +44,7 @@ function sendSheet(
   format: string,
   moneyColumns: number[] = [],
 ): void {
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const ws = XLSX.utils.aoa_to_sheet(bucketExportRows(aoa));
   applyIndianNumberFormats(ws, { moneyColumns });
   if (format === "csv") {
     const csv = XLSX.utils.sheet_to_csv(ws);
@@ -114,6 +115,7 @@ async function getPrayagMaps(): Promise<Map<string, PrayagInfo>> {
     })
       .from(catalogProductsTable)
       .where(and(
+        bucketSql(sql`${catalogProductsTable.itemCode}`),
         eq(catalogProductsTable.isActive, true),
         sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayStr})`,
       )),
@@ -187,6 +189,7 @@ async function getCatalogCandidates(): Promise<CatalogCandidate[]> {
     })
     .from(catalogProductsTable)
     .where(and(
+      bucketSql(sql`${catalogProductsTable.itemCode}`),
       eq(catalogProductsTable.isActive, true),
       sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${todayForCandidates})`,
     ));
@@ -608,7 +611,7 @@ router.get("/catalog/comparison", async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
-  const conditions = [];
+  const conditions = [bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (competitors.length) conditions.push(inArray(competitorPricesTable.competitor, competitors));
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
@@ -668,7 +671,7 @@ router.get("/catalog/comparison/export", async (req, res) => {
   const expensiveOnly = req.query.expensiveOnly === "true";
   const format = String(req.query.format ?? "xlsx");
 
-  const conditions = [];
+  const conditions = [bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (competitors.length) conditions.push(inArray(competitorPricesTable.competitor, competitors));
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (matchStatus) conditions.push(eq(competitorPricesTable.matchStatus, matchStatus));
@@ -785,7 +788,8 @@ router.get("/catalog/comparison/export", async (req, res) => {
 router.get("/catalog/comparison/summary", async (req, res) => {
   const competitors = competitorParams(req.query.competitor);
   let q = db.select().from(competitorPricesTable).$dynamic();
-  if (competitors.length) q = q.where(inArray(competitorPricesTable.competitor, competitors));
+  q = q.where(and(bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`),
+    competitors.length ? inArray(competitorPricesTable.competitor, competitors) : undefined));
   const [maps, all] = await Promise.all([getPrayagMaps(), q]);
   const windows = getCompetitorWindows(all);
   const matchedWindows = getCompetitorWindows(
@@ -1031,7 +1035,7 @@ router.post("/catalog/mapping-review/auto-accept", requireAdmin, async (req, res
     : "high";
   const minRank = TIERS.indexOf(minTier);
 
-  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  const conditions = [ne(competitorPricesTable.matchStatus, "matched"), bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (confidence)
     conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
@@ -1095,7 +1099,7 @@ router.get("/catalog/mapping-review/auto-accept-preview", async (req, res) => {
   const search = strParam(req.query.search);
   const TIERS = ["low", "medium", "high"] as const;
 
-  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  const conditions = [ne(competitorPricesTable.matchStatus, "matched"), bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (confidence)
     conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
@@ -1219,7 +1223,7 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
-  const conditions = [];
+  const conditions = [bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (category) conditions.push(eq(competitorPricesTable.category, category));
   if (search) {
     const like = `%${search.toLowerCase()}%`;
@@ -1694,7 +1698,7 @@ router.get("/catalog/mapping-review", async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
 
-  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  const conditions = [ne(competitorPricesTable.matchStatus, "matched"), bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (confidence)
     conditions.push(eq(competitorPricesTable.matchConfidence, confidence));
@@ -1767,7 +1771,7 @@ router.get("/catalog/comparison/matrix", async (req, res) => {
   const all = await db
     .select()
     .from(competitorPricesTable)
-    .where(eq(competitorPricesTable.matchStatus, "matched"));
+    .where(and(eq(competitorPricesTable.matchStatus, "matched"), bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)));
   const matchedWindows = getCompetitorWindows(all);
 
   const available = all.filter(
@@ -1939,7 +1943,7 @@ router.get("/catalog/mapping-review/export", async (req, res) => {
   const search = strParam(req.query.search);
   const format = String(req.query.format ?? "xlsx");
 
-  const conditions = [ne(competitorPricesTable.matchStatus, "matched")];
+  const conditions = [ne(competitorPricesTable.matchStatus, "matched"), bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)];
   if (competitor) conditions.push(eq(competitorPricesTable.competitor, competitor));
   if (period) conditions.push(eq(competitorPricesTable.effectiveDate, period));
   if (search) {

@@ -66,6 +66,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+export function isAdminUser(user: { role?: string | null } | null | undefined): boolean {
+  return user?.role === "admin";
+}
+
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   // See requireAuth above: this preserves isolated route-handler test harnesses
   // while the complete route stack remains covered by request-level auth tests.
@@ -81,7 +85,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     res.status(403).json({ error: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
     return;
   }
-  if (req.user.role !== "admin") {
+  if (!isAdminUser(req.user)) {
     res.status(403).json({ error: "Admin access required." });
     return;
   }

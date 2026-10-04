@@ -1,6 +1,7 @@
 import { planCategorySpellings, readCategoryCatalogue, assertCategorySpellingPlan, assertCategorySpellingPreview, assertExactCategoryRestoration, lockCategorySpellings } from "../lib/categorySpellingGuard";
 import { Router, type IRouter } from "express";
 import { supportsCatalogRange } from "@workspace/formatting";
+import { bucketSql, bucketExportRows } from "../lib/bucketFilter";
 import { createHash, randomUUID } from "node:crypto";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -2440,7 +2441,7 @@ router.get("/catalog/export", async (req, res) => {
     const rows = await db
       .select()
       .from(mrpPriceHistoryTable)
-      .where(eq(mrpPriceHistoryTable.reviewStatus, "approved"))
+      .where(and(eq(mrpPriceHistoryTable.reviewStatus, "approved"), bucketSql(sql`${mrpPriceHistoryTable.itemCode}`)))
       .orderBy(
         asc(mrpPriceHistoryTable.itemCode),
         desc(mrpPriceHistoryTable.effectiveDate),
@@ -2523,6 +2524,7 @@ router.get("/catalog/export", async (req, res) => {
             FROM mrp_price_history h
             JOIN catalog_products p ON p.item_code = h.item_code
             WHERE h.effective_date = ${asOf}
+              AND ${bucketSql(sql`p.item_code`)}
               AND h.review_status = 'approved'
               AND h.variant = 'Standard'
               AND h.mrp IS NOT NULL
@@ -2549,6 +2551,7 @@ router.get("/catalog/export", async (req, res) => {
             FROM mrp_price_history h
             JOIN catalog_products p ON p.item_code = h.item_code
             WHERE h.effective_date <= ${asOf}
+              AND ${bucketSql(sql`p.item_code`)}
               AND h.review_status = 'approved'
               AND h.variant = 'Standard'
               AND h.mrp IS NOT NULL
@@ -2611,7 +2614,7 @@ router.get("/catalog/export", async (req, res) => {
     ];
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const ws = XLSX.utils.aoa_to_sheet(bucketExportRows(aoa));
 
   if (format === "csv") {
     const csv = XLSX.utils.sheet_to_csv(ws);
@@ -2626,7 +2629,7 @@ router.get("/catalog/export", async (req, res) => {
 
   const wb = XLSX.utils.book_new();
   if (summaryAoa) {
-    const summaryWs = XLSX.utils.aoa_to_sheet(summaryAoa);
+    const summaryWs = XLSX.utils.aoa_to_sheet(bucketExportRows(summaryAoa));
     XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
   }
   XLSX.utils.book_append_sheet(wb, ws, sheetName);

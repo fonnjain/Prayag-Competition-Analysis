@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { bucketSql, filterBucketRows, bucketExportRows } from "../lib/bucketFilter";
 import { and, eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { applyIndianNumberFormats } from "@workspace/formatting";
@@ -72,6 +73,7 @@ export async function getPrayagCatalogMapForPeriod(atDate?: string | null): Prom
       })
       .from(catalogProductsTable)
       .where(and(
+        bucketSql(sql`${catalogProductsTable.itemCode}`),
         eq(catalogProductsTable.isActive, true),
         sql`(${catalogProductsTable.discontinuedFrom} is null or ${catalogProductsTable.discontinuedFrom} > ${resolvedDate})`,
       )),
@@ -371,7 +373,7 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Filtered
     prayagDiscount: discounts.prayag,
     discountFor: (c) => discounts.byCompetitor.get(c) ?? DEFAULT_COMPETITOR_DISCOUNT,
   };
-  const rows = all
+  const rows = filterBucketRows(all, c => c.matchedPrayagCode)
     .filter((c) => {
       if (c.matchStatus !== "matched") return true;
       if (!c.matchedPrayagCode) return false;
@@ -395,13 +397,13 @@ router.get("/analysis/filters", async (_req, res) => {
         matchStatus: competitorPricesTable.matchStatus,
         matchConfidence: competitorPricesTable.matchConfidence,
       })
-      .from(competitorPricesTable),
+      .from(competitorPricesTable).where(bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)),
     db
       .selectDistinct({
         division: catalogProductsTable.division,
         category: catalogProductsTable.category,
       })
-      .from(catalogProductsTable),
+      .from(catalogProductsTable).where(bucketSql(sql`${catalogProductsTable.itemCode}`)),
   ]);
 
   const competitors = [...new Set(comps.map((c) => c.competitor))].sort();
@@ -589,7 +591,7 @@ function sendSheet(
   fileBase: string,
   format: string,
 ): void {
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const ws = XLSX.utils.aoa_to_sheet(bucketExportRows(aoa));
   applyIndianNumberFormats(ws, {
     moneyColumns: [7, 10, 13, 15, 18, 19, 26],
   });
@@ -782,6 +784,7 @@ router.get("/analysis/mrp-increases", async (req, res) => {
     JOIN catalog_products c ON c.item_code = r.item_code
     WHERE r.rn = 1
       AND c.is_active IS TRUE
+      AND ${bucketSql(sql`c.item_code`)}
       AND (c.discontinued_from IS NULL OR c.discontinued_from > ${atDate})
       AND r.prev_mrp IS NOT NULL
       AND r.prev_mrp > 0

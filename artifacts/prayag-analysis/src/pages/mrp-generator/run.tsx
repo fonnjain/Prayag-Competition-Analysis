@@ -1,7 +1,7 @@
 import { formatMoney } from "@workspace/formatting";
 import React, { useState } from "react";
 import { useRoute } from "wouter";
-import { useGetMrpGeneratorRun, useHandoffMrpGeneratorRun, getGetMrpGeneratorRunQueryKey, MrpGeneratorTrace, MrpGeneratorCompetitorValue, MrpGeneratorFreshnessCompetitor } from "@workspace/api-client-react";
+import { useGetMrpGeneratorRun, useHandoffMrpGeneratorRun, getGetMrpGeneratorRunQueryKey, MrpGeneratorTrace, MrpGeneratorCompetitorValue, MrpGeneratorFreshnessCompetitor, useActiveBucket, bucketEffectText } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronRight, ArrowRight, Zap, ChevronDown, Check, X, AlertTriangle, Lock, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDisplayDate } from "@/lib/date-format";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 
@@ -18,6 +19,8 @@ export default function MrpGeneratorRun() {
   const { data, isLoading, error } = useGetMrpGeneratorRun(runId, { query: { enabled: !!runId, queryKey: getGetMrpGeneratorRunQueryKey(runId) } });
   const handoffMutation = useHandoffMrpGeneratorRun();
   const { toast } = useToast();
+  const { user: bucketUser } = useAuth();
+  const activeBucket = useActiveBucket(bucketUser?.id);
 
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -114,6 +117,7 @@ export default function MrpGeneratorRun() {
   };
 
   const exportCsv = () => {
+    const bucketLine = bucketEffectText(activeBucket.list);
     const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const header = [
       "item_code", "product", "division", "category", "current_mrp", "current_date",
@@ -176,7 +180,7 @@ export default function MrpGeneratorRun() {
     }
 
     const blob = new Blob(
-      [[header, ...rows].map((row) => row.map(quote).join(",")).join("\n")],
+      [[[bucketLine], header, ...rows].map((row) => row.map(quote).join(",")).join("\n")],
       { type: "text/csv;charset=utf-8" },
     );
     const url = URL.createObjectURL(blob);
@@ -512,6 +516,7 @@ export default function MrpGeneratorRun() {
         {/* Coverage Panel */}
         <Card className="p-4 sm:p-5 shadow-sm border-primary/20 bg-primary/5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground mb-4">Comprehensive Coverage & Evidence Limits</h2>
+          <p className="mb-4 text-xs text-muted-foreground">Original full-scope source audit at run creation. Bucket lists filter the displayed run results, not these recorded source counts.</p>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-sm">
 
             <div className="space-y-2 bg-card p-3 rounded border">

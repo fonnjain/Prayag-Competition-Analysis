@@ -12908,3 +12908,273 @@ export const UndoP029UgdClassificationResponse = zod.object({
 })
 
 
+/**
+ * @summary Lists visible to the signed-in user
+ */
+export const GetBucketListsResponseItem = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+}))
+export const GetBucketListsResponse = zod.array(GetBucketListsResponseItem)
+
+
+/**
+ * @summary Create an owned bucket list
+ */
+export const CreateBucketListBody = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Unfiltered catalogue for the bucket picker
+ */
+export const GetBucketCatalogueResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Resolve a draft without saving anything
+ */
+export const PreviewBucketListBody = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+})
+
+export const PreviewBucketListResponse = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+}))
+
+
+/**
+ * @summary Stateless Excel or CSV code preview; does not add or save codes
+ */
+export const PreviewBucketUploadBody = zod.object({
+  "file": zod.instanceof(File),
+  "draft": zod.string().describe('JSON-encoded BucketDraft')
+})
+
+export const PreviewBucketUploadResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Current user's global active bucket; anonymous always has none
+ */
+export const GetActiveBucketListResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const SetActiveBucketListBody = zod.object({
+  "listId": zod.string().nullable()
+})
+
+export const SetActiveBucketListResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const GetBucketListParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetBucketListResponse = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+}))
+
+
+export const UpdateBucketListParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateBucketListBody = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+})
+
+export const UpdateBucketListResponse = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+}))
+
+
+export const DeleteBucketListParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteBucketListResponse = zod.record(zod.string(), zod.unknown())
+
+
+export const DetachBucketListParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DetachBucketListResponse = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+}))
+
+
+export const ExportBucketListParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+

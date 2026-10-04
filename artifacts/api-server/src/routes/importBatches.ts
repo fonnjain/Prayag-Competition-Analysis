@@ -2030,8 +2030,9 @@ router.get("/catalog/import-batches/:id/export", async (req, res) => {
       ];
     });
 
-  const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
-  const newProductsWs = XLSX.utils.aoa_to_sheet([newProductHeader, ...newProductBody]);
+  const scopeNotice = [["Bucket lists do not apply here."], ["Full-scope maintenance review; no active bucket filter applied."], []];
+  const ws = XLSX.utils.aoa_to_sheet([...scopeNotice, header, ...body]);
+  const newProductsWs = XLSX.utils.aoa_to_sheet([...scopeNotice, newProductHeader, ...newProductBody]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Review");
   if (batch.competitor !== "Apollo") {

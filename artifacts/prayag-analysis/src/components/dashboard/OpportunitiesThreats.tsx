@@ -1,6 +1,7 @@
 import { formatMoney } from "@workspace/formatting";
 import React, { useState } from "react";
-import { useGetAnalysisOpportunities, useGetPriceHistory, useGetMrpIncreases } from "@workspace/api-client-react";
+import { useGetAnalysisOpportunities, useGetPriceHistory, useGetMrpIncreases, BucketFilteredNotice, isBucketFiltered } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
 import type { AnalysisOpportunityItem } from "@workspace/api-client-react";
 import type { DashboardFilters } from "@/pages/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -227,7 +228,12 @@ function OpportunityTable({ items, isThreat, prayagMrpDate, asOf }: { items: Ana
 // ─── Per-product price history panel ────────────────────────────────────────
 
 function PriceHistoryPanel({ itemCode, asOf }: { itemCode: string; asOf?: string }) {
-  const { data, isLoading } = useGetPriceHistory({ itemCode, asOf });
+  const { user: historyUser } = useAuth();
+  const { data, isLoading, error } = useGetPriceHistory({ itemCode, asOf });
+
+  if (isBucketFiltered(error)) {
+    return <div className="p-3"><BucketFilteredNotice userId={historyUser?.id} /></div>;
+  }
 
   if (isLoading || !data) {
     return (

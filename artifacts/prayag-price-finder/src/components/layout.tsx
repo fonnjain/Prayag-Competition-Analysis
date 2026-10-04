@@ -14,6 +14,8 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { BucketBanner } from "@workspace/api-client-react";
+import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -69,6 +71,7 @@ export function Layout({ children }: LayoutProps) {
   const FINDER_NAV = [
     { path: "/", href: searchHref, label: "Search products", icon: Search },
     { path: "/comparison", href: comparisonHref, label: "Compare", icon: Scale },
+    ...(user ? [{ path: "/bucket-lists", href: "/bucket-lists", label: "Bucket lists", icon: Bookmark }] : []),
   ];
 
   function CatalogueNav({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
@@ -309,7 +312,7 @@ export function Layout({ children }: LayoutProps) {
         )}
 
         {/* User / logout */}
-        <div className={cn("px-3 pb-3 pt-2 border-t flex items-center", collapsed ? "justify-center flex-col gap-2" : "gap-2")}>
+        {user && <div className={cn("px-3 pb-3 pt-2 border-t flex items-center", collapsed ? "justify-center flex-col gap-2" : "gap-2")}>
           <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0 select-none">
             {userName.slice(0, 1).toUpperCase()}
           </div>
@@ -326,7 +329,7 @@ export function Layout({ children }: LayoutProps) {
           >
             <LogOut className="w-4 h-4" />
           </button>
-        </div>
+        </div>}
       </div>
     );
   }
@@ -401,6 +404,7 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Scrollable page content */}
           <main className="flex-1 overflow-y-auto relative">
+            {!location.startsWith("/bucket-lists") && <BucketBanner userId={user?.id} />}
             {children}
           </main>
         </div>

@@ -24,12 +24,16 @@ import catalogNameChangesRouter from "./catalogNameChanges";
 import mrpProvenanceBackfillRouter from "./mrpProvenanceBackfill";
 import productRetirementRouter from "./productRetirement";
 import apolloStagedLoadRouter from "./apolloStagedLoad";
+import bucketListsRouter from "./bucketLists";
+import { bucketFilterMiddleware } from "../lib/bucketFilter";
 
 const router: IRouter = Router();
 
 // Unauthenticated routes
 router.use(healthRouter);
 router.use(authRouter);
+router.use(bucketListsRouter);
+router.use(bucketFilterMiddleware);
 
 // External API: authenticated with X-API-Key (no session needed)
 router.use(externalV1Router);

@@ -1,0 +1,53 @@
+P053 BUCKET LISTS — DEVELOPMENT VERIFICATION
+
+Status: development implementation complete. Production feature verification is pending the user's publication. No production schema migration or publication was performed by the agent.
+
+DELIVERED
+- Authenticated Bucket lists browse/editor pages in Price Finder. Public anonymous pricing remains public without a bucket. Product Database's existing access gate is unchanged.
+- Owned private Included/Excluded lists; administrator sharing as Head Office lists; ownership enforcement and normalised duplicate-name checks.
+- Dynamic division/category/approved-Range rules, individual additions/removals, visible membership/zero-rule/missing-item review.
+- Linked copies follow parent changes, preserve local overlays, detach into fixed membership, and survive parent deletion/privacy downgrade/account deletion without losing members.
+- XLSX/CSV item_code upload preview with matched, whitespace-matched, duplicate, not-found and inactive classifications. Only Add these changes the draft.
+- One server-persisted active list per user; Clear; visible effect banners and explicit export scope disclosures.
+- Inventory A–K browse/comparison/report populations filtered at their source, before display totals and pagination. Immutable saved-run views aggregate frozen visible evidence; original runs, recommendations, policies and snapshots are not rewritten.
+- Inventory L–T maintenance surfaces remain unfiltered and show 'Bucket lists do not apply here.' Maintenance workbook exports disclose their full scope. Machine /api/v1 feeds and signed catalogue snapshots remain unfiltered; signed payload/manifest/signature are unchanged, with disclosure outside the signed payload.
+- Full-scope acceptance-batch/source-audit counts are explicitly labelled separately from filtered display totals.
+
+VERIFICATION
+- 17 disposable-schema regression tests passed with vitest.p051.config.ts. They include ownership/privacy/roles, inheritance/deletion/detachment, normalised rules, pagination, concurrent and anonymous isolation, exports, archived missing membership, actual multipart upload, Analysis/source metadata filtering, and frozen competitive/historical/P011/P012 totals.
+- Full-row public development catalogue, MRP and competitor digests stayed unchanged across the regression suite.
+- API server and all four web artifact typechecks passed. All four web production builds passed with configured artifact base paths. Existing bundle-size warnings are non-blocking. git diff --check passed.
+- Genuine signed-in development browser pass passed creation/save/use-as-filter, one-product pricing/comparison, navigation persistence, linked-copy overlays/inheritance, detach preservation, upload preview/diagnostics/Add these, empty-Included warning, approved Range boundary, Clear and cleared-state reload.
+- Anonymous page gating and public pricing were verified. Logout revoked the real session; anonymous returned user:null and no active banner. The remaining cosmetic sidebar logout control was corrected and typechecked/built after the browser pass.
+- Active preference persistence is covered by server tests and route navigation. A separate browser full reload while a filter was still active was not performed. Optional Product Database BUCKET_FILTERED/L–T browser checks were not run; backend boundary tests and code inspection cover those paths.
+- Temporary browser lists and CSV/diagnostic files were removed, prior active preference restored to none, and the ephemeral genuine session handoff was deleted and session revoked. No product, price, classification, competitor, Sales, scenario or run data was changed by browser testing.
+
+PROTECTED DATA
+DEVELOPMENT — checked 2026-10-04 16:16:41 IST
+MRP rows: 14012
+MRP value SHA-256: 4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2
+Catalogue rows: 6948
+Full catalogue MD5: 6be775f28feaa7cc55eb86a1d67d183f
+Classification SHA-256: 7c5086c7df253fbcaf06dcffa69b3569803118f3e4b3b4f50070f0e5e751c577
+All match the pre-code baseline; raw archived classification CSV bytes match.
+
+PRODUCTION — checked 2026-10-04 16:16:51 IST
+MRP rows: 14302
+MRP value SHA-256: e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458
+Catalogue rows: 7191
+Full catalogue MD5: 63b7a4ec2434846a0b6e880773770abb
+Classification SHA-256: b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376
+All match the pre-code baseline; raw archived classification CSV bytes match.
+
+EVIDENCE FILES
+reports/p053/protected-data-before.json — pre-code timestamps, counts, exact checksum SQL and hashes.
+reports/p053/protected-data-after.json — final read-only checks and byte-equality results.
+reports/p053/classification-development-baseline.csv and classification-development-after.csv.
+reports/p053/classification-production-baseline.csv and classification-production-after.csv.
+The raw CSV baseline archives were captured after implementation, anchored to matching pre-code classification hashes; subsequent archives are byte-identical. This distinction is recorded rather than claiming an earlier raw-file capture.
+reports/p053/anonymous-bucket-gate.jpg — anonymous sign-in gate screenshot.
+Signed-in screenshots are attached to the browser verification in the conversation.
+
+DEFERRED
+No Head Office list has been seeded. The workbook decisions for A-464 and PW55S and separate seeding approval remain required.
+The user publishes. Genuine production feature confirmation, production schema checks and post-publication integrity checks follow publication; today's production read-only integrity check is not production feature verification.
