@@ -1,0 +1,35 @@
+{
+  "productionUrl": "https://prayag-price.com",
+  "assets": [
+    {
+      "app": "Product Database",
+      "route": "/product-db/",
+      "file": "/product-db/assets/index-ChhUt-o0.js",
+      "sha256": "3863c16650b49d514a125ecbfdd68c15a6d0ee1032d2a5f8c081568777ea65b2",
+      "clockIST": "2026-10-04 20:03:49",
+      "httpStatus": 200,
+      "bytes": 1155408,
+      "headerPlacementMarker": true
+    },
+    {
+      "app": "Price Finder",
+      "route": "/price-finder/",
+      "file": "/price-finder/assets/index-DZwHXOXP.js",
+      "sha256": "8bf458f46eee91e91bf3f8531bf678fc56aa0f0c3784d18dae260cc0c3c86c63",
+      "clockIST": "2026-10-04 20:03:50",
+      "httpStatus": 200,
+      "bytes": 501571,
+      "headerPlacementMarker": true
+    },
+    {
+      "app": "Competition Analysis",
+      "route": "/analysis/",
+      "file": "/analysis/assets/index-DS6dFYFn.js",
+      "sha256": "e35125040258f268977b2782c163e5a8d5a2f9a064426942c6443367f5e0b7fc",
+      "clockIST": "2026-10-04 20:03:50",
+      "httpStatus": 200,
+      "bytes": 1023082,
+      "headerPlacementMarker": true
+    }
+  ]
+}
