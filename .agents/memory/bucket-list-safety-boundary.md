@@ -32,6 +32,15 @@ shared control and consistent Included/Excluded colours across screens, without
 changing resolution or interpreting name suffixes. Preserve legacy disclosure
 recognition for re-uploading old files, as well as the new labelled format.
 
+Production bucket verification must not activate any list or change saved
+preferences. Leave active-state visual checks requiring a selection to the user.
+
+**Why:** The user explicitly prohibited production list activation and preference
+changes during read-only confirmation.
+
+**How to apply:** Inspect the existing state without selecting or clearing a
+list. Do not treat a screenshot request as permission to write a preference.
+
 Every A–K bucket control belongs in the page header, right-aligned on the same
 row as the page title, visible without scrolling at 1366×768. No alternative
 filter-bar or below-actions placement is allowed, including loading/empty/error
