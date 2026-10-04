@@ -9,6 +9,12 @@ Test every re-uploadable export with its exact downloaded bytes, including discl
 
 **How to apply:** Cover both file formats and each normal re-upload contract. Distinguish report-only downloads from supported upload templates. Compare against a no-disclosure control when identifying whether a failure was introduced by metadata.
 
+Include non-ASCII disclosure text in CSV round-trip tests.
+
+**Why:** SheetJS can decode a UTF-8 CSV Buffer as a legacy code page when no encoding is supplied; an em dash and middle dot then become mojibake. The same banner matches correctly in XLSX but fails recognition in CSV.
+
+**How to apply:** Verify the encoding contract using emitted bytes, not an already-decoded string. Silently ignore recognised metadata without deleting worksheet rows, so source-row provenance remains accurate.
+
 Full-reload acceptance must include the initial visible aggregate counts as well as restored preference, banner, API population, and drilled-in prices.
 
 **Why:** A genuine reload preserved the selected filter and scoped API responses but displayed full-catalogue division counts initially.

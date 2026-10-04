@@ -42,6 +42,7 @@ function isScopedKey(key: readonly unknown[]) {
   if (KEEP(key)) return false;
   const path = String(key[0] ?? "");
   return /^\/api\/(?:price-finder\/|analysis\/|mrp-generator\/)/.test(path)
+    || path.startsWith("price-finder-")
     || /^\/api\/catalog\/(?:products(?:\/|$)|product$|filters$|comparison(?:\/|$)|mapping-review(?:\/|$))/.test(path);
 }
 async function resetScoped(qc: ReturnType<typeof useQueryClient>) {
@@ -93,7 +94,7 @@ export function useActiveBucket(userId: string | null | undefined) {
   const list: ActiveBucketInfo | null = l
     ? { id: String(l.id), name: String(l.name), type: l.type as "included" | "excluded", count: Number(l.activeCount ?? l.count ?? 0) }
     : null;
-  return { list, banner: raw?.banner ?? null, isLoading: signedIn && q.isLoading, data: raw };
+  return { list, banner: raw?.banner ?? null, isLoading: signedIn && q.isLoading, data: raw, scopeKey: sigNow };
 }
 
 export function useSetActiveBucket() {

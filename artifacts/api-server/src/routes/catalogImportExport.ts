@@ -30,6 +30,7 @@ import {
   type DatabaseTransaction,
 } from "../lib/catalog";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { hideExportDisclosures, workbookHeaderRow } from "../lib/exportDisclosure";
 import { effectivePrice } from "../lib/analysis";
 import { deriveConfirmedDiscontinuations } from "../lib/discontinuationPolicy";
 import {
@@ -649,7 +650,8 @@ function parsePeriodHeader(value: unknown): string | null {
 }
 
 function hasResolvablePeriodHeader(grid: unknown[][]): boolean {
-  return grid.slice(0, 15).some((row) => row.some((cell) => !!parsePeriodHeader(cell)));
+  // Data-cell dates are not dated column headers. Use the same header row as parseSheet.
+  return (grid[workbookHeaderRow(grid)] ?? []).some(cell => !!parsePeriodHeader(cell));
 }
 
 function parseSheet(
@@ -1152,7 +1154,7 @@ export function parseWorkbookBuffer(
   hasHeaderPeriods: boolean;
   warnings: string[];
 } {
-  const wb = XLSX.read(buffer, { type: "buffer" });
+  const wb = XLSX.read(buffer, { type: "buffer", codepage: 65001 });
   let rows: ParsedRow[] = [];
   let basis = "Verify";
   let codeColHeader = "";
@@ -1184,10 +1186,10 @@ export function parseWorkbookBuffer(
   for (const sheetName of sheetsToProcess) {
     const sheet = wb.Sheets[sheetName];
     if (!sheet) continue;
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    const grid = hideExportDisclosures(XLSX.utils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
       defval: null,
-    });
+    }));
     const parsed = parseSheet(grid, knownCodes, workbookHasHeaderPeriods);
     skippedUnparseable += parsed.skippedRows.length;
     skippedRows.push(...parsed.skippedRows);

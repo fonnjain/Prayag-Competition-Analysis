@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { AuthUser } from '@workspace/api-client-react';
 import { changePassword as changePasswordRequest, setAuthTokenGetter } from '@workspace/api-client-react';
 import { ActivityTracker } from "./activity-tracker";
+import { revokeBrowserSession } from "./logout";
 
 export type { AuthUser };
 
@@ -45,6 +46,7 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const fetchedRef = useRef(false);
 
   const fetchUser = useCallback(async () => {
@@ -117,10 +119,16 @@ export function AuthProvider({
   );
 
   const logout = useCallback(async () => {
+    setLogoutError(null);
+    try {
+      await revokeBrowserSession(fetch, getStoredSid());
+    } catch {
+      setLogoutError("Server-side logout could not be confirmed. Please retry.");
+      return;
+    }
     clearStoredSid();
     deactivateBearer();
     setUser(null);
-    await fetch('/api/logout', { credentials: 'include' }).catch(() => {});
     const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL)
       ? import.meta.env.BASE_URL
       : '/';
@@ -130,6 +138,7 @@ export function AuthProvider({
   return (
     <AuthContext.Provider value={{ user, isLoading, isAuthenticated: !!user, loginWithPassword, changePassword, logout }}>
       <ActivityTracker user={user} appSlug={appSlug} />
+      {logoutError && <p role="alert" className="p-3 text-sm text-destructive">{logoutError}</p>}
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { useGetPriceFinderBrowse } from "@workspace/api-client-react";
+import { useGetPriceFinderBrowse, useActiveBucket } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation, useSearch } from "wouter";
 import { localPriceFinderUrl, normalizePriceFinderParams } from "./priceFinderRouteState";
 import type { PriceFinderBrowseResponse } from "@workspace/api-client-react";
 
 interface BrowseContextValue {
+  scopeKey: readonly unknown[];
+  scopeReady: boolean;
   browseDivision: string | null;
   browseCategory: string | null;
   divisionsData: PriceFinderBrowseResponse | undefined;
@@ -22,13 +25,17 @@ export function BrowseProvider({ children }: { children: React.ReactNode }) {
   const [browseCategory, setBrowseCategory] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const searchString = useSearch();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const bucket = useActiveBucket(user?.id);
+  const scopeReady = !isAuthLoading && (!user || bucket.scopeKey !== null);
+  const scopeKey = [user?.id ?? "anonymous", bucket.scopeKey] as const;
 
   const { data: divisionsData, isLoading: isDivisionsLoading } = useGetPriceFinderBrowse(
     { limit: 300 },
     {
       query: {
-        queryKey: ["price-finder-browse-divisions"],
-        enabled: !browseDivision,
+        queryKey: ["price-finder-browse-divisions", ...scopeKey],
+        enabled: scopeReady && !browseDivision,
         staleTime: 1000 * 60,
       },
     },
@@ -38,8 +45,8 @@ export function BrowseProvider({ children }: { children: React.ReactNode }) {
     { division: browseDivision ?? undefined, limit: 300 },
     {
       query: {
-        queryKey: ["price-finder-browse-categories", browseDivision],
-        enabled: !!browseDivision,
+        queryKey: ["price-finder-browse-categories", browseDivision, ...scopeKey],
+        enabled: scopeReady && !!browseDivision,
         staleTime: 1000 * 60,
       },
     },
@@ -78,11 +85,13 @@ export function BrowseProvider({ children }: { children: React.ReactNode }) {
   return (
     <BrowseContext.Provider value={{
       browseDivision,
+      scopeKey,
+      scopeReady,
       browseCategory,
       divisionsData,
-      isDivisionsLoading,
+      isDivisionsLoading: !scopeReady || isDivisionsLoading,
       categoriesData,
-      isCategoriesLoading,
+      isCategoriesLoading: !scopeReady || isCategoriesLoading,
       selectDivision,
       selectCategory
     }}>

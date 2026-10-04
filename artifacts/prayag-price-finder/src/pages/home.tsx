@@ -268,6 +268,8 @@ export default function PriceFinderPage() {
   const suppressSelectionResetRef = useRef(false);
   const {
     browseDivision,
+    scopeKey,
+    scopeReady,
     browseCategory,
     selectDivision,
     selectCategory,
@@ -435,8 +437,8 @@ export default function PriceFinderPage() {
     { filters: queryFilters, limit: 3000 },
     {
       query: {
-        queryKey: ["price-finder-search", queryFilters],
-        enabled: queryFilters.length > 0,
+        queryKey: ["price-finder-search", queryFilters, ...scopeKey],
+        enabled: scopeReady && queryFilters.length > 0,
         staleTime: 1000 * 60,
       },
     },
@@ -465,8 +467,8 @@ export default function PriceFinderPage() {
     { division: browseDivision ?? undefined, category: browseCategory ?? undefined, limit: 300 },
     {
       query: {
-        queryKey: ["price-finder-browse-products", browseDivision, browseCategory],
-        enabled: !!browseDivision && !!browseCategory,
+        queryKey: ["price-finder-browse-products", browseDivision, browseCategory, ...scopeKey],
+        enabled: scopeReady && !!browseDivision && !!browseCategory,
         staleTime: 1000 * 60,
       },
     },
@@ -991,6 +993,9 @@ export default function PriceFinderPage() {
               {(divisionsData?.divisions ?? []).map((item) => (
                 <button
                   key={item.division}
+                  data-testid="browse-division"
+                  data-division={item.division}
+                  data-count={item.count}
                   type="button"
                   onClick={() => {
                     selectDivision(item.division);

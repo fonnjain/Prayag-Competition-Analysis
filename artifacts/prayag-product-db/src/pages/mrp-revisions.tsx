@@ -443,6 +443,7 @@ export default function MrpRevisionsPage() {
         <div className="space-y-2">
           <Label htmlFor="revision-file">Revision workbook</Label>
           <Input id="revision-file" type="file" accept=".xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+          <p className="text-xs text-muted-foreground">Use the revision workbook template with a worksheet named “revision”. MRP Generator CSV files are reports, not upload templates.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="revision-reason">Reason for this revision</Label>

@@ -200,9 +200,12 @@ export default function MrpGeneratorRun() {
           <h1 className="text-lg font-semibold text-foreground">Run #{run.id}</h1>
           <p className="text-sm text-muted-foreground">Scenario: {scenario?.name || run.scenarioId} &middot; As of {formatDisplayDate(run.asOf)}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCsv}>
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </Button>
+        <div className="text-right">
+          <Button variant="outline" size="sm" onClick={exportCsv}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV report
+          </Button>
+          <p className="mt-1 text-xs text-muted-foreground">Report only — not a revision upload template.</p>
+        </div>
       </div>
 
       <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full space-y-6">

@@ -1,6 +1,7 @@
 // Pure parsing/auto-detection helpers for competitor sheet import.
 // Kept free of express/multer/db imports so the matching heuristics can be
 // unit-tested in isolation (the import route wires these into the upload flow).
+import { isExportDisclosureRow } from "./exportDisclosure";
 
 export const KNOWN_BRANDS = [
   "Finolex",
@@ -133,6 +134,7 @@ export function parseSheet(
     if (r === headerRow) continue;
     const row = grid[r]!;
     const code = normCode(row[codeCol]);
+    if (isExportDisclosureRow(row)) continue;
     if (!code) continue;
     const price = Number(row[priceCol]);
     if (isNaN(price) || price <= 0) continue;

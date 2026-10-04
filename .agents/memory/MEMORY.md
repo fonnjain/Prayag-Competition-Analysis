@@ -50,3 +50,4 @@
 - [Source-price conflict interpretation](source-price-conflict-interpretation.md) — legacy flags can compare old/new revisions; PEXI unit changes require an explicit Prayag ruling.
 - [Bucket-list safety](bucket-list-safety-boundary.md) — display-only sets require visible export disclosure; HO plumbing seeding awaits separate Prayag rulings.
 - [Export round-trip verification](export-round-trip-verification.md) — test exact disclosed files through importers; reload checks must include initial totals, not just restored banners.
+- [Logout revocation boundary](logout-revocation-boundary.md) — confirm server revocation before clearing bearer identity; local sign-out alone is not security proof.
