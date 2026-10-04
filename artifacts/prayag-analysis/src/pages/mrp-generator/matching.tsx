@@ -1,5 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import {
@@ -168,25 +168,24 @@ export default function MrpMatchingWorkbench() {
   if (!princeExposure && (!division || competitors.length === 0)) {
     return (
       <div className="p-8">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold">Matching MRP Workbench</h1>
-          <BucketSlot />
+        <div className="mb-4">
+          <BucketPageHeader title={<h1 className="text-lg font-semibold">Matching MRP Workbench</h1>} />
         </div>
         <p className="text-muted-foreground">Please select a scope and competitors from the generator list to begin.</p>
       </div>
     );
   }
 
-  if (isLoading) return <div className="p-8"><div className="flex justify-end px-4 pt-3 sm:px-6"><BucketSlot /></div><Skeleton className="h-10 w-64 mb-4" /><Skeleton className="h-[500px] w-full" /></div>;
-  if (error || !data) return <div className="p-8"><div className="flex justify-end px-4 pt-3 sm:px-6"><BucketSlot /></div><p className="text-destructive">Failed to load matching workbench.</p></div>;
+  const pageTitle = princeExposure ? "Where Prince undercuts us" : "Matching MRP Workbench";
+  if (isLoading) return <div className="p-8"><BucketPageHeader title={<h1 className="text-lg font-semibold">{pageTitle}</h1>} /><Skeleton className="h-10 w-64 mb-4" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (error || !data) return <div className="p-8"><BucketPageHeader title={<h1 className="text-lg font-semibold">{pageTitle}</h1>} /><p className="text-destructive">Failed to load matching workbench.</p></div>;
 
   return (
     <div className="flex flex-col min-h-full bg-muted/20 pb-20">
-      <div className="border-b bg-card px-4 py-3 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-10 shadow-sm">
+      <div className="border-b bg-card px-4 py-3 sm:px-6 sticky top-0 z-10 shadow-sm">
+        <BucketPageHeader title={<h1 className="text-lg font-semibold text-foreground">{pageTitle}</h1>} />
+        <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">
-            {princeExposure ? "Where Prince undercuts us" : "Matching MRP Workbench"}
-          </h1>
           <p className="text-sm text-muted-foreground">
             {princeExposure
               ? (data as any)?.exposure?.description || "The products where Prince is cheaper. Review only — suggests nothing."
@@ -195,12 +194,12 @@ export default function MrpMatchingWorkbench() {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-        {princeExposure && <BucketSlot />}
         {!princeExposure && (
           <Button onClick={handleSave} disabled={saveSession.isPending || !hasDecisions}>
             {saveSession.isPending ? "Saving..." : <><Save className="w-4 h-4 mr-2" /> Save &amp; Review Run</>}
           </Button>
         )}
+        </div>
         </div>
       </div>
 
@@ -239,7 +238,6 @@ export default function MrpMatchingWorkbench() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="ml-auto"><BucketSlot /></div>
           </div>
 
           <div className="pt-4 border-t flex flex-wrap items-end gap-3 bg-muted/20 p-3 rounded">

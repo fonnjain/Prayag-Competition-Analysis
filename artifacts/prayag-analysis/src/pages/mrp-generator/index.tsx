@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Plus, Play, Trash2, Edit, Activity, History, Zap, Info, ShieldAlert, Lock, Copy, RotateCcw, Target } from "lucide-react";
@@ -127,6 +127,8 @@ export default function MrpGeneratorList() {
 
   if (isForbidden) {
     return (
+      <div className="p-4 sm:p-6">
+        <BucketPageHeader title={<h1 className="text-lg font-semibold text-foreground">MRP Generator</h1>} />
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center space-y-4">
         <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center">
           <Lock className="w-6 h-6 text-destructive" />
@@ -137,6 +139,7 @@ export default function MrpGeneratorList() {
             You do not have permission to access the MRP Generator. This feature is restricted to senior commercial administrators.
           </p>
         </div>
+      </div>
       </div>
     );
   }
@@ -205,13 +208,13 @@ export default function MrpGeneratorList() {
 
   return (
     <div className="flex flex-col min-h-full bg-muted/20">
-      <div className="border-b bg-card px-4 py-3 sm:px-6 flex items-center justify-between gap-4">
+      <div className="border-b bg-card px-4 py-3 sm:px-6">
+        <BucketPageHeader title={<h1 className="text-lg font-semibold text-foreground">MRP Generator</h1>} />
+        <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">MRP Generator</h1>
           <p className="text-sm text-muted-foreground">Define deterministic pricing scenarios based on competitor matching rules.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <BucketSlot />
           <Button variant="outline" asChild>
             <Link href="/mrp-generator/compare">
               <Activity className="w-4 h-4 mr-2" />
@@ -237,6 +240,7 @@ export default function MrpGeneratorList() {
             New Scenario
           </Button>
         </div>
+      </div>
       </div>
 
       <div className="flex-1 p-4 sm:p-6 max-w-[1600px] mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6">

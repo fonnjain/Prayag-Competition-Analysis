@@ -5,3 +5,4 @@ export type { AuthTokenGetter } from "./custom-fetch";
 export * from "./bucket";
 export * from "./bucketType";
 export { BucketControl } from "./BucketControl";
+export { BucketPageHeader } from "./BucketPageHeader";

@@ -1,5 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { useRoute } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { BucketFilteredNotice, isBucketFiltered, useGetCatalogProduct, getGetCatalogProductQueryKey } from "@workspace/api-client-react";
@@ -32,15 +32,15 @@ export default function ProductDetailPage() {
   });
 
   if (isLoading) {
-    return <div className="p-4 sm:p-6 text-center">Loading product...</div>;
+    return <div className="p-4 sm:p-6"><BucketPageHeader title={<h1 className="text-2xl font-bold">Product Details</h1>} />Loading product...</div>;
   }
 
   if (!data && isBucketFiltered(error)) {
-    return <div className="p-4 sm:p-6 max-w-xl mx-auto"><div className="mb-3 flex justify-end"><BucketSlot /></div><BucketFilteredNotice userId={user?.id} /></div>;
+    return <div className="p-4 sm:p-6"><BucketPageHeader title={<h1 className="text-2xl font-bold">Product Details</h1>} /><BucketFilteredNotice userId={user?.id} /></div>;
   }
 
   if (!data) {
-    return <div className="p-4 sm:p-6 text-center"><div className="mb-3 flex justify-end"><BucketSlot /></div>Product not found</div>;
+    return <div className="p-4 sm:p-6"><BucketPageHeader title={<h1 className="text-2xl font-bold">Product Details</h1>} />Product not found</div>;
   }
 
   const chartData = [...data.history].reverse().map(h => ({
@@ -50,13 +50,12 @@ export default function ProductDetailPage() {
 
   return (
     <div className="px-3 py-4 sm:px-5 lg:px-6 max-w-5xl mx-auto space-y-4">
+      <BucketPageHeader title={<h1 className="text-2xl md:text-3xl font-bold tracking-tight">{data.product.productName || data.product.itemCode}</h1>} />
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{data.product.productName || data.product.itemCode}</h1>
           <p className="text-sm text-muted-foreground mt-1 font-mono">{data.product.itemCode}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-        <BucketSlot />
         <Button variant="outline" asChild>
           <a href={productHistoryExportHref(itemCode)} download>
             <Download className="w-4 h-4 mr-2" />

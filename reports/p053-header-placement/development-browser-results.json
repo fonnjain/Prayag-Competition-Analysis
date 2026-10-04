@@ -1,0 +1,797 @@
+{
+  "scope": "development only; read-only UI verification",
+  "auth": {
+    "genuineSidFromPrivateHandoff": true,
+    "apiAuthUserStatus": 200,
+    "role": "admin",
+    "verifiedUsingBearerWithoutLoggingToken": true
+  },
+  "environment": {
+    "viewport": "1366x768",
+    "timezone": "Asia/Kolkata",
+    "scrollPosition": 0,
+    "existingDevelopmentLists": 0,
+    "originalListId": null,
+    "bucketState": "Bucket: None"
+  },
+  "writes": {
+    "fixturesOrSeeds": 0,
+    "imports": 0,
+    "saves": 0,
+    "runsCreated": 0,
+    "listCreations": 0,
+    "edits": 0,
+    "sourceChanges": 0
+  },
+  "screens": [
+    {
+      "label": "A Product Catalogue",
+      "route": "/product-db/",
+      "state": "default; Bucket None",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Product Catalog",
+      "header": {
+        "x": 280,
+        "y": 138,
+        "width": 1047,
+        "height": 36,
+        "right": 1327,
+        "bottom": 174
+      },
+      "titleBox": {
+        "x": 280,
+        "y": 138,
+        "width": 912.765625,
+        "height": 36,
+        "right": 1192.765625,
+        "bottom": 174
+      },
+      "controlWrapper": {
+        "x": 1208.765625,
+        "y": 140,
+        "width": 118.234375,
+        "height": 32,
+        "right": 1327,
+        "bottom": 172
+      },
+      "control": {
+        "x": 1208.765625,
+        "y": 140,
+        "width": 118.234375,
+        "height": 32,
+        "right": 1327,
+        "bottom": 172,
+        "text": "Bucket:\nNone\n▾"
+      },
+      "headerControls": 1,
+      "mainH1Count": 1,
+      "headingLines": "36px",
+      "now": "4 Oct 2026, 7:37:44 pm"
+    },
+    {
+      "label": "B Product Details",
+      "route": "/product-db/product?itemCode=101",
+      "state": "settled existing item 101 details; product name and price history rendered",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Waste Coupling 31/32mm (H/T)",
+      "header": {
+        "x": 315.5,
+        "y": 138,
+        "width": 976,
+        "height": 36,
+        "right": 1291.5,
+        "bottom": 174
+      },
+      "titleBox": {
+        "x": 315.5,
+        "y": 138,
+        "width": 841.8,
+        "height": 36,
+        "right": 1157.3,
+        "bottom": 174
+      },
+      "wrapperBox": {
+        "x": 1180.2,
+        "y": 146,
+        "width": 146.8,
+        "height": 32,
+        "right": 1327,
+        "bottom": 178
+      },
+      "controlBox": {
+        "x": 1173.3,
+        "y": 140,
+        "width": 118.2,
+        "height": 32,
+        "right": 1291.5,
+        "bottom": 172
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:45:11 pm",
+      "screenshotObservationId": "9vwqgz"
+    },
+    {
+      "label": "C Market Comparison",
+      "route": "/product-db/comparison",
+      "state": "default",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Market Comparison",
+      "header": {
+        "x": 288,
+        "y": 154,
+        "width": 1031,
+        "height": 36,
+        "right": 1319,
+        "bottom": 190
+      },
+      "titleBox": {
+        "x": 288,
+        "y": 154,
+        "width": 896.8,
+        "height": 36,
+        "right": 1184.8,
+        "bottom": 190
+      },
+      "wrapperBox": {
+        "x": 1200.8,
+        "y": 156,
+        "width": 118.2,
+        "height": 32,
+        "right": 1319,
+        "bottom": 188
+      },
+      "controlBox": {
+        "x": 1200.8,
+        "y": 156,
+        "width": 118.2,
+        "height": 32,
+        "right": 1319,
+        "bottom": 188
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:38:24 pm"
+    },
+    {
+      "label": "D Mapping Review",
+      "route": "/product-db/mapping-review",
+      "state": "default",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Mapping Review",
+      "header": {
+        "x": 288,
+        "y": 154,
+        "width": 1031,
+        "height": 36,
+        "right": 1319,
+        "bottom": 190
+      },
+      "titleBox": {
+        "x": 288,
+        "y": 154,
+        "width": 896.8,
+        "height": 36,
+        "right": 1184.8,
+        "bottom": 190
+      },
+      "wrapperBox": {
+        "x": 1200.8,
+        "y": 156,
+        "width": 118.2,
+        "height": 32,
+        "right": 1319,
+        "bottom": 188
+      },
+      "controlBox": {
+        "x": 1200.8,
+        "y": 156,
+        "width": 118.2,
+        "height": 32,
+        "right": 1319,
+        "bottom": 188
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:38:32 pm"
+    },
+    {
+      "label": "E Price Finder",
+      "route": "/price-finder/",
+      "state": "default",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Price Finder",
+      "header": {
+        "x": 299.5,
+        "y": 73,
+        "width": 976,
+        "height": 36,
+        "right": 1275.5,
+        "bottom": 109
+      },
+      "titleBox": {
+        "x": 299.5,
+        "y": 73,
+        "width": 841.8,
+        "height": 36,
+        "right": 1141.3,
+        "bottom": 109
+      },
+      "wrapperBox": {
+        "x": 1157.3,
+        "y": 75,
+        "width": 118.2,
+        "height": 32,
+        "right": 1275.5,
+        "bottom": 107
+      },
+      "controlBox": {
+        "x": 1157.3,
+        "y": 75,
+        "width": 118.2,
+        "height": 32,
+        "right": 1275.5,
+        "bottom": 107
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:38:39 pm"
+    },
+    {
+      "label": "F Price Finder Product Comparison — selected",
+      "route": "/price-finder/comparison?code=101&asOf=2026-10-04",
+      "state": "settled populated comparison; one product selected; Prayag ₹122.00 vs Sparsh Pearl ₹127.00 (+4.1%); no save",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Product Comparison",
+      "header": {
+        "x": 248,
+        "y": 71,
+        "width": 1079,
+        "height": 32,
+        "right": 1327,
+        "bottom": 103
+      },
+      "titleBox": {
+        "x": 248,
+        "y": 71,
+        "width": 944.8,
+        "height": 32,
+        "right": 1192.8,
+        "bottom": 103
+      },
+      "wrapperBox": {
+        "x": 1180.2,
+        "y": 71,
+        "width": 146.8,
+        "height": 32,
+        "right": 1327,
+        "bottom": 103
+      },
+      "controlBox": {
+        "x": 1208.8,
+        "y": 71,
+        "width": 118.2,
+        "height": 32,
+        "right": 1327,
+        "bottom": 103
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:45:27 pm",
+      "loading": false,
+      "mainText": "Product Comparison\nBucket:\nNone\n▾\nBack to Search\n\nComparing 1 selected product\n\nSparsh Pearl\nAshirvad\nPrince\nVectus\nAs of\nSave these 1 products as a bucket list\nExport Excel\n\tPRODUCT INFO\tPRAYAG MRP\tSPARSH PEARL\n\n\t\n101\nWaste Coupling 31/32mm (H/T)\nPTMT & PLASTIC FITTINGS • WASTE COUPLING\n\t\n₹122.00\nfrom 01-09-2026\n\t\n₹127.00\n4.1% above Prayag\nfrom 01-07-2026\nConfirmed matches only · Comparable MRP basis\nResolved as of 04-10-2026",
+      "screenshotObservationId": "zjx1ee",
+      "apiStatuses": [
+        {
+          "path": "/api/auth/user",
+          "status": 200
+        },
+        {
+          "path": "/api/price-finder/comparison",
+          "status": 200
+        },
+        {
+          "path": "/api/activity/events",
+          "status": 202
+        },
+        {
+          "path": "/api/price-finder/comparison",
+          "status": 200
+        },
+        {
+          "path": "/api/bucket-lists/active",
+          "status": 200
+        },
+        {
+          "path": "/api/price-finder/browse",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "label": "F Price Finder Product Comparison — empty",
+      "route": "/price-finder/comparison",
+      "state": "empty selection view; no saves; content: Product Comparison Bucket: Loading… ▾ No Products Selected Select products from the Price Finder to compare them. Go to Price Finder",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Product Comparison",
+      "header": {
+        "x": 371.5,
+        "y": 89,
+        "width": 832,
+        "height": 32,
+        "right": 1203.5,
+        "bottom": 121
+      },
+      "titleBox": {
+        "x": 371.5,
+        "y": 89,
+        "width": 669.2,
+        "height": 32,
+        "right": 1040.7,
+        "bottom": 121
+      },
+      "wrapperBox": {
+        "x": 1056.7,
+        "y": 89,
+        "width": 146.8,
+        "height": 32,
+        "right": 1203.5,
+        "bottom": 121
+      },
+      "controlBox": {
+        "x": 1056.7,
+        "y": 89,
+        "width": 146.8,
+        "height": 32,
+        "right": 1203.5,
+        "bottom": 121
+      },
+      "controlText": "Bucket:\nLoading…\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:38:57 pm"
+    },
+    {
+      "label": "G Competition Analysis",
+      "route": "/analysis/",
+      "state": "default",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Competition Analysis",
+      "header": {
+        "x": 248,
+        "y": 125,
+        "width": 1079,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "titleBox": {
+        "x": 248,
+        "y": 127,
+        "width": 916.2,
+        "height": 28,
+        "right": 1164.2,
+        "bottom": 155
+      },
+      "wrapperBox": {
+        "x": 1180.2,
+        "y": 125,
+        "width": 146.8,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "controlBox": {
+        "x": 1180.2,
+        "y": 125,
+        "width": 146.8,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "controlText": "Bucket:\nLoading…\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:39:09 pm"
+    },
+    {
+      "label": "H MRP Generator",
+      "route": "/analysis/mrp-generator",
+      "state": "default; initial content: MRP Generator Bucket: None ▾ Define deterministic pricing scenarios based on competitor matching rules. Compare Runs Matching MRP Where Prince undercuts us Compute Historical New Scenario SAVED SCENARIOS No scenarios found. Create one to begin. RECENT RUNS No recent runs available.",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "MRP Generator",
+      "header": {
+        "x": 248,
+        "y": 125,
+        "width": 1079,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "titleBox": {
+        "x": 248,
+        "y": 127,
+        "width": 944.8,
+        "height": 28,
+        "right": 1192.8,
+        "bottom": 155
+      },
+      "wrapperBox": {
+        "x": 1208.8,
+        "y": 125,
+        "width": 118.2,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "controlBox": {
+        "x": 1208.8,
+        "y": 125,
+        "width": 118.2,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:39:19 pm"
+    },
+    {
+      "label": "H Scenario Dialog",
+      "route": "/analysis/mrp-generator [New Scenario dialog]",
+      "state": "opened; blank, unsaved; closed via Cancel",
+      "dialog": {
+        "x": 299,
+        "y": 38.4,
+        "width": 768,
+        "height": 691.2,
+        "right": 1067,
+        "bottom": 729.6
+      },
+      "header": {
+        "x": 324,
+        "y": 63.4,
+        "width": 683,
+        "height": 32,
+        "right": 1007,
+        "bottom": 95.4
+      },
+      "title": "New Scenario",
+      "titleBox": {
+        "x": 324,
+        "y": 70.4,
+        "width": 548.8,
+        "height": 18,
+        "right": 872.8,
+        "bottom": 88.4
+      },
+      "controlText": "Bucket:\nNone\n▾",
+      "controlBox": {
+        "x": 888.8,
+        "y": 63.4,
+        "width": 118.2,
+        "height": 32,
+        "right": 1007,
+        "bottom": 95.4
+      },
+      "dialogBucketCount": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "now": "4 Oct 2026, 7:39:36 pm"
+    },
+    {
+      "label": "I Matching MRP Workbench — default",
+      "route": "/analysis/mrp-generator/matching",
+      "state": "default no-scope view; content: Matching MRP Workbench Bucket: Loading… ▾ Please select a scope and competitors from the generator list to begin.",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Matching MRP Workbench",
+      "header": {
+        "x": 256,
+        "y": 145,
+        "width": 1063,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "titleBox": {
+        "x": 256,
+        "y": 147,
+        "width": 900.2,
+        "height": 28,
+        "right": 1156.2,
+        "bottom": 175
+      },
+      "wrapperBox": {
+        "x": 1172.2,
+        "y": 145,
+        "width": 146.8,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "controlBox": {
+        "x": 1172.2,
+        "y": 145,
+        "width": 146.8,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "controlText": "Bucket:\nLoading…\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:39:49 pm"
+    },
+    {
+      "label": "I Matching MRP Workbench — Prince exposure",
+      "route": "/analysis/mrp-generator/matching?view=prince_exposure",
+      "state": "read-only prince_exposure variant; content: Where Prince undercuts us Bucket: None ▾",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Where Prince undercuts us",
+      "header": {
+        "x": 256,
+        "y": 145,
+        "width": 1063,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "titleBox": {
+        "x": 256,
+        "y": 147,
+        "width": 900.2,
+        "height": 28,
+        "right": 1156.2,
+        "bottom": 175
+      },
+      "wrapperBox": {
+        "x": 1172.2,
+        "y": 145,
+        "width": 146.8,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "controlBox": {
+        "x": 1172.2,
+        "y": 145,
+        "width": 146.8,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "controlText": "Bucket:\nLoading…\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:39:56 pm"
+    },
+    {
+      "label": "J Run Details — existing run 1050",
+      "route": "/analysis/mrp-generator/runs/1050",
+      "state": "existing run 1050; settled read-only details verified",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Run Details",
+      "header": {
+        "x": 256,
+        "y": 145,
+        "width": 1063,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "titleBox": {
+        "x": 256,
+        "y": 147,
+        "width": 900.2,
+        "height": 28,
+        "right": 1156.2,
+        "bottom": 175
+      },
+      "wrapperBox": {
+        "x": 1172.2,
+        "y": 145,
+        "width": 146.8,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "controlBox": {
+        "x": 1172.2,
+        "y": 145,
+        "width": 146.8,
+        "height": 32,
+        "right": 1319,
+        "bottom": 177
+      },
+      "controlText": "Bucket:\nLoading…\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "mainH1Count": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:40:12 pm",
+      "settled": {
+        "viewport": {
+          "width": 1366,
+          "height": 768
+        },
+        "scrollY": 0,
+        "heading": "Run #1050",
+        "header": {
+          "x": 248,
+          "y": 125,
+          "width": 1079,
+          "height": 32,
+          "right": 1327,
+          "bottom": 157
+        },
+        "titleBox": {
+          "x": 248,
+          "y": 127,
+          "width": 944.8,
+          "height": 28,
+          "right": 1192.8,
+          "bottom": 155
+        },
+        "controlBox": {
+          "x": 1208.8,
+          "y": 125,
+          "width": 118.2,
+          "height": 32,
+          "right": 1327,
+          "bottom": 157
+        },
+        "controlText": "Bucket:\nNone\n▾",
+        "headerControlCount": 1,
+        "globalBucketCount": 1,
+        "centerDelta": 0,
+        "rightDelta": 0,
+        "titleWrap": false,
+        "runSummaryVisible": true,
+        "now": "4 Oct 2026, 7:42:00 pm"
+      }
+    },
+    {
+      "label": "K Compare Scenarios",
+      "route": "/analysis/mrp-generator/compare",
+      "state": "default",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "scrollY": 0,
+      "heading": "Compare Scenarios",
+      "header": {
+        "x": 248,
+        "y": 125,
+        "width": 1079,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "titleBox": {
+        "x": 248,
+        "y": 127,
+        "width": 916.2,
+        "height": 28,
+        "right": 1164.2,
+        "bottom": 155
+      },
+      "controlBox": {
+        "x": 1180.2,
+        "y": 125,
+        "width": 146.8,
+        "height": 32,
+        "right": 1327,
+        "bottom": 157
+      },
+      "controlText": "Bucket:\nLoading…\n▾",
+      "headerControlCount": 1,
+      "globalBucketCount": 1,
+      "centerDelta": 0,
+      "rightDelta": 0,
+      "titleWrap": false,
+      "now": "4 Oct 2026, 7:40:53 pm"
+    }
+  ],
+  "limitations": [
+    "Browser observations auto-captured screenshots for the route states; the browser tool does not expose a supported local PNG export path, so no PNGs were written.",
+    "Per-screen screenshot observation IDs are not persisted in this JSON.",
+    "The Bucket wrapper-specific testid was absent; measurements used the actual button-bucket-open control inside bucket-page-header."
+  ]
+}

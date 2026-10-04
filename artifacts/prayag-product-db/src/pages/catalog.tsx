@@ -1,5 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { useState, useEffect } from "react";
 import {
   useGetCatalogProducts,
@@ -213,9 +213,9 @@ export default function CatalogPage() {
 
   return (
     <div className="px-3 py-4 sm:px-5 lg:px-6 max-w-7xl mx-auto">
+      <BucketPageHeader title={<h1 className="text-2xl md:text-3xl font-bold tracking-tight">Product Catalog</h1>} />
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Product Catalog</h1>
           <p className="text-muted-foreground mt-1">
             {productsData?.total ? `${productsData.total} items` : "Loading..."}
           </p>
@@ -253,7 +253,6 @@ export default function CatalogPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center sm:col-span-2 lg:col-span-1"><BucketSlot /></div>
 
         <Select
           value={division}

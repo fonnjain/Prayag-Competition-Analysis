@@ -1117,3 +1117,31 @@ mtime_ms = 1791121130345
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/db62ea95-416f-458e-8658-b9d5238ee6bd/16198ea8-1d41-4408-b4c5-970e0d03ef12"
 storage_version_token = "1791121142971676"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "-WePQd-ClAT_ZvKyJhwWX"
+uri = "file://reports/P053-Step-2-Header-Placement.html"
+type = "html"
+title = "A–K Header Placement — Screenshot Report"
+description = "All 11 named development screenshots at 1366×768, with zero-scroll header alignment and unchanged protected counts."
+logical_id = "3a9990b8-4b14-4cb1-9a74-f4b3e5491f92"
+content_hash = "sha256:b6ba8e2db5692484377fd420e318be0b2b02d6c35b91d0f95e7f5f1bc560004f"
+size = 1738448
+mtime_ms = 1791123668153
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/3a9990b8-4b14-4cb1-9a74-f4b3e5491f92/125f8d64-e4e4-4c2b-8868-43220d76fd58"
+storage_version_token = "1791123715540018"
+content_type = "text/html"
+
+[[outputs]]
+id = "gkv1T30sUhuGQ8aDzH7lk"
+uri = "file://reports/P053-Step-2-Header-Placement.zip"
+type = "unspecified"
+title = "P053 Header Placement — Evidence Download"
+description = "11 named PNG screenshots, measured positions, before/after protected-data snapshots and verification report."
+logical_id = "e41055b7-1bc9-450e-a790-7c534bb6cf46"
+content_hash = "sha256:10394fc42c382f4fe6c8dff1ef5f89aacec60218e0788150c807dc6d310e6c84"
+size = 2517640
+mtime_ms = 1791123668561
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e41055b7-1bc9-450e-a790-7c534bb6cf46/8c803c84-663d-42ba-a267-9eca75f38690"
+storage_version_token = "1791123716931377"
+content_type = "application/octet-stream"

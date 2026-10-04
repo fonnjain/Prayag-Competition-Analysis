@@ -1,7 +1,7 @@
 import { formatMoney } from "@workspace/formatting";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -363,9 +363,8 @@ export function ScenarioDialog({ open, onOpenChange, initialData, onSave, isSavi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3 pr-5">
-            <DialogTitle>{initialData?.id ? "Edit Scenario" : "New Scenario"}</DialogTitle>
-            <BucketSlot />
+          <div className="pr-5">
+            <BucketPageHeader title={<DialogTitle>{initialData?.id ? "Edit Scenario" : "New Scenario"}</DialogTitle>} />
           </div>
             <Tabs value={policyVersion === 3 ? "simple" : "advanced"} onValueChange={handleTabChange} className="w-[300px] pt-2">
               <TabsList className="grid w-full grid-cols-2">

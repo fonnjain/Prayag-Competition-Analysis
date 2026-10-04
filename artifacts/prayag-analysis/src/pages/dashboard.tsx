@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
@@ -126,6 +126,9 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-full bg-muted/20">
+      <div className="border-b bg-card px-3 py-3 sm:px-4 lg:px-6">
+        <BucketPageHeader title={<h1 className="text-lg font-semibold text-foreground">Competition Analysis</h1>} />
+      </div>
       {/* Controls bar — global nav owned by AppShell; only app controls here */}
       <div className="border-b bg-card px-3 py-2.5 sm:px-4 lg:px-6 flex flex-wrap items-center gap-2">
         <ModeToggle mode={mode} onChange={setMode} />
@@ -231,7 +234,7 @@ function FilterBar({
   const { data: periodsData } = useGetAnalysisPeriods();
 
   if (isLoading || !data) {
-    return <div className="space-y-2"><div className="flex justify-end"><BucketSlot /></div><Skeleton className="h-16 w-full" /></div>;
+    return <div className="space-y-2"><Skeleton className="h-16 w-full" /></div>;
   }
 
   const handleClear = () => onChange({});
@@ -251,7 +254,6 @@ function FilterBar({
         <div className="col-span-2 flex items-center gap-2 text-sm font-medium text-muted-foreground sm:mr-1 h-8">
           <Filter className="h-4 w-4" />
           Filters
-          <span className="ml-auto sm:ml-3 font-normal"><BucketSlot /></span>
         </div>
 
         <div className="min-w-0 space-y-1">

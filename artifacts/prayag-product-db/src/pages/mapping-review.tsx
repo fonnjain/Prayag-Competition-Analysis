@@ -1,5 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { useState, useEffect, Fragment, useMemo } from "react";
 import { 
   useGetMappingReview,
@@ -456,9 +456,9 @@ export default function MappingReviewPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      <BucketPageHeader title={<h1 className="text-3xl font-bold tracking-tight">Mapping Review</h1>} />
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mapping Review</h1>
           <p className="text-muted-foreground mt-1">
             Review and map competitor products to Prayag item codes.
           </p>
@@ -482,7 +482,6 @@ export default function MappingReviewPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        <BucketSlot />
         <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 

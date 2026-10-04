@@ -32,6 +32,18 @@ shared control and consistent Included/Excluded colours across screens, without
 changing resolution or interpreting name suffixes. Preserve legacy disclosure
 recognition for re-uploading old files, as well as the new labelled format.
 
+Every A–K bucket control belongs in the page header, right-aligned on the same
+row as the page title, visible without scrolling at 1366×768. No alternative
+filter-bar or below-actions placement is allowed, including loading/empty/error
+states and generator subviews.
+
+**Why:** Production verification found three placements. The user replaced the
+earlier two-placement allowance with this single rule, explicitly without exceptions.
+
+**How to apply:** Reuse the shared title/control header layout. Keep subtitles,
+actions, filter bars, summaries and metrics below that row; never duplicate the
+control inside them. Verify all eleven screens by screenshots at the target size.
+
 The approved scope is inventory A–K only. Maintenance/audit surfaces L–T stay
 unfiltered and say “Bucket lists do not apply here.” Machine APIs and signed
 full-catalogue snapshots also remain unfiltered.

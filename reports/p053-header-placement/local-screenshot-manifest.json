@@ -1,0 +1,396 @@
+{
+  "viewport": {
+    "width": 1366,
+    "height": 768
+  },
+  "environment": "development",
+  "bucketState": "None",
+  "source": "Genuine authenticated Chromium screenshots; no fixtures, request mocks, preference writes or CSS injection",
+  "screens": [
+    {
+      "letter": "A",
+      "name": "Product Catalogue",
+      "route": "/product-db/",
+      "filePath": "reports/p053-header-placement/screenshots/A-product-catalogue.png",
+      "title": "Product Catalog",
+      "titleBox": {
+        "x": 280,
+        "y": 183,
+        "width": 925.96875,
+        "height": 36,
+        "right": 1205.96875,
+        "bottom": 219
+      },
+      "header": {
+        "x": 280,
+        "y": 183,
+        "width": 1062,
+        "height": 36,
+        "right": 1342,
+        "bottom": 219
+      },
+      "control": {
+        "x": 1221.96875,
+        "y": 185,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1342,
+        "bottom": 217
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:10",
+      "passed": true
+    },
+    {
+      "letter": "B",
+      "name": "Product Details",
+      "route": "/product-db/product?itemCode=101",
+      "filePath": "reports/p053-header-placement/screenshots/B-product-details.png",
+      "title": "Waste Coupling 31/32mm (H/T)",
+      "titleBox": {
+        "x": 323,
+        "y": 183,
+        "width": 839.96875,
+        "height": 36,
+        "right": 1162.96875,
+        "bottom": 219
+      },
+      "header": {
+        "x": 323,
+        "y": 183,
+        "width": 976,
+        "height": 36,
+        "right": 1299,
+        "bottom": 219
+      },
+      "control": {
+        "x": 1178.96875,
+        "y": 185,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1299,
+        "bottom": 217
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:11",
+      "passed": true
+    },
+    {
+      "letter": "C",
+      "name": "Market Comparison",
+      "route": "/product-db/comparison",
+      "filePath": "reports/p053-header-placement/screenshots/C-market-comparison.png",
+      "title": "Market Comparison",
+      "titleBox": {
+        "x": 288,
+        "y": 199,
+        "width": 909.96875,
+        "height": 36,
+        "right": 1197.96875,
+        "bottom": 235
+      },
+      "header": {
+        "x": 288,
+        "y": 199,
+        "width": 1046,
+        "height": 36,
+        "right": 1334,
+        "bottom": 235
+      },
+      "control": {
+        "x": 1213.96875,
+        "y": 201,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1334,
+        "bottom": 233
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:16",
+      "passed": true
+    },
+    {
+      "letter": "D",
+      "name": "Mapping Review",
+      "route": "/product-db/mapping-review",
+      "filePath": "reports/p053-header-placement/screenshots/D-mapping-review.png",
+      "title": "Mapping Review",
+      "titleBox": {
+        "x": 288,
+        "y": 199,
+        "width": 909.96875,
+        "height": 36,
+        "right": 1197.96875,
+        "bottom": 235
+      },
+      "header": {
+        "x": 288,
+        "y": 199,
+        "width": 1046,
+        "height": 36,
+        "right": 1334,
+        "bottom": 235
+      },
+      "control": {
+        "x": 1213.96875,
+        "y": 201,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1334,
+        "bottom": 233
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:17",
+      "passed": true
+    },
+    {
+      "letter": "E",
+      "name": "Price Finder",
+      "route": "/price-finder/",
+      "filePath": "reports/p053-header-placement/screenshots/E-price-finder.png",
+      "title": "Price Finder",
+      "titleBox": {
+        "x": 307,
+        "y": 118,
+        "width": 839.96875,
+        "height": 36,
+        "right": 1146.96875,
+        "bottom": 154
+      },
+      "header": {
+        "x": 307,
+        "y": 118,
+        "width": 976,
+        "height": 36,
+        "right": 1283,
+        "bottom": 154
+      },
+      "control": {
+        "x": 1162.96875,
+        "y": 120,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1283,
+        "bottom": 152
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:18",
+      "passed": true
+    },
+    {
+      "letter": "F",
+      "name": "Price Finder Product Comparison",
+      "route": "/price-finder/comparison?code=101&asOf=2026-10-04",
+      "filePath": "reports/p053-header-placement/screenshots/F-price-finder-product-comparison.png",
+      "title": "Product Comparison",
+      "titleBox": {
+        "x": 248,
+        "y": 116,
+        "width": 957.96875,
+        "height": 32,
+        "right": 1205.96875,
+        "bottom": 148
+      },
+      "header": {
+        "x": 248,
+        "y": 116,
+        "width": 1094,
+        "height": 32,
+        "right": 1342,
+        "bottom": 148
+      },
+      "control": {
+        "x": 1221.96875,
+        "y": 116,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1342,
+        "bottom": 148
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:19",
+      "passed": true
+    },
+    {
+      "letter": "G",
+      "name": "Competition Analysis",
+      "route": "/analysis/",
+      "filePath": "reports/p053-header-placement/screenshots/G-competition-analysis.png",
+      "title": "Competition Analysis",
+      "titleBox": {
+        "x": 248,
+        "y": 172,
+        "width": 957.96875,
+        "height": 28,
+        "right": 1205.96875,
+        "bottom": 200
+      },
+      "header": {
+        "x": 248,
+        "y": 170,
+        "width": 1094,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "control": {
+        "x": 1221.96875,
+        "y": 170,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:21",
+      "passed": true
+    },
+    {
+      "letter": "H",
+      "name": "MRP Generator Scenarios",
+      "route": "/analysis/mrp-generator",
+      "filePath": "reports/p053-header-placement/screenshots/H-mrp-generator-scenarios.png",
+      "title": "MRP Generator",
+      "titleBox": {
+        "x": 248,
+        "y": 172,
+        "width": 957.96875,
+        "height": 28,
+        "right": 1205.96875,
+        "bottom": 200
+      },
+      "header": {
+        "x": 248,
+        "y": 170,
+        "width": 1094,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "control": {
+        "x": 1221.96875,
+        "y": 170,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:22",
+      "passed": true
+    },
+    {
+      "letter": "I",
+      "name": "Matching MRP Workbench",
+      "route": "/analysis/mrp-generator/matching",
+      "filePath": "reports/p053-header-placement/screenshots/I-matching-mrp-workbench.png",
+      "title": "Matching MRP Workbench",
+      "titleBox": {
+        "x": 256,
+        "y": 192,
+        "width": 941.96875,
+        "height": 28,
+        "right": 1197.96875,
+        "bottom": 220
+      },
+      "header": {
+        "x": 256,
+        "y": 190,
+        "width": 1078,
+        "height": 32,
+        "right": 1334,
+        "bottom": 222
+      },
+      "control": {
+        "x": 1213.96875,
+        "y": 190,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1334,
+        "bottom": 222
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:23",
+      "passed": true
+    },
+    {
+      "letter": "J",
+      "name": "Run Details",
+      "route": "/analysis/mrp-generator/runs/1050",
+      "filePath": "reports/p053-header-placement/screenshots/J-run-details.png",
+      "title": "Run #1050",
+      "titleBox": {
+        "x": 248,
+        "y": 172,
+        "width": 957.96875,
+        "height": 28,
+        "right": 1205.96875,
+        "bottom": 200
+      },
+      "header": {
+        "x": 248,
+        "y": 170,
+        "width": 1094,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "control": {
+        "x": 1221.96875,
+        "y": 170,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:27",
+      "passed": true
+    },
+    {
+      "letter": "K",
+      "name": "Compare Scenarios",
+      "route": "/analysis/mrp-generator/compare",
+      "filePath": "reports/p053-header-placement/screenshots/K-compare-scenarios.png",
+      "title": "Compare Scenarios",
+      "titleBox": {
+        "x": 248,
+        "y": 172,
+        "width": 957.96875,
+        "height": 28,
+        "right": 1205.96875,
+        "bottom": 200
+      },
+      "header": {
+        "x": 248,
+        "y": 170,
+        "width": 1094,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "control": {
+        "x": 1221.96875,
+        "y": 170,
+        "width": 120.03125,
+        "height": 32,
+        "right": 1342,
+        "bottom": 202
+      },
+      "controlCount": 1,
+      "scrollY": 0,
+      "timestampIST": "2026-10-04 19:49:28",
+      "passed": true
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
-import { BucketSlot } from "@/components/BucketSlot";
+import { BucketPageHeader } from "@/components/BucketSlot";
 import { useEffect } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useGetPriceFinderComparison, getExportPriceFinderComparisonUrl } from "@workspace/api-client-react";
@@ -79,13 +79,13 @@ export default function ComparisonPage() {
 
   if (codes.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto p-8 text-center mt-20">
+      <div className="max-w-4xl mx-auto p-8 text-center">
+        <BucketPageHeader title={<h1 className="text-2xl font-bold text-left">Product Comparison</h1>} />
         <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
           <Search className="w-8 h-8 text-muted-foreground" />
         </div>
         <div className="mb-2 flex items-center justify-between gap-3 text-left">
-          <h1 className="text-2xl font-bold">No Products Selected</h1>
-          <BucketSlot />
+          <h2 className="text-2xl font-bold">No Products Selected</h2>
         </div>
         <p className="text-muted-foreground mb-6">Select products from the Price Finder to compare them.</p>
         <Link href={localPriceFinderUrl("/", normalizePriceFinderParams(params, "search"))} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 shadow-sm">
@@ -98,14 +98,15 @@ export default function ComparisonPage() {
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden">
       <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 text-white shrink-0">
-        <div className="max-w-[1600px] mx-auto px-4 py-3 md:px-6 md:py-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="max-w-[1600px] mx-auto px-4 py-3 md:px-6 md:py-3.5">
+          <BucketPageHeader title={<h1 className="text-xl md:text-2xl font-black tracking-tight text-white">Product Comparison</h1>} />
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-indigo-300 mb-1">
               <Link href={localPriceFinderUrl("/", normalizePriceFinderParams(params, "search"))} className="hover:text-white transition-colors flex items-center gap-1 text-xs font-semibold">
                 <ChevronLeft className="w-3.5 h-3.5" /> Back to Search
               </Link>
             </div>
-            <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">Product Comparison</h1>
             <p className="text-indigo-200 mt-0.5 text-xs font-medium">
               Comparing {codes.length} selected product{codes.length > 1 ? "s" : ""}
             </p>
@@ -148,7 +149,7 @@ export default function ComparisonPage() {
             >
               <Download className="w-3.5 h-3.5" /> Export Excel
             </a>
-            <div className="border-l border-white/10 pl-3"><BucketSlot /></div>
+          </div>
           </div>
         </div>
       </div>
