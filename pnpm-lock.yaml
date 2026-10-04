@@ -1266,6 +1266,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.100.9(react@19.1.0)
+      '@workspace/formatting':
+        specifier: workspace:*
+        version: link:../formatting
     devDependencies:
       '@types/react':
         specifier: 'catalog:'

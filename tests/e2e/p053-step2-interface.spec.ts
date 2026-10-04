@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { formatBucketExportDisclosure } from "../../lib/formatting/src/index";
 
 const XLSX = createRequire(path.resolve("artifacts/api-server/package.json"))("xlsx");
 
@@ -127,9 +128,11 @@ test("P053 Step 2 development global bucket control/editor acceptance", async ({
     const bytes = await exportRes.body();
     fs.writeFileSync(path.join(dir, "development-filtered-catalogue.csv"), bytes);
     const csv = bytes.toString("utf8");
-    const workbook = XLSX.read(bytes, { type: "buffer", codepage: 65001 });
+    const workbook = XLSX.read(bytes.toString("utf8").replace(/^\uFEFF/, ""), { type: "string", FS: "," });
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" }) as string[][];
-    expect(rows[0][0]).toBe(active.banner);
+    expect(rows[0][0]).toBe(formatBucketExportDisclosure({
+      name: active.list.name, type: active.list.type, count: active.list.activeCount ?? active.list.count,
+    }));
     expect(rows[1][0]).toBe("Display-only product filter; no source product or price data changed.");
     console.log(`EXPORT development-filtered-catalogue.csv IST ${stamp()} firstLine=${JSON.stringify(csv.split(/\r?\n/)[0])} secondLine=${JSON.stringify(csv.split(/\r?\n/)[1])} bytes=${bytes.length}`);
 

@@ -1075,3 +1075,45 @@ mtime_ms = 1791120154031
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b1f8623f-0eac-4580-b96a-b38d863fb94c/4f64d0b6-e6ba-4046-bb8d-b64f62128760"
 storage_version_token = "1791120162470084"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "ITWISfc-f_OaZ-UnuloFe"
+uri = "file://reports/p053-export-fix/ho-name-catalogue.csv"
+type = "table"
+title = "Actual corrected catalogue export — CSV"
+description = "Development download with the raw saved name “HO (Plumbing) — Excluded”, explicit type and full 184-item effect."
+logical_id = "502a0181-5be1-4a0a-89c9-8c68e0f0244d"
+content_hash = "sha256:c7b4ead82c5b31c952677586335f22d4ae56cb677ccb569e3d440fdddd83a5c7"
+size = 1236783
+mtime_ms = 1791120816897
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/502a0181-5be1-4a0a-89c9-8c68e0f0244d/b10e3d74-5ef3-45e6-99f5-cbae85dabad9"
+storage_version_token = "1791121140157920"
+content_type = "text/csv"
+
+[[outputs]]
+id = "BhJvpiK--oTOsFIBULBXT"
+uri = "file://reports/p053-export-fix/Report.html"
+type = "html"
+title = "P053 export disclosure correction — report"
+description = "Coverage, format boundaries, timestamps, cleanup and unchanged development/production fingerprints."
+logical_id = "1bc5d8af-156f-49db-a93d-94bb7658edc6"
+content_hash = "sha256:c0ce0f558ff7130e95911ca089a29663182644a3b830463bacae52aaaaf9a11d"
+size = 9684
+mtime_ms = 1791121107489
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1bc5d8af-156f-49db-a93d-94bb7658edc6/1ef196d5-29f2-4411-816f-3e7f656b2014"
+storage_version_token = "1791121141618070"
+content_type = "text/html"
+
+[[outputs]]
+id = "DJzXC92wuds23fLesBn-p"
+uri = "file://reports/P053-Step-2-Export-Fix.zip"
+type = "unspecified"
+title = "P053 Step 2 — corrected export evidence"
+description = "33 files: actual CSV/XLSX downloads for both names, report, test results and protected-data snapshots."
+logical_id = "db62ea95-416f-458e-8658-b9d5238ee6bd"
+content_hash = "sha256:0ba485c8ad431c515e19a6d9f2c1eaaba08b3230a4d951262085f6832ef8a1df"
+size = 2891429
+mtime_ms = 1791121130345
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/db62ea95-416f-458e-8658-b9d5238ee6bd/16198ea8-1d41-4408-b4c5-970e0d03ef12"
+storage_version_token = "1791121142971676"
+content_type = "application/octet-stream"

@@ -5,8 +5,9 @@ import { getActiveBucket } from "./bucketLists";
 import { bucketAllowsCode } from "./bucketMembership";
 import { isAdminUser } from "../middlewares/authMiddleware";
 import { normCode } from "./catalog";
+import { formatBucketExportDisclosure } from "@workspace/formatting";
 
-type Context = { type: "included" | "excluded"; codes: Set<string>; banner: string };
+type Context = { type: "included" | "excluded"; codes: Set<string>; banner: string; exportBanner?: string };
 const storage = new AsyncLocalStorage<Context | null>();
 
 /** Explicit screen-source allowlist. Never infer scope from shared helper calls. */
@@ -31,7 +32,13 @@ export async function bucketFilterMiddleware(req: Request, res: Response, next: 
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Vary", "Cookie, Authorization");
     const context: Context | null = active.list && active.banner
-      ? { type: active.list.type, codes: new Set(active.codes.map(normCode)), banner: active.banner } : null;
+      ? {
+        type: active.list.type, codes: new Set(active.codes.map(normCode)), banner: active.banner,
+        exportBanner: formatBucketExportDisclosure({
+          name: active.list.name, type: active.list.type,
+          count: active.list.activeCount ?? active.list.count,
+        }),
+      } : null;
     // A direct detail/history request must not reveal a filtered product.
     const directPath = /^(?:\/catalog\/products\/|\/price-finder\/product\/)(.+)$/.exec(req.path);
     const directQuery = ["/catalog/product", "/price-finder/product", "/analysis/price-history"].includes(req.path);
@@ -64,7 +71,8 @@ export function bucketSql(column: SQL): SQL {
   return context.type === "included" ? sql`${canonical} IN (${values})` : sql`(${canonical} IS NULL OR ${canonical} NOT IN (${values}))`;
 }
 export function bucketExportBanner() {
-  return storage.getStore()?.banner ?? "Bucket lists: none applied.";
+  const context = storage.getStore();
+  return context?.exportBanner ?? context?.banner ?? "Bucket lists: none applied.";
 }
 export function hasBucketFilter() {
   return !!storage.getStore();

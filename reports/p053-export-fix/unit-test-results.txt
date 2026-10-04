@@ -1,0 +1,22 @@
+(node:512) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/workspace/tests/unit/bucket-export-disclosure.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/runner/workspace/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ "HO (Plumbing) — Excluded" / included / csv: separate name, type and complete effect (4.022072ms)
+✔ "HO (Plumbing) — Excluded" / included / xlsx: separate name, type and complete effect (15.635066ms)
+✔ "HO (Plumbing) — Excluded" / excluded / csv: separate name, type and complete effect (0.507766ms)
+✔ "HO (Plumbing) — Excluded" / excluded / xlsx: separate name, type and complete effect (3.624678ms)
+✔ "Excluded" / included / csv: separate name, type and complete effect (0.729686ms)
+✔ "Excluded" / included / xlsx: separate name, type and complete effect (11.217925ms)
+✔ "Excluded" / excluded / csv: separate name, type and complete effect (0.55293ms)
+✔ "Excluded" / excluded / xlsx: separate name, type and complete effect (7.025053ms)
+✔ escaped raw names remain names, and only single-cell metadata is recognised (0.46114ms)
+✔ old exported metadata remains recognised for round-trip imports (0.588136ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 550.279659

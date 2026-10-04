@@ -9,5 +9,6 @@
     "lib": ["dom", "es2022"],
     "jsx": "react-jsx"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "../formatting" }]
 }

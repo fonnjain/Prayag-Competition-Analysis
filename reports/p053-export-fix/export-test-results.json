@@ -1,0 +1,448 @@
+[
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:36",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "catalogue",
+    "format": "csv",
+    "filename": "ho-name-catalogue.csv",
+    "bytes": 1236783,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:37",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "catalogue",
+    "format": "xlsx",
+    "filename": "ho-name-catalogue.xlsx",
+    "bytes": 3620158,
+    "sheets": [
+      "Summary",
+      "MRP In Force"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:38",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "history",
+    "format": "csv",
+    "filename": "ho-name-history.csv",
+    "bytes": 1990998,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:39",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "history",
+    "format": "xlsx",
+    "filename": "ho-name-history.xlsx",
+    "bytes": 5309592,
+    "sheets": [
+      "MRP History"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:39",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "revisions",
+    "format": "csv",
+    "filename": "ho-name-revisions.csv",
+    "bytes": 360,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:39",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "revisions",
+    "format": "xlsx",
+    "filename": "ho-name-revisions.xlsx",
+    "bytes": 18445,
+    "sheets": [
+      "Summary",
+      "MRP Revisions"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:41",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "comparison",
+    "format": "csv",
+    "filename": "ho-name-comparison.csv",
+    "bytes": 445785,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:43",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "comparison",
+    "format": "xlsx",
+    "filename": "ho-name-comparison.xlsx",
+    "bytes": 1843339,
+    "sheets": [
+      "Comparison"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:44",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "mapping-review",
+    "format": "csv",
+    "filename": "ho-name-mapping-review.csv",
+    "bytes": 685,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:46",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "mapping-review",
+    "format": "xlsx",
+    "filename": "ho-name-mapping-review.xlsx",
+    "bytes": 17239,
+    "sheets": [
+      "Mapping Review"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:46",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "price-finder-comparison",
+    "format": "xlsx",
+    "filename": "ho-name-price-finder-comparison.xlsx",
+    "bytes": 17380,
+    "sheets": [
+      "Price comparison"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:46",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "analysis",
+    "format": "csv",
+    "filename": "ho-name-analysis.csv",
+    "bytes": 382676,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:46",
+    "name": "HO (Plumbing) — Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "analysis",
+    "format": "xlsx",
+    "filename": "ho-name-analysis.xlsx",
+    "bytes": 1727102,
+    "sheets": [
+      "Analysis"
+    ],
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development formatter/writer check",
+    "timeIST": "2026-10-04 19:03:46",
+    "name": "HO (Plumbing) — Excluded",
+    "kind": "browser-mrp-generator",
+    "format": "csv",
+    "disclosure": "Showing: List name: \"HO (Plumbing) — Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:47",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "catalogue",
+    "format": "csv",
+    "filename": "short-name-catalogue.csv",
+    "bytes": 1236765,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:47",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "catalogue",
+    "format": "xlsx",
+    "filename": "short-name-catalogue.xlsx",
+    "bytes": 3620183,
+    "sheets": [
+      "Summary",
+      "MRP In Force"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:48",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "history",
+    "format": "csv",
+    "filename": "short-name-history.csv",
+    "bytes": 1990980,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:49",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "history",
+    "format": "xlsx",
+    "filename": "short-name-history.xlsx",
+    "bytes": 5309635,
+    "sheets": [
+      "MRP History"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:49",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "revisions",
+    "format": "csv",
+    "filename": "short-name-revisions.csv",
+    "bytes": 342,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:49",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "revisions",
+    "format": "xlsx",
+    "filename": "short-name-revisions.xlsx",
+    "bytes": 18470,
+    "sheets": [
+      "Summary",
+      "MRP Revisions"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:50",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "comparison",
+    "format": "csv",
+    "filename": "short-name-comparison.csv",
+    "bytes": 445767,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:52",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "comparison",
+    "format": "xlsx",
+    "filename": "short-name-comparison.xlsx",
+    "bytes": 1843321,
+    "sheets": [
+      "Comparison"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:54",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "mapping-review",
+    "format": "csv",
+    "filename": "short-name-mapping-review.csv",
+    "bytes": 667,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:55",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "mapping-review",
+    "format": "xlsx",
+    "filename": "short-name-mapping-review.xlsx",
+    "bytes": 17221,
+    "sheets": [
+      "Mapping Review"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:55",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "price-finder-comparison",
+    "format": "xlsx",
+    "filename": "short-name-price-finder-comparison.xlsx",
+    "bytes": 17362,
+    "sheets": [
+      "Price comparison"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:55",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "analysis",
+    "format": "csv",
+    "filename": "short-name-analysis.csv",
+    "bytes": 382658,
+    "sheets": [
+      "Sheet1"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:56",
+    "name": "Excluded",
+    "type": "excluded",
+    "count": 184,
+    "kind": "analysis",
+    "format": "xlsx",
+    "filename": "short-name-analysis.xlsx",
+    "bytes": 1727084,
+    "sheets": [
+      "Analysis"
+    ],
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development formatter/writer check",
+    "timeIST": "2026-10-04 19:03:56",
+    "name": "Excluded",
+    "kind": "browser-mrp-generator",
+    "format": "csv",
+    "disclosure": "Showing: List name: \"Excluded\" · Type: Excluded · Effect: 184 items hidden from results",
+    "passed": true
+  },
+  {
+    "environment": "development",
+    "timeIST": "2026-10-04 19:03:57",
+    "kind": "import-review",
+    "format": "xlsx",
+    "scope": "unchanged full scope",
+    "passed": true
+  }
+]

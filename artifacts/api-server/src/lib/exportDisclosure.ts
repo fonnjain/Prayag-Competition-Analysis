@@ -3,6 +3,10 @@ export function isExportDisclosureRow(row: unknown[]): boolean {
   const cells = row.map(cell => String(cell ?? "").trim()).filter(Boolean);
   if (cells.length !== 1) return false;
   const text = cells[0];
+  const labelled = /^Showing: List name: ("(?:[^"\\]|\\.)*") · Type: (?:Included|Excluded) · Effect: (?:\d+ items hidden from results|only \d+ items shown)$/.exec(text);
+  if (labelled) {
+    try { return typeof JSON.parse(labelled[1]) === "string"; } catch { return false; }
+  }
   return /^(?:Bucket lists: none applied\.?|Bucket lists do not apply here\.?|Display-only product filter; no source product or price data changed\.)$/.test(text)
     || /^Showing: .+ — (?:Included|Excluded) · \d+ items (?:shown|hidden)$/.test(text)
     || /^Bucket list applied: .+ \((?:Included|Excluded)\) - (?:showing only \d+ items|\d+ items hidden from results)$/.test(text);

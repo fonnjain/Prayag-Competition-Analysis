@@ -20,15 +20,17 @@ environments when implementing.
 Saved names may literally be `Excluded` or end in `— Excluded`. Treat the name
 as a name, never as type metadata. The interface shows name, type and effect as
 separate elements; quieter controls must still make an active filter obvious.
-Export disclosures remain full and unchanged, even when the on-screen control
-is shortened.
+Export disclosures remain full even when the on-screen control is shortened.
+Use a quoted raw name and explicitly labelled type/effect parts in exports;
+the user subsequently approved correcting the duplicated export wording too.
 
 **Why:** The user reported duplicate type text in the global banner and stressed
 that a silently filtered report is still the central risk.
 
 **How to apply:** Preserve raw saved names and explicit type fields. Keep one
 shared control and consistent Included/Excluded colours across screens, without
-changing resolution or interpreting name suffixes.
+changing resolution or interpreting name suffixes. Preserve legacy disclosure
+recognition for re-uploading old files, as well as the new labelled format.
 
 The approved scope is inventory A–K only. Maintenance/audit surfaces L–T stay
 unfiltered and say “Bucket lists do not apply here.” Machine APIs and signed

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatBucketExportDisclosure } from "@workspace/formatting";
 import {
   useGetActiveBucketList,
   useSetActiveBucketList,
@@ -13,10 +14,7 @@ export interface ActiveBucketInfo {
 }
 
 export function bucketEffectText(list: ActiveBucketInfo | null): string {
-  if (!list) return "Bucket lists: none applied";
-  return list.type === "excluded"
-    ? `Bucket list applied: ${list.name} (Excluded) - ${list.count} items hidden from results`
-    : `Bucket list applied: ${list.name} (Included) - showing only ${list.count} items`;
+  return formatBucketExportDisclosure(list);
 }
 
 /** Active list for the signed-in user. Anonymous never queries. */

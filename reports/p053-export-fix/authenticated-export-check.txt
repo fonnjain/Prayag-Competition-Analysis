@@ -1,0 +1,27 @@
+catalogue/csv/ho-name passed 2026-10-04 19:03:36 IST
+catalogue/xlsx/ho-name passed 2026-10-04 19:03:37 IST
+history/csv/ho-name passed 2026-10-04 19:03:38 IST
+history/xlsx/ho-name passed 2026-10-04 19:03:39 IST
+revisions/csv/ho-name passed 2026-10-04 19:03:39 IST
+revisions/xlsx/ho-name passed 2026-10-04 19:03:39 IST
+comparison/csv/ho-name passed 2026-10-04 19:03:41 IST
+comparison/xlsx/ho-name passed 2026-10-04 19:03:43 IST
+mapping-review/csv/ho-name passed 2026-10-04 19:03:44 IST
+mapping-review/xlsx/ho-name passed 2026-10-04 19:03:46 IST
+price-finder-comparison/xlsx/ho-name passed 2026-10-04 19:03:46 IST
+analysis/csv/ho-name passed 2026-10-04 19:03:46 IST
+analysis/xlsx/ho-name passed 2026-10-04 19:03:46 IST
+catalogue/csv/short-name passed 2026-10-04 19:03:47 IST
+catalogue/xlsx/short-name passed 2026-10-04 19:03:47 IST
+history/csv/short-name passed 2026-10-04 19:03:48 IST
+history/xlsx/short-name passed 2026-10-04 19:03:49 IST
+revisions/csv/short-name passed 2026-10-04 19:03:49 IST
+revisions/xlsx/short-name passed 2026-10-04 19:03:49 IST
+comparison/csv/short-name passed 2026-10-04 19:03:50 IST
+comparison/xlsx/short-name passed 2026-10-04 19:03:52 IST
+mapping-review/csv/short-name passed 2026-10-04 19:03:54 IST
+mapping-review/xlsx/short-name passed 2026-10-04 19:03:55 IST
+price-finder-comparison/xlsx/short-name passed 2026-10-04 19:03:55 IST
+analysis/csv/short-name passed 2026-10-04 19:03:55 IST
+analysis/xlsx/short-name passed 2026-10-04 19:03:56 IST
+Private fixtures deleted, original active preference restored, own session revoked 2026-10-04 19:03:57 IST

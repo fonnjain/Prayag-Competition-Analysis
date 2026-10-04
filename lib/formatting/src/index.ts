@@ -5,6 +5,18 @@ const money = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 });
 
+/** Export metadata only: a raw saved name is never parsed as type information. */
+export function formatBucketExportDisclosure(list: {
+  name: string; type: "included" | "excluded"; count: number;
+} | null): string {
+  if (!list) return "Bucket lists: none applied";
+  const type = list.type === "excluded" ? "Excluded" : "Included";
+  const effect = list.type === "excluded"
+    ? `${list.count} items hidden from results`
+    : `only ${list.count} items shown`;
+  return `Showing: List name: ${JSON.stringify(list.name)} · Type: ${type} · Effect: ${effect}`;
+}
+
 /** Prayag's approved Range divisions. Exact stored values only; no aliases. */
 export const RANGE_DIVISIONS = [
   "CP Fittings / Faucets",

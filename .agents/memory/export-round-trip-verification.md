@@ -3,6 +3,16 @@ name: Export round-trip verification
 description: Acceptance evidence for re-uploadable files and persisted display filters
 ---
 
+Decode CSV evidence as UTF-8 text and remove an optional BOM before parsing it
+as a string. Do not force SheetJS `codepage: 65001` on a BOM-bearing buffer.
+
+**Why:** Forced codepage handling corrupted the leading quoted cell and Unicode
+in an export-disclosure test. BOM-bearing and non-BOM CSV bytes need different
+buffer detection; explicit UTF-8 text avoids a false formatter regression.
+
+**How to apply:** Keep original download bytes untouched. Decode only the
+verification copy, specify its CSV delimiter, and read XLSX as a binary buffer.
+
 Test every re-uploadable export with its exact downloaded bytes, including disclosure rows, through the actual importer. Check recovered identities, prices, and diagnostics—not only successful HTTP status or presence of a banner.
 
 **Why:** The user explicitly raised this requirement before implementation and repeated it after download-only checks missed the gap. CSV and XLSX can behave differently because spreadsheet readers coerce their cell types differently. Disclosure rows must not become fictitious invalid product rows.
