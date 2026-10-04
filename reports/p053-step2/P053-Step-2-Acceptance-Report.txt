@@ -1,0 +1,56 @@
+P053 Step 2 — interface-only acceptance report
+Date: 2026-10-04. All times below are IST.
+Status: development implementation verified; production UI confirmation awaits user publication.
+
+IMPLEMENTATION
+Shared compact bucket control on A–K; no global full-width banner. Name is the raw saved name exactly once; type and effect separate. Included is sky blue, Excluded amber throughout. Dropdown order: None, Included group, Excluded group, Manage. HO badge/sort rule uses existing everyone visibility; no HO list was seeded. Owner and type browse chips are independent.
+Review panel has internal content scrolling and pinned action area with live effect/count and existing disabled reasons. Same footer is used for new and editable existing lists. On narrow layouts, ordinary page scrolling reaches the stacked review; item scrolling does not hide Save.
+No backend, row-filtering, membership, export, upload-preview or maintenance notice implementation changed.
+
+VERIFICATION
+Shared client and all three affected apps type-check; production builds pass. Presentation unit tests: 3 passed, including raw-name preservation, HO-first grouping, effects 0/1/184 and distinct type palettes.
+Development browser checks: switching Included/Excluded, raw names, one-click server clear, independent owner/type chips and A–K control presence passed. Initial matching no-scope branch omission was fixed and checked. Scenario dialog control also checked. J used an existing error/absent-run view; no scenario/run was created. Maintenance load-MRP has no control and retains the existing full-scope notice. Other L–T notices were preserved by source inspection, not individually browser-tested.
+Editor new-list counts 0/1/184 at 1366x768 passed (development 18:34:14–18:34:18). 125% CSS-equivalent cases passed at 1093x614; actual Chrome tab zoom was then separately verified using chrome.tabs.setZoom(1.25), devicePixelRatio=1.25, innerWidth=1093, innerHeight=614 (development 18:42:53–18:42:57).
+Narrow new-list cases 0/1/184 passed at 480x850: 184 at 18:34:25; 0 at 18:47:03; 1 at 18:47:05. Saved existing 184-item list footer passed at 1366x768,1093x614,480x850 at 18:39:03–18:39:05. Internal scrolling did not move Save below the viewport.
+HO marking/sorting was checked by source and pure presentation tests; no live development HO fixture was seeded.
+Exactly two private only-me fixture lists used per relevant run, existing catalogue codes only. Original active preference restored; fixtures deleted; all check sessions revoked. Playwright tracing was disabled. No account or catalogue fixture created.
+
+EXACT EXPORT
+Development CSV downloaded 2026-10-04 18:34:12 IST; 12,367 bytes. Actual file: development-filtered-catalogue.csv. Parsed first cell exactly matches the existing API disclosure:
+Showing: HO (Plumbing) — Excluded — Excluded · 184 items hidden
+Second disclosure cell remains: Display-only product filter; no source product or price data changed.
+CSV padding commas retained. No CSV edits or re-upload. Export wording was deliberately NOT shortened; its pre-existing name/type repetition remains as required.
+
+PROTECTED DATA — BEFORE/AFTER
+development — before 2026-10-04 18:16:36 IST; after 2026-10-04 18:44:40 IST; all identical.
+MRP rows: 14012; SHA-256: 4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2
+Catalogue rows: 6948; full-row MD5: 6be775f28feaa7cc55eb86a1d67d183f
+Classification SHA-256: 7c5086c7df253fbcaf06dcffa69b3569803118f3e4b3b4f50070f0e5e751c577
+
+production — before 2026-10-04 18:16:42 IST; after 2026-10-04 18:44:47 IST; all identical.
+MRP rows: 14302; SHA-256: e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458
+Catalogue rows: 7191; full-row MD5: 63b7a4ec2434846a0b6e880773770abb
+Classification SHA-256: b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376
+
+Classification fingerprint covers item code/category/range/division in canonical C-sorted order; full catalogue MD5 also unchanged. Baseline clocks refer to the read-only Step 2 observations before editing. After queries were read-only in both environments. SQL recipe and raw after results are in protected-data-after.json.
+
+SCREENSHOT FIGURES — ALL DEVELOPMENT PREVIEW
+control-inactive.png — 2026-10-04 18:30:12 IST; {"width":1366,"height":768}; inactive/grouped states.
+control-dropdown-groups.png — 2026-10-04 18:30:12 IST; {"width":1366,"height":768}; inactive/grouped states.
+control-active-excluded.png — 2026-10-04 18:30:13 IST; {"width":1366,"height":768}; 184 items.
+control-active-included.png — 2026-10-04 18:30:13 IST; {"width":1366,"height":768}; 1 items.
+editor-1366x768-0.png — 2026-10-04 18:34:14 IST; {"width":1366,"height":768}; 0 items.
+editor-1366x768-1.png — 2026-10-04 18:34:16 IST; {"width":1366,"height":768}; 1 items.
+editor-1366x768-184.png — 2026-10-04 18:34:18 IST; {"width":1366,"height":768}; 184 items.
+editor-125pct-css-equivalent-0.png — 2026-10-04 18:34:19 IST; {"width":1093,"height":614}; 0 items.
+editor-125pct-css-equivalent-1.png — 2026-10-04 18:34:22 IST; {"width":1093,"height":614}; 1 items.
+editor-125pct-css-equivalent-184.png — 2026-10-04 18:34:23 IST; {"width":1093,"height":614}; 184 items.
+editor-narrow-184.png — 2026-10-04 18:34:25 IST; {"width":480,"height":850}; 184 items.
+editor-actual-125pct-0.png — 2026-10-04 18:42:53 IST; {"width":1093,"height":614,"dpr":1.25}; 0 items; browser zoom 1.25.
+editor-actual-125pct-1.png — 2026-10-04 18:42:55 IST; {"width":1093,"height":614,"dpr":1.25}; 1 items; browser zoom 1.25.
+editor-actual-125pct-184.png — 2026-10-04 18:42:57 IST; {"width":1093,"height":614,"dpr":1.25}; 184 items; browser zoom 1.25.
+editor-narrow-0.png — 2026-10-04 18:47:03 IST; {"width":480,"height":850,"dpr":1}; 0 items; browser zoom 1.
+editor-narrow-1.png — 2026-10-04 18:47:05 IST; {"width":480,"height":850,"dpr":1}; 1 items; browser zoom 1.
+
+PRODUCTION HANDOFF
+No production interface verification is claimed before publish. The production protected-data check at 18:44:47 IST is a read-only database check, not a published-build confirmation. After the user publishes, confirm the live shared control, clear/grouped dropdown/editor footer/export disclosure and rerun protected-data fingerprints, recording live clock times.

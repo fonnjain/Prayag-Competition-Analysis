@@ -1,4 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
+import { BucketSlot } from "@/components/BucketSlot";
 import React, { useState } from "react";
 import { useRoute } from "wouter";
 import { useGetMrpGeneratorRun, useHandoffMrpGeneratorRun, getGetMrpGeneratorRunQueryKey, MrpGeneratorTrace, MrpGeneratorCompetitorValue, MrpGeneratorFreshnessCompetitor, useActiveBucket, bucketEffectText } from "@workspace/api-client-react";
@@ -32,7 +33,7 @@ export default function MrpGeneratorRun() {
 
   const isError403 = (err: any) => err && typeof err === 'object' && 'status' in err && err.status === 403;
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-10 w-1/4" /><Skeleton className="h-40 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  if (isLoading) return <div className="p-8 space-y-4"><div className="flex justify-end px-4 pt-3 sm:px-6"><BucketSlot /></div><Skeleton className="h-10 w-1/4" /><Skeleton className="h-40 w-full" /><Skeleton className="h-96 w-full" /></div>;
   if (isError403(error)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center space-y-4">
@@ -48,7 +49,7 @@ export default function MrpGeneratorRun() {
       </div>
     );
   }
-  if (error || !data) return <div className="p-8 text-destructive">Error loading run details.</div>;
+  if (error || !data) return <div className="p-8"><div className="flex justify-end px-4 pt-3 sm:px-6"><BucketSlot /></div><p className="text-destructive">Error loading run details.</p></div>;
 
   const { run, scenario, results } = data;
   const summary = run.summary as any;
@@ -200,7 +201,8 @@ export default function MrpGeneratorRun() {
           <h1 className="text-lg font-semibold text-foreground">Run #{run.id}</h1>
           <p className="text-sm text-muted-foreground">Scenario: {scenario?.name || run.scenarioId} &middot; As of {formatDisplayDate(run.asOf)}</p>
         </div>
-        <div className="text-right">
+        <div className="flex flex-wrap items-center justify-end gap-2 text-right">
+          <BucketSlot />
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="mr-2 h-4 w-4" /> Export CSV report
           </Button>

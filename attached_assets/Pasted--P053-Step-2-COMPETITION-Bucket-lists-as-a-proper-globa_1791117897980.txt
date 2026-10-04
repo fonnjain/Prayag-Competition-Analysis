@@ -1,0 +1,146 @@
+# P053 — Step 2 — COMPETITION — Bucket lists as a proper global filter
+
+> **P053 Step 2** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** Interface only.
+> **No change to membership resolution, to what a list contains, or to which rows are filtered.**
+> Quote `P053 Step 2` when reporting back.
+
+P053 works. Three interface problems stop it being usable.
+
+---
+
+# 1. The banner text is wrong
+
+Live production shows:
+
+```
+Showing: HO (Plumbing) — Excluded, — Excluded · 184 items hidden
+```
+
+The type is appended to a name that already ends with it. Build the label from the **list name alone**; the type is shown as its own element, never concatenated into the name. Test with a list named `Excluded` and with one named `HO (Plumbing) — Excluded`.
+
+---
+
+# 2. The full-width banner becomes a filter control
+
+A yellow strip across the page is not where a filter belongs, and it pushes the page down on every screen.
+
+**2.1** Replace it with a **bucket control that sits with the other filters** on each screen from the P053 inventory (A–K). On screens with a filter bar it goes in that bar. On screens without one it goes in the page header, on the same line as the title, right-aligned.
+
+**2.2 When no list is active**, the control is quiet:
+
+```
+Bucket: None  ▾
+```
+
+**2.3 When a list is active**, the control carries its state visibly, in one line:
+
+```
+● HO (Plumbing)   184 hidden   ×
+```
+
+- a coloured dot or left bar: one colour for **Included**, a different one for **Excluded** — the same two colours used everywhere else
+- the **list name only**
+- the effect in plain words: *"184 hidden"* or *"only 42 shown"*
+- an **×** that clears it in one click
+
+**2.4** It must stay obvious at a glance that a filter is on. A quiet control is the point; an invisible one is not. The active state is clearly distinct from the inactive state without reading the text — colour and weight, not just wording.
+
+**2.5** The control is **the same component on every screen**, in the same place, with the same behaviour. One implementation, not one per page.
+
+---
+
+# 3. Included and Excluded are kept apart
+
+**3.1 In the control's dropdown**, group them under headings, in this order:
+
+```
+None
+
+SHOW ONLY THESE  (Included)
+  <list name>            42 products
+  <list name>           118 products
+
+HIDE THESE  (Excluded)
+  HO (Plumbing)         184 products
+  <list name>            12 products
+
+Manage bucket lists →
+```
+
+Head Office lists are marked **HO** in the row. A user's own lists are not marked. Head Office lists sort above a user's own within each group.
+
+**3.2 On the browse page**, add the same split: filter chips become **All · Included · Excluded**, alongside the existing **HO lists · My lists**. The two sets of chips are independent.
+
+**3.3** The two colours for Included and Excluded are used consistently: on the type cards in the editor, on the browse badges, in the dropdown headings and on the active control.
+
+---
+
+# 4. The Save button must always be visible
+
+In the editor, **Save bucket list** sits below the item list. With 184 items it is far off screen, and a user reasonably concludes the page is broken.
+
+**4.1** Pin the action area to the bottom of the review panel. The item list scrolls **inside** the panel; the button never scrolls away.
+
+**4.2** Above the button, in that pinned area, show the live effect sentence and the item count, so the user can see what they are saving without scrolling up.
+
+**4.3** Keep the existing disabled state, with a one-line reason why it is disabled.
+
+**4.4** Same treatment when editing an existing list, not only when creating one.
+
+**4.5** Check at 1366×768 and at 125% zoom, with 0, 1 and 184 items, and on a narrow window where the panel stacks below the form. Save must be reachable in every case without hunting.
+
+---
+
+# 5. What must not change
+
+**5.1 Exports keep the full disclosure line**, with the list name, type and effect, exactly as P053 built it. **The screen gets quieter; the file does not.** A report that leaves the app must still say what was filtered.
+
+**5.2** No change to which rows are filtered, to membership resolution, to the A–K and L–T split, to the upload preview, or to the maintenance-screen notice.
+
+**5.3** Still one active list at a time.
+
+---
+
+# Rules
+
+1. Interface only. No product, price, category, range, division or competitor row changes.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums.
+3. The catalogue classification snapshot is byte-identical, both environments.
+4. No change to the export disclosure.
+5. Development first, then publish, then confirm in production.
+
+# Tests
+
+```
+1. A list named "HO (Plumbing) — Excluded" shows as that name once,
+   with the type as a separate element
+2. A list named "Excluded" shows correctly
+3. The control appears in the same place on every A-K screen
+4. Inactive and active states are distinguishable without reading the text
+5. The dropdown groups Included and Excluded under their headings,
+   with HO lists marked and sorted first
+6. Clearing from the control removes the filter in one click
+7. Browse page filters by type as well as by owner
+8. Save is visible with 0, 1 and 184 items, at 1366x768, at 125% zoom,
+   and in a narrow window
+9. Export disclosure unchanged — name, type and effect still in the file
+10. mrp_price_history count and checksum unchanged, both environments
+```
+
+# Report
+
+1. Screenshots: the control inactive, active with an Excluded list, active with an Included list, and the dropdown open with both groups.
+2. Screenshots of the editor at 0, 1 and 184 items, and in a narrow window.
+3. One export file showing the disclosure line is unchanged.
+4. Test results.
+5. `mrp_price_history` and classification snapshot, before and after, both environments.
+6. Production confirmation after publish, with clock times.
+
+State the environment and the clock time against every figure.
+
+---
+
+## The balance to hold
+
+The reason the banner was loud was to stop someone forgetting a filter is on and sending out a wrong number. Moving it into the filter bar is right, but the active state has to remain impossible to miss. Quiet when nothing is on; unmistakable when something is.

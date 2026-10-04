@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BucketSlot } from "@/components/BucketSlot";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Plus, Play, Trash2, Edit, Activity, History, Zap, Info, ShieldAlert, Lock, Copy, RotateCcw, Target } from "lucide-react";
@@ -209,7 +210,8 @@ export default function MrpGeneratorList() {
           <h1 className="text-lg font-semibold text-foreground">MRP Generator</h1>
           <p className="text-sm text-muted-foreground">Define deterministic pricing scenarios based on competitor matching rules.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <BucketSlot />
           <Button variant="outline" asChild>
             <Link href="/mrp-generator/compare">
               <Activity className="w-4 h-4 mr-2" />

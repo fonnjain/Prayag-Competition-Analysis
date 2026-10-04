@@ -103,8 +103,8 @@ export function useSetActiveBucket() {
     mutation: { onSuccess: () => { void qc.invalidateQueries(); } },
   });
   return {
-    setActive: (listId: string | null, onDone?: () => void) =>
-      m.mutate({ data: { listId } }, { onSuccess: () => onDone?.() }),
+    setActive: (listId: string | null, onDone?: () => void, onError?: (e: unknown) => void) =>
+      m.mutate({ data: { listId } }, { onSuccess: () => onDone?.(), onError: (e) => onError?.(e) }),
     isPending: m.isPending,
   };
 }

@@ -1,4 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
+import { BucketSlot } from "@/components/BucketSlot";
 import { useState, useEffect } from "react";
 import {
   useGetCatalogProducts,
@@ -252,6 +253,7 @@ export default function CatalogPage() {
             className="pl-9"
           />
         </div>
+        <div className="flex items-center sm:col-span-2 lg:col-span-1"><BucketSlot /></div>
 
         <Select
           value={division}

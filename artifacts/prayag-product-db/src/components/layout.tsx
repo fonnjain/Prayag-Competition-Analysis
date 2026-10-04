@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
-import { BucketBanner, BucketBoundary } from "@workspace/api-client-react";
+import { BucketBoundary } from "@workspace/api-client-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface LayoutProps {
@@ -312,9 +312,7 @@ export function Layout({ children }: LayoutProps) {
         <main className="min-w-0">
           {/^\/(data-health|load-mrp|new-products|import-competitor|import-review|mrp-revisions|price-editor|name-changes|mrp-provenance-backfill)/.test(location) ? (
             <BucketBoundary />
-          ) : /^\/(api-keys)/.test(location) ? null : (
-            <BucketBanner userId={user?.id} />
-          )}
+          ) : null}
           {children}
         </main>
       </div>

@@ -1,4 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
+import { BucketSlot } from "@/components/BucketSlot";
 import { useState, useEffect, Fragment, useMemo } from "react";
 import { 
   useGetMappingReview,
@@ -480,8 +481,9 @@ export default function MappingReviewPage() {
         </DropdownMenu>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+        <BucketSlot />
+        <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
             placeholder="Search descriptions, codes..." 

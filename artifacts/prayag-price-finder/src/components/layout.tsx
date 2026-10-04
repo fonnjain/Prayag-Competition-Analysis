@@ -14,7 +14,6 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
-import { BucketBanner } from "@workspace/api-client-react";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -404,7 +403,6 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Scrollable page content */}
           <main className="flex-1 overflow-y-auto relative">
-            {!location.startsWith("/bucket-lists") && <BucketBanner userId={user?.id} />}
             {children}
           </main>
         </div>

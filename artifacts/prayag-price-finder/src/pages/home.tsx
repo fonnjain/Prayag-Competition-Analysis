@@ -1,4 +1,5 @@
 import { formatMoney, formatCount } from "@workspace/formatting";
+import { BucketSlot } from "@/components/BucketSlot";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useBrowse } from "@/lib/browseContext";
 import {
@@ -479,11 +480,14 @@ export default function PriceFinderPage() {
       className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-4 md:px-6 md:py-4 space-y-4"
       onPointerDownCapture={cancelSpeech}
     >
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Price Finder</h1>
         <p className="text-muted-foreground mt-0.5 text-sm max-w-lg">
           Fast counter-side lookup for Prayag prices and market position.
         </p>
+        </div>
+        <BucketSlot />
       </div>
 
       <div

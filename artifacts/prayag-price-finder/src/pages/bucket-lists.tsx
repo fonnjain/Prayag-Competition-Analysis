@@ -9,6 +9,8 @@ import {
   useGetBucketLists,
   useSetActiveBucket,
   useUpdateBucketList,
+  BUCKET_TYPE,
+  bucketKind,
   type BucketList,
 } from "@workspace/api-client-react";
 import { Plus, Download, Eye, Copy, Pencil, Trash2, Check, Bookmark } from "lucide-react";
@@ -24,13 +26,13 @@ import { cn } from "@/lib/utils";
 import { SignInRequired, errMessage, useBucketUser } from "@/lib/bucketShared";
 
 type Chip = "all" | "ho" | "mine";
+type TypeChip = "all" | "included" | "excluded";
 
 export function TypeBadge({ type }: { type?: string }) {
-  const ex = type === "excluded";
+  const t = BUCKET_TYPE[bucketKind(type)];
   return (
-    <span className={cn("inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
-      ex ? "bg-amber-200 text-amber-950" : "bg-sky-200 text-sky-950")}>
-      {ex ? "Excluded" : "Included"}
+    <span className={cn("inline-block rounded px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide", t.badgeClass)}>
+      {t.label}
     </span>
   );
 }
@@ -40,6 +42,7 @@ export default function BucketListsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [chip, setChip] = useState<Chip>("all");
+  const [typeChip, setTypeChip] = useState<TypeChip>("all");
   const [search, setSearch] = useState("");
   const [del, setDel] = useState<BucketList | null>(null);
   const [rename, setRename] = useState<BucketList | null>(null);
@@ -58,11 +61,12 @@ export default function BucketListsPage() {
     const q = search.trim().toLowerCase();
     return (data ?? []).filter((l) => {
       const ho = l.visibility === "everyone";
+      if (typeChip !== "all" && bucketKind(l.type) !== typeChip) return false;
       if (chip === "ho" && !ho) return false;
       if (chip === "mine" && ho && l.ownerId !== user?.id) return false;
       return !q || (l.name ?? "").toLowerCase().includes(q);
     });
-  }, [data, chip, search, user?.id]);
+  }, [data, chip, typeChip, search, user?.id]);
 
   if (!authLoading && !signedIn) return <SignInRequired title="Bucket lists" />;
 
@@ -88,6 +92,16 @@ export default function BucketListsPage() {
           <button key={k} type="button" onClick={() => setChip(k)} data-testid={`chip-${k}`}
             className={cn("rounded-full border px-3.5 py-1 text-sm font-semibold transition-colors",
               chip === k ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-accent")}>
+            {label}
+          </button>
+        ))}
+        <span className="mx-1 hidden h-5 w-px bg-border sm:inline-block" aria-hidden />
+        {([["all", "All"], ["included", "Included"], ["excluded", "Excluded"]] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setTypeChip(k)} data-testid={`chip-type-${k}`}
+            className={cn("rounded-full border-2 px-3.5 py-1 text-sm font-semibold transition-colors",
+              typeChip === k
+                ? (k === "all" ? "border-primary bg-primary text-primary-foreground" : cn(BUCKET_TYPE[k].cardOnClass, "text-foreground"))
+                : "bg-card hover:bg-accent")}>
             {label}
           </button>
         ))}

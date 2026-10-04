@@ -17,6 +17,19 @@ guard, normalised vocabulary comparison and approved Range division helper.
 Capture and preserve catalogue classifications and MRP fingerprints in both
 environments when implementing.
 
+Saved names may literally be `Excluded` or end in `— Excluded`. Treat the name
+as a name, never as type metadata. The interface shows name, type and effect as
+separate elements; quieter controls must still make an active filter obvious.
+Export disclosures remain full and unchanged, even when the on-screen control
+is shortened.
+
+**Why:** The user reported duplicate type text in the global banner and stressed
+that a silently filtered report is still the central risk.
+
+**How to apply:** Preserve raw saved names and explicit type fields. Keep one
+shared control and consistent Included/Excluded colours across screens, without
+changing resolution or interpreting name suffixes.
+
 The approved scope is inventory A–K only. Maintenance/audit surfaces L–T stay
 unfiltered and say “Bucket lists do not apply here.” Machine APIs and signed
 full-catalogue snapshots also remain unfiltered.

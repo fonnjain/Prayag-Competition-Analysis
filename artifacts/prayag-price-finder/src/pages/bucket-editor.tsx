@@ -15,6 +15,8 @@ import {
   type BucketDraft,
   type BucketList,
   type BucketRule,
+  BUCKET_TYPE,
+  bucketEffectShort,
 } from "@workspace/api-client-react";
 import { AlertTriangle, ChevronLeft, Download, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -90,6 +92,34 @@ export default function BucketEditorPage() {
   });
   const unsavedChanges = !!detail && definitionFingerprint(draft) !== definitionFingerprint(detail);
   const readOnly = !!editId && (sp.get("view") === "1" || (!!detail && !detail.canEdit));
+
+  // Review panel sizing: bound to the visible viewport from its real top offset.
+  const asideRef = useRef<HTMLElement | null>(null);
+  const [wide, setWide] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
+  const [panelH, setPanelH] = useState<number | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onMq = () => setWide(mq.matches);
+    mq.addEventListener("change", onMq);
+    return () => mq.removeEventListener("change", onMq);
+  }, []);
+  useEffect(() => {
+    if (!wide) { setPanelH(null); return; }
+    const measure = () => {
+      const el = asideRef.current;
+      if (!el) return;
+      const scroller = el.closest("main")?.getBoundingClientRect().top ?? 0;
+      const top = Math.max(el.getBoundingClientRect().top, scroller + 16);
+      const h = Math.max(300, Math.floor(window.innerHeight - top - 16));
+      setPanelH((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.body);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); window.removeEventListener("scroll", measure, true); };
+  }, [wide, ready]);
 
   // Init once per route target
   useEffect(() => {
@@ -211,6 +241,28 @@ export default function BucketEditorPage() {
   }
   if (!ready) return <div className="space-y-3 p-8"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>;
 
+  const kindT = BUCKET_TYPE[draft.type === "included" ? "included" : "excluded"];
+  const disabledReason = canSave ? "" : conflict ? "Name already used by another of your lists." : !cleanName ? "Enter a name to save." : !hasItems ? "Add at least one item to save." : "";
+  const actionFooter = (
+    <div className="shrink-0 border-t-2 bg-card p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.06)]" data-testid="panel-save-footer">
+      {saveError && (
+        <p className="mb-2 text-sm text-destructive" data-testid="text-save-error">
+          {saveError.message}{" "}
+          {saveError.existing && <Link href={`/bucket-lists/edit?id=${saveError.existing.id}`} className="underline" data-testid="link-existing-list">Open "{saveError.existing.name}"</Link>}
+        </p>
+      )}
+      <div className="mb-2 flex items-center gap-2 text-sm" data-testid="text-live-effect">
+        <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold uppercase", kindT.badgeClass)}>{kindT.label}</span>
+        <strong>{preview ? bucketEffectShort(draft.type, preview.count) : "Resolving..."}</strong>
+        <span className="ml-auto text-xs text-muted-foreground" data-testid="text-item-count">{members.length.toLocaleString()} item{members.length === 1 ? "" : "s"}</span>
+      </div>
+      {!canSave && disabledReason && <p className="mb-2 truncate text-xs text-muted-foreground" data-testid="text-save-disabled-reason">{disabledReason}</p>}
+      <Button className="w-full" disabled={!canSave} onClick={onSaveClick} data-testid="button-save-bucket">
+        {createM.isPending || updateM.isPending ? "Saving..." : "Save bucket list"}
+      </Button>
+    </div>
+  );
+
   const parentName = detail?.parentName ?? preview?.parentName ?? (allLists.data ?? []).find((l) => l.id === draft.parentId)?.name;
 
   return (
@@ -242,7 +294,7 @@ export default function BucketEditorPage() {
               {([["included", "Included", "Show only these items"], ["excluded", "Excluded", "Hide these items"]] as const).map(([v, t, s]) => (
                 <button key={v} type="button" disabled={readOnly} onClick={() => set({ type: v })} data-testid={`card-type-${v}`}
                   className={cn("rounded-lg border-2 p-4 text-left transition-colors",
-                    draft.type === v ? (v === "included" ? "border-sky-600 bg-sky-100" : "border-amber-600 bg-amber-100") : "bg-background hover:bg-accent")}>
+                    draft.type === v ? BUCKET_TYPE[v].cardOnClass : "bg-background hover:bg-accent")}>
                   <div className="text-lg font-black">{t}</div>
                   <div className="text-sm text-muted-foreground">{s}</div>
                 </button>
@@ -313,9 +365,13 @@ export default function BucketEditorPage() {
         </div>
 
         {/* Block three: summary */}
-        <aside className="lg:sticky lg:top-4 lg:self-start" data-testid="panel-summary">
-          <section className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border-2 border-primary/30 bg-card p-4 shadow-sm">
-            <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">3. Review</h2>
+        <aside ref={asideRef} className="lg:sticky lg:top-4 lg:self-start" data-testid="panel-summary">
+          <section
+            className="flex flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-card shadow-sm"
+            style={wide && panelH ? { height: panelH } : undefined}
+          >
+            <div className={cn("min-h-0 p-4", wide ? "flex-1 overflow-y-auto" : "max-h-[60dvh] overflow-y-auto")} data-testid="region-summary-scroll">
+              <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">3. Review</h2>
             {previewError ? (
               <p className="text-sm text-destructive">Could not resolve the list: {previewError}</p>
             ) : !preview ? (
@@ -374,7 +430,7 @@ export default function BucketEditorPage() {
                   </details>
                 )}
                 <h3 className="mt-3 text-xs font-bold uppercase text-muted-foreground">Items ({members.length})</h3>
-                <ul className="mt-1 max-h-72 divide-y overflow-y-auto rounded border text-xs">
+                <ul className="mt-1 divide-y rounded border text-xs">
                   {members.length === 0 && <li className="p-3 text-muted-foreground">No products yet.</li>}
                   {members.slice(0, 500).map((m) => (
                     <li key={m.itemCode} className="flex items-center gap-2 px-2 py-1.5" data-testid={`item-${m.itemCode}`}>
@@ -389,21 +445,10 @@ export default function BucketEditorPage() {
                 {members.length > 500 && <p className="mt-1 text-xs text-muted-foreground">Showing the first 500 of {members.length}.</p>}
               </>
             )}
-            {!readOnly && (
-              <div className="mt-4 border-t pt-3">
-                {saveError && (
-                  <p className="mb-2 text-sm text-destructive" data-testid="text-save-error">
-                    {saveError.message}{" "}
-                    {saveError.existing && <Link href={`/bucket-lists/edit?id=${saveError.existing.id}`} className="underline" data-testid="link-existing-list">Open "{saveError.existing.name}"</Link>}
-                  </p>
-                )}
-                {!canSave && <p className="mb-2 text-xs text-muted-foreground">{!cleanName ? "Enter a name to save." : !hasItems ? "Add at least one item to save." : ""}</p>}
-                <Button className="w-full" disabled={!canSave} onClick={onSaveClick} data-testid="button-save-bucket">
-                  {createM.isPending || updateM.isPending ? "Saving..." : "Save bucket list"}
-                </Button>
-              </div>
-            )}
+            </div>
+            {!readOnly && wide && actionFooter}
           </section>
+          {!readOnly && !wide && <div className="sticky bottom-0 z-20 -mx-4 mt-3 md:-mx-6">{actionFooter}</div>}
         </aside>
       </div>
 

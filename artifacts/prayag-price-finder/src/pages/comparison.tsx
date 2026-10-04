@@ -1,4 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
+import { BucketSlot } from "@/components/BucketSlot";
 import { useEffect } from "react";
 import { useSearch, useLocation, Link } from "wouter";
 import { useGetPriceFinderComparison, getExportPriceFinderComparisonUrl } from "@workspace/api-client-react";
@@ -82,7 +83,10 @@ export default function ComparisonPage() {
         <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
           <Search className="w-8 h-8 text-muted-foreground" />
         </div>
-        <h1 className="text-2xl font-bold mb-2">No Products Selected</h1>
+        <div className="mb-2 flex items-center justify-between gap-3 text-left">
+          <h1 className="text-2xl font-bold">No Products Selected</h1>
+          <BucketSlot />
+        </div>
         <p className="text-muted-foreground mb-6">Select products from the Price Finder to compare them.</p>
         <Link href={localPriceFinderUrl("/", normalizePriceFinderParams(params, "search"))} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4 shadow-sm">
           Go to Price Finder
@@ -144,6 +148,7 @@ export default function ComparisonPage() {
             >
               <Download className="w-3.5 h-3.5" /> Export Excel
             </a>
+            <div className="border-l border-white/10 pl-3"><BucketSlot /></div>
           </div>
         </div>
       </div>

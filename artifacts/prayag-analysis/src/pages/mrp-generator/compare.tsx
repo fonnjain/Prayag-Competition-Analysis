@@ -1,4 +1,5 @@
 import { formatMoney } from "@workspace/formatting";
+import { BucketSlot } from "@/components/BucketSlot";
 import React, { useState, useMemo } from "react";
 import { useCompareMrpGeneratorRuns, getCompareMrpGeneratorRunsQueryKey, useListMrpGeneratorRuns, MrpGeneratorComparison } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -100,9 +101,12 @@ export default function MrpGeneratorCompare() {
 
   return (
     <div className="flex flex-col min-h-full bg-muted/20">
-      <div className="border-b bg-card px-4 py-3 sm:px-6">
+      <div className="border-b bg-card px-4 py-3 sm:px-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
         <h1 className="text-lg font-semibold text-foreground">Compare Scenarios</h1>
         <p className="text-sm text-muted-foreground">Compare the results of multiple generator runs side-by-side.</p>
+        </div>
+        <BucketSlot />
       </div>
 
       <div className="p-4 sm:p-6 max-w-[1600px] mx-auto w-full space-y-6">

@@ -893,3 +893,171 @@ mtime_ms = 1791111094995
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4be09f96-9361-4b5e-b2db-7a684d72d98f/799aa128-fd1f-4357-8adc-afc7faf84021"
 storage_version_token = "1791111096673142"
 content_type = "text/plain"
+
+[[outputs]]
+id = "TWDgOPXaK4M0k0uhGoTO1"
+uri = "file://reports/p053-step2/control-inactive.png"
+type = "image"
+title = "P053 Step 2: Control — inactive"
+description = "Development preview · 2026-10-04 18:30:12 IST · 1366×768."
+logical_id = "b574b652-6b41-45a1-9a65-c86057502777"
+content_hash = "sha256:0e02ff7bb5bf296fe36a97cd2453bd1a219f08b7713a1cb74f5d85f2cc7286bd"
+size = 134565
+mtime_ms = 1791118812497
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b574b652-6b41-45a1-9a65-c86057502777/ca48f67e-a617-47b0-9b1c-06d2ebe22a07"
+storage_version_token = "1791120034298648"
+content_type = "image/png"
+
+[[outputs]]
+id = "JmwtsyBi1zzyRjd8c_Gfz"
+uri = "file://reports/p053-step2/control-active-excluded.png"
+type = "image"
+title = "P053 Step 2: Control — Excluded"
+description = "Development preview · 2026-10-04 18:30:13 IST · 1366×768 · 184 items."
+logical_id = "bbc38de0-0d72-417a-8bc7-70165bdb0b39"
+content_hash = "sha256:be1cd3743505a4abf8864dd630980cf249785af4a0ce557d167ede67e3126eb7"
+size = 137420
+mtime_ms = 1791118813109
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/bbc38de0-0d72-417a-8bc7-70165bdb0b39/0ba54da5-1ae5-4bf8-947b-37f640b6c88b"
+storage_version_token = "1791120035887980"
+content_type = "image/png"
+
+[[outputs]]
+id = "hEuR-UB064d4Cj8a7rq4j"
+uri = "file://reports/p053-step2/control-active-included.png"
+type = "image"
+title = "P053 Step 2: Control — Included"
+description = "Development preview · 2026-10-04 18:30:13 IST · 1366×768 · 1 items."
+logical_id = "2e79fcd0-9c5c-4604-be8b-367b462c1d27"
+content_hash = "sha256:db1b43a8d534c50f5dd7e1a32205c6250e86d47796fb5fc2eb8e20f28b197285"
+size = 89254
+mtime_ms = 1791118813409
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/2e79fcd0-9c5c-4604-be8b-367b462c1d27/e497704e-9832-4d43-985b-0c1471f2d30a"
+storage_version_token = "1791120037174490"
+content_type = "image/png"
+
+[[outputs]]
+id = "2alA97y7--Lxq4sqvCLSr"
+uri = "file://reports/p053-step2/control-dropdown-groups.png"
+type = "image"
+title = "P053 Step 2: Dropdown — both groups"
+description = "Development preview · 2026-10-04 18:30:12 IST · 1366×768."
+logical_id = "07ca7c04-5932-495b-8801-e603ecb01f29"
+content_hash = "sha256:2ef2a901a671fa065e9b38bda0e0d578b2669363cf752be72aed8a13a3e2f184"
+size = 146405
+mtime_ms = 1791118812773
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/07ca7c04-5932-495b-8801-e603ecb01f29/00642a50-db62-47e3-9e1e-86be6be769b4"
+storage_version_token = "1791120038524317"
+content_type = "image/png"
+
+[[outputs]]
+id = "yNNjUTiDT3anHBTd_3zTs"
+uri = "file://reports/p053-step2/editor-1366x768-0.png"
+type = "image"
+title = "P053 Step 2: Editor — 0 items"
+description = "Development preview · 2026-10-04 18:34:14 IST · 1366×768 · 0 items."
+logical_id = "9578f02b-d359-4d5b-848f-f1acc0472d4b"
+content_hash = "sha256:75d4f87f5fada39d3dfc2a3dbcda0e21e9d3ede1b6ed3cec0145277c0ebd4e72"
+size = 188494
+mtime_ms = 1791119054939
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9578f02b-d359-4d5b-848f-f1acc0472d4b/58cbf432-034e-412e-924a-5be223c3245d"
+storage_version_token = "1791120039903706"
+content_type = "image/png"
+
+[[outputs]]
+id = "7GU_2rPYL3814iYSGQ930"
+uri = "file://reports/p053-step2/editor-1366x768-1.png"
+type = "image"
+title = "P053 Step 2: Editor — 1 item"
+description = "Development preview · 2026-10-04 18:34:16 IST · 1366×768 · 1 items."
+logical_id = "13773b24-08df-4eac-98b5-2a0d7a22db0c"
+content_hash = "sha256:b51e768fd1b9241a4ff02157da7d30ed0a3aebda6b528f9b86045c508fe0ebbd"
+size = 195810
+mtime_ms = 1791119056995
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/13773b24-08df-4eac-98b5-2a0d7a22db0c/00550377-bb8a-45b9-a39c-55c53b1f8b9e"
+storage_version_token = "1791120041290165"
+content_type = "image/png"
+
+[[outputs]]
+id = "lNqFns6K4I6mLFQNteKHK"
+uri = "file://reports/p053-step2/editor-1366x768-184.png"
+type = "image"
+title = "P053 Step 2: Editor — 184 items"
+description = "Development preview · 2026-10-04 18:34:18 IST · 1366×768 · 184 items."
+logical_id = "d1762ba2-1499-4358-8967-4d1dfbc4fa41"
+content_hash = "sha256:bf816ac6e778d048e546051dfaf710a54c6ba5c6011d95fbdfa4a05f79161fca"
+size = 214412
+mtime_ms = 1791119058731
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d1762ba2-1499-4358-8967-4d1dfbc4fa41/47a1886f-be1c-46fc-a867-123fffca0abe"
+storage_version_token = "1791120042655125"
+content_type = "image/png"
+
+[[outputs]]
+id = "RTb1VXyAtiYIuPKBW2QIc"
+uri = "file://reports/p053-step2/editor-narrow-184.png"
+type = "image"
+title = "P053 Step 2: Editor — narrow, 184 items"
+description = "Development preview · 2026-10-04 18:34:25 IST · 480×850 · 184 items."
+logical_id = "4b43c420-26e8-415a-adaf-c44e52025db4"
+content_hash = "sha256:b07901ffb9ec8a7a04ccfd3aa640b55fb5ef932cb1f85dd121d1211f8a86575b"
+size = 146442
+mtime_ms = 1791119065783
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/4b43c420-26e8-415a-adaf-c44e52025db4/56e965e5-32bc-42a6-aa30-c0e532a3a2dd"
+storage_version_token = "1791120044102473"
+content_type = "image/png"
+
+[[outputs]]
+id = "x9cCkMPVGVs_vuLneDb12"
+uri = "file://reports/p053-step2/editor-actual-125pct-184.png"
+type = "image"
+title = "P053 Step 2: Editor — actual 125% zoom"
+description = "Development preview · 2026-10-04 18:42:57 IST · 1093×614 · 184 items."
+logical_id = "27a9f2a4-4887-4a90-bef1-e9933b0c89ec"
+content_hash = "sha256:50ad162e2ab280684d910f0f08749fb90744ba79a850630099716b90ad4f839b"
+size = 175192
+mtime_ms = 1791119577171
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/27a9f2a4-4887-4a90-bef1-e9933b0c89ec/31b23260-aef4-4f1d-bfa5-a5b2df085c16"
+storage_version_token = "1791120045502721"
+content_type = "image/png"
+
+[[outputs]]
+id = "fl6xYEsZXS3aQq8co79Mi"
+uri = "file://reports/p053-step2/development-filtered-catalogue.csv"
+type = "table"
+title = "P053 Step 2: exact exported CSV"
+description = "Development · 2026-10-04 18:34:12 IST. Full name/type/effect disclosure and disclaimer unchanged; exact downloaded bytes."
+logical_id = "cb546dd4-e3f9-4bd5-8e9e-a8bc65c7c428"
+content_hash = "sha256:bc0cc9b78f30f6c078aef917cd94446b17b1ddc2f0d4dc27cfa80232ad864d38"
+size = 1236740
+mtime_ms = 1791119052631
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/cb546dd4-e3f9-4bd5-8e9e-a8bc65c7c428/d5f6f224-780f-4134-a146-f3aac5abf3a7"
+storage_version_token = "1791120046872997"
+content_type = "text/csv"
+
+[[outputs]]
+id = "G25Wdl-2EVG3tPgju7uXN"
+uri = "file://reports/p053-step2/protected-data-comparison.csv"
+type = "table"
+title = "P053 Step 2: protected data before/after"
+description = "Development: 18:16:36 → 18:44:40 IST. Production: 18:16:42 → 18:44:47 IST, 2026-10-04. Counts and all fingerprints identical."
+logical_id = "13d9ae7e-e41e-4514-ad1c-06234d43dfb5"
+content_hash = "sha256:aa6cd6a14607cfd24dab616f793a84504eb0142b9ae5fa8938592380d7480806"
+size = 966
+mtime_ms = 1791119955495
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/13d9ae7e-e41e-4514-ad1c-06234d43dfb5/0c0e718a-f584-4658-b8ec-dc086b382626"
+storage_version_token = "1791120048209877"
+content_type = "text/csv"
+
+[[outputs]]
+id = "DmIxwPOlfHp4P7c3eDfcw"
+uri = "file://reports/p053-step2/P053-Step-2-Acceptance-Report.txt"
+type = "text"
+title = "P053 Step 2: acceptance report"
+description = "Development verification, evidence clocks, test coverage, full protected-data checksums and remaining production-after-publish confirmation."
+logical_id = "694ab76a-12dd-45e0-80ff-980f6cc9c4ff"
+content_hash = "sha256:ef8a025e7f6699534d11f515c103d6e344afc915b7813ff626d79244ef960674"
+size = 6287
+mtime_ms = 1791120032463
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/694ab76a-12dd-45e0-80ff-980f6cc9c4ff/5025c430-ba1c-43aa-ac9f-30c39e37b71b"
+storage_version_token = "1791120049629517"
+content_type = "text/plain"

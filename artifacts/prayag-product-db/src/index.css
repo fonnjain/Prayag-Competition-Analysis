@@ -3,6 +3,7 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 @source "../../../lib/replit-auth-web/src";
+@source "../../../lib/api-client-react/src";
 
 @custom-variant dark (&:is(.dark *));
 

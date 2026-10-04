@@ -1,0 +1,172 @@
+[
+  {
+    "filename": "control-inactive.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04, 18:30:12",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": null
+  },
+  {
+    "filename": "control-dropdown-groups.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04, 18:30:12",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": null
+  },
+  {
+    "filename": "control-active-excluded.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04, 18:30:13",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": 184
+  },
+  {
+    "filename": "control-active-included.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04, 18:30:13",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": 1
+  },
+  {
+    "filename": "editor-1366x768-0.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:14",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": 0
+  },
+  {
+    "filename": "editor-1366x768-1.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:16",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": 1
+  },
+  {
+    "filename": "editor-1366x768-184.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:18",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "dataCount": 184
+  },
+  {
+    "filename": "editor-125pct-css-equivalent-0.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:19",
+    "viewport": {
+      "width": 1093,
+      "height": 614
+    },
+    "dataCount": 0
+  },
+  {
+    "filename": "editor-125pct-css-equivalent-1.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:22",
+    "viewport": {
+      "width": 1093,
+      "height": 614
+    },
+    "dataCount": 1
+  },
+  {
+    "filename": "editor-125pct-css-equivalent-184.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:23",
+    "viewport": {
+      "width": 1093,
+      "height": 614
+    },
+    "dataCount": 184
+  },
+  {
+    "filename": "editor-narrow-184.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:34:25",
+    "viewport": {
+      "width": 480,
+      "height": 850
+    },
+    "dataCount": 184
+  },
+  {
+    "filename": "editor-actual-125pct-0.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:42:53",
+    "viewport": {
+      "width": 1093,
+      "height": 614,
+      "dpr": 1.25
+    },
+    "zoom": 1.25,
+    "dataCount": 0
+  },
+  {
+    "filename": "editor-actual-125pct-1.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:42:55",
+    "viewport": {
+      "width": 1093,
+      "height": 614,
+      "dpr": 1.25
+    },
+    "zoom": 1.25,
+    "dataCount": 1
+  },
+  {
+    "filename": "editor-actual-125pct-184.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:42:57",
+    "viewport": {
+      "width": 1093,
+      "height": 614,
+      "dpr": 1.25
+    },
+    "zoom": 1.25,
+    "dataCount": 184
+  },
+  {
+    "filename": "editor-narrow-0.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:47:03",
+    "viewport": {
+      "width": 480,
+      "height": 850,
+      "dpr": 1
+    },
+    "zoom": 1,
+    "dataCount": 0
+  },
+  {
+    "filename": "editor-narrow-1.png",
+    "environment": "development preview",
+    "timeIST": "2026-10-04 18:47:05",
+    "viewport": {
+      "width": 480,
+      "height": 850,
+      "dpr": 1
+    },
+    "zoom": 1,
+    "dataCount": 1
+  }
+]

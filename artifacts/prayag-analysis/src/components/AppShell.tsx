@@ -16,7 +16,6 @@ import {
   Zap,
 } from "lucide-react";
 import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
-import { BucketBanner } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -356,7 +355,6 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Scrollable page content */}
         <main className="flex-1 overflow-y-auto">
-          {location !== "/settings/discounts" && <BucketBanner userId={user?.id} />}
           {children}
         </main>
       </div>
