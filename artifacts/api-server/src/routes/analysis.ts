@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { bucketSql, filterBucketRows, bucketExportRows } from "../lib/bucketFilter";
+import { bucketSql, bucketCompetitorSql, filterBucketRows, bucketExportRows } from "../lib/bucketFilter";
 import { and, eq, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { applyIndianNumberFormats } from "@workspace/formatting";
@@ -215,6 +215,7 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
         SELECT DISTINCT ON (competitor, matched_prayag_code) *
         FROM competitor_prices
         WHERE matched_prayag_code IS NOT NULL
+          AND ${bucketCompetitorSql(sql`competitor`, sql`matched_prayag_code`)}
           AND match_status = 'matched'
           AND effective_date IS NOT NULL
           AND effective_date <= ${resolvedDate}
@@ -272,6 +273,7 @@ export async function getCompetitorRowsForPeriod(atDate?: string | null): Promis
       ) latest ON cp.competitor = latest.competitor
         AND cp.effective_date = latest.max_date
       WHERE cp.matched_prayag_code IS NULL
+        AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
     `),
   ]);
   return [...matched.rows, ...unmatched.rows].map(mapCompetitorRow);
@@ -397,7 +399,7 @@ router.get("/analysis/filters", async (_req, res) => {
         matchStatus: competitorPricesTable.matchStatus,
         matchConfidence: competitorPricesTable.matchConfidence,
       })
-      .from(competitorPricesTable).where(bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`)),
+      .from(competitorPricesTable).where(bucketSql(sql`${competitorPricesTable.matchedPrayagCode}`, sql`${competitorPricesTable.competitor}`)),
     db
       .selectDistinct({
         division: catalogProductsTable.division,
@@ -709,7 +711,8 @@ router.get("/analysis/periods", async (_req, res) => {
   type DateRow = { effective_date: string };
   const [mrpDates, compDates] = await Promise.all([
     db.execute<DateRow>(sql`SELECT DISTINCT effective_date FROM mrp_price_history ORDER BY effective_date DESC`),
-    db.execute<DateRow>(sql`SELECT DISTINCT effective_date FROM competitor_prices WHERE effective_date IS NOT NULL ORDER BY effective_date DESC`),
+    db.execute<DateRow>(sql`SELECT DISTINCT effective_date FROM competitor_prices WHERE effective_date IS NOT NULL
+      AND ${bucketCompetitorSql(sql`competitor`, sql`matched_prayag_code`)} ORDER BY effective_date DESC`),
   ]);
 
   const allDates = new Set<string>();
@@ -872,6 +875,7 @@ async function getAnalysisPriceHistory(req: Request, res: Response) {
         '[.]0$',
         ''
       ) = ${normCode(itemCode)}
+        AND ${bucketCompetitorSql(sql`competitor`, sql`matched_prayag_code`)}
         AND price IS NOT NULL
         AND effective_date IS NOT NULL
       ORDER BY competitor ASC, effective_date ASC, id ASC

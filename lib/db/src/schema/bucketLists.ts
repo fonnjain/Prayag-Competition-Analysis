@@ -3,7 +3,15 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { usersTable } from "./auth";
 
-export type BucketRule = { division?: string; category?: string; range?: string };
+// Competitors have no brand master: exact stored price-row names are the picker
+// and validation boundary against accidentally creating a second spelling.
+export type BucketRule = {
+  division?: string; category?: string; range?: string;
+  competitor?: string; scope?: "everywhere" | "division" | "category";
+  divisions?: string[]; categories?: string[];
+  /** Preserve a frozen, empty inherited product selection on detach/delete. */
+  retainProductFilter?: boolean;
+};
 
 export const bucketListsTable = pgTable("bucket_lists", {
   id: uuid("id").primaryKey().defaultRandom(),

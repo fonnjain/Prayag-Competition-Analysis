@@ -1,0 +1,16 @@
+[
+  {
+    "environment": "development",
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "checked_at_ist,stored_rows,non_null_prices,null_prices\n2026-10-09 17:19:55,300,300,0\n",
+    "success": true
+  },
+  {
+    "environment": "production",
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "checked_at_ist,stored_rows,non_null_prices,null_prices\n2026-10-09 17:20:00,300,290,10\n",
+    "success": true
+  }
+]

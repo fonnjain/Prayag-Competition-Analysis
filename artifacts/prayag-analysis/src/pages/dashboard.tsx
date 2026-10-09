@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthHeaders } from "@workspace/replit-auth-web";
 import {
   Card,
 } from "@/components/ui/card";
@@ -56,7 +57,8 @@ export default function Dashboard() {
   }>({
     queryKey: ["catalog", "mrp-provenance"],
     queryFn: async () => {
-      const res = await fetch("/api/catalog/mrp-provenance");
+      const res = await fetch("/api/catalog/mrp-provenance", { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(`Provenance request failed (${res.status})`);
       if (!res.ok) throw new Error("Failed to load MRP provenance");
       return res.json();
     },
@@ -80,7 +82,8 @@ export default function Dashboard() {
     const url = getExportAnalysisUrl({ ...filters, format });
     setExportLoading(true);
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const rowCount = res.headers.get("x-export-row-count");
       if (rowCount === "0") {
         const warning = res.headers.get("x-export-warning");

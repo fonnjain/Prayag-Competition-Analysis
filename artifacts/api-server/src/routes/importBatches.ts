@@ -13,6 +13,7 @@
  */
 
 import { Router, type IRouter } from "express";
+import { resolveCompetitorLoadName } from "../lib/competitorLoadName";
 import { createHash } from "node:crypto";
 import multer from "multer";
 import { and, eq, sql, desc } from "drizzle-orm";
@@ -531,6 +532,7 @@ router.post(
   "/catalog/import-batches/preflight",
   requireAdmin,
   upload.single("file"),
+  resolveCompetitorLoadName,
   async (req, res) => {
     const file = req.file;
     if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
@@ -642,6 +644,7 @@ router.post(
   "/catalog/import-batches",
   requireAdmin,
   upload.single("file"),
+  resolveCompetitorLoadName,
   async (req, res) => {
     const file = req.file;
     if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }

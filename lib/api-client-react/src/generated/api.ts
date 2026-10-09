@@ -53,6 +53,9 @@ import type {
   AutoAcceptResult,
   BeginBrowserLoginParams,
   BucketDraft,
+  BucketEnforcementInput,
+  BucketEnforcementReleaseInput,
+  BucketEnforcementState,
   BucketList,
   BulkMappingResult,
   BulkMappingUpdate,
@@ -10427,7 +10430,7 @@ export const getGetActiveBucketListUrl = () => {
 }
 
 /**
- * @summary Current user's global active bucket; anonymous always has none
+ * @summary Company-enforced and optional personal layers; anonymous has no personal list
  */
 export const getActiveBucketList = async ( options?: RequestInit): Promise<GetActiveBucketList200> => {
 
@@ -10474,7 +10477,7 @@ export type GetActiveBucketListQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Current user's global active bucket; anonymous always has none
+ * @summary Company-enforced and optional personal layers; anonymous has no personal list
  */
 
 export function useGetActiveBucketList<TData = Awaited<ReturnType<typeof getActiveBucketList>>, TError = ErrorType<unknown>>(
@@ -10558,6 +10561,207 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getSetActiveBucketListMutationOptions(options));
+    }
+
+export const getGetBucketEnforcementUrl = () => {
+
+
+
+
+  return `/api/bucket-lists/enforcement`
+}
+
+export const getBucketEnforcement = async ( options?: RequestInit): Promise<BucketEnforcementState> => {
+
+  return customFetch<BucketEnforcementState>(getGetBucketEnforcementUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBucketEnforcementQueryKey = () => {
+    return [
+    `/api/bucket-lists/enforcement`
+    ] as const;
+    }
+
+
+export const getGetBucketEnforcementQueryOptions = <TData = Awaited<ReturnType<typeof getBucketEnforcement>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBucketEnforcement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBucketEnforcementQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBucketEnforcement>>> = ({ signal }) => getBucketEnforcement({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBucketEnforcement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBucketEnforcementQueryResult = NonNullable<Awaited<ReturnType<typeof getBucketEnforcement>>>
+export type GetBucketEnforcementQueryError = ErrorType<unknown>
+
+
+
+export function useGetBucketEnforcement<TData = Awaited<ReturnType<typeof getBucketEnforcement>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBucketEnforcement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBucketEnforcementQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getEnforceBucketListUrl = () => {
+
+
+
+
+  return `/api/bucket-lists/enforcement`
+}
+
+export const enforceBucketList = async (bucketEnforcementInput: BucketEnforcementInput, options?: RequestInit): Promise<BucketEnforcementState> => {
+
+  return customFetch<BucketEnforcementState>(getEnforceBucketListUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bucketEnforcementInput,)
+  }
+);}
+
+
+
+
+export const getEnforceBucketListMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enforceBucketList>>, TError,{data: BodyType<BucketEnforcementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof enforceBucketList>>, TError,{data: BodyType<BucketEnforcementInput>}, TContext> => {
+
+const mutationKey = ['enforceBucketList'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof enforceBucketList>>, {data: BodyType<BucketEnforcementInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  enforceBucketList(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EnforceBucketListMutationResult = NonNullable<Awaited<ReturnType<typeof enforceBucketList>>>
+    export type EnforceBucketListMutationBody = BodyType<BucketEnforcementInput>
+    export type EnforceBucketListMutationError = ErrorType<void>
+
+    export const useEnforceBucketList = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enforceBucketList>>, TError,{data: BodyType<BucketEnforcementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof enforceBucketList>>,
+        TError,
+        {data: BodyType<BucketEnforcementInput>},
+        TContext
+      > => {
+      return useMutation(getEnforceBucketListMutationOptions(options));
+    }
+
+export const getReleaseBucketEnforcementUrl = () => {
+
+
+
+
+  return `/api/bucket-lists/enforcement/release`
+}
+
+export const releaseBucketEnforcement = async (bucketEnforcementReleaseInput: BucketEnforcementReleaseInput, options?: RequestInit): Promise<BucketEnforcementState> => {
+
+  return customFetch<BucketEnforcementState>(getReleaseBucketEnforcementUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bucketEnforcementReleaseInput,)
+  }
+);}
+
+
+
+
+export const getReleaseBucketEnforcementMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseBucketEnforcement>>, TError,{data: BodyType<BucketEnforcementReleaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof releaseBucketEnforcement>>, TError,{data: BodyType<BucketEnforcementReleaseInput>}, TContext> => {
+
+const mutationKey = ['releaseBucketEnforcement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof releaseBucketEnforcement>>, {data: BodyType<BucketEnforcementReleaseInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  releaseBucketEnforcement(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReleaseBucketEnforcementMutationResult = NonNullable<Awaited<ReturnType<typeof releaseBucketEnforcement>>>
+    export type ReleaseBucketEnforcementMutationBody = BodyType<BucketEnforcementReleaseInput>
+    export type ReleaseBucketEnforcementMutationError = ErrorType<void>
+
+    export const useReleaseBucketEnforcement = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseBucketEnforcement>>, TError,{data: BodyType<BucketEnforcementReleaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof releaseBucketEnforcement>>,
+        TError,
+        {data: BodyType<BucketEnforcementReleaseInput>},
+        TContext
+      > => {
+      return useMutation(getReleaseBucketEnforcementMutationOptions(options));
     }
 
 export const getGetBucketListUrl = (id: string,) => {

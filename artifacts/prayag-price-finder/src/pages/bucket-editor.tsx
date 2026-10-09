@@ -24,12 +24,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompetitorsTab, competitorScopeLabel, type CompetitorOption, type CompetitorRuleLike } from "@/components/bucket-competitors-tab";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { enforcedEffectText } from "@/components/bucket-enforcement";
+import { getAuthHeaders } from "@workspace/replit-auth-web";
 import { SignInRequired, errMessage, isLive, normName, useBucketUser, type Member, type UploadResult, type UploadStatus } from "@/lib/bucketShared";
 
 const STATUS_LABEL: Record<UploadStatus, string> = {
@@ -41,7 +44,9 @@ const STATUS_LABEL: Record<UploadStatus, string> = {
 };
 const STATUS_ORDER: UploadStatus[] = ["matched", "space_matched", "duplicate", "not_found", "inactive"];
 const uniq = (a: (string | null | undefined)[]) => Array.from(new Set(a.filter((value): value is string => typeof value === "string" && !!value.trim())));
-const sameRule = (a: BucketRule, b: BucketRule) => (a.division ?? "") === (b.division ?? "") && (a.category ?? "") === (b.category ?? "") && (a.range ?? "") === (b.range ?? "");
+const compOf = (r: BucketRule) => (r as { competitor?: string | null }).competitor;
+const isProductRule = (r: BucketRule) => !compOf(r);
+const sameRule = (a: BucketRule, b: BucketRule) => !compOf(a) && !compOf(b) && (a.division ?? "") === (b.division ?? "") && (a.category ?? "") === (b.category ?? "") && (a.range ?? "") === (b.range ?? "");
 const ruleLabel = (r: BucketRule) => [r.division, r.category, r.range].filter(Boolean).join(" / ");
 
 export default function BucketEditorPage() {
@@ -74,7 +79,8 @@ export default function BucketEditorPage() {
   const [saveError, setSaveError] = useState<{ message: string; existing?: { id: string; name: string } } | null>(null);
   const [confirmZero, setConfirmZero] = useState(false);
   const [confirmDetach, setConfirmDetach] = useState(false);
-  const [tab, setTab] = useState<"pick" | "upload">("pick");
+  const [confirmEnforced, setConfirmEnforced] = useState(false);
+  const [tab, setTab] = useState<"pick" | "upload" | "competitors">("pick");
 
   const previewM = usePreviewBucketList();
   const previewRef = useRef(previewM.mutate);
@@ -168,7 +174,7 @@ export default function BucketEditorPage() {
     }));
   const removeCode = (code: string) =>
     setDraft((d) => {
-      const stillCovered = (d.rules?.length ?? 0) > 0 || !!d.parentId;
+      const stillCovered = (d.rules ?? []).some(isProductRule) || !!d.parentId;
       return {
         ...d,
         addedCodes: (d.addedCodes ?? []).filter((c) => c !== code),
@@ -180,8 +186,8 @@ export default function BucketEditorPage() {
       const nc = normName(category);
       const members = (preview?.members ?? []) as unknown as Member[];
       const codes = members.filter((m) => m.division === division && normName(m.category) === nc).map((m) => m.itemCode);
-      const nextRules = (d.rules ?? []).filter((r) => !(r.division === division && r.category && normName(r.category) === nc));
-      const covered = nextRules.length > 0 || !!d.parentId;
+      const nextRules = (d.rules ?? []).filter((r) => !(isProductRule(r) && r.division === division && r.category && normName(r.category) === nc));
+      const covered = nextRules.some(isProductRule) || !!d.parentId;
       return {
         ...d,
         rules: nextRules,
@@ -207,11 +213,14 @@ export default function BucketEditorPage() {
   const ruleCounts = (preview?.ruleCounts ?? []) as unknown as { rule: BucketRule; count: number }[];
   const hasItems = rules.length + added.length > 0 || !!draft.parentId;
   const canSave = !readOnly && !!cleanName && hasItems && !conflict && !createM.isPending && !updateM.isPending;
-  const zeroIncluded = draft.type === "included" && (preview?.count ?? 1) === 0;
+  const zeroIncluded = draft.type === "included" && preview?.productFilterApplied !== false && (preview?.count ?? 1) === 0;
 
-  const doSave = () => {
+  const enforcedAffected = !!editId && !!detail && (!!detail.isEnforced || !!detail.affectsEnforced);
+  const enforcedName = detail?.isEnforced ? detail.name : detail?.enforcedListName ?? detail?.name;
+  const doSave = (confirmed = false) => {
     setSaveError(null);
     const body: BucketDraft = { ...draft, name: cleanName, visibility: isAdmin ? draft.visibility : "only_me" };
+    if (confirmed === true) body.confirmEnforcedEdit = true;
     const onSuccess = () => {
       void qc.invalidateQueries();
       toast({ title: "Bucket list saved" });
@@ -227,7 +236,7 @@ export default function BucketEditorPage() {
     if (editId) updateM.mutate({ id: editId, data: body }, { onSuccess, onError });
     else createM.mutate({ data: body }, { onSuccess, onError });
   };
-  const onSaveClick = () => (zeroIncluded ? setConfirmZero(true) : doSave());
+  const onSaveClick = () => (enforcedAffected ? setConfirmEnforced(true) : zeroIncluded ? setConfirmZero(true) : doSave());
 
   if (!authLoading && !signedIn) return <SignInRequired title="Create a bucket list" />;
   if (editId && existing.isError) {
@@ -344,7 +353,7 @@ export default function BucketEditorPage() {
             <section className="rounded-xl border bg-card p-4 shadow-sm">
               <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">2. Add items</h2>
               <div className="mb-3 flex gap-2">
-                {([["pick", "Pick from the catalogue"], ["upload", "Upload from Excel"]] as const).map(([k, l]) => (
+                {([["pick", "Pick from the catalogue"], ["upload", "Upload from Excel"], ["competitors", "Competitors"]] as const).map(([k, l]) => (
                   <button key={k} type="button" onClick={() => setTab(k)} data-testid={`tab-${k}`}
                     className={cn("rounded-md border px-3 py-1.5 text-sm font-semibold", tab === k ? "border-primary bg-primary text-primary-foreground" : "bg-background")}>{l}</button>
                 ))}
@@ -356,6 +365,12 @@ export default function BucketEditorPage() {
                   rangeDivisions={(catalogue.data?.rangeDivisions ?? []) as string[]}
                   selected={new Set(added)} onAddCodes={addCodes}
                   onAddRule={(r) => setDraft((d) => ({ ...d, rules: [...(d.rules ?? []).filter((x) => !sameRule(x, r)), r] }))}
+                />
+              ) : tab === "competitors" ? (
+                <CompetitorsTab
+                  options={((catalogue.data?.competitors ?? []) as CompetitorOption[])}
+                  loading={catalogue.isLoading} error={catalogue.isError} retry={() => catalogue.refetch()}
+                  onAdd={(rs) => setDraft((d) => ({ ...d, rules: [...(d.rules ?? []), ...(rs as unknown as BucketRule[])] }))}
                 />
               ) : (
                 <UploadTab draft={draft} onAdd={addCodes} uploadM={uploadM} />
@@ -379,7 +394,9 @@ export default function BucketEditorPage() {
             ) : (
               <>
                 <p className="text-base" data-testid="text-summary-sentence">
-                  {draft.type === "excluded"
+                  {preview.productFilterApplied === false
+                    ? <>No product filter applies: <strong>all products</strong> are shown.</>
+                    : draft.type === "excluded"
                     ? <>This list will hide <strong>{preview.count.toLocaleString()}</strong> of <strong>{(preview.totalProducts ?? 0).toLocaleString()}</strong> products from every comparison.</>
                     : <>This list will show only <strong>{preview.count.toLocaleString()}</strong> products.</>}
                 </p>
@@ -405,9 +422,10 @@ export default function BucketEditorPage() {
                     </ul>
                   </div>
                 )}
-                {(rules.length > 0) && (
+                {(rules.some(isProductRule)) && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {rules.map((r, i) => {
+                      if (!isProductRule(r)) return null;
                       const c = ruleCounts.find((x) => x.rule && sameRule(x.rule, r))?.count ?? ruleCounts[i]?.count ?? 0;
                       return (
                         <span key={i} className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-950" data-testid={`chip-rule-${i}`}>
@@ -418,6 +436,35 @@ export default function BucketEditorPage() {
                     })}
                   </div>
                 )}
+                {(() => {
+                  const pv = preview;
+                  const cr = pv.competitorRules ?? [];
+                  if (cr.length === 0 && !rules.some((x) => !isProductRule(x))) return null;
+                  const competitorKey = (r: BucketRule) => JSON.stringify([r.competitor, r.scope ?? "everywhere",
+                    [...(r.divisions ?? [])].sort(), [...(r.categories ?? [])].sort()]);
+                  const localKeys = new Set(rules.filter(r => !isProductRule(r)).map(competitorKey));
+                  return (
+                    <div className="mt-3" data-testid="section-competitor-summary">
+                      <h3 className="text-xs font-bold uppercase text-muted-foreground">Competitor prices ignored</h3>
+                      <p className="mt-1 text-sm" data-testid="text-competitor-effect">
+                        {pv.productFilterApplied === false ? "No product filter applies. " : ""}
+                        {draft.type === "included" ? "Omits " : "Ignores "}<strong>{(pv.competitorPriceCount ?? 0).toLocaleString()}</strong> competitor quotes
+                        {(pv.noCompetitorPriceCount ?? 0) > 0 && <>; <strong>{pv.noCompetitorPriceCount}</strong> products would lose their last quote</>}.
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {(draft.parentId ? cr.filter(r => !localKeys.has(competitorKey(r))) : []).map((r, i) => (
+                          <span key={`inh-${i}`} className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold" data-testid={`chip-inherited-competitor-${i}`}>{competitorScopeLabel(r as CompetitorRuleLike)} (inherited)</span>
+                        ))}
+                        {rules.map((r, i) => isProductRule(r) ? null : (
+                          <span key={`loc-${i}`} className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold", ["bg-amber-100 text-amber-950", "bg-sky-100 text-sky-950", "bg-emerald-100 text-emerald-950", "bg-rose-100 text-rose-950"][i % 4])} data-testid={`chip-competitor-${i}`}>
+                            {competitorScopeLabel(r as CompetitorRuleLike)}
+                            {!readOnly && <button type="button" aria-label={`Remove rule ${competitorScopeLabel(r as CompetitorRuleLike)}`} onClick={() => set({ rules: rules.filter((_, j) => j !== i) })}><X className="h-3 w-3" /></button>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {!readOnly && Array.from(new Set(members.filter((m) => m.category).map((m) => `${m.division}||${m.category}`))).length > 0 && (
                   <details className="mt-3 text-sm">
                     <summary className="cursor-pointer font-semibold">Remove all from a category</summary>
@@ -452,6 +499,22 @@ export default function BucketEditorPage() {
         </aside>
       </div>
 
+      <AlertDialog open={confirmEnforced} onOpenChange={setConfirmEnforced}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>This change reaches the enforced list "{enforcedName}"</AlertDialogTitle>
+            <AlertDialogDescription data-testid="text-enforced-edit-effect">
+              {detail?.isEnforced ? "This list is in force for every user." : `This list feeds "${enforcedName}", which is in force for every user.`}{" "}
+              Saving changes what everyone sees. {detail ? enforcedEffectText({ ...detail, type: draft.type ?? detail.type, count: preview?.count ?? detail.count, competitorRules: preview?.competitorRules ?? detail.competitorRules, competitorPriceCount: preview?.competitorPriceCount ?? detail.competitorPriceCount, noCompetitorPriceCount: preview?.noCompetitorPriceCount ?? detail.noCompetitorPriceCount, productFilterApplied: preview?.productFilterApplied ?? detail.productFilterApplied }) : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogAction data-testid="button-confirm-enforced-edit" onClick={() => { setConfirmEnforced(false); doSave(true); }}>Save and apply to everyone</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={confirmZero} onOpenChange={setConfirmZero}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -460,7 +523,7 @@ export default function BucketEditorPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Go back</AlertDialogCancel>
-            <AlertDialogAction onClick={doSave} data-testid="button-confirm-zero">Save anyway</AlertDialogAction>
+            <AlertDialogAction onClick={() => doSave(enforcedAffected)} data-testid="button-confirm-zero">Save anyway</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -470,22 +533,34 @@ export default function BucketEditorPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Detach from {parentName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The current {preview?.count ?? ""} members are copied into this list and the link is removed. It will never change on its own again. This cannot be undone; you would have to start again.
+              The current {preview?.count ?? ""} members are copied into this list and the link is removed. It will never change on its own again. This cannot be undone; you would have to start again.{detail?.affectsEnforced && <> This changes the enforced list "{detail.enforcedListName}" for every user.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction data-testid="button-confirm-detach" onClick={() => {
               if (!editId) return;
-              detachM.mutate({ id: editId }, {
-                onSuccess: (r) => {
+              const onSuccess = (r: BucketList) => {
                   void qc.invalidateQueries();
                   initFor.current = null;
                   setDraft({ name: r.name ?? "", description: r.description ?? "", type: r.type, visibility: r.visibility, parentId: null, rules: r.rules ?? [], addedCodes: r.addedCodes ?? [], removedCodes: r.removedCodes ?? [] });
                   toast({ title: "Detached. This list is now frozen." });
-                },
-                onError: (e) => toast({ title: "Detach failed", description: errMessage(e), variant: "destructive" }),
-              });
+              };
+              const onError = (e: unknown) => toast({ title: "Detach failed", description: errMessage(e), variant: "destructive" });
+              if (detail?.affectsEnforced) {
+                void (async () => {
+                  try {
+                    const res = await fetch(`/api/bucket-lists/${editId}/detach`, {
+                      method: "POST", credentials: "include",
+                      headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
+                      body: JSON.stringify({ confirmEnforcedEdit: true }),
+                    });
+                    const body = await res.json().catch(() => ({}));
+                    if (!res.ok) throw { data: body };
+                    onSuccess(body as BucketList);
+                  } catch (e) { onError(e); }
+                })();
+              } else detachM.mutate({ id: editId }, { onSuccess, onError });
             }}>Detach</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

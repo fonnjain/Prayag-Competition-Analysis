@@ -5,10 +5,25 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export type BucketRuleScope = typeof BucketRuleScope[keyof typeof BucketRuleScope];
+
+
+export const BucketRuleScope = {
+  everywhere: 'everywhere',
+  division: 'division',
+  category: 'category',
+} as const;
+
 export interface BucketRule {
+  /** Internal preservation of an empty inherited product selection when detaching or deleting a parent. */
+  retainProductFilter?: boolean;
   division?: string;
   category?: string;
   range?: string;
+  competitor?: string;
+  scope?: BucketRuleScope;
+  divisions?: string[];
+  categories?: string[];
 }
 
 export type BucketDraftType = typeof BucketDraftType[keyof typeof BucketDraftType];
@@ -28,6 +43,7 @@ export const BucketDraftVisibility = {
 } as const;
 
 export interface BucketDraft {
+  confirmEnforcedEdit?: boolean;
   name?: string;
   /** @nullable */
   description?: string | null;
@@ -56,15 +72,102 @@ export type BucketList = BucketDraft & ({
   missingCount?: number;
   totalProducts?: number;
   canEdit: boolean;
+  isEnforced?: boolean;
+  affectsEnforced?: boolean;
+  /** @nullable */
+  enforcedListName?: string | null;
   members: BucketListMembersItem[];
   divisions?: BucketListDivisionsItem[];
   ruleCounts?: BucketListRuleCountsItem[];
+  competitorRules?: BucketRule[];
+  competitorCount?: number;
+  competitorPriceCount?: number;
+  noCompetitorPriceCount?: number;
+  productFilterApplied?: boolean;
   createdAt?: string;
   updatedAt?: string;
   updatedBy?: string;
   /** @nullable */
   detachedNotice?: string | null;
 });
+
+export interface BucketEnforcementInput {
+  listId: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  reason: string;
+  /** @minimum 0 */
+  expectedVersion: number;
+}
+
+export interface BucketEnforcementReleaseInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  reason: string;
+  /** @minimum 0 */
+  expectedVersion: number;
+}
+
+export interface BucketEnforcedInfo {
+  list: BucketList;
+  actorLabel: string;
+  enforcedAt: string;
+  reason: string;
+}
+
+export type BucketEnforcementEventAction = typeof BucketEnforcementEventAction[keyof typeof BucketEnforcementEventAction];
+
+
+export const BucketEnforcementEventAction = {
+  enforced: 'enforced',
+  replaced: 'replaced',
+  released: 'released',
+  edited: 'edited',
+} as const;
+
+export type BucketEnforcementEventListType = typeof BucketEnforcementEventListType[keyof typeof BucketEnforcementEventListType];
+
+
+export const BucketEnforcementEventListType = {
+  included: 'included',
+  excluded: 'excluded',
+} as const;
+
+export type BucketEnforcementEventSnapshot = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type BucketEnforcementEventBeforeSnapshot = { [key: string]: unknown } | null;
+
+export interface BucketEnforcementEvent {
+  id: string;
+  version: number;
+  action: BucketEnforcementEventAction;
+  actorLabel: string;
+  reason: string;
+  listName: string;
+  listType: BucketEnforcementEventListType;
+  itemCount: number;
+  competitorCount: number;
+  competitorPriceCount: number;
+  /** @nullable */
+  previousListName?: string | null;
+  occurredAt: string;
+  snapshot?: BucketEnforcementEventSnapshot;
+  /** @nullable */
+  beforeSnapshot?: BucketEnforcementEventBeforeSnapshot;
+}
+
+export interface BucketEnforcementState {
+  version: number;
+  enforced: BucketEnforcedInfo | null;
+  history: BucketEnforcementEvent[];
+}
 
 export type P029UgdClassificationPreviewStatus = typeof P029UgdClassificationPreviewStatus[keyof typeof P029UgdClassificationPreviewStatus];
 
@@ -207,7 +310,16 @@ export type PdfPreflightDuplicateMatchesItem = {
  */
 export type PdfPreflightLatestGst = { [key: string]: unknown } | null;
 
+export interface CompetitorNameResolution {
+  requested: string;
+  competitor: string;
+  reusedStoredSpelling: boolean;
+  /** @nullable */
+  message?: string | null;
+}
+
 export interface PdfPreflight {
+  competitorNameResolution?: CompetitorNameResolution;
   /** @pattern ^[0-9a-f]{64}$ */
   fileSha256: string;
   /** @minimum 1 */
@@ -2675,6 +2787,7 @@ export interface CompetitorWorkbookPeriod {
 }
 
 export interface CompetitorWorkbookPreview {
+  competitorNameResolution?: CompetitorNameResolution;
   isSparshMaster: boolean;
   requiresCompetitor?: boolean;
   periods: CompetitorWorkbookPeriod[];

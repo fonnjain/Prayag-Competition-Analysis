@@ -11,9 +11,9 @@ function errText(e: unknown): string {
   return x?.data?.error ?? x?.data?.message ?? x?.message ?? "Could not change the bucket list.";
 }
 
-/** The single bucket filter control for screens A-K. Signed-in only. */
+/** A-K header: locked company layer above the optional personal selector. */
 export function BucketControl({ userId }: { userId: string | null | undefined }) {
-  const { list, isLoading } = useActiveBucket(userId);
+  const { personalList: list, enforcedList, noCompetitorPriceCount, isLoading } = useActiveBucket(userId);
   const { setActive, isPending } = useSetActiveBucket();
   const [open, setOpen] = useState(false);
   const [alignRight, setAlignRight] = useState(false);
@@ -42,7 +42,7 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
 
   const groups = useMemo(() => groupBucketChoices(lists.data ?? []), [lists.data]);
 
-  if (!userId) return null;
+  if (!userId && !enforcedList) return null;
 
   const choose = (id: string | null) => {
     setErr(null);
@@ -52,20 +52,35 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
   const ret = typeof window !== "undefined" ? encodeURIComponent(window.location.pathname + window.location.search) : "";
   const kind = list ? bucketKind(list.type) : null;
   const t = kind ? BUCKET_TYPE[kind] : null;
+  const effect = list ? [
+    list.productFilterApplied === false ? "all products" : bucketEffectShort(list.type, list.count),
+    ...(list.competitorCount ? [`${list.competitorCount} competitor${list.competitorCount === 1 ? "" : "s"}`] : []),
+  ].join(" · ") : "";
 
   const base: React.CSSProperties = { font: "inherit", cursor: "pointer", color: INK, background: "transparent", border: 0, padding: 0, textAlign: "left" };
 
   return (
-    <div ref={root} data-testid="bucket-control" data-state={isLoading ? "loading" : list ? "active" : "none"} style={{ position: "relative", display: "inline-block", maxWidth: "100%", fontSize: 13, lineHeight: 1.2 }}>
-      {list && t ? (
+    <div ref={root} data-testid="bucket-control" data-state={isLoading ? "loading" : list || enforcedList ? "active" : "none"} style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 4, maxWidth: "100%", fontSize: 13, lineHeight: 1.2 }}>
+      {enforcedList && (
+        <div data-testid="bucket-enforced" title={`Head Office enforced: ${enforcedList.name}. Cannot be cleared here.`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 30, padding: "0 9px", border: "1px solid #9baeb9", borderRadius: 6, background: "#edf2f5", color: INK, maxWidth: "100%" }}>
+          <svg aria-hidden="true" width="13" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg>
+          <strong style={{ fontSize: 11 }}>Enforced</strong>
+          <span style={{ fontWeight: 700, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{enforcedList.name}</span>
+          <span>{enforcedList.type === "excluded" ? "Excluded" : "Included"}</span>
+          <span style={{ color: MUTED, fontSize: 11, whiteSpace: "nowrap" }}>{enforcedList.productFilterApplied === false ? "all products" : bucketEffectShort(enforcedList.type, enforcedList.count)}
+            {enforcedList.competitorCount ? ` · ${enforcedList.competitorCount} competitor${enforcedList.competitorCount === 1 ? "" : "s"}` : ""}</span>
+        </div>
+      )}
+      {userId && (list && t ? (
         <div role="status" style={{ display: "inline-flex", alignItems: "center", maxWidth: "100%", background: t.bg, border: `1px solid ${t.border}`, borderLeft: `5px solid ${t.border}`, borderRadius: 6, color: t.text, minHeight: 32 }}>
-          <button type="button" data-testid="button-bucket-open" aria-haspopup="menu" aria-expanded={open} title={`${list.name} (${t.label}) - ${bucketEffectShort(list.type, list.count)}`}
+          <button type="button" data-testid="button-bucket-open" aria-haspopup="menu" aria-expanded={open} title={`${list.name} (${t.label}) - ${effect}`}
             onClick={() => setOpen((o) => !o)}
             style={{ ...base, color: t.text, display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 8px", minWidth: 0 }}>
             <span aria-hidden style={{ width: 9, height: 9, borderRadius: 9, background: t.dot, flex: "none" }} />
             <strong data-testid="text-bucket-name" style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{list.name}</strong>
             <span data-testid="text-bucket-type" style={{ flex: "none", fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", border: `1px solid ${t.border}`, borderRadius: 3, padding: "1px 4px" }}>{t.label}</span>
-            <span data-testid="text-bucket-effect" style={{ flex: "none", fontWeight: 600, whiteSpace: "nowrap" }}>{bucketEffectShort(list.type, list.count)}</span>
+            <span data-testid="text-bucket-effect" style={{ flex: "none", fontWeight: 600, whiteSpace: "nowrap" }}>{effect}</span>
           </button>
           <button type="button" data-testid="button-bucket-clear" aria-label="Clear bucket list" title="Clear bucket list" disabled={isPending} onClick={clear}
             style={{ ...base, color: t.text, alignSelf: "stretch", padding: "0 9px", fontSize: 18, fontWeight: 700, borderLeft: `1px solid ${t.border}`, opacity: isPending ? 0.5 : 1 }}>
@@ -77,6 +92,11 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
           style={{ ...base, color: MUTED, display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "0 10px", border: "1px dashed #aab4bb", borderRadius: 6 }}>
           <span>Bucket:</span><span style={{ fontWeight: 500 }}>{isLoading ? "Loading…" : "None"}</span><span aria-hidden style={{ fontSize: 10 }}>&#9662;</span>
         </button>
+      ))}
+      {!!noCompetitorPriceCount && (
+        <div role="status" data-testid="bucket-no-competitor-count" style={{ marginTop: 5, fontSize: 12, color: MUTED, textAlign: "right" }}>
+          {noCompetitorPriceCount} products have no competitor price under this filter
+        </div>
       )}
 
       {open && (
@@ -84,7 +104,7 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
           {err && <p role="alert" data-testid="text-bucket-error" style={{ margin: 0, padding: "8px 12px", background: "#fee2e2", color: "#7f1d1d", fontSize: 12 }}>{err}</p>}
           <button type="button" role="menuitem" data-testid="option-bucket-none" disabled={isPending} onClick={() => choose(null)}
             style={{ ...base, display: "flex", width: "100%", padding: "9px 12px", fontWeight: list ? 500 : 700, background: list ? "transparent" : "#f1f4f5" }}>
-            None{!list && <span style={{ marginLeft: "auto", color: MUTED }}>current</span>}
+            {enforcedList ? "No personal list (HO rule remains)" : "None"}{!list && <span style={{ marginLeft: "auto", color: MUTED }}>current</span>}
           </button>
           {lists.isLoading && <p style={{ margin: 0, padding: "10px 12px", color: MUTED }}>Loading lists...</p>}
           {lists.isError && (

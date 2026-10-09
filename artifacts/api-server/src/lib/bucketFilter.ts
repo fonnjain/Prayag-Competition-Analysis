@@ -6,8 +6,11 @@ import { bucketAllowsCode } from "./bucketMembership";
 import { isAdminUser } from "../middlewares/authMiddleware";
 import { normCode } from "./catalog";
 import { formatBucketExportDisclosure } from "@workspace/formatting";
+import { competitorAllowed, competitorScopeText, type CompetitorClause } from "./bucketCompetitors";
+import { composedProductAllowed, composedProductSql, composedQuoteAllowed, composedQuoteSql, type BucketLayer } from "./bucketComposition";
 
-type Context = { type: "included" | "excluded"; codes: Set<string>; banner: string; exportBanner?: string };
+type Context = { type: "included" | "excluded"; codes: Set<string>; banner: string; exportBanner?: string;
+  productFilterApplied?: boolean; clauses?: CompetitorClause[]; noCompetitorPriceCount?: number; layers?: BucketLayer[] };
 const storage = new AsyncLocalStorage<Context | null>();
 
 /** Explicit screen-source allowlist. Never infer scope from shared helper calls. */
@@ -23,28 +26,31 @@ export function bucketRouteApplies(method: string, path: string): boolean {
     || path.startsWith("/mrp-generator/");
 }
 export async function bucketFilterMiddleware(req: Request, res: Response, next: NextFunction) {
-  if (!bucketRouteApplies(req.method, req.path) || !req.user || req.user.mustChangePassword) {
+  if (!bucketRouteApplies(req.method, req.path)) {
     storage.run(null, next);
     return;
   }
   try {
-    const active = await getActiveBucket({ id: req.user.id, admin: isAdminUser(req.user), label: req.user.id });
+    // Public Price Finder must not become a sign-out bypass of the company rule.
+    const active = await getActiveBucket(req.user && !req.user.mustChangePassword
+      ? { id: req.user.id, admin: isAdminUser(req.user), label: req.user.id } : null, true);
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Vary", "Cookie, Authorization");
-    const context: Context | null = active.list && active.banner
+    const primary = active.enforced ?? active.list;
+    const context: Context | null = primary && active.banner
       ? {
-        type: active.list.type, codes: new Set(active.codes.map(normCode)), banner: active.banner,
-        exportBanner: formatBucketExportDisclosure({
-          name: active.list.name, type: active.list.type,
-          count: active.list.activeCount ?? active.list.count,
-        }),
+        type: primary.type, codes: new Set(active.codes.map(normCode)), banner: active.banner,
+        layers: active.layers, noCompetitorPriceCount: active.noCompetitorPriceCount,
+        exportBanner: active.banner,
       } : null;
     // A direct detail/history request must not reveal a filtered product.
     const directPath = /^(?:\/catalog\/products\/|\/price-finder\/product\/)(.+)$/.exec(req.path);
     const directQuery = ["/catalog/product", "/price-finder/product", "/analysis/price-history"].includes(req.path);
     const code = directPath ? decodeURIComponent(directPath[1]) : directQuery && typeof req.query.itemCode === "string" ? req.query.itemCode : null;
-    if (context && code && !bucketAllowsCode(context.type, context.codes, code)) {
-      res.status(404).json({ error: "This product is hidden by your active bucket list. Clear the bucket to view it.", code: "BUCKET_FILTERED", banner: context.banner });
+    if (context && code && !composedProductAllowed(context.layers ?? [context], code)) {
+      res.status(404).json({ error: active.enforced
+        ? "This product is hidden by the Head Office and/or personal restrictions. The enforced layer cannot be cleared here."
+        : "This product is hidden by your active bucket list. Clear your personal list to view it.", code: "BUCKET_FILTERED", banner: context.banner });
       return;
     }
     storage.run(context, next);
@@ -55,20 +61,29 @@ export async function bucketFilterMiddleware(req: Request, res: Response, next: 
 }
 export function bucketCodeAllowed(code: string | null | undefined): boolean {
   const context = storage.getStore();
-  return !context || bucketAllowsCode(context.type, context.codes, code);
+  return !context || composedProductAllowed(context.layers ?? [context], code);
 }
 export function filterBucketRows<T>(rows: T[], code: (row: T) => string | null | undefined): T[] {
   return rows.filter(row => bucketCodeAllowed(code(row)));
 }
-export function bucketSql(column: SQL): SQL {
+export function bucketSql(column: SQL, competitorColumn?: SQL): SQL {
   const context = storage.getStore();
   if (!context) return sql`TRUE`;
-  if (!context.codes.size) return context.type === "included" ? sql`FALSE` : sql`TRUE`;
-  const values = sql.join([...context.codes].map(code => sql`${code}`), sql`, `);
-  // Match the existing catalogue join identity (normCode), including legacy
-  // competitor codes with different case/whitespace. Never edit stored codes.
-  const canonical = sql`regexp_replace(upper(regexp_replace(trim(${column}), '\\s+', '', 'g')), '\\.0$', '')`;
-  return context.type === "included" ? sql`${canonical} IN (${values})` : sql`(${canonical} IS NULL OR ${canonical} NOT IN (${values}))`;
+  const competitor = competitorColumn ? bucketCompetitorSql(competitorColumn, column) : sql`TRUE`;
+  return sql`(${composedProductSql(context.layers ?? [context], column)}) AND (${competitor})`;
+}
+/** Quote predicate, never a product-universe predicate. Scoped category codes
+ * are compiled with the existing P051 function, not a second SQL normalizer. */
+export function bucketCompetitorSql(brand: SQL, code: SQL): SQL {
+  const context = storage.getStore();
+  return context ? composedQuoteSql(context.layers ?? [context], brand, code) : sql`TRUE`;
+}
+export function bucketCompetitorAllowed(competitor: string, code: string | null | undefined) {
+  const context = storage.getStore();
+  return !context || composedQuoteAllowed(context.layers ?? [context], competitor, code);
+}
+export function filterBucketCompetitorRows<T>(rows: T[], brand: (row: T) => string, code: (row: T) => string | null | undefined): T[] {
+  return rows.filter(row => bucketCompetitorAllowed(brand(row), code(row)));
 }
 export function bucketExportBanner() {
   const context = storage.getStore();
@@ -77,8 +92,16 @@ export function bucketExportBanner() {
 export function hasBucketFilter() {
   return !!storage.getStore();
 }
+export function hasBucketCompetitorFilter() {
+  const context = storage.getStore();
+  return !!context && (context.layers ?? [context]).some(layer => !!layer.clauses?.length);
+}
 export function bucketExportRows<T extends (string | number | null)[]>(rows: T[]): (string | number | null)[][] {
-  return [[bucketExportBanner()], ["Display-only product filter; no source product or price data changed."], [], ...rows];
+  const count = storage.getStore()?.noCompetitorPriceCount ?? 0;
+  // Separate physical worksheet/CSV records: a multiline A1 can conceal the
+  // personal disclosure when Excel displays only the first line.
+  return [...bucketExportBanner().split("\n").map(line => [line]), ...(count > 0 ? [[`${count} products have no competitor price under this filter`]] : []),
+    ["Display-only product and competitor filter; no source product or price data changed."], [], ...rows];
 }
 export function withBucketContext<T>(context: Context | null, run: () => T): T {
   return storage.run(context, run);

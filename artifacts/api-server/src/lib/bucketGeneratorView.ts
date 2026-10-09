@@ -1,6 +1,7 @@
 import type { mrpGeneratorResultsTable, mrpGeneratorRunsTable } from "@workspace/db";
 import { filterBucketRows, hasBucketFilter } from "./bucketFilter";
 import { evaluateP011Portfolio, type GeneratorProduct, type GeneratorResult } from "./mrpGenerator";
+import { projectCompetitorEvidence, projectFrozenResult } from "./bucketGeneratorEvidence";
 
 type Run = typeof mrpGeneratorRunsTable.$inferSelect;
 type Result = typeof mrpGeneratorResultsTable.$inferSelect;
@@ -20,8 +21,9 @@ const distribution = (values: (string | null | undefined)[]) => {
 export function bucketRunSummary(run: Run, supplied: Result[]) {
   const original = parse(run.summary);
   if (!hasBucketFilter()) return original;
-  const rows = filterBucketRows(supplied, row => row.itemCode);
-  const snapshot = parse(run.inputSnapshot);
+  const snapshot = bucketRunSnapshot(run.inputSnapshot);
+  const policyByCode = new Map<string, any>((snapshot.p012Results ?? snapshot.p011Results ?? []).map((row: any) => [row.itemCode, row]));
+  const rows = filterBucketRows(supplied, row => row.itemCode).map(row => projectFrozenResult(row, policyByCode.get(row.itemCode)));
   const products = new Map((snapshot.products ?? []).map((product: any) => [product.itemCode, product]));
   const policies = filterBucketRows<any>(snapshot.p012Results ?? snapshot.p011Results ?? [], row => row.itemCode);
   const evidence = rows.map(row => parse(row.evidence));
@@ -96,7 +98,8 @@ export function bucketRunSnapshot(raw: string | null | undefined) {
   const snapshot = parse(raw);
   if (!hasBucketFilter()) return snapshot;
   for (const key of ["products", "p011Results", "p012Results"]) {
-    if (Array.isArray(snapshot[key])) snapshot[key] = filterBucketRows<any>(snapshot[key], row => row.itemCode);
+    if (Array.isArray(snapshot[key])) snapshot[key] = filterBucketRows<any>(snapshot[key], row => row.itemCode)
+      .map(row => projectCompetitorEvidence(row, row.itemCode));
   }
   return snapshot;
 }

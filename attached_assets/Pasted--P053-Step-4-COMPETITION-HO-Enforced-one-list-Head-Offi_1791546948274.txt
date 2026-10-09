@@ -1,0 +1,146 @@
+# P053 — Step 4 — COMPETITION — HO Enforced: one list Head Office applies to everyone
+
+> **P053 Step 4** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** It changes no product, price, competitor row or classification.
+> **Build this after Step 3.** Both touch the filter composition.
+> Quote `P053 Step 4` when reporting back.
+
+Head Office can put **one** bucket list in force for everyone. While it is in force, every user sees its effect, and no user can switch it off. Head Office can take it out of force at any time.
+
+---
+
+# 1. How an enforced list combines with a user's own
+
+**The enforced list always applies. A user may still apply one of their own lists on top.** Both take effect.
+
+```
+catalogue
+  -> enforced list applied      (always, cannot be cleared by the user)
+  -> the user's own list applied (optional, their choice)
+  -> what they see
+```
+
+**1.1 Exclusions always win.** A product or competitor excluded by either list is gone. An **Included** list can only pick from what survived the enforced list — it can never bring back something the enforced list removed.
+
+**1.2** A non-admin cannot clear, change or escape the enforced list. The endpoint refuses it, not only the screen.
+
+**1.3** An admin is subject to it too. Enforcement is a company rule, not a rule for other people. An admin who needs to see everything takes it out of force, which is recorded.
+
+---
+
+# 2. What can be enforced
+
+**2.1 Only a list whose visibility is Everyone**, i.e. an existing HO list. A private list can never be enforced; if an admin tries, refuse and say why.
+
+**2.2 One at a time, company-wide.** Enforcing a second list replaces the first, with both named in the confirmation.
+
+**2.3 Admin only.** Non-admins do not see the control and the endpoint returns 403.
+
+**2.4** Enforcing and un-enforcing each require a **typed reason**, and each records actor, timestamp, reason, the list, and its item and competitor counts at that moment.
+
+---
+
+# 3. The HO Enforced tab
+
+A third tab on the Bucket Lists page, beside **All · HO lists · My lists**:
+
+```
+HO Enforced
+```
+
+**3.1 When nothing is in force** it says so plainly, and for an admin offers **Enforce a list** with a picker of HO lists only.
+
+**3.2 When a list is in force** it shows: the list name, its type, its effect in words, who put it in force, when, and their reason. For an admin, **Take out of force**.
+
+**3.3 Below that, the history**: every enforce and un-enforce, with actor, time and reason, newest first. This is the record of what everyone was seeing and when, which matters when an old report is questioned.
+
+**3.4** Non-admins see this tab too, read-only. They should be able to find out what is being applied to them and why, without asking.
+
+---
+
+# 4. Making it visible everywhere
+
+**4.1** The filter control shows the enforced list **above** the personal one, marked and not clearable:
+
+```
+🔒 HO (Plumbing)        184 hidden · 2 competitors     Enforced
+●  My CP view           only 312 shown                 ×
+```
+
+**4.2** On the browse page, the enforced list carries an **Enforced** badge wherever it appears.
+
+**4.3 Every export disclosure names both**, the enforced list first:
+
+```
+Showing: Enforced by Head Office: "HO (Plumbing) — Excluded" ·
+Type: Excluded · Effect: 184 items hidden; Apollo excluded everywhere
+Also applied: your list "My CP view" · Type: Included · Effect: only
+312 products shown
+67 products have no competitor price under this filter
+```
+
+**4.4** When nothing is enforced, nothing about enforcement appears anywhere. No empty banner, no placeholder.
+
+---
+
+# 5. Editing and deleting while in force
+
+**5.1 Editing a list that is in force changes what every user sees immediately.** Allow it, but the admin must confirm a message naming the list and that it is in force for all users. Record the edit in the enforcement history too, not only in the list's own audit.
+
+**5.2 A list that is in force cannot be deleted.** Refuse, and say it must be taken out of force first.
+
+**5.3** If a user's own list is deleted while an enforced list is in force, the enforced list continues. Nothing else changes.
+
+---
+
+# Rules
+
+1. **No product, price, competitor row, mapping or classification changes.** Display only.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums.
+3. The catalogue classification snapshot is byte-identical, both environments.
+4. Reuse the P048 admin check, the existing bucket model and the Step 3 composition. No second copy.
+5. Enforcement is **one record**, company-wide. Not per user, not per division, not per role.
+6. Development first, then publish, then confirm in production.
+7. **Do not enforce anything in production.** Build the capability; putting a list in force is my action.
+
+# Tests
+
+```
+ 1. A non-admin cannot enforce or un-enforce; both endpoints return 403
+ 2. A private list cannot be enforced, with a clear refusal
+ 3. Enforcing a second list replaces the first, naming both
+ 4. A non-admin cannot clear the enforced list from the screen or the endpoint
+ 5. An admin is also subject to it until they take it out of force
+ 6. Enforced plus personal: exclusions from both apply
+ 7. An Included personal list cannot bring back anything the enforced
+    list removed
+ 8. Enforce and un-enforce without a typed reason are both refused
+ 9. The history records actor, time, reason and counts for every change
+10. A list in force cannot be deleted; the refusal says to un-enforce first
+11. Editing a list in force asks for confirmation and is recorded in the
+    enforcement history
+12. Exports name the enforced list first, then the personal one
+13. With nothing enforced, no enforcement text appears anywhere
+14. A non-admin sees the HO Enforced tab read-only, with no controls
+15. mrp_price_history count and checksum unchanged, both environments
+16. Catalogue classification snapshot byte-identical, both environments
+```
+
+**Tests 6, 7 and 12 are the ones that matter.** If the two lists compose wrongly, or an export names only one of them, someone reads a number that is filtered in a way they cannot see.
+
+# Report
+
+1. The composition order, quoted from the code.
+2. Screenshots: the tab with nothing in force, with a list in force, the history, the control showing both lines, and the non-admin read-only view.
+3. One exported CSV and one XLSX naming both lists.
+4. Test results.
+5. `mrp_price_history` and classification snapshot, before and after, both environments.
+6. Production confirmation after publish, with clock times, **with nothing enforced**.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Why the history matters more than it looks
+
+Someone will send a report, and three weeks later someone else will ask why a product is missing from it. The enforcement history is the only way to answer that, because the list itself may have changed since. Build §3.3 properly rather than as a convenience.

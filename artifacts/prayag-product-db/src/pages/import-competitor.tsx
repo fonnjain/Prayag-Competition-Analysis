@@ -126,6 +126,7 @@ export default function ImportCompetitorPage() {
   const [sparshPeriods, setSparshPeriods] = useState<SparshMasterPeriodDraft[]>([]);
   const [isPreviewingWorkbook, setIsPreviewingWorkbook] = useState(false);
   const [workbookPreviewError, setWorkbookPreviewError] = useState<string | null>(null);
+  const [competitorSpellingNotice, setCompetitorSpellingNotice] = useState<string | null>(null);
   const [workbookCoverageGaps, setWorkbookCoverageGaps] = useState<CoverageGap[] | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -240,6 +241,7 @@ export default function ImportCompetitorPage() {
     setResult(null);
     setSparshPeriods([]);
     setWorkbookPreviewError(null);
+    setCompetitorSpellingNotice(null);
     setWorkbookCoverageGaps(null);
     invalidatePdfPreflight();
     setPriceBasisTouched(false);
@@ -253,6 +255,7 @@ export default function ImportCompetitorPage() {
     try {
       const data = await previewCompetitorWorkbook({ file: nextFile, competitor: selectedCompetitor.trim() || undefined });
       if (requestSequence !== workbookPreviewSequence.current) return;
+      setCompetitorSpellingNotice(data.competitorNameResolution?.message ?? null);
 
       if (data.isSparshMaster && Array.isArray(data.periods) && data.periods.length > 0) {
         setSparshPeriods(
@@ -314,6 +317,7 @@ export default function ImportCompetitorPage() {
       if (sequence !== pdfPreflightSequence.current) return;
       const result = data as PdfPreflight;
       setPdfPreflight(result);
+      setCompetitorSpellingNotice(data.competitorNameResolution?.message ?? null);
       // No recommendation means the user must consciously select a supported
       // path; do not turn an unsupported text recommendation into auto-vision.
       setPdfExtractionPath(result.recommendedPath);
@@ -943,6 +947,9 @@ export default function ImportCompetitorPage() {
               <p className="text-xs text-destructive" data-testid="text-workbook-preview-error">
                 {workbookPreviewError}
               </p>
+            )}
+            {competitorSpellingNotice && (
+              <p role="status" className="text-sm text-amber-800" data-testid="competitor-spelling-notice">{competitorSpellingNotice}</p>
             )}
             {file && !isPdf && (
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm" data-testid="workbook-coverage-gaps">

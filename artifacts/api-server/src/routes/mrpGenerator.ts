@@ -13,8 +13,9 @@ import {
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
 import { getCompetitorRowsForPeriod, getPrayagCatalogMapForPeriod } from "./analysis";
-import { bucketSql, filterBucketRows } from "../lib/bucketFilter";
+import { bucketSql, bucketCompetitorSql, filterBucketRows } from "../lib/bucketFilter";
 import { bucketRunSummary, bucketRunSnapshot } from "../lib/bucketGeneratorView";
+import { projectCompetitorEvidence, projectFrozenResult } from "../lib/bucketGeneratorEvidence";
 import { effectivePrice } from "../lib/analysis";
 import {
   evaluateProduct,
@@ -585,7 +586,8 @@ router.get("/mrp-generator/scopes", requireAdmin, async (_req, res) => {
             AND h.review_status = 'approved'
         )
     `),
-    db.selectDistinct({ competitor: competitorPricesTable.competitor }).from(competitorPricesTable),
+    db.selectDistinct({ competitor: competitorPricesTable.competitor }).from(competitorPricesTable)
+      .where(bucketCompetitorSql(sql`${competitorPricesTable.competitor}`, sql`${competitorPricesTable.matchedPrayagCode}`)),
   ]);
   const productRows = products.rows;
   const categoryPairs = [...new Map(productRows.map((product) => [
@@ -999,7 +1001,9 @@ router.get("/mrp-generator/freshness", requireAdmin, async (req, res) => {
   const asOf = validDate(req.query.asOf) ? req.query.asOf : today();
   const [mrp, comp] = await Promise.all([
     db.execute<{ effective_date: string }>(sql`SELECT MAX(effective_date) AS effective_date FROM mrp_price_history WHERE effective_date <= ${asOf} AND review_status = 'approved' AND variant = 'Standard' AND mrp IS NOT NULL`),
-    db.execute<{ competitor: string; effective_date: string }>(sql`SELECT competitor, MAX(effective_date) AS effective_date FROM competitor_prices WHERE effective_date <= ${asOf} AND match_status = 'matched' AND price IS NOT NULL GROUP BY competitor ORDER BY competitor`),
+    db.execute<{ competitor: string; effective_date: string }>(sql`SELECT competitor, MAX(effective_date) AS effective_date FROM competitor_prices
+      WHERE effective_date <= ${asOf} AND match_status = 'matched' AND price IS NOT NULL
+      AND ${bucketCompetitorSql(sql`competitor`, sql`matched_prayag_code`)} GROUP BY competitor ORDER BY competitor`),
   ]);
   const salesStatus = await bootstrapSalesStatus();
   const cachedSales = getCachedSalesSnapshot();
@@ -1828,7 +1832,7 @@ function exposedRun(run: typeof mrpGeneratorRunsTable.$inferSelect, results: typ
     scenarioName: snapshotRunType(parsed(run.inputSnapshot, { modelKind: run.modelKind })) === "matching"
       ? "Matching Scenario" : null,
     summary: bucketRunSummary(run, results),
-    sourceFreshness: parsed(run.sourceFreshness, {}),
+    sourceFreshness: projectCompetitorEvidence(parsed(run.sourceFreshness, {}), ""),
     inputSnapshot: exposedInputSnapshot(run.inputSnapshot, run.modelKind),
   };
 }
@@ -1837,6 +1841,8 @@ function exposedResult(
   evidence?: { sales?: unknown; margin?: unknown; warnings?: string[] },
   policyResult?: Record<string, unknown>,
 ): any {
+  row = projectFrozenResult(row, policyResult);
+  if (policyResult) policyResult = projectCompetitorEvidence(policyResult, row.itemCode);
   const persistedEvidence = parsed<{ salesEvidence?: unknown; marginEvidence?: unknown }>(row.evidence ?? "{}", {});
   return {
     ...row,
@@ -1956,7 +1962,10 @@ router.get("/mrp-generator/runs/:runId/results", requireAdmin, async (req, res) 
     inputSnapshot: mrpGeneratorRunsTable.inputSnapshot,
     modelKind: mrpGeneratorRunsTable.modelKind,
   }).from(mrpGeneratorRunsTable).where(eq(mrpGeneratorRunsTable.id, id)).limit(1))[0];
-  const snapshot = parsed<{ products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }>; p011Results?: Array<Record<string, unknown>>; p012Results?: Array<Record<string, unknown>> }>(run?.inputSnapshot ?? "{}", {});
+  const snapshot = bucketRunSnapshot(run?.inputSnapshot) as {
+    products?: Array<{ itemCode?: string; sales?: unknown; margin?: unknown }>;
+    p011Results?: Array<Record<string, unknown>>; p012Results?: Array<Record<string, unknown>>;
+  };
   const evidence = new Map((snapshot.products ?? []).map((product) => [
     canonicalItemCode(product.itemCode ?? ""), {
       sales: product.sales,
@@ -1999,7 +2008,13 @@ router.get("/mrp-generator/compare", requireAdmin, async (req, res) => {
   const resultSets = await Promise.all(runIds.map((id) =>
     db.select().from(mrpGeneratorResultsTable).where(eq(mrpGeneratorResultsTable.runId, id)),
   ));
-  const resultRows = filterBucketRows(resultSets.flat(), row => row.itemCode);
+  const policiesByRun = new Map(runs.map(run => {
+    const snapshot = bucketRunSnapshot(run.inputSnapshot);
+    return [run.id, new Map<string, any>((snapshot.p012Results ?? snapshot.p011Results ?? [])
+      .map((result: any) => [canonicalItemCode(result.itemCode), result]))] as const;
+  }));
+  const resultRows = filterBucketRows(resultSets.flat(), row => row.itemCode)
+    .map(row => projectFrozenResult(row, policiesByRun.get(row.runId)?.get(canonicalItemCode(row.itemCode))));
   const byRun = new Map<number, typeof resultRows>();
   for (const row of resultRows) byRun.set(row.runId, [...(byRun.get(row.runId) ?? []), row]);
   const runById = new Map(runs.map((run) => [run.id, run]));

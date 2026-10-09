@@ -10,6 +10,8 @@ import {
   type BucketActor,
 } from "../lib/bucketLists";
 import { BucketError, classifyBucketUpload, resolveBucketCodes } from "../lib/bucketMembership";
+import { competitorOptions } from "../lib/bucketCompetitors";
+import { changeBucketEnforcement, getBucketEnforcement } from "../lib/bucketEnforcement";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
@@ -33,11 +35,23 @@ function sendExcel(res: Response, rows: (string | number | null)[][], name: stri
   res.send(XLSX.write(book, { type: "buffer", bookType: "xlsx" }));
 }
 
-// Anonymous reads are explicitly empty, never a browser/session/global cache.
+// Anonymous reads have only the company layer, never a personal preference.
 router.get("/bucket-lists/active", handler(async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
-  if (!req.user || req.user.mustChangePassword) return res.json({ list: null, banner: null, codes: [] });
-  return res.json(await getActiveBucket(bucketActor(req)));
+  res.setHeader("Vary", "Cookie, Authorization");
+  const actor = req.user && !req.user.mustChangePassword ? bucketActor(req) : null;
+  const active = await getActiveBucket(actor);
+  if (!actor && active.enforced) {
+    // Public header disclosure, not a membership/identity/history endpoint.
+    const l = active.enforced;
+    return res.json({ ...active, codes: [], enforced: {
+      id: l.id, name: l.name, type: l.type, visibility: l.visibility,
+      count: l.count, activeCount: l.activeCount, competitorCount: l.competitorCount,
+      competitorPriceCount: l.competitorPriceCount, productFilterApplied: l.productFilterApplied,
+      competitorRules: l.competitorRules, members: [], canEdit: false,
+    } });
+  }
+  return res.json(active);
 }));
 router.use("/bucket-lists", requireWorkspaceReadAccess, (req, res, next) => {
   if (!req.user) { res.status(401).json({ error: "Sign in to manage bucket lists." }); return; }
@@ -52,7 +66,8 @@ router.get("/bucket-lists", handler(async (req, res) => {
 }));
 router.get("/bucket-lists/catalogue", handler(async (_req, res) => {
   const world = await loadBucketWorld();
-  res.json({ products: world.catalogue.map(p => ({ ...p, missing: false })), rangeDivisions: RANGE_DIVISIONS });
+  res.json({ products: world.catalogue.map(p => ({ ...p, missing: false })), rangeDivisions: RANGE_DIVISIONS,
+    competitors: competitorOptions(world.competitorNames ?? [], world.catalogue, world.quotes ?? []) });
 }));
 router.post("/bucket-lists/preview", handler(async (req, res) => {
   const actor = bucketActor(req), world = await loadBucketWorld();
@@ -87,12 +102,24 @@ router.get("/bucket-lists/template", handler(async (_req, res) => {
   sendExcel(res, [["item_code"], ...examples], "bucket-list-template");
 }));
 router.put("/bucket-lists/active", handler(async (req, res) => {
+  if (Object.keys(req.body ?? {}).some(key => key !== "listId"))
+    throw new BucketError("This selector changes only your personal list, not Head Office enforcement.");
   const value = req.body?.listId;
   if (value !== null && (typeof value !== "string" || !/^[0-9a-f-]{36}$/i.test(value))) throw new BucketError("listId must be a list ID or null.");
   res.json(await setActiveBucket(bucketActor(req), value));
 }));
 router.post("/bucket-lists", handler(async (req, res) => {
   res.status(201).json(await saveBucket(req.body, bucketActor(req)));
+}));
+router.get("/bucket-lists/enforcement", handler(async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  return res.json(await getBucketEnforcement(bucketActor(req)));
+}));
+router.post("/bucket-lists/enforcement", handler(async (req, res) => {
+  return res.json(await changeBucketEnforcement(req.body, bucketActor(req)));
+}));
+router.post("/bucket-lists/enforcement/release", handler(async (req, res) => {
+  return res.json(await changeBucketEnforcement(req.body, bucketActor(req), true));
 }));
 router.get("/bucket-lists/:id", handler(async (req, res) => {
   const actor = bucketActor(req), world = await loadBucketWorld();
@@ -107,7 +134,7 @@ router.delete("/bucket-lists/:id", handler(async (req, res) => {
   res.json(await deleteBucket(String(req.params.id), bucketActor(req)));
 }));
 router.post("/bucket-lists/:id/detach", handler(async (req, res) => {
-  res.json(await detachBucket(String(req.params.id), bucketActor(req)));
+  res.json(await detachBucket(String(req.params.id), bucketActor(req), req.body));
 }));
 router.get("/bucket-lists/:id/export", handler(async (req, res) => {
   const actor = bucketActor(req), world = await loadBucketWorld();

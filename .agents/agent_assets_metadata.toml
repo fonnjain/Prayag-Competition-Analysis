@@ -1173,3 +1173,115 @@ mtime_ms = 1791544602566
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/3775fe44-0add-4659-a7d0-c3c014c90e18/9335b2b6-93f7-4e41-936a-8729c311cf80"
 storage_version_token = "1791544615117416"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "T86r6NHj6WZGiQQ1TErYj"
+uri = "file://reports/P053-Step-3-Sparsh-Pearl-read-only.html"
+type = "html"
+title = "P053 Step 3 — Sparsh Pearl read-only report"
+description = "Production null-price codes and recorded load-batch fields, separate from the development build. All observations include IST clocks."
+logical_id = "025f047d-bcf4-4335-a07f-2d979c14d683"
+content_hash = "sha256:65bc2a67fa7fa498de3f0f475a743aad97c94c434d89d323985be9a7f466c6f2"
+size = 3109
+mtime_ms = 1791547433054
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/025f047d-bcf4-4335-a07f-2d979c14d683/85696f5a-caf6-48e2-897a-ebc65080823b"
+storage_version_token = "1791547434783134"
+content_type = "text/html"
+
+[[outputs]]
+id = "nhSCvD4EbBagwcevjB0O-"
+uri = "file://reports/p053-step3-production-sparsh-null-prices.csv"
+type = "table"
+title = "Production Sparsh Pearl — null-price rows"
+description = "Read-only row list; load batch and last revision batch are unrecorded (NULL)."
+logical_id = "8ab09ee4-5785-4275-a134-6f0cd7065699"
+content_hash = "sha256:b2ca332ad572234397ee909f55a3a276ceb2fdc8da9f474777d4b72c27cd222f"
+size = 1206
+mtime_ms = 1791545105814
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8ab09ee4-5785-4275-a134-6f0cd7065699/ad592959-1fe5-4324-8607-73a345ca5347"
+storage_version_token = "1791547436158575"
+content_type = "text/csv"
+
+[[outputs]]
+id = "OvwyUBOHzmj2-Hyub3tJv"
+uri = "file://reports/P053-Step-3-build-verification.html"
+type = "html"
+title = "P053 Step 3 — build verification"
+description = "Development behaviour, timed before/after integrity evidence, browser findings and corrected-state verification."
+logical_id = "fd9b725f-00c8-4ff7-b045-3324c2a15a05"
+content_hash = "sha256:61680ca3f57587edf9195c92c6a8cf8af5f0a944d60f22f9f28cdc92ba32b2a6"
+size = 11681
+mtime_ms = 1791549975923
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/fd9b725f-00c8-4ff7-b045-3324c2a15a05/4fcdbff8-cc5b-4814-99b7-486339d7971c"
+storage_version_token = "1791549977724243"
+content_type = "text/html"
+
+[[outputs]]
+id = "ER9OY6hiA82Uk5vqOvnoe"
+uri = "file://reports/p053-step3-build/browser-exports/final-apollo-pipes.csv"
+type = "table"
+title = "P053 Step 3 — actual CSV download"
+description = "Authenticated Analysis button download at 18:00:21 IST, with full active-list disclosure."
+logical_id = "eda7bdcd-9551-4bab-bcf2-9476b7a4dbbd"
+content_hash = "sha256:3584fe4103562d0f5e40c97b2de2612f0c7b909e428e5e4a482810484e8333e7"
+size = 281245
+mtime_ms = 1791549021875
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/eda7bdcd-9551-4bab-bcf2-9476b7a4dbbd/ae0e662f-1aeb-41b9-83f0-b4f0999e4329"
+storage_version_token = "1791549979176346"
+content_type = "text/csv"
+
+[[outputs]]
+id = "59WpbHBPQNMzkZWjO72S6"
+uri = "file://reports/p053-step3-build/browser-exports/final-apollo-pipes.xlsx"
+type = "table"
+title = "P053 Step 3 — actual Excel download"
+description = "Authenticated Analysis button download at 18:00:35 IST, validated as a real XLSX file."
+logical_id = "e3669dc7-c52c-4771-aa2e-18d97384f81a"
+content_hash = "sha256:56b94979bbb011cf0ef0e9a3cdbcc8b16973760309cca1e48fbd15ad2a351e7c"
+size = 1257313
+mtime_ms = 1791549035231
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e3669dc7-c52c-4771-aa2e-18d97384f81a/9938bf0f-0ea7-4f23-afdb-ff3836ffb867"
+storage_version_token = "1791549980634369"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "mmQs9jxj1vzVDdFwonFxt"
+uri = "file://reports/p053-step4/browser-exports/analysis-overlap-sparsh.csv"
+type = "table"
+title = "P053 Step 4 — development Analysis CSV"
+description = "Captured 9 Oct 2026 at 19:29:58 IST with both QA filter layers; the single 150-product disclosure is in its own row. Development only; those QA rules were later released."
+logical_id = "6a868a05-47bc-46be-9125-d2237aa3b19a"
+content_hash = "sha256:54c6fc3b24489a60f97e92a9cc3b0e06778b73023450f5c45ac8e3d5bbfe6095"
+size = 363086
+mtime_ms = 1791554398598
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/6a868a05-47bc-46be-9125-d2237aa3b19a/250891ff-1fed-4b29-b547-4825c58f304c"
+storage_version_token = "1791555251916866"
+content_type = "text/csv"
+
+[[outputs]]
+id = "dqULGvXyLL5G9JFfdGGgY"
+uri = "file://reports/p053-step4/browser-exports/analysis-overlap-sparsh.xlsx"
+type = "table"
+title = "P053 Step 4 — development Analysis XLSX"
+description = "Captured 9 Oct 2026 at 19:30:32 IST with both QA filter layers and one 150-product disclosure. Development only; those QA rules were later released."
+logical_id = "c8f9a018-4889-4e8f-bb91-a2525ed3b798"
+content_hash = "sha256:ce87ba007bacfc2b33c7a26bdd3c17b2dd1b827ffab95bad6446779d8b02a453"
+size = 1641180
+mtime_ms = 1791554432411
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c8f9a018-4889-4e8f-bb91-a2525ed3b798/94148804-a9f1-4fa5-884d-adaf3a2be5ff"
+storage_version_token = "1791555253233007"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "MKvWgYCQVzfbTNFrGqwWT"
+uri = "file://reports/p053-step4/screenshots/anonymous-price-finder.jpg"
+type = "image"
+title = "Development — enforced rule also applies when signed out"
+description = "1366×768 Price Finder, saved 9 Oct 2026 at 19:14:58 IST while a temporary Sparsh QA rule was in force. It was later released."
+logical_id = "27c2cdfa-58d8-471a-b6fd-2bbab290d438"
+content_hash = "sha256:bcbbad348a7dc89d9434f9b3dab44f4c5bb20de7e77b5a18ed9c6e14dd1d18e3"
+size = 107987
+mtime_ms = 1791553498338
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/27c2cdfa-58d8-471a-b6fd-2bbab290d438/05af6882-3538-4db4-a701-e8f2429dc661"
+storage_version_token = "1791555254515150"
+content_type = "image/jpeg"

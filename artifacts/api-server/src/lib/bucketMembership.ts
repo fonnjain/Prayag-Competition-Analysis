@@ -18,7 +18,7 @@ export function isLiveBucketProduct(product: BucketProduct, date = new Date().to
   return product.isActive && (!product.discontinuedFrom || product.discontinuedFrom > date);
 }
 export function matchesBucketRule(product: BucketProduct, rule: BucketRule): boolean {
-  return (!rule.division || rule.division === product.division)
+  return !rule.competitor && (!rule.division || rule.division === product.division)
     && (!rule.category || normalizeVocabularyKey(rule.category) === normalizeVocabularyKey(product.category ?? ""))
     && (!rule.range || (supportsCatalogRange(product.division)
       && normalizeVocabularyKey(rule.range) === normalizeVocabularyKey(product.seriesRange ?? "")));

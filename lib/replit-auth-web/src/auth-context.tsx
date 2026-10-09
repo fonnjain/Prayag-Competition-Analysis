@@ -26,6 +26,11 @@ interface AuthState {
 function getStoredSid(): string | null {
   try { return localStorage.getItem(SID_KEY); } catch { return null; }
 }
+/** Native file downloads need the same genuine bearer identity as API hooks. */
+export function getAuthHeaders(): Record<string, string> {
+  const sid = getStoredSid();
+  return sid ? { Authorization: `Bearer ${sid}` } : {};
+}
 function storeSid(sid: string): void {
   try { localStorage.setItem(SID_KEY, sid); } catch { /* ignore */ }
 }

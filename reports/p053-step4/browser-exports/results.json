@@ -1,0 +1,152 @@
+{
+  "title": "P053 Step 4 development verification",
+  "environment": "development only",
+  "api": "existing API via /api proxy",
+  "viewport": "1366x768",
+  "clock_timezone": "Asia/Kolkata",
+  "production_interaction": false,
+  "run_status": "completed; genuine non-admin proof remains unavailable",
+  "admin_session": {
+    "identity": "CEO Prayag; GET /api/auth/user previously returned HTTP 200 and role admin",
+    "role_changed": false
+  },
+  "guards_and_history": [
+    {
+      "check": "DELETE guard for an enforced list",
+      "result": "HTTP 409 ENFORCED_DELETE_FORBIDDEN",
+      "details": "A list in force could not be deleted."
+    },
+    {
+      "check": "PATCH guard for an enforced list without confirmEnforcedEdit",
+      "result": "HTTP 409 ENFORCED_EDIT_CONFIRMATION_REQUIRED",
+      "details": "UI then required explicit confirmation naming Sparsh and explaining all-user impact; a QA-only description edit was confirmed and recorded as enforcement version 3.",
+      "ist": "9 Oct 2026, 19:11:39",
+      "screenshot_id": "x9uuwo"
+    },
+    {
+      "check": "company enforcement replacements and reasons",
+      "details": "Replaced HO Sparsh with HO Included A368/A369, then HO Product-A367, then HO Apollo UPVC Pipe, then HO Sparsh Everywhere. Each replacement required a typed reason and remained in the history."
+    },
+    {
+      "check": "duplicate Sparsh exclusion / last-quote loss",
+      "details": "With the same Sparsh Pearl Everywhere exclusion active as both personal and HO policy, the UI and Analysis exports reported 150 products with no competitor price once, not 300."
+    }
+  ],
+  "composition_tests": [
+    {
+      "test": 6,
+      "result": "Intersection: HO Included {A-368,A-369} plus personal Included Core {A-367,A-368} returned only A-368; A-367 and A-369 returned zero.",
+      "screenshots": [
+        {"id": "kuypta", "ist": "9 Oct 2026, 19:17:23", "detail": "A-368 is the sole result."},
+        {"id": "f9oj6u", "ist": "9 Oct 2026, 19:17:47", "detail": "A-367 returns zero."},
+        {"id": "rn765f", "ist": "9 Oct 2026, 19:18:05", "detail": "A-369 returns zero."}
+      ]
+    },
+    {
+      "test": 7,
+      "result": "HO Product-A367 exclusion overrode personal Included Core: A-367 returned zero while A-368 remained visible.",
+      "screenshots": [
+        {"id": "dc5g6q", "ist": "9 Oct 2026, 19:19:32", "detail": "A-367 excluded."},
+        {"id": "1srw4j", "ist": "9 Oct 2026, 19:19:39", "detail": "A-368 still visible."}
+      ]
+    },
+    {
+      "test": 12,
+      "result": "With company Apollo Excluded and personal Prince Included both active, PU-1T remained comparable with Prince at INR 240; Apollo was absent from competitor choices and the comparison table.",
+      "ist": "9 Oct 2026, 19:26:16",
+      "screenshot_id": "8mgozv"
+    }
+  ],
+  "analysis_exports": {
+    "active_layers": [
+      "Enforced HO QA-P053-DEV-HO-Sparsh-Everywhere-R2 (Excluded; Sparsh Pearl everywhere)",
+      "Personal QA-P053-DEV-Personal-Excluded-Sparsh-Everywhere (Excluded; Sparsh Pearl everywhere)"
+    ],
+    "deduplicated_no_competitor_count": 150,
+    "csv": {
+      "path": "reports/p053-step4/browser-exports/analysis-overlap-sparsh.csv",
+      "suggested_filename": "prayag-competition-analysis.csv",
+      "bytes": 363086,
+      "file_mtime_ist": "9 Oct 2026, 19:29:58.599",
+      "verified": "CSV header names both layers, says 150 products have no competitor price under this filter once, and states display-only filtering did not change source product/price data."
+    },
+    "xlsx": {
+      "path": "reports/p053-step4/browser-exports/analysis-overlap-sparsh.xlsx",
+      "suggested_filename": "prayag-competition-analysis.xlsx",
+      "bytes": 1641180,
+      "file_mtime_ist": "9 Oct 2026, 19:30:32.411",
+      "verified": "Valid ZIP/XLSX signature; xl/worksheets/sheet1.xml contains both list names, the single 150-products-with-no-competitor notice, and the display-only/no-source-data-change text."
+    },
+    "dashboard_screenshot": {
+      "id": "zek5l2",
+      "ist": "9 Oct 2026, 19:30:32",
+      "detail": "Both Sparsh exclusions, count 150, CSV and Excel Export controls visible."
+    }
+  },
+  "cleanup": {
+    "company_enforcement_active": false,
+    "current_enforcement_pointer": null,
+    "enforcement_version": 8,
+    "history_count_after_cleanup": 8,
+    "newest_history_action": "released",
+    "released_list": "QA-P053-DEV-HO-Sparsh-Everywhere-R2",
+    "release_reason": "P053 Step 4 DEV QA cleanup: release company Sparsh enforcement after verification; retain the append-only audit history.",
+    "release_verified_ist": "9 Oct 2026, 19:32:55",
+    "personal_preference_original": "None",
+    "personal_preference_final": "None",
+    "personal_none_verified_ist": "9 Oct 2026, 19:33:13",
+    "qa_definitions_remaining": 0,
+    "qa_deletions": "Eight QA-P053-DEV bucket-list definitions were deleted via API; every DELETE returned HTTP 200 and explicitly confirmed that no products or prices were deleted.",
+    "final_api_verification_ist": "9 Oct 2026, 19:34:58"
+  },
+  "qa_metadata_created_and_cleaned": [
+    {"name": "QA-P053-DEV-HO-Product-A367-R2", "id": "978db513-f254-4536-b029-3282a3399c96", "delete_status": 200},
+    {"name": "QA-P053-DEV-Personal-Included-Core", "id": "6aa45eae-9387-4c53-a96a-0460f8ad4590", "delete_status": 200},
+    {"name": "QA-P053-DEV-HO-Apollo-Pipes-R2", "id": "f1f79670-c7ef-4470-9f25-ce9a6d5c9cb9", "delete_status": 200},
+    {"name": "QA-P053-DEV-HO-Sparsh-Everywhere-R2", "id": "7a446222-eece-4428-835a-5dc6df8176b8", "delete_status": 200},
+    {"name": "QA-P053-DEV-Personal-Included-Prince-Everywhere", "id": "eb5d323a-9956-4e79-84f0-92e3d974e074", "delete_status": 200},
+    {"name": "QA-P053-DEV-HO-Included-A368-A369", "id": "db2a38f7-70c9-4912-888e-3cd135f42c5e", "delete_status": 200},
+    {"name": "QA-P053-DEV-Personal-Included-Prince-UPVC-PU-1T", "id": "b227bc1d-5d19-4194-8553-9b57301a4b16", "delete_status": 200},
+    {"name": "QA-P053-DEV-Personal-Excluded-Sparsh-Everywhere", "id": "e2a5c88a-7367-40d8-92ff-95dabf1ed9a7", "delete_status": 200}
+  ],
+  "screenshots": [
+    {"id": "m9f9xj", "ist": "9 Oct 2026, 19:28:46", "detail": "HO Sparsh enforcement in force; 150 competitor quotes and 150 products without a competitor quote."},
+    {"id": "fs3jtt", "ist": "9 Oct 2026, 19:29:07", "detail": "Both Sparsh layers active; one 150-products-without-competitor status."},
+    {"id": "981pg7", "ist": "9 Oct 2026, 19:32:55", "detail": "No list in force; newest release event and earlier audit history retained."},
+    {"id": "wsd5rz", "ist": "9 Oct 2026, 19:33:13", "detail": "Price Finder personal preference reads Bucket: None."},
+    {"id": "7kmd3b", "ist": "9 Oct 2026, 19:33:40", "detail": "Analysis dashboard loaded with Bucket: None and no stale QA/150-count placeholder."},
+    {"id": "a7sdzm", "ist": "9 Oct 2026, 19:34:58", "detail": "Final populated Analysis dashboard; Bucket: None; current enforcement null and no QA definitions remain."}
+  ],
+  "known_observations": [
+    {
+      "check": "early personal Included draft attempt",
+      "ist": "9 Oct 2026, 18:55:20",
+      "screenshot_id": "ardlan",
+      "details": "One draft attempt showed an in-force visibility validation message while the later HO Enforced view had no active list/history. Subsequent private Included lists saved and were used successfully; this did not block the completed tests. Root cause was not investigated."
+    },
+    {
+      "check": "Analysis initial navigation render",
+      "details": "The route was briefly blank/loading immediately after navigation, then rendered a populated dashboard after a short wait; exports completed successfully."
+    }
+  ],
+  "non_admin": {
+    "status": "blocked; not faked",
+    "details": "The available P053_NON_ADMIN identity reportedly authenticates as admin. No role, session, password, or user changes were made."
+  },
+  "not_run": [
+    "Genuine non-admin verification, because no valid non-admin identity was available.",
+    "Database before/after checksums for MRP history/classification/source rows; no such source data was changed, and production was not accessed."
+  ],
+  "safety": {
+    "source_products_prices_competitor_rows_mappings_classifications_changed": false,
+    "new_product_or_price_fixtures_added": false,
+    "roles_changed": false,
+    "production_accessed": false,
+    "company_enforcement_active_at_cleanup": false,
+    "qa_list_definitions_remaining": 0,
+    "append_only_audit_history_preserved": true,
+    "enforcement_history_events_after_cleanup": 8,
+    "personal_preference_restored": true
+  },
+  "timestamp_gaps": "The exact time of each DELETE inside the sequential cleanup batch was not logged separately; the final API verification at 9 Oct 2026, 19:34:58 confirmed zero QA definitions, no active enforcement, and eight retained history events. CSV/XLSX times are filesystem mtimes in Asia/Kolkata."
+}

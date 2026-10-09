@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import XLSX from "xlsx";
-import { bucketCodeAllowed, bucketSql, bucketExportRows } from "../lib/bucketFilter";
+import { bucketCodeAllowed, bucketCompetitorAllowed, bucketCompetitorSql, bucketSql, bucketExportRows } from "../lib/bucketFilter";
 import {
   priceChangePct,
   validToFromNextDate,
@@ -76,6 +76,7 @@ async function buildPriceFinderComparison(
   asOf: string,
 ) {
   codes = codes.filter(bucketCodeAllowed);
+  competitors = competitors.filter(brand => codes.some(code => bucketCompetitorAllowed(brand, code)));
   const codeList = codes.length ? sqlList(codes) : sql`NULL`;
   const productResult = await db.execute<ComparisonProductRow>(sql`
     SELECT
@@ -123,7 +124,7 @@ async function buildPriceFinderComparison(
     throw new Error(`Unknown or inactive product code: ${unknownCodes.join(", ")}`);
   }
 
-  const pricesResult = await db.execute<ComparisonPriceRow>(sql`
+  const pricesResult = competitors.length ? await db.execute<ComparisonPriceRow>(sql`
     SELECT
       p.item_code,
       brands.competitor,
@@ -146,6 +147,7 @@ async function buildPriceFinderComparison(
         cp.effective_date
       FROM competitor_prices cp
       WHERE cp.competitor = brands.competitor
+        AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
         AND cp.matched_prayag_code = p.item_code
         AND cp.match_status = 'matched'
         AND cp.price IS NOT NULL
@@ -163,6 +165,7 @@ async function buildPriceFinderComparison(
         cp.effective_date
       FROM competitor_prices cp
       WHERE cp.competitor = brands.competitor
+        AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
         AND cp.matched_prayag_code = p.item_code
         AND cp.match_status = 'matched'
         AND cp.price IS NOT NULL
@@ -173,7 +176,7 @@ async function buildPriceFinderComparison(
     WHERE p.item_code IN (${codeList})
       AND p.is_active IS TRUE
       AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf})
-  `);
+  `) : { rows: [] as ComparisonPriceRow[] };
 
   const priceMap = new Map<string, Map<string, ComparisonPriceRow>>();
   for (const row of pricesResult.rows) {
@@ -495,6 +498,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         SELECT 1
         FROM competitor_prices cp
         WHERE cp.matched_prayag_code = p.item_code
+          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
       ) AS has_competitor_data,
@@ -543,6 +547,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         END AS normalized_price
       FROM competitor_prices cp
       WHERE cp.matched_prayag_code = p.item_code
+        AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
         AND cp.price IS NOT NULL
         AND cp.effective_date <= CURRENT_DATE
       ORDER BY ABS(
@@ -719,6 +724,7 @@ router.get("/price-finder/browse", async (req, res) => {
           SELECT 1
           FROM competitor_prices cp
           WHERE cp.matched_prayag_code = p.item_code
+            AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
             AND cp.price IS NOT NULL
             AND cp.effective_date <= CURRENT_DATE
         ) AS has_competitor_data,
@@ -767,6 +773,7 @@ router.get("/price-finder/browse", async (req, res) => {
           END AS normalized_price
         FROM competitor_prices cp
         WHERE cp.matched_prayag_code = p.item_code
+          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
         ORDER BY ABS(
@@ -956,6 +963,7 @@ async function getPriceFinderProduct(req: Request, res: Response) {
         SELECT DISTINCT cp.competitor
         FROM competitor_prices cp
         WHERE cp.matched_prayag_code = ${product.item_code}
+          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.match_status = 'matched'
           AND cp.price IS NOT NULL
           AND cp.effective_date <= CURRENT_DATE
@@ -964,6 +972,7 @@ async function getPriceFinderProduct(req: Request, res: Response) {
         SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
         FROM competitor_prices cp
         WHERE cp.competitor = brands.competitor
+          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.matched_prayag_code = ${product.item_code}
           AND cp.match_status = 'matched'
           AND cp.price IS NOT NULL
@@ -975,6 +984,7 @@ async function getPriceFinderProduct(req: Request, res: Response) {
         SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
         FROM competitor_prices cp
         WHERE cp.competitor = brands.competitor
+          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.matched_prayag_code = ${product.item_code}
           AND cp.match_status = 'matched'
           AND cp.price IS NOT NULL

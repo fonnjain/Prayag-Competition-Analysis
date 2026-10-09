@@ -23,9 +23,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { EnforcementTab } from "@/components/bucket-enforcement";
 import { SignInRequired, errMessage, useBucketUser } from "@/lib/bucketShared";
 
-type Chip = "all" | "ho" | "mine";
+type Chip = "all" | "ho" | "mine" | "enforced";
 type TypeChip = "all" | "included" | "excluded";
 
 export function TypeBadge({ type }: { type?: string }) {
@@ -88,7 +89,7 @@ export default function BucketListsPage() {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        {([["all", "All"], ["ho", "HO lists"], ["mine", "My lists"]] as const).map(([k, label]) => (
+        {([["all", "All"], ["ho", "HO lists"], ["mine", "My lists"], ["enforced", "HO Enforced"]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setChip(k)} data-testid={`chip-${k}`}
             className={cn("rounded-full border px-3.5 py-1 text-sm font-semibold transition-colors",
               chip === k ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-accent")}>
@@ -110,7 +111,7 @@ export default function BucketListsPage() {
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-xl border bg-card shadow-sm">
-        {isLoading ? (
+        {chip === "enforced" ? <EnforcementTab isAdmin={user?.role === "admin"} /> : isLoading ? (
           <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : isError ? (
           <div className="p-8 text-center">
@@ -142,12 +143,13 @@ export default function BucketListsPage() {
             <tbody className="divide-y">
               {rows.map((l) => {
                 const ho = l.visibility === "everyone";
-                const isActive = active.list?.id === l.id;
+                const isActive = active.personalList?.id === l.id;
                 const divs = (l.divisions ?? []).map((d) => `${d.division} (${d.count})`);
                 return (
                   <tr key={l.id} data-testid={`row-bucket-${l.id}`} className={cn("align-top", isActive && "bg-primary/5")}>
                     <td className="px-3 py-3">
                       <div className="font-bold">{l.name}</div>
+                      {l.isEnforced && <span className="mr-1 inline-block rounded bg-primary px-2 py-0.5 text-[10px] font-bold uppercase text-primary-foreground" data-testid={`badge-enforced-${l.id}`}>Enforced</span>}
                       {isActive && <div className="text-xs font-semibold text-primary">Active filter</div>}
                       {l.parentName && <div className="text-xs text-muted-foreground">Based on {l.parentName}</div>}
                     </td>
@@ -188,9 +190,10 @@ export default function BucketListsPage() {
                               <Pencil className="h-3.5 w-3.5" /> Edit
                             </Link>
                             <Button size="sm" variant="outline" data-testid={`button-rename-${l.id}`} onClick={() => { setRename(l); setNewName(l.name ?? ""); }}>Rename</Button>
-                            <Button size="sm" variant="outline" className="text-destructive" data-testid={`button-delete-${l.id}`} onClick={() => setDel(l)}>
+                            <Button size="sm" variant="outline" className="text-destructive" data-testid={`button-delete-${l.id}`} disabled={l.isEnforced || l.affectsEnforced} title={l.isEnforced ? "In force. Take it out of force first." : l.affectsEnforced ? `Protected: it feeds ${l.enforcedListName}. Take that list out of force first.` : undefined} onClick={() => setDel(l)}>
                               <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
                             </Button>
+                            {(l.isEnforced || l.affectsEnforced) && <div className="w-full text-xs text-muted-foreground" data-testid={`text-delete-blocked-${l.id}`}>{l.isEnforced ? "Cannot delete: in force. Take it out of force first." : `Cannot delete: it feeds the enforced list ${l.enforcedListName}. Take that list out of force first.`}</div>}
                           </>
                         )}
                       </div>

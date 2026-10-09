@@ -182,7 +182,7 @@ export default function MrpGeneratorRun() {
     }
 
     const blob = new Blob(
-      [[[bucketLine], header, ...rows].map((row) => row.map(quote).join(",")).join("\n")],
+      [[...bucketLine.split("\n").map(line => [line]), header, ...rows].map((row) => row.map(quote).join(",")).join("\n")],
       { type: "text/csv;charset=utf-8" },
     );
     const url = URL.createObjectURL(blob);

@@ -5,8 +5,9 @@ description: Display-only saved-product sets, export disclosure, and delayed Hea
 
 Bucket lists are display-only saved product sets. They may not change any
 catalogue classification, product, price, competitor data or Sales application.
-They use one server-persisted active list per user across screens, not separate
-remembered filters per page.
+They use one optional server-persisted personal list per user across screens,
+not separate remembered filters per page, plus at most one company-wide Head
+Office list.
 
 **Why:** The user identified a silently filtered report exported much later as
 the central risk. Visible disclosure is more important than convenience.
@@ -16,6 +17,25 @@ export must disclose the active list and its effect. Reuse the established admin
 guard, normalised vocabulary comparison and approved Range division helper.
 Capture and preserve catalogue classifications and MRP fingerprints in both
 environments when implementing.
+
+The Head Office layer always restricts first; the optional personal layer
+restricts its survivors. Product and quote predicates compose independently
+with intersection, never by merging definitions under one Included/Excluded
+mode. Neither an admin nor a personal Included list can restore company
+exclusions. Anonymous Price Finder also receives the company restriction, but
+never a personal list or private enforcement history.
+
+**Why:** The user explicitly made enforcement company-wide and forbade user
+bypass. Treating two Included lists as a union, or dropping the company rule
+when signed out, would violate that boundary.
+
+**How to apply:** Only existing Everyone lists are eligible; enforce/release
+need admin authority and typed reasons. Keep immutable event-time definitions,
+resolved scope and counts so later edits cannot rewrite the explanation of an
+old report. Confirm edits affecting an in-force list, including linked
+originals; require release before deletion. Show company then personal in
+headers/exports, and compute last-quote loss once over the combined predicates.
+Show no inactive enforcement placeholder outside its management tab.
 
 Saved names may literally be `Excluded` or end in `— Excluded`. Treat the name
 as a name, never as type metadata. The interface shows name, type and effect as
@@ -41,14 +61,18 @@ changes during read-only confirmation.
 **How to apply:** Inspect the existing state without selecting or clearing a
 list. Do not treat a screenshot request as permission to write a preference.
 
-Competitor rules filter prices, never the Prayag product universe. A product
-whose last competitor is filtered out must remain visible with
-“no competitor price under this filter.” Recompute every competitor-price
+Competitor rules filter prices without changing source products. Preserve each
+screen's existing no-competitor display rule; do not add synthetic no-price rows.
+Disclose the newly lost-last-quote count on every A–K screen and export as
+“N products have no competitor price under this filter”; hide this line at zero.
+The count excludes products that already lacked quotes and products removed
+by the product bucket. Recompute every competitor-price
 count, average, position, coverage measure and ranking from surviving quotes;
 do not include a placeholder as a price or competitor SKU.
 
-**Why:** The user identified silently disappearing products and totals still
-counting excluded competitors as the critical failures.
+**Why:** The user corrected the earlier row-preservation requirement: filtered
+products must behave like the thousands already omitted for lacking competitors,
+but the new loss must be visible. Totals must never retain excluded quotes.
 
 **How to apply:** Keep product membership and competitor-price selection
 separate. Support additive competitor scopes using stored brand spellings and
@@ -105,3 +129,12 @@ an instruction to exclude the Prayag product.
 
 **How to apply:** Do not seed Head Office lists during the feature build or
 silently resolve those two product decisions.
+
+Editable rule ownership and resolved preview effects are separate.
+
+**Why:** A correct aggregate preview can still show misleading inherited chips
+or lose removable local chips when its combined rule list is treated as ownership.
+
+**How to apply:** Derive removal controls from local definitions, inherited
+labels from a real parent, and counts from the resolved union. Semantic
+fingerprints must not be reused as positional rendering guards.

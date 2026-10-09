@@ -11,24 +11,39 @@ export interface ActiveBucketInfo {
   name: string;
   type: "included" | "excluded";
   count: number;
+  competitorCount?: number;
+  competitorRules?: { competitor?: string; scope?: string; divisions?: string[]; categories?: string[] }[];
+  noCompetitorPriceCount?: number;
+  productFilterApplied?: boolean;
+  /** Effective server disclosure: company first, then personal, never a union. */
+  exportDisclosure?: string;
 }
 
 export function bucketEffectText(list: ActiveBucketInfo | null): string {
-  return formatBucketExportDisclosure(list);
+  if (list?.exportDisclosure) return list.exportDisclosure
+    + (list.noCompetitorPriceCount ? `\n${list.noCompetitorPriceCount} products have no competitor price under this filter` : "");
+  const base = formatBucketExportDisclosure(list);
+  if (!list) return base;
+  const rules = (list.competitorRules ?? []).map(rule => `${rule.competitor} ${list.type === "excluded" ? "excluded" : "included"} ${
+    !rule.scope || rule.scope === "everywhere" ? "everywhere" : `in ${(rule.scope === "division" ? rule.divisions : rule.categories)?.join(", ")}`
+  }`);
+  return base + (rules.length ? `; ${rules.join("; ")}` : "")
+    + (list.productFilterApplied === false ? "; no product filter applied" : "")
+    + (list.noCompetitorPriceCount ? `\n${list.noCompetitorPriceCount} products have no competitor price under this filter` : "");
 }
 
-/** Active list for the signed-in user. Anonymous never queries. */
+/** Company layer is public; personal selection remains identity-scoped. */
 const ACTIVE_ROOT = "bucket-active";
 
 let scopeUser: string | null = null;
 let scopeSig: string | null = null;
 
 /** Signature of the resolved active membership (id, type, count and the codes themselves). */
-function scopeSignature(d: { list?: Record<string, unknown> | null; codes?: string[] }): string {
+function scopeSignature(d: { list?: Record<string, unknown> | null; codes?: string[]; enforced?: Record<string, unknown> | null; enforcementVersion?: number }): string {
   const l = d.list;
-  if (!l) return "none";
-  const codes = (d.codes ?? (l.codes as string[] | undefined) ?? []).slice().sort();
-  return JSON.stringify([l.id, l.type, l.activeCount ?? l.count, codes]);
+  const codes = (d.codes ?? (l?.codes as string[] | undefined) ?? []).slice().sort();
+  return JSON.stringify([d.enforcementVersion ?? 0, d.enforced?.id, d.enforced?.activeCount, d.enforced?.competitorRules,
+    l?.id, l?.type, l?.activeCount ?? l?.count, codes, l?.competitorRules ?? [], l?.noCompetitorPriceCount ?? 0]);
 }
 
 const KEEP = (k: unknown): boolean => {
@@ -37,6 +52,10 @@ const KEEP = (k: unknown): boolean => {
 };
 
 function isScopedKey(key: readonly unknown[]) {
+  const meta = String(key[0] ?? "");
+  // A different company version must refresh browse badges and the audit tab,
+  // not just the price queries. Do not reset editable drafts or active query.
+  if (meta === "/api/bucket-lists" || meta === "/api/bucket-lists/enforcement" || meta === "bucket-lists-enforce-picker") return true;
   if (KEEP(key)) return false;
   const path = String(key[0] ?? "");
   return /^\/api\/(?:price-finder\/|analysis\/|mrp-generator\/)/.test(path)
@@ -55,22 +74,21 @@ export function useActiveBucket(userId: string | null | undefined) {
   // Cache key is scoped to the signed-in user id so one user's list can never show for another.
   const key = [ACTIVE_ROOT, userId ?? "anonymous"] as const;
   const q = useGetActiveBucketList({
-    query: { queryKey: key as unknown as readonly unknown[], enabled: signedIn, refetchOnWindowFocus: true, staleTime: 0 },
+    query: { queryKey: key as unknown as readonly unknown[], refetchOnWindowFocus: true, refetchInterval: 5000, staleTime: 0 },
   });
   useEffect(() => {
     qc.removeQueries({ queryKey: [ACTIVE_ROOT], predicate: (qq) => qq.queryKey[1] !== (userId ?? "anonymous") });
-    if (signedIn) qc.invalidateQueries({ queryKey: key });
+    qc.invalidateQueries({ queryKey: key });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
   useEffect(() => {
-    if (!signedIn) return;
     const on = () => document.visibilityState === "visible" && qc.invalidateQueries({ queryKey: key });
     document.addEventListener("visibilitychange", on);
     return () => document.removeEventListener("visibilitychange", on);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
-  const rawNow = signedIn ? (q.data as { list?: Record<string, unknown> | null; codes?: string[] } | undefined) : undefined;
-  const sigNow = !signedIn ? "anon" : q.isSuccess && rawNow ? scopeSignature(rawNow) : null;
+  const rawNow = q.data as { list?: Record<string, unknown> | null; codes?: string[]; enforced?: Record<string, unknown> | null; enforcementVersion?: number } | undefined;
+  const sigNow = q.isSuccess && rawNow ? scopeSignature(rawNow) : null;
   useEffect(() => {
     const who = userId ?? "anonymous";
     if (scopeUser !== null && scopeUser !== who) {
@@ -87,12 +105,22 @@ export function useActiveBucket(userId: string | null | undefined) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, sigNow]);
-  const raw = signedIn ? (q.data as { list?: Record<string, unknown> | null; banner?: string | null } | undefined) : undefined;
-  const l = raw?.list ?? null;
-  const list: ActiveBucketInfo | null = l
-    ? { id: String(l.id), name: String(l.name), type: l.type as "included" | "excluded", count: Number(l.activeCount ?? l.count ?? 0) }
-    : null;
-  return { list, banner: raw?.banner ?? null, isLoading: signedIn && q.isLoading, data: raw, scopeKey: sigNow };
+  const raw = q.data as { list?: Record<string, unknown> | null; enforced?: Record<string, unknown> | null;
+    banner?: string | null; noCompetitorPriceCount?: number } | undefined;
+  const info = (l: Record<string, unknown> | null | undefined): ActiveBucketInfo | null => l ? {
+    id: String(l.id), name: String(l.name), type: l.type as "included" | "excluded",
+    count: Number(l.activeCount ?? l.count ?? 0), competitorCount: Number(l.competitorCount ?? 0),
+    competitorRules: l.competitorRules as ActiveBucketInfo["competitorRules"],
+    noCompetitorPriceCount: Number(l.noCompetitorPriceCount ?? 0), productFilterApplied: l.productFilterApplied !== false,
+  } : null;
+  const personalList = info(raw?.list), enforcedList = info(raw?.enforced);
+  // Existing export consumers receive the EFFECTIVE disclosure even with no
+  // personal selection. Header/picker use personalList explicitly.
+  const primary = personalList ?? enforcedList;
+  const list = primary ? { ...primary, exportDisclosure: raw?.banner ?? undefined,
+    noCompetitorPriceCount: Number(raw?.noCompetitorPriceCount ?? 0) } : null;
+  return { list, personalList, enforcedList, noCompetitorPriceCount: Number(raw?.noCompetitorPriceCount ?? 0),
+    banner: raw?.banner ?? null, isLoading: q.isLoading, data: raw, scopeKey: sigNow };
 }
 
 export function useSetActiveBucket() {
@@ -159,18 +187,19 @@ export function BucketBoundary() {
 
 /** Explanation for backend BUCKET_FILTERED 404s. */
 export function BucketFilteredNotice({ userId }: { userId: string | null | undefined }) {
-  const { list } = useActiveBucket(userId);
+  const { list, personalList, enforcedList } = useActiveBucket(userId);
   const { setActive, isPending } = useSetActiveBucket();
   return (
     <div data-testid="bucket-filtered-notice" className="rounded-md border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
       <p className="font-semibold">This product is hidden by your active bucket list.</p>
       <p className="mt-1">
         {list ? `${list.name} (${list.type === "excluded" ? "Excluded" : "Included"}) is filtering what you can see. ` : ""}
-        The product exists; clear the bucket list to view it.
+        {enforcedList ? "The Head Office restriction cannot be cleared here. Clearing a personal list does not override it."
+          : "The product exists; clear your personal list to view it."}
       </p>
-      <button type="button" disabled={isPending} onClick={() => setActive(null)} className="mt-2 font-bold underline">
-        Clear bucket list
-      </button>
+      {personalList && <button type="button" disabled={isPending} onClick={() => setActive(null)} className="mt-2 font-bold underline">
+        Clear personal list
+      </button>}
     </div>
   );
 }

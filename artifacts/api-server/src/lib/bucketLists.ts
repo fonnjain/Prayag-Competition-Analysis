@@ -1,9 +1,13 @@
 import { eq, sql } from "drizzle-orm";
 import { PreviewBucketListBody } from "@workspace/api-zod";
-import { db, bucketListsTable, bucketPreferencesTable, catalogProductsTable, type BucketListRecord } from "@workspace/db";
+import { db, bucketListsTable, bucketPreferencesTable, catalogProductsTable, competitorPricesTable, bucketEnforcementTable, type BucketEnforcementRecord, type BucketListRecord } from "@workspace/db";
 import { supportsCatalogRange } from "@workspace/formatting";
 import { normalizeVocabularyKey } from "./priceEditorVocabulary";
-import { BucketError, isLiveBucketProduct, matchesBucketRule, resolveBucketCodes, type BucketDefinition, type BucketProduct } from "./bucketMembership";
+import { BucketError, bucketAllowsCode, isLiveBucketProduct, matchesBucketRule, resolveBucketCodes, type BucketDefinition, type BucketProduct } from "./bucketMembership";
+import { normCode } from "./catalog";
+import { compileCompetitorRules, competitorImpact, competitorOptions, hasProductDefinition, resolveCompetitorRules, type CompetitorQuote } from "./bucketCompetitors";
+import { assertEnforcedDelete, assertEnforcedEdit, enforcedAffected, enforcementSnapshot, recordEnforcedEdit } from "./bucketEnforcement";
+import { composedProductAllowed, composedQuoteAllowed, composedDisclosure, type BucketLayer } from "./bucketComposition";
 
 export type BucketActor = { id: string; admin: boolean; label: string };
 export const bucketDraftSchema = PreviewBucketListBody.strict().superRefine((draft, ctx) => {
@@ -12,6 +16,15 @@ export const bucketDraftSchema = PreviewBucketListBody.strict().superRefine((dra
   if (draft.parentId && !/^[0-9a-f-]{36}$/i.test(draft.parentId)) invalid("Invalid parent list ID.");
   if ((draft.rules?.length ?? 0) > 300) invalid("Use at most 300 rules.");
   for (const rule of draft.rules ?? []) {
+    if (rule.competitor) {
+      if (rule.division || rule.category || rule.range) invalid("A competitor rule cannot also be a product rule.");
+      if (!rule.scope) invalid("Choose a competitor scope.");
+      const values = rule.scope === "division" ? rule.divisions : rule.scope === "category" ? rule.categories : [];
+      if (rule.scope !== "everywhere" && !values?.length) invalid("Choose at least one division or category.");
+      if ((values?.length ?? 0) > 300 || values?.some(value => !value.trim() || value.length > 300)) invalid("Invalid competitor scope.");
+      continue;
+    }
+    if (rule.scope || rule.divisions || rule.categories) invalid("Choose a stored competitor for the scope.");
     if (!(rule.division?.trim() || rule.category?.trim() || rule.range?.trim())) invalid("A rule must select something.");
     if ([rule.division, rule.category, rule.range].some(value => value !== undefined && (!value.trim() || value.length > 300))) invalid("Invalid rule selection.");
     if (rule.range && (!rule.division || !supportsCatalogRange(rule.division))) invalid("Range requires an approved Range division.");
@@ -22,18 +35,30 @@ export const bucketDraftSchema = PreviewBucketListBody.strict().superRefine((dra
 });
 type Draft = typeof bucketDraftSchema["_output"];
 type Executor = Pick<typeof db, "select" | "insert" | "update" | "delete" | "execute">;
-export type BucketWorld = { catalogue: BucketProduct[]; lists: BucketListRecord[]; byId: Map<string, BucketListRecord> };
+export type BucketExecutor = Executor;
+export type BucketWorld = { catalogue: BucketProduct[]; lists: BucketListRecord[]; byId: Map<string, BucketListRecord>;
+  competitorNames?: string[]; quotes?: CompetitorQuote[]; enforcement?: BucketEnforcementRecord };
 
 export async function loadBucketWorld(executor: Executor = db): Promise<BucketWorld> {
-  const [catalogue, lists] = await Promise.all([
+  const [catalogue, lists, names, currentQuotes, enforcement] = await Promise.all([
     executor.select({
       itemCode: catalogProductsTable.itemCode, productName: catalogProductsTable.productName,
       division: catalogProductsTable.division, category: catalogProductsTable.category,
       seriesRange: catalogProductsTable.seriesRange, isActive: catalogProductsTable.isActive,
       discontinuedFrom: catalogProductsTable.discontinuedFrom,
     }).from(catalogProductsTable), executor.select().from(bucketListsTable),
+    // Price-row text is the only brand authority. No freehand picker spelling.
+    executor.select({ competitor: competitorPricesTable.competitor }).from(competitorPricesTable).groupBy(competitorPricesTable.competitor),
+    executor.execute<{ id: number; competitor: string; matchedPrayagCode: string; price: number }>(sql`
+      SELECT DISTINCT ON (competitor, matched_prayag_code)
+        id, competitor, matched_prayag_code AS "matchedPrayagCode", price
+      FROM competitor_prices WHERE matched_prayag_code IS NOT NULL AND match_status = 'matched'
+        AND effective_date <= CURRENT_DATE AND price IS NOT NULL
+      ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC`),
+    executor.select().from(bucketEnforcementTable).where(eq(bucketEnforcementTable.id, 1)),
   ]);
-  return { catalogue, lists, byId: new Map(lists.map(list => [list.id, list])) };
+  return { catalogue, lists, byId: new Map(lists.map(list => [list.id, list])),
+    competitorNames: names.map(row => row.competitor).sort(), quotes: currentQuotes.rows, enforcement: enforcement[0] };
 }
 export function canReadBucket(list: BucketListRecord, actor: BucketActor) {
   return list.ownerId === actor.id || list.visibility === "everyone";
@@ -82,20 +107,41 @@ export function describeBucket(definition: BucketDefinition & Partial<BucketList
     divisionCounts.set(division, (divisionCounts.get(division) ?? 0) + 1);
   }
   const parent = definition.parentId ? world.byId.get(definition.parentId) : null;
+  const competitorRules = resolveCompetitorRules(definition, world.byId);
+  const productFilterApplied = !competitorRules.length || hasProductDefinition(definition, world.byId);
+  const normalizedCodes = new Set([...codes].map(normCode));
+  const type = definition.type ?? "excluded";
+  const impact = competitorImpact(type, competitorRules, world.catalogue, world.quotes ?? [],
+    code => !productFilterApplied || bucketAllowsCode(type, normalizedCodes, code));
   return {
     ...definition, id: definition.id ?? "", name: definition.name ?? "", type: definition.type ?? "excluded",
     visibility: definition.visibility ?? "only_me", parentName: parent?.name ?? null,
     canEdit: definition.ownerId === actor.id && (definition.visibility !== "everyone" || actor.admin),
+    isEnforced: !!definition.id && definition.id === world.enforcement?.listId,
+    affectsEnforced: !!definition.id && enforcedAffected(definition.id, world),
+    enforcedListName: world.enforcement?.listId ? world.byId.get(world.enforcement.listId)?.name ?? null : null,
     count: members.length, activeCount: members.filter(p => p.isActive).length,
     missingCount: members.filter(p => p.missing).length, totalProducts: world.catalogue.length,
     members, divisions: [...divisionCounts].map(([division, count]) => ({ division, count })),
-    ruleCounts: definition.rules.map(rule => ({ rule, count: world.catalogue.filter(p => matchesBucketRule(p, rule)).length })),
+    ruleCounts: definition.rules.filter(rule => !rule.competitor).map(rule => ({ rule, count: world.catalogue.filter(p => matchesBucketRule(p, rule)).length })),
+    competitorRules, competitorCount: new Set(competitorRules.map(rule => rule.competitor)).size,
+    productFilterApplied, ...impact,
   };
 }
 export function prepareBucketDraft(input: unknown, actor: BucketActor, world: BucketWorld, previous?: BucketListRecord) {
   const result = bucketDraftSchema.safeParse(input);
   if (!result.success) throw new BucketError(result.error.issues.map(i => i.message).join("; "));
   const draft: Draft = result.data;
+  const options = competitorOptions(world.competitorNames ?? [], world.catalogue, world.quotes ?? []);
+  for (const rule of draft.rules ?? []) {
+    if (!rule.competitor) continue;
+    const option = options.find(value => value.competitor === rule.competitor);
+    if (!option) throw new BucketError("Choose a competitor from the stored list.");
+    if (rule.scope === "division" && rule.divisions?.some(value => !option.divisions.some(d => d.value === value)))
+      throw new BucketError("That competitor has no current prices in the selected division.");
+    if (rule.scope === "category" && rule.categories?.some(value => !option.categories.some(c => normalizeVocabularyKey(c.value) === normalizeVocabularyKey(value))))
+      throw new BucketError("That competitor has no current prices in the selected category.");
+  }
   const definition = {
     name: (draft.name ?? previous?.name ?? "").trim().replace(/\s+/g, " "),
     description: draft.description === undefined ? previous?.description ?? null : draft.description,
@@ -120,7 +166,7 @@ export function prepareBucketDraft(input: unknown, actor: BucketActor, world: Bu
   }
   return definition;
 }
-async function lockBuckets(executor: Executor) {
+export async function lockBuckets(executor: Executor) {
   await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtext('bucket-lists:membership'))`);
 }
 export async function saveBucket(input: unknown, actor: BucketActor, id?: string) {
@@ -129,7 +175,11 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
     const world = await loadBucketWorld(tx);
     const previous = id ? assertBucketVisible(id, actor, world) : undefined;
     if (previous) assertOwner(previous, actor);
+    const affects = previous ? assertEnforcedEdit(previous.id, input, actor, world) : false;
+    const before = affects ? enforcementSnapshot(world.byId.get(world.enforcement!.listId!)!, world, actor) : null;
     const draft = prepareBucketDraft(input, actor, world, previous);
+    if (previous && previous.id === world.enforcement?.listId && draft.visibility !== "everyone")
+      throw new BucketError("A list in force must remain Everyone. Take it out of force before making it private.");
     if (draft.parentId) await observeBucketMembership(world.byId.get(draft.parentId)!, world, tx);
     if (!draft.name || !normalizeVocabularyKey(draft.name)) throw new BucketError("A name is required.");
     const nameKey = normalizeVocabularyKey(draft.name);
@@ -155,8 +205,14 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
       ? await tx.update(bucketListsTable).set(values).where(eq(bucketListsTable.id, previous.id)).returning()
       : await tx.insert(bucketListsTable).values({ ...values, createdBy: actor.label }).returning();
     world.byId.set(saved.id, saved);
+    if (before) await recordEnforcedEdit(tx, actor, world, before, saved.name);
     return describeBucket(saved, world, actor);
   });
+}
+function frozenCompetitorRules(definition: Parameters<typeof resolveCompetitorRules>[0], world: BucketWorld, codes: string[]) {
+  return resolveCompetitorRules(definition, world.byId).map((rule, index) =>
+    !codes.length && index === 0 && hasProductDefinition(definition, world.byId)
+      ? { ...rule, retainProductFilter: true } : rule);
 }
 async function freezeChildren(parent: BucketListRecord, world: BucketWorld, executor: Executor, actor: BucketActor,
   predicate = (_child: BucketListRecord) => true, reason = "The original was deleted") {
@@ -164,7 +220,7 @@ async function freezeChildren(parent: BucketListRecord, world: BucketWorld, exec
   for (const child of children) {
     const codes = [...resolveBucketCodes(child, world.byId, world.catalogue)];
     const changed = {
-      parentId: null, rules: [], addedCodes: codes, removedCodes: [], observedCodes: codes,
+      parentId: null, rules: frozenCompetitorRules(child, world, codes), addedCodes: codes, removedCodes: [], observedCodes: codes,
       detachedNotice: `${reason}: ${parent.name}. Your items were kept; this copy no longer updates automatically.`,
       updatedAt: new Date(), updatedBy: actor.label,
     };
@@ -178,6 +234,7 @@ export async function deleteBucket(id: string, actor: BucketActor) {
     await lockBuckets(tx);
     const world = await loadBucketWorld(tx), list = assertBucketVisible(id, actor, world);
     assertOwner(list, actor);
+    assertEnforcedDelete(id, world);
     const detachedChildren = await freezeChildren(list, world, tx, actor);
     await tx.delete(bucketListsTable).where(eq(bucketListsTable.id, list.id));
     return { deleted: true, detachedChildren, message: "Only the bucket list was deleted. No products or prices were deleted." };
@@ -189,34 +246,58 @@ export async function deleteBucketDataForAccount(userId: string, label: string, 
   await lockBuckets(executor);
   const world = await loadBucketWorld(executor);
   const owned = world.lists.filter(list => list.ownerId === userId);
+  for (const list of owned) assertEnforcedDelete(list.id, world);
   for (const list of owned) await freezeChildren(list, world, executor, { id: userId, admin: true, label },
     child => child.ownerId !== userId, "The original owner's account was deleted");
   await executor.delete(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, userId));
   for (const list of owned) await executor.delete(bucketListsTable).where(eq(bucketListsTable.id, list.id));
 }
-export async function detachBucket(id: string, actor: BucketActor) {
+export async function detachBucket(id: string, actor: BucketActor, input: unknown = {}) {
   return db.transaction(async tx => {
     await lockBuckets(tx);
     const world = await loadBucketWorld(tx), list = assertBucketVisible(id, actor, world);
     assertOwner(list, actor);
+    const affects = assertEnforcedEdit(id, input, actor, world);
+    const before = affects ? enforcementSnapshot(world.byId.get(world.enforcement!.listId!)!, world, actor) : null;
     const codes = [...resolveBucketCodes(list, world.byId, world.catalogue)];
     const [changed] = await tx.update(bucketListsTable).set({
-      parentId: null, rules: [], addedCodes: codes, removedCodes: [], observedCodes: codes,
+      parentId: null, rules: frozenCompetitorRules(list, world, codes), addedCodes: codes, removedCodes: [], observedCodes: codes,
       detachedNotice: "Detached from the original. These fixed codes no longer update automatically. To relink, start again.",
       updatedAt: new Date(), updatedBy: actor.label,
     }).where(eq(bucketListsTable.id, id)).returning();
+    world.byId.set(changed.id, changed);
+    if (before) await recordEnforcedEdit(tx, actor, world, before, changed.name);
     return describeBucket(changed, world, actor);
   });
 }
-export async function getActiveBucket(actor: BucketActor) {
-  const [preference] = await db.select().from(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, actor.id));
-  if (!preference?.activeListId) return { list: null, banner: null, codes: [] as string[] };
-  const world = await loadBucketWorld(), list = world.byId.get(preference.activeListId);
-  if (!list || !canReadBucket(list, actor)) return { list: null, banner: null, codes: [] as string[] };
-  await observeBucketMembership(list, world);
-  const detail = describeBucket(list, world, actor), codes = detail.members.map(member => member.itemCode);
-  const effect = list.type === "excluded" ? `${detail.activeCount} items hidden` : `${detail.activeCount} items shown`;
-  return { list: detail, banner: `Showing: ${list.name} — ${list.type === "excluded" ? "Excluded" : "Included"} · ${effect}`, codes };
+export async function getActiveBucket(actor: BucketActor | null, forFilter = false) {
+  const [state] = await db.select().from(bucketEnforcementTable).where(eq(bucketEnforcementTable.id, 1));
+  const [preference] = actor ? await db.select().from(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, actor.id)) : [];
+  if (!state?.listId && !preference?.activeListId)
+    return { list: null, enforced: null, banner: null, codes: [] as string[], layers: [] as BucketLayer[],
+      enforcementVersion: state?.version ?? 0, noCompetitorPriceCount: 0 };
+  const world = await loadBucketWorld();
+  const viewer = actor ?? { id: "", admin: false, label: "" };
+  const forced = world.enforcement?.listId ? world.byId.get(world.enforcement.listId) : null;
+  if (world.enforcement?.listId && (!forced || forced.visibility !== "everyone"))
+    throw new BucketError("Invalid company enforcement; refusing an unfiltered fallback.", 500, "ENFORCEMENT_INVALID");
+  const candidate = preference?.activeListId ? world.byId.get(preference.activeListId) : null;
+  const personal = actor && candidate && canReadBucket(candidate, actor) ? candidate : null;
+  const enforced = forced ? describeBucket(forced, world, viewer) : null;
+  if (personal) await observeBucketMembership(personal, world);
+  const detail = personal ? describeBucket(personal, world, viewer) : null;
+  // Company restriction FIRST, optional personal restriction SECOND.
+  const details = [enforced, detail].filter((value): value is NonNullable<typeof value> => !!value);
+  const layers: BucketLayer[] = details.map(value => ({
+    type: value.type, codes: new Set(value.members.map(member => normCode(member.itemCode))),
+    productFilterApplied: value.productFilterApplied, clauses: compileCompetitorRules(value.competitorRules, world.catalogue),
+  }));
+  const impact = competitorImpact("excluded", [], world.catalogue, world.quotes ?? [],
+    code => composedProductAllowed(layers, code), (brand, code) => composedQuoteAllowed(layers, brand, code));
+  const banner = details.length ? composedDisclosure(enforced, detail) : null;
+  return { list: detail, enforced, banner, codes: detail?.members.map(member => member.itemCode) ?? [],
+    layers: forFilter ? layers : [], clauses: forFilter ? layers.at(-1)?.clauses : undefined,
+    enforcementVersion: world.enforcement?.version ?? 0, ...impact };
 }
 export async function setActiveBucket(actor: BucketActor, id: string | null) {
   // Serialize against deletion/visibility changes, so a stale selection cannot

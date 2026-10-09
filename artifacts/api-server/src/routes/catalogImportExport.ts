@@ -1,5 +1,6 @@
 import { planCategorySpellings, readCategoryCatalogue, assertCategorySpellingPlan, assertCategorySpellingPreview, assertExactCategoryRestoration, lockCategorySpellings } from "../lib/categorySpellingGuard";
 import { Router, type IRouter } from "express";
+import { resolveCompetitorLoadName } from "../lib/competitorLoadName";
 import { supportsCatalogRange } from "@workspace/formatting";
 import { bucketSql, bucketExportRows } from "../lib/bucketFilter";
 import { createHash, randomUUID } from "node:crypto";
@@ -3110,6 +3111,7 @@ router.post(
   "/catalog/preview-competitor",
   requireAdmin,
   upload.single("file"),
+  resolveCompetitorLoadName,
   async (req, res) => {
     const file = req.file;
     if (!file) {
@@ -3226,6 +3228,7 @@ router.post(
   "/catalog/stage-competitor-workbook",
   requireAdmin,
   upload.single("file"),
+  resolveCompetitorLoadName,
   async (req, res) => {
     const file = req.file;
     if (!file) { res.status(400).json({ error: "No file uploaded" }); return; }
@@ -3680,6 +3683,7 @@ router.post(
   "/catalog/load-competitor",
   requireAdmin,
   upload.single("file"),
+  resolveCompetitorLoadName,
   async (req, res) => {
     const file = req.file;
     if (!file) {

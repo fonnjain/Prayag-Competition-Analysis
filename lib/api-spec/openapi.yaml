@@ -2853,7 +2853,7 @@ paths:
   /bucket-lists/active:
     get:
       operationId: getActiveBucketList
-      summary: Current user's global active bucket; anonymous always has none
+      summary: Company-enforced and optional personal layers; anonymous has no personal list
       responses:
         '200':
           description: Active selection and disclosure
@@ -2877,6 +2877,48 @@ paths:
           content:
             application/json:
               schema: {type: object, additionalProperties: true}
+  /bucket-lists/enforcement:
+    get:
+      operationId: getBucketEnforcement
+      tags: [BucketLists]
+      responses:
+        '200':
+          description: Company enforcement and immutable newest-first history
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketEnforcementState'}
+    post:
+      operationId: enforceBucketList
+      tags: [BucketLists]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BucketEnforcementInput'}
+      responses:
+        '200':
+          description: Enforced; personal preferences are unchanged
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketEnforcementState'}
+        '403': {description: Administrator required}
+        '409': {description: State changed; confirm again with the current names}
+  /bucket-lists/enforcement/release:
+    post:
+      operationId: releaseBucketEnforcement
+      tags: [BucketLists]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BucketEnforcementReleaseInput'}
+      responses:
+        '200':
+          description: Taken out of force; recorded in history
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketEnforcementState'}
+        '403': {description: Administrator required}
   /bucket-lists/{id}:
     parameters:
       - name: id
@@ -3019,12 +3061,20 @@ components:
     BucketRule:
       type: object
       properties:
+        retainProductFilter:
+          type: boolean
+          description: Internal preservation of an empty inherited product selection when detaching or deleting a parent.
         division: {type: string}
         category: {type: string}
         range: {type: string}
+        competitor: {type: string}
+        scope: {type: string, enum: [everywhere, division, category]}
+        divisions: {type: array, items: {type: string}}
+        categories: {type: array, items: {type: string}}
     BucketDraft:
       type: object
       properties:
+        confirmEnforcedEdit: {type: boolean}
         name: {type: string}
         description: {type: [string, 'null']}
         type: {type: string, enum: [included, excluded]}
@@ -3047,13 +3097,70 @@ components:
             missingCount: {type: integer}
             totalProducts: {type: integer}
             canEdit: {type: boolean}
+            isEnforced: {type: boolean}
+            affectsEnforced: {type: boolean}
+            enforcedListName: {type: [string, 'null']}
             members: {type: array, items: {type: object, additionalProperties: true}}
             divisions: {type: array, items: {type: object, additionalProperties: true}}
             ruleCounts: {type: array, items: {type: object, additionalProperties: true}}
+            competitorRules: {type: array, items: {$ref: '#/components/schemas/BucketRule'}}
+            competitorCount: {type: integer}
+            competitorPriceCount: {type: integer}
+            noCompetitorPriceCount: {type: integer}
+            productFilterApplied: {type: boolean}
             createdAt: {type: string}
             updatedAt: {type: string}
             updatedBy: {type: string}
             detachedNotice: {type: [string, 'null']}
+    BucketEnforcementInput:
+      type: object
+      required: [listId, reason, expectedVersion]
+      properties:
+        listId: {type: string, format: uuid}
+        reason: {type: string, minLength: 1, maxLength: 2000}
+        expectedVersion: {type: integer, minimum: 0}
+    BucketEnforcementReleaseInput:
+      type: object
+      required: [reason, expectedVersion]
+      properties:
+        reason: {type: string, minLength: 1, maxLength: 2000}
+        expectedVersion: {type: integer, minimum: 0}
+    BucketEnforcedInfo:
+      type: object
+      required: [list, actorLabel, enforcedAt, reason]
+      properties:
+        list: {$ref: '#/components/schemas/BucketList'}
+        actorLabel: {type: string}
+        enforcedAt: {type: string}
+        reason: {type: string}
+    BucketEnforcementEvent:
+      type: object
+      required: [id, version, action, actorLabel, reason, listName, listType, itemCount, competitorCount, competitorPriceCount, occurredAt]
+      properties:
+        id: {type: string}
+        version: {type: integer}
+        action: {type: string, enum: [enforced, replaced, released, edited]}
+        actorLabel: {type: string}
+        reason: {type: string}
+        listName: {type: string}
+        listType: {type: string, enum: [included, excluded]}
+        itemCount: {type: integer}
+        competitorCount: {type: integer}
+        competitorPriceCount: {type: integer}
+        previousListName: {type: [string, 'null']}
+        occurredAt: {type: string}
+        snapshot: {type: object, additionalProperties: true}
+        beforeSnapshot: {type: [object, 'null'], additionalProperties: true}
+    BucketEnforcementState:
+      type: object
+      required: [version, enforced, history]
+      properties:
+        version: {type: integer}
+        enforced:
+          anyOf:
+            - {$ref: '#/components/schemas/BucketEnforcedInfo'}
+            - {type: 'null'}
+        history: {type: array, items: {$ref: '#/components/schemas/BucketEnforcementEvent'}}
     P029UgdClassificationPreview:
       type: object
       required: [correctionKey, status, rows, priceChecks, copiedFields, sizeAction, canApply]
@@ -3129,6 +3236,8 @@ components:
       type: object
       required: [fileSha256, fileSizeBytes, totalPages, samplePages, pages, sampleCount, textBearingCount, textBearingShare, medianCharacters, medianDigits, detectedClass, recommendedPath, textBearingPages, nonTextBearingPages, assignmentTextBearingCount, assignmentNonTextBearingCount, humanReason]
       properties:
+        competitorNameResolution:
+          $ref: "#/components/schemas/CompetitorNameResolution"
         fileSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
         fileSizeBytes: { type: integer, minimum: 1 }
         totalPages: { type: integer, minimum: 1 }
@@ -4803,6 +4912,8 @@ components:
       type: object
       required: [isSparshMaster, periods]
       properties:
+        competitorNameResolution:
+          $ref: "#/components/schemas/CompetitorNameResolution"
         isSparshMaster:
           type: boolean
         requiresCompetitor:
@@ -4833,6 +4944,14 @@ components:
           enum: [MRP, Ex-GST]
         gstPct:
           type: number
+    CompetitorNameResolution:
+      type: object
+      required: [requested, competitor, reusedStoredSpelling]
+      properties:
+        requested: {type: string}
+        competitor: {type: string}
+        reusedStoredSpelling: {type: boolean}
+        message: {type: [string, 'null']}
     CompetitorWorkbookImportedPeriod:
       type: object
       required: [effectiveDate, inserted, directMatches, descSizeMatches]

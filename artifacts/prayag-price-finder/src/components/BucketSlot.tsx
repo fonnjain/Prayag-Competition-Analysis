@@ -2,11 +2,10 @@ import { useAuth } from "@workspace/replit-auth-web";
 import type { ReactNode } from "react";
 import { BucketControl, BucketPageHeader as SharedBucketPageHeader } from "@workspace/api-client-react";
 
-/** Shared bucket filter control. Renders nothing for anonymous visitors. */
+/** Anonymous visitors have only a locked company layer, never a personal list. */
 export function BucketSlot() {
   const { user } = useAuth();
-  if (!user) return null;
-  return <BucketControl userId={user.id} />;
+  return <BucketControl userId={user?.id} />;
 }
 
 export function BucketPageHeader({ title }: { title: ReactNode }) {

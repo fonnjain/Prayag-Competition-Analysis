@@ -1,0 +1,16 @@
+[
+  {
+    "environment": "development",
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "checked_at_ist,competitor_rows_md5,aliases_md5\n2026-10-09 17:20:04,e1fc5572bf4affe2c624c3f181d9f477,f371dff0ad0b35ca8b91c794dc710011\n",
+    "success": true
+  },
+  {
+    "environment": "production",
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "checked_at_ist,competitor_rows_md5,aliases_md5\n2026-10-09 17:20:08,9e667262444f3dd99123d804a7cfc9ef,5c2d95bea6ab77e98997e194772ff974\n",
+    "success": true
+  }
+]
