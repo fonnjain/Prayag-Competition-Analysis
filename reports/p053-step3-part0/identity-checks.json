@@ -1,0 +1,23 @@
+{
+  "sql": "WITH keys AS (SELECT regexp_replace(upper(regexp_replace(trim(item_code),'\\s+','','g')),'\\.0$','') AS key,count(*)::int AS n,count(*) FILTER(WHERE is_active AND (discontinued_from IS NULL OR discontinued_from>(now() AT TIME ZONE 'Asia/Kolkata')::date))::int AS active_n FROM catalog_products GROUP BY key), matched_keys AS (SELECT DISTINCT regexp_replace(upper(regexp_replace(trim(matched_prayag_code),'\\s+','','g')),'\\.0$','') AS key FROM competitor_prices WHERE match_status='matched' AND price>0) SELECT to_char(now() AT TIME ZONE 'Asia/Kolkata','YYYY-MM-DD HH24:MI:SS') AS observed_ist,count(*) FILTER(WHERE n>1)::int AS all_collision_groups,count(*) FILTER(WHERE active_n>1)::int AS active_collision_groups,count(*) FILTER(WHERE n>1 AND key IN(SELECT key FROM matched_keys))::int AS priced_collision_groups,count(*) FILTER(WHERE active_n>1 AND key IN(SELECT key FROM matched_keys))::int AS active_priced_collision_groups FROM keys",
+  "checks": [
+    {
+      "environment": "development",
+      "result": {
+        "exitCode": 0,
+        "exitReason": null,
+        "output": "observed_ist,all_collision_groups,active_collision_groups,priced_collision_groups,active_priced_collision_groups\n2026-10-09 16:38:00,229,0,84,0\n",
+        "success": true
+      }
+    },
+    {
+      "environment": "production",
+      "result": {
+        "exitCode": 0,
+        "exitReason": null,
+        "output": "observed_ist,all_collision_groups,active_collision_groups,priced_collision_groups,active_priced_collision_groups\n2026-10-09 16:38:05,229,0,84,0\n",
+        "success": true
+      }
+    }
+  ]
+}

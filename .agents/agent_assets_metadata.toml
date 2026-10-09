@@ -1145,3 +1145,31 @@ mtime_ms = 1791123668561
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e41055b7-1bc9-450e-a790-7c534bb6cf46/8c803c84-663d-42ba-a267-9eca75f38690"
 storage_version_token = "1791123716931377"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "E6PiEzRtTwwcgPSxjS9OK"
+uri = "file://reports/P053-Step-3-Part-0.html"
+type = "html"
+title = "P053 Step 3 — Part 0 Report"
+description = "Read-only competitor inventory, every division/category count, affected aggregate sources, last-competitor cases, timestamps and protected baselines."
+logical_id = "1423d092-c4d0-4065-8656-235337774d72"
+content_hash = "sha256:95aa37a658322bc1ab6343d2ac6163b594a0ea903a4dca98971161098c310477"
+size = 50061
+mtime_ms = 1791544544706
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1423d092-c4d0-4065-8656-235337774d72/8af31f0a-0ba0-4c8e-8280-89c9b3f93de4"
+storage_version_token = "1791544613793140"
+content_type = "text/html"
+
+[[outputs]]
+id = "rO93Mv2A7IWqP10Z_6YY0"
+uri = "file://reports/P053-Step-3-Part-0.zip"
+type = "unspecified"
+title = "P053 Step 3 — Part 0 Evidence"
+description = "Full report, scope CSVs, canonical queries, source dependency inventory and byte-identical classification snapshots for development and production."
+logical_id = "3775fe44-0add-4659-a7d0-c3c014c90e18"
+content_hash = "sha256:abcdfad135213d60702c663c281e09a414817311c4a16982acc45825638734dc"
+size = 83300
+mtime_ms = 1791544602566
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/3775fe44-0add-4659-a7d0-c3c014c90e18/9335b2b6-93f7-4e41-936a-8729c311cf80"
+storage_version_token = "1791544615117416"
+content_type = "application/octet-stream"

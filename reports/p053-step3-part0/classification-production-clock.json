@@ -1,0 +1,9 @@
+{
+  "environment": "production",
+  "result": {
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "observed_ist\n2026-10-09 16:43:30\n",
+    "success": true
+  }
+}

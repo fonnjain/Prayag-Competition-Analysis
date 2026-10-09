@@ -1,0 +1,162 @@
+# P053 — Step 3 — COMPETITION — Exclude a competitor, whole or by division or category
+
+> **P053 Step 3** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** It changes no product, price, competitor row or mapping.
+> Quote `P053 Step 3` when reporting back.
+
+A bucket list can today hold **products**. This adds **competitors** to the same list, so one saved list can say *"hide these 184 products, and ignore Apollo entirely"*.
+
+---
+
+# 1. The important difference — read this before building
+
+**Excluding a product removes the whole comparison row.**
+**Excluding a competitor does NOT.** It removes that competitor's prices from the comparison, and the Prayag product stays.
+
+```
+Excluded product   PW11          -> the PW11 row disappears
+Excluded competitor Apollo       -> every row stays; Apollo's price is gone from each
+```
+
+**1.1** If a product's only competitor prices come from excluded competitors, **the row still appears**, with *"no competitor price under this filter"* in place of the comparison. **It is not dropped.** Dropping it would quietly change the product count, which is the failure this whole feature exists to prevent.
+
+**1.2** Every aggregate recomputes from the remaining competitors: widest-gap rankings, positioning, coverage, by-brand and by-category breakdowns, and opportunity counts. **An excluded competitor must not appear in any total, any ranking or any average.** Hiding the rendered row while the totals still count it is wrong.
+
+---
+
+# 2. Three scopes
+
+In the editor, a competitor rule is one row:
+
+```
+Competitor          Scope
+Apollo              Everywhere
+Prince              Pipes & Fittings                     (one or more divisions)
+Ashirvad            SWR Fittings, Pipe Clip              (one or more categories)
+```
+
+**2.1 Everywhere** — that competitor never appears, in any division.
+
+**2.2 By division** — that competitor's prices are hidden only on products in the chosen divisions. Multi-select.
+
+**2.3 By category** — hidden only on products in the chosen categories. Multi-select. Category matching uses the **P051 normalised comparison**, so a rule on `Blaze 62` also catches `BLAZE 62`.
+
+**2.4** A competitor may have more than one rule. The rules add up: Prince excluded in Pipes & Fittings *and* in CPVC Fittings means both.
+
+**2.5** Competitors are chosen from **the stored competitor list**, never typed free-hand. That avoids Ashirvad / Ashirwad becoming two things.
+
+---
+
+# 3. Included lists
+
+In an **Included** list, a competitor rule means *"show only these competitors"*. Same three scopes, inverted. If an Included list names no competitor at all, every competitor is shown — a list about products says nothing about competitors.
+
+Same for the reverse: an Excluded list naming only competitors hides no products.
+
+---
+
+# 4. The editor
+
+**4.1** A third tab in **2. Add items**, beside *Pick from the catalogue* and *Upload from Excel*:
+
+```
+Competitors
+```
+
+**4.2** It lists every competitor with a checkbox and, beside each, a scope selector defaulting to **Everywhere**. Choosing *By division* or *By category* opens a multi-select of the values that competitor actually has prices for — **do not offer divisions or categories where that competitor has no data**, and show the count:
+
+```
+Apollo        Everywhere            700 prices
+Prince        By division  ▾        Pipes & Fittings (812)   CP Fittings / Faucets (133)
+```
+
+**4.3 The review panel states both parts plainly**, and updates live:
+
+> *This list will hide **184** products and ignore **Apollo** entirely, and **Prince** in Pipes & Fittings. **1,512** competitor prices will not be counted.*
+
+**4.4** Competitor rules appear in the item list as their own removable chips, visibly different from product entries.
+
+---
+
+# 5. The filter control and exports
+
+**5.1** The active control's effect text carries both parts, still in one line:
+
+```
+● HO (Plumbing)   184 hidden · 2 competitors   ×
+```
+
+**5.2 The export disclosure names the competitor rules in full.** A file that quietly omits Apollo is exactly as misleading as one that quietly omits 184 products:
+
+```
+Showing: List name: "HO (Plumbing) — Excluded" · Type: Excluded ·
+Effect: 184 items hidden from results; Apollo excluded everywhere;
+Prince excluded in Pipes & Fittings
+```
+
+**5.3** Same screens as before: A–K only. L–T maintenance screens stay unfiltered and keep their notice.
+
+---
+
+# 6. Part 0 — read-only, report before building
+
+**6.1** How are competitors stored — a table of brands, or a text column on price rows? Quote it. If they are text, report every distinct stored spelling with its row count, since that decides whether a brand picker is safe.
+
+**6.2** For each competitor, the divisions and categories it actually has prices in, with counts. This feeds 4.2.
+
+**6.3** Every aggregate that counts competitor prices — by-brand, by-category, positioning, coverage matrix, opportunities, widest gap — and where each computes its totals. Name the ones that would need changing so an excluded competitor leaves the totals properly.
+
+**6.4** How many products would have **no competitor price at all** if each competitor were excluded in turn. That is the size of the "no competitor price under this filter" case.
+
+---
+
+# Rules
+
+1. **No product, price, competitor row, mapping or classification changes.** Display only.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums.
+3. The catalogue classification snapshot is byte-identical, both environments.
+4. Reuse the existing bucket model, the P048 normaliser, the P049 division list and the P051 category matching. No second copy of any.
+5. Still one active list at a time. Still header placement, every A–K screen.
+6. Development first, then publish, then confirm in production.
+
+# Tests
+
+```
+ 1. Excluding a competitor everywhere removes its prices from every A-K
+    screen and every aggregate, and removes no Prayag product row
+ 2. A product whose only competitor was excluded still appears, marked
+    "no competitor price under this filter"
+ 3. Widest-gap, positioning, coverage and by-brand totals recompute;
+    the excluded competitor appears in none of them
+ 4. A division-scoped rule affects only that division
+ 5. A category-scoped rule on "Blaze 62" also catches "BLAZE 62"
+ 6. Two rules on one competitor both apply
+ 7. An Included list naming no competitor shows all competitors
+ 8. An Excluded list naming only competitors hides no products
+ 9. The scope picker offers only divisions and categories where that
+    competitor has prices
+10. The export disclosure names every competitor rule in full, CSV and XLSX
+11. The control's effect text shows products and competitors in one line
+12. mrp_price_history count and checksum unchanged, both environments
+13. Catalogue classification snapshot byte-identical, both environments
+```
+
+**Tests 2 and 3 are the ones that matter.** Everything else is convenience; a product silently vanishing, or a total still counting a competitor the user excluded, is a wrong number.
+
+# Report
+
+1. Part 0, 6.1 to 6.4.
+2. Which aggregates you changed and how each now excludes a competitor at source.
+3. Screenshots: the Competitors tab, a division-scoped rule, the review panel with both parts, the active control, and a product showing "no competitor price under this filter".
+4. One exported CSV and one XLSX showing the full disclosure.
+5. Test results.
+6. `mrp_price_history` and classification snapshot, before and after, both environments.
+7. Production confirmation after publish, with clock times.
+
+State the environment and the clock time against every figure.
+
+---
+
+## Why this is worth having
+
+Apollo's 700 prices are not loaded yet and its codes are hand-made. Ashirvad's list is eighteen months old and its pipe-clip prices are seven to seventeen times Prayag's, probably per pack. Until those are settled, anyone looking at a gap report is reading numbers that include known-bad data. One click to set a competitor aside is more honest than a mental note to ignore a column.

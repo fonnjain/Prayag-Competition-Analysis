@@ -41,6 +41,20 @@ changes during read-only confirmation.
 **How to apply:** Inspect the existing state without selecting or clearing a
 list. Do not treat a screenshot request as permission to write a preference.
 
+Competitor rules filter prices, never the Prayag product universe. A product
+whose last competitor is filtered out must remain visible with
+“no competitor price under this filter.” Recompute every competitor-price
+count, average, position, coverage measure and ranking from surviving quotes;
+do not include a placeholder as a price or competitor SKU.
+
+**Why:** The user identified silently disappearing products and totals still
+counting excluded competitors as the critical failures.
+
+**How to apply:** Keep product membership and competitor-price selection
+separate. Support additive competitor scopes using stored brand spellings and
+the existing division/category vocabulary. Do not rewrite products, prices,
+mappings, classifications or saved pricing-run evidence to apply a display filter.
+
 Every A–K bucket control belongs in the page header, right-aligned on the same
 row as the page title, visible without scrolling at 1366×768. No alternative
 filter-bar or below-actions placement is allowed, including loading/empty/error

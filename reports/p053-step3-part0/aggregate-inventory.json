@@ -1,0 +1,71 @@
+{
+  "environment": "development workspace source inspection",
+  "observedIST": "2026-10-09 16:41:07",
+  "aggregates": [
+    [
+      "Analysis overview",
+      "routes/analysis.ts /analysis/overview; getFilteredRows; lib/analysis.ts gapStats, confidenceCounts",
+      "Total/matched/unmatched/comparable SKU counts, coverage, competitor count, mean/median gap, cheaper/costlier counts and revision counts. Filter competitor input before these reducers."
+    ],
+    [
+      "Analysis by brand/category",
+      "routes/analysis.ts /analysis/by-brand and /analysis/by-category",
+      "Per-group SKU and comparable counts, coverage, mean/median gaps, cheaper/costlier counts and category sort. Remove excluded quotes before grouping."
+    ],
+    [
+      "Positioning",
+      "routes/analysis.ts /analysis/positioning; lib/analysis.ts bucketize",
+      "Comparable count and all histogram bins. Feed only allowed prices, never no-price placeholders."
+    ],
+    [
+      "Coverage matrix",
+      "routes/analysis.ts /analysis/coverage-matrix",
+      "Each brand row plus All competitors total: matched/unmatched, confidence buckets and coverage. Omit globally excluded brands and sum allowed inputs."
+    ],
+    [
+      "Opportunities and widest-gap rankings",
+      "routes/analysis.ts /analysis/opportunities; lib/analysis.ts toOpportunityItem",
+      "Threshold qualification, headroom/threat ranking and top-limit lists. Remove forbidden quotes before sorting/limiting. Existing endpoint returns limited lists, not a separate full-population opportunity count."
+    ],
+    [
+      "Market Comparison summary",
+      "routes/comparison.ts /catalog/comparison/summary",
+      "Canonical full-precision mean gap, comparable/cheaper counts, review/unit-ambiguity/confidence counts and category win rates. Filter before current-row selection and aggregation, retaining existing period/unit policy."
+    ],
+    [
+      "Market Comparison product groups",
+      "routes/comparison.ts /catalog/comparison/by-product",
+      "Rival count, cheapest competitor, price/median/spread gaps, market position, widest-gap order, dynamic competitor columns and pagination totals. Preserve the unfiltered eligible Prayag product universe; this path currently drops rows whose competitors.length is zero."
+    ],
+    [
+      "Comparison quote table and matrix",
+      "routes/comparison.ts /catalog/comparison; /catalog/comparison/matrix",
+      "Quote-table totals and sorting; matrix cheapest-per-brand cells, brand columns, grouped product totals and paging. Apply the price predicate at source; use product anchors so exclusion never removes a Prayag row."
+    ],
+    [
+      "Mapping Review display",
+      "routes/comparison.ts /catalog/mapping-review and read-only auto-accept preview",
+      "Displayed row count, filtered review totals and suggestions in screen D. Filter the read-only display without changing match status, accept history or mappings; do not activate competitor filtering on write handlers."
+    ],
+    [
+      "Price Finder detail/comparison",
+      "routes/priceFinder.ts getPriceFinderProduct; buildPriceFinderComparison; comparison and export endpoints",
+      "Current/upcoming brand cards/cells and derived gaps; keep selected Prayag products when all competitor quotes are filtered. Comparison currently has a hardcoded Sparsh Pearl/Ashirvad/Prince/Vectus allowlist that omits stored Apollo."
+    ],
+    [
+      "Generator metadata/scopes/matching",
+      "routes/mrpGenerator.ts metadata, scopes, matching, freshness; matchingRows; lib/p015.ts matchingPosition/selectMatchingCompetitor",
+      "Competitor options and scope counts, matched price counts, above/below positions, exposure counts and selected rival candidates. Filter competitor evidence for display without mutating product data or repricing immutable runs."
+    ],
+    [
+      "Generator previews, saved-run views and scenario comparison",
+      "routes/mrpGenerator.ts scenario preview, runs/results and compare; lib/bucketGeneratorView.ts bucketRunSummary/bucketRunSnapshot; lib/mrpGenerator.ts evaluation reducers",
+      "Existing frozen product/competitor evidence and visible summary projections feed candidate counts, coverage/confidence and portfolio views. Extend the display projection to remove disallowed competitor evidence; preserve original recommendations, fingerprints and stored audit snapshots."
+    ],
+    [
+      "Selectors and exports",
+      "analysis/comparison filter endpoints; Price Finder and generator selectors; lib/bucketFilter.ts bucketExportRows; shared export formatter",
+      "Do not leave globally excluded brand choices/columns in A–K outputs. Every affected CSV/XLSX/report export needs full competitor-rule disclosure. Keep L–T, machine APIs and full-source audit records outside the filtering context."
+    ]
+  ]
+}

@@ -1,0 +1,889 @@
+{
+  "environment": "production",
+  "inventory": {
+    "observed_ist": "2026-10-09 16:34:23",
+    "brand_inventory": [
+      {
+        "competitor": "Apollo",
+        "stored_rows": 691,
+        "undated_rows": 0,
+        "nonnull_price_rows": 691,
+        "positive_price_rows": 691,
+        "accepted_matched_rows": 691
+      },
+      {
+        "competitor": "Ashirvad",
+        "stored_rows": 669,
+        "undated_rows": 0,
+        "nonnull_price_rows": 669,
+        "positive_price_rows": 669,
+        "accepted_matched_rows": 669
+      },
+      {
+        "competitor": "Prince",
+        "stored_rows": 943,
+        "undated_rows": 0,
+        "nonnull_price_rows": 943,
+        "positive_price_rows": 943,
+        "accepted_matched_rows": 943
+      },
+      {
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 300,
+        "undated_rows": 0,
+        "nonnull_price_rows": 290,
+        "positive_price_rows": 290,
+        "accepted_matched_rows": 300
+      }
+    ]
+  },
+  "scopes": {
+    "observed_ist": "2026-10-09 16:39:43",
+    "scopes": [
+      {
+        "category": "AGRI Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 21,
+        "positive_price_rows": 21,
+        "active_catalogue_rows": 21,
+        "distinct_catalogue_products": 21,
+        "category_match_key": "agri fitting"
+      },
+      {
+        "category": "AGRI Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 123,
+        "positive_price_rows": 123,
+        "active_catalogue_rows": 123,
+        "distinct_catalogue_products": 123,
+        "category_match_key": "agri pipe"
+      },
+      {
+        "category": "AGRI Smart Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 15,
+        "positive_price_rows": 15,
+        "active_catalogue_rows": 15,
+        "distinct_catalogue_products": 15,
+        "category_match_key": "agri smart fitting"
+      },
+      {
+        "category": "CPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 125,
+        "positive_price_rows": 125,
+        "active_catalogue_rows": 125,
+        "distinct_catalogue_products": 125,
+        "category_match_key": "cpvc fitting"
+      },
+      {
+        "category": "CPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 36,
+        "positive_price_rows": 36,
+        "active_catalogue_rows": 36,
+        "distinct_catalogue_products": 36,
+        "category_match_key": "cpvc pipe"
+      },
+      {
+        "category": "Casing Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 13,
+        "positive_price_rows": 13,
+        "active_catalogue_rows": 13,
+        "distinct_catalogue_products": 13,
+        "category_match_key": "casing pipe"
+      },
+      {
+        "category": "PPR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 55,
+        "positive_price_rows": 55,
+        "active_catalogue_rows": 55,
+        "distinct_catalogue_products": 55,
+        "category_match_key": "ppr fitting"
+      },
+      {
+        "category": "PPR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 15,
+        "positive_price_rows": 15,
+        "active_catalogue_rows": 15,
+        "distinct_catalogue_products": 15,
+        "category_match_key": "ppr pipe"
+      },
+      {
+        "category": "SWR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 108,
+        "positive_price_rows": 108,
+        "active_catalogue_rows": 108,
+        "distinct_catalogue_products": 108,
+        "category_match_key": "swr fitting"
+      },
+      {
+        "category": "SWR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 24,
+        "positive_price_rows": 24,
+        "active_catalogue_rows": 24,
+        "distinct_catalogue_products": 24,
+        "category_match_key": "swr pipe"
+      },
+      {
+        "category": "UGD Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 9,
+        "positive_price_rows": 9,
+        "active_catalogue_rows": 9,
+        "distinct_catalogue_products": 9,
+        "category_match_key": "ugd pipe"
+      },
+      {
+        "category": "UPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 95,
+        "positive_price_rows": 95,
+        "active_catalogue_rows": 95,
+        "distinct_catalogue_products": 95,
+        "category_match_key": "upvc fitting"
+      },
+      {
+        "category": "UPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "stored_rows": 52,
+        "positive_price_rows": 52,
+        "active_catalogue_rows": 52,
+        "distinct_catalogue_products": 52,
+        "category_match_key": "upvc pipe"
+      },
+      {
+        "category": "AGRI Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 20,
+        "positive_price_rows": 20,
+        "active_catalogue_rows": 20,
+        "distinct_catalogue_products": 20,
+        "category_match_key": "agri fitting"
+      },
+      {
+        "category": "AGRI Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 67,
+        "positive_price_rows": 67,
+        "active_catalogue_rows": 67,
+        "distinct_catalogue_products": 67,
+        "category_match_key": "agri pipe"
+      },
+      {
+        "category": "CPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 171,
+        "positive_price_rows": 171,
+        "active_catalogue_rows": 171,
+        "distinct_catalogue_products": 171,
+        "category_match_key": "cpvc fitting"
+      },
+      {
+        "category": "CPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 40,
+        "positive_price_rows": 40,
+        "active_catalogue_rows": 40,
+        "distinct_catalogue_products": 40,
+        "category_match_key": "cpvc pipe"
+      },
+      {
+        "category": "SWR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 121,
+        "positive_price_rows": 121,
+        "active_catalogue_rows": 121,
+        "distinct_catalogue_products": 121,
+        "category_match_key": "swr fitting"
+      },
+      {
+        "category": "SWR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 56,
+        "positive_price_rows": 56,
+        "active_catalogue_rows": 56,
+        "distinct_catalogue_products": 56,
+        "category_match_key": "swr pipe"
+      },
+      {
+        "category": "UPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 154,
+        "positive_price_rows": 154,
+        "active_catalogue_rows": 154,
+        "distinct_catalogue_products": 154,
+        "category_match_key": "upvc fitting"
+      },
+      {
+        "category": "UPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "stored_rows": 40,
+        "positive_price_rows": 40,
+        "active_catalogue_rows": 40,
+        "distinct_catalogue_products": 40,
+        "category_match_key": "upvc pipe"
+      },
+      {
+        "category": "AGRI Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 28,
+        "positive_price_rows": 28,
+        "active_catalogue_rows": 28,
+        "distinct_catalogue_products": 28,
+        "category_match_key": "agri fitting"
+      },
+      {
+        "category": "AGRI Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 88,
+        "positive_price_rows": 88,
+        "active_catalogue_rows": 88,
+        "distinct_catalogue_products": 88,
+        "category_match_key": "agri pipe"
+      },
+      {
+        "category": "AGRI Smart Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 9,
+        "positive_price_rows": 9,
+        "active_catalogue_rows": 9,
+        "distinct_catalogue_products": 9,
+        "category_match_key": "agri smart fitting"
+      },
+      {
+        "category": "CPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 171,
+        "positive_price_rows": 171,
+        "active_catalogue_rows": 171,
+        "distinct_catalogue_products": 171,
+        "category_match_key": "cpvc fitting"
+      },
+      {
+        "category": "CPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 40,
+        "positive_price_rows": 40,
+        "active_catalogue_rows": 40,
+        "distinct_catalogue_products": 40,
+        "category_match_key": "cpvc pipe"
+      },
+      {
+        "category": "Casing Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 15,
+        "positive_price_rows": 15,
+        "active_catalogue_rows": 15,
+        "distinct_catalogue_products": 15,
+        "category_match_key": "casing pipe"
+      },
+      {
+        "category": "PPR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 106,
+        "positive_price_rows": 106,
+        "active_catalogue_rows": 106,
+        "distinct_catalogue_products": 106,
+        "category_match_key": "ppr fitting"
+      },
+      {
+        "category": "PPR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 30,
+        "positive_price_rows": 30,
+        "active_catalogue_rows": 30,
+        "distinct_catalogue_products": 30,
+        "category_match_key": "ppr pipe"
+      },
+      {
+        "category": "SWR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 96,
+        "positive_price_rows": 96,
+        "active_catalogue_rows": 96,
+        "distinct_catalogue_products": 96,
+        "category_match_key": "swr fitting"
+      },
+      {
+        "category": "SWR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 125,
+        "positive_price_rows": 125,
+        "active_catalogue_rows": 125,
+        "distinct_catalogue_products": 125,
+        "category_match_key": "swr pipe"
+      },
+      {
+        "category": "UGD Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 14,
+        "positive_price_rows": 14,
+        "active_catalogue_rows": 14,
+        "distinct_catalogue_products": 14,
+        "category_match_key": "ugd pipe"
+      },
+      {
+        "category": "UPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 169,
+        "positive_price_rows": 169,
+        "active_catalogue_rows": 169,
+        "distinct_catalogue_products": 169,
+        "category_match_key": "upvc fitting"
+      },
+      {
+        "category": "UPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "stored_rows": 52,
+        "positive_price_rows": 52,
+        "active_catalogue_rows": 52,
+        "distinct_catalogue_products": 52,
+        "category_match_key": "upvc pipe"
+      },
+      {
+        "category": "Ball Cocks",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 38,
+        "positive_price_rows": 28,
+        "active_catalogue_rows": 38,
+        "distinct_catalogue_products": 19,
+        "category_match_key": "ball cock"
+      },
+      {
+        "category": "Black Pearl",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 24,
+        "positive_price_rows": 24,
+        "active_catalogue_rows": 24,
+        "distinct_catalogue_products": 12,
+        "category_match_key": "black pearl"
+      },
+      {
+        "category": "Cobra",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 36,
+        "positive_price_rows": 36,
+        "active_catalogue_rows": 36,
+        "distinct_catalogue_products": 18,
+        "category_match_key": "cobra"
+      },
+      {
+        "category": "Diamond",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 38,
+        "positive_price_rows": 38,
+        "active_catalogue_rows": 38,
+        "distinct_catalogue_products": 19,
+        "category_match_key": "diamond"
+      },
+      {
+        "category": "Faucets & Jet Sprays",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 8,
+        "positive_price_rows": 8,
+        "active_catalogue_rows": 8,
+        "distinct_catalogue_products": 4,
+        "category_match_key": "faucet jet spray"
+      },
+      {
+        "category": "P.V.C. Connections",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 24,
+        "positive_price_rows": 24,
+        "active_catalogue_rows": 24,
+        "distinct_catalogue_products": 12,
+        "category_match_key": "p v c connection"
+      },
+      {
+        "category": "Quadra",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 28,
+        "positive_price_rows": 28,
+        "active_catalogue_rows": 28,
+        "distinct_catalogue_products": 14,
+        "category_match_key": "quadra"
+      },
+      {
+        "category": "Showers & Accessories",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 8,
+        "positive_price_rows": 8,
+        "active_catalogue_rows": 8,
+        "distinct_catalogue_products": 4,
+        "category_match_key": "shower accessory"
+      },
+      {
+        "category": "Standard (New Handle)",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 40,
+        "positive_price_rows": 40,
+        "active_catalogue_rows": 40,
+        "distinct_catalogue_products": 20,
+        "category_match_key": "standard new handle"
+      },
+      {
+        "category": "Tank Nipples",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 6,
+        "positive_price_rows": 6,
+        "active_catalogue_rows": 6,
+        "distinct_catalogue_products": 3,
+        "category_match_key": "tank nipple"
+      },
+      {
+        "category": "Vitro",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 24,
+        "positive_price_rows": 24,
+        "active_catalogue_rows": 24,
+        "distinct_catalogue_products": 12,
+        "category_match_key": "vitro"
+      },
+      {
+        "category": "Washing Machine",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 14,
+        "positive_price_rows": 14,
+        "active_catalogue_rows": 14,
+        "distinct_catalogue_products": 7,
+        "category_match_key": "washing machine"
+      },
+      {
+        "category": "Waste Coupling",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "stored_rows": 12,
+        "positive_price_rows": 12,
+        "active_catalogue_rows": 12,
+        "distinct_catalogue_products": 6,
+        "category_match_key": "waste coupling"
+      }
+    ]
+  },
+  "last-price": {
+    "observed_ist": "2026-10-09 16:34:32",
+    "as_of": "2026-10-09",
+    "active_in_force_products": "6400",
+    "already_without_any_competitor": "5130",
+    "scenarios": [
+      {
+        "competitor": "Apollo",
+        "without_any_after_exclusion": 5197,
+        "newly_without_any_competitor": 67,
+        "products_with_this_competitor": 691
+      },
+      {
+        "competitor": "Ashirvad",
+        "without_any_after_exclusion": 5214,
+        "newly_without_any_competitor": 84,
+        "products_with_this_competitor": 669
+      },
+      {
+        "competitor": "Prince",
+        "without_any_after_exclusion": 5347,
+        "newly_without_any_competitor": 217,
+        "products_with_this_competitor": 943
+      },
+      {
+        "competitor": "Sparsh Pearl",
+        "without_any_after_exclusion": 5280,
+        "newly_without_any_competitor": 150,
+        "products_with_this_competitor": 150
+      }
+    ]
+  },
+  "currentScopes": {
+    "observed_ist": "2026-10-09 16:36:58",
+    "scopes": [
+      {
+        "category": "AGRI Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 21,
+        "category_match_key": "agri fitting"
+      },
+      {
+        "category": "AGRI Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 123,
+        "category_match_key": "agri pipe"
+      },
+      {
+        "category": "AGRI Smart Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 15,
+        "category_match_key": "agri smart fitting"
+      },
+      {
+        "category": "CPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 125,
+        "category_match_key": "cpvc fitting"
+      },
+      {
+        "category": "CPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 36,
+        "category_match_key": "cpvc pipe"
+      },
+      {
+        "category": "Casing Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 13,
+        "category_match_key": "casing pipe"
+      },
+      {
+        "category": "PPR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 55,
+        "category_match_key": "ppr fitting"
+      },
+      {
+        "category": "PPR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 15,
+        "category_match_key": "ppr pipe"
+      },
+      {
+        "category": "SWR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 108,
+        "category_match_key": "swr fitting"
+      },
+      {
+        "category": "SWR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 24,
+        "category_match_key": "swr pipe"
+      },
+      {
+        "category": "UGD Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 9,
+        "category_match_key": "ugd pipe"
+      },
+      {
+        "category": "UPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 95,
+        "category_match_key": "upvc fitting"
+      },
+      {
+        "category": "UPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Apollo",
+        "current_positive_price_rows": 52,
+        "category_match_key": "upvc pipe"
+      },
+      {
+        "category": "AGRI Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 20,
+        "category_match_key": "agri fitting"
+      },
+      {
+        "category": "AGRI Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 67,
+        "category_match_key": "agri pipe"
+      },
+      {
+        "category": "CPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 171,
+        "category_match_key": "cpvc fitting"
+      },
+      {
+        "category": "CPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 40,
+        "category_match_key": "cpvc pipe"
+      },
+      {
+        "category": "SWR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 121,
+        "category_match_key": "swr fitting"
+      },
+      {
+        "category": "SWR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 56,
+        "category_match_key": "swr pipe"
+      },
+      {
+        "category": "UPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 154,
+        "category_match_key": "upvc fitting"
+      },
+      {
+        "category": "UPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Ashirvad",
+        "current_positive_price_rows": 40,
+        "category_match_key": "upvc pipe"
+      },
+      {
+        "category": "AGRI Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 28,
+        "category_match_key": "agri fitting"
+      },
+      {
+        "category": "AGRI Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 88,
+        "category_match_key": "agri pipe"
+      },
+      {
+        "category": "AGRI Smart Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 9,
+        "category_match_key": "agri smart fitting"
+      },
+      {
+        "category": "CPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 171,
+        "category_match_key": "cpvc fitting"
+      },
+      {
+        "category": "CPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 40,
+        "category_match_key": "cpvc pipe"
+      },
+      {
+        "category": "Casing Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 15,
+        "category_match_key": "casing pipe"
+      },
+      {
+        "category": "PPR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 106,
+        "category_match_key": "ppr fitting"
+      },
+      {
+        "category": "PPR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 30,
+        "category_match_key": "ppr pipe"
+      },
+      {
+        "category": "SWR Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 96,
+        "category_match_key": "swr fitting"
+      },
+      {
+        "category": "SWR Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 125,
+        "category_match_key": "swr pipe"
+      },
+      {
+        "category": "UGD Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 14,
+        "category_match_key": "ugd pipe"
+      },
+      {
+        "category": "UPVC Fittings",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 169,
+        "category_match_key": "upvc fitting"
+      },
+      {
+        "category": "UPVC Pipe",
+        "division": "Pipes & Fittings",
+        "competitor": "Prince",
+        "current_positive_price_rows": 52,
+        "category_match_key": "upvc pipe"
+      },
+      {
+        "category": "Ball Cocks",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 19,
+        "category_match_key": "ball cock"
+      },
+      {
+        "category": "Black Pearl",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 12,
+        "category_match_key": "black pearl"
+      },
+      {
+        "category": "Cobra",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 18,
+        "category_match_key": "cobra"
+      },
+      {
+        "category": "Diamond",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 19,
+        "category_match_key": "diamond"
+      },
+      {
+        "category": "Faucets & Jet Sprays",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 4,
+        "category_match_key": "faucet jet spray"
+      },
+      {
+        "category": "P.V.C. Connections",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 12,
+        "category_match_key": "p v c connection"
+      },
+      {
+        "category": "Quadra",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 14,
+        "category_match_key": "quadra"
+      },
+      {
+        "category": "Showers & Accessories",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 4,
+        "category_match_key": "shower accessory"
+      },
+      {
+        "category": "Standard (New Handle)",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 20,
+        "category_match_key": "standard new handle"
+      },
+      {
+        "category": "Tank Nipples",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 3,
+        "category_match_key": "tank nipple"
+      },
+      {
+        "category": "Vitro",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 12,
+        "category_match_key": "vitro"
+      },
+      {
+        "category": "Washing Machine",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 7,
+        "category_match_key": "washing machine"
+      },
+      {
+        "category": "Waste Coupling",
+        "division": "PTMT & Plastic Fittings",
+        "competitor": "Sparsh Pearl",
+        "current_positive_price_rows": 6,
+        "category_match_key": "waste coupling"
+      }
+    ]
+  },
+  "protected": {
+    "checked_at_ist": "2026-10-09 16:36:52",
+    "mrp_count": "14302",
+    "mrp_value_sha256": "e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458",
+    "catalogue_count": "7191",
+    "catalogue_full_md5": "63b7a4ec2434846a0b6e880773770abb",
+    "classification_sha256": "b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376"
+  }
+}
