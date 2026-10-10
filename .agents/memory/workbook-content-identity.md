@@ -20,3 +20,9 @@ For multi-period previews, distinguish unique products from priced product-perio
 An absent XLSX formula cache is not proof of an absent price. Use a cached numeric result when present, or explicitly compute only a verified formula from the selected brand's own source cells; otherwise refuse with a formula-specific reason. State when results were recomputed rather than cached.
 
 **Why:** Astral per-metre PPR formulas had valid source prices but no cached results. Treating data-only blanks as missing prices would incorrectly remove coverage.
+
+Before applying a new competitor workbook, confirm the chosen price unit against existing competitors. If they differ, stop and report; do not select a different price column or convert prices without explicit approval.
+
+**Why:** Prayag required the Astral PPR unit check as an apply gate. Opposite formula directions can conceal a per-metre/per-pipe mismatch, while legacy stored unit labels may be blank or say only "MRP".
+
+**How to apply:** Verify the stored numeric prices against their own source columns/formulas, rather than treating "MRP" as a length unit. A confirmed mismatch blocks the entire approved batch until the user gives further instructions.
