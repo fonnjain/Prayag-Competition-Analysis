@@ -5,9 +5,9 @@ description: Display-only saved-product sets, export disclosure, and delayed Hea
 
 Bucket lists are display-only saved product sets. They may not change any
 catalogue classification, product, price, competitor data or Sales application.
-They use one optional server-persisted personal list per user across screens,
-not separate remembered filters per page, plus at most one company-wide Head
-Office list.
+They use at most one personal Included list and any number of personal Excluded
+lists per user across screens, not separate remembered filters per page, plus at
+most one company-wide Head Office list.
 
 **Why:** The user identified a silently filtered report exported much later as
 the central risk. Visible disclosure is more important than convenience.
@@ -18,8 +18,8 @@ guard, normalised vocabulary comparison and approved Range division helper.
 Capture and preserve catalogue classifications and MRP fingerprints in both
 environments when implementing.
 
-The Head Office layer always restricts first; the optional personal layer
-restricts its survivors. Product and quote predicates compose independently
+The Head Office layer always restricts first, then the user's Included list,
+then every active personal Excluded list. Product and quote predicates compose independently
 with intersection, never by merging definitions under one Included/Excluded
 mode. Neither an admin nor a personal Included list can restore company
 exclusions. Anonymous Price Finder also receives the company restriction, but
@@ -28,6 +28,19 @@ never a personal list or private enforcement history.
 **Why:** The user explicitly made enforcement company-wide and forbade user
 bypass. Treating two Included lists as a union, or dropping the company rule
 when signed out, would violate that boundary.
+
+The one-at-a-time personal rule was explicitly withdrawn. Excluded lists add
+up in any order; a second personal Included replaces the first with a one-line
+notice. Enforcement is automatic, above personal selections with no clear
+action, never a dropdown option. The HO Enforced tab is management only.
+
+**Why:** The user clarified that hiding a product set and excluding a competitor
+simultaneously is unambiguous, unlike choosing two personal Included sets.
+
+**How to apply:** Keep each personal selection independently clearable. Name
+every applied list in exports and count newly lost last quotes once across the
+combined predicates. Competitor-only lists disclose their competitor count,
+not an apparently empty product-only count.
 
 **How to apply:** Only existing Everyone lists are eligible; enforce/release
 need admin authority but no typed reason, approval or extra confirmation. Keep immutable event-time definitions,

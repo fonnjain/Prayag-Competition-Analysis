@@ -1355,3 +1355,17 @@ mtime_ms = 1791610278282
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d91076b4-2dc3-4301-9da1-b5db3b63f6aa/f677eac1-7825-486a-a85f-477731767409"
 storage_version_token = "1791610345114731"
 content_type = "text/csv"
+
+[[outputs]]
+id = "0U9yOAJ3eax61CanK_GTy"
+uri = "file://generated-artifacts/p053-step5/disclosed-export.csv"
+type = "table"
+title = "P053 Step 5 — disclosed CSV export"
+description = "Actual backend export from isolated development test lists: enforced, Included and two Excluded lists, with one combined lost-price count."
+logical_id = "363e520c-2356-487b-8be8-3c561cf5be8f"
+content_hash = "sha256:c9d4e8c4c3b22d926fa5833105bfa72e55ae033e256baaf919309276af2fc231"
+size = 1260
+mtime_ms = 1791623810486
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/363e520c-2356-487b-8be8-3c561cf5be8f/c9f990d0-7782-4102-9e17-7c5bf5872f09"
+storage_version_token = "1791624114507814"
+content_type = "text/csv"

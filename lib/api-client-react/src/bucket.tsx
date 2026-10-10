@@ -38,12 +38,17 @@ const ACTIVE_ROOT = "bucket-active";
 let scopeUser: string | null = null;
 let scopeSig: string | null = null;
 
-/** Signature of the resolved active membership (id, type, count and the codes themselves). */
-function scopeSignature(d: { list?: Record<string, unknown> | null; codes?: string[]; enforced?: Record<string, unknown> | null; enforcementVersion?: number }): string {
-  const l = d.list;
-  const codes = (d.codes ?? (l?.codes as string[] | undefined) ?? []).slice().sort();
-  return JSON.stringify([d.enforcementVersion ?? 0, d.enforced?.id, d.enforced?.activeCount, d.enforced?.competitorRules,
-    l?.id, l?.type, l?.activeCount ?? l?.count, codes, l?.competitorRules ?? [], l?.noCompetitorPriceCount ?? 0]);
+type Raw = Record<string, unknown>;
+const asArr = (v: unknown): Raw[] => (Array.isArray(v) ? (v as Raw[]) : []);
+const listSig = (l: Raw | null | undefined) => l ? [l.id, l.type, l.activeCount ?? l.count, l.competitorCount ?? 0,
+  l.competitorRules ?? [], l.productFilterApplied, l.noCompetitorPriceCount ?? 0,
+  asArr(l.members).map(m => String(m.itemCode ?? m.code ?? m.productCode ?? "")).sort(),
+  ((l.codes as string[] | undefined) ?? []).slice().sort()] : null;
+/** Signature of every resolved list: identity, type, rules, filter flag, members, company version and loss count. */
+function scopeSignature(d: { list?: Raw | null; codes?: string[]; enforced?: Raw | null; enforcementVersion?: number;
+  included?: Raw | null; excluded?: Raw[]; personalLists?: Raw[]; noCompetitorPriceCount?: number }): string {
+  return JSON.stringify([d.enforcementVersion ?? 0, listSig(d.enforced), listSig(d.list), (d.codes ?? []).slice().sort(),
+    listSig(d.included), asArr(d.excluded).map(listSig), asArr(d.personalLists).map(listSig), d.noCompetitorPriceCount ?? 0]);
 }
 
 const KEEP = (k: unknown): boolean => {
@@ -87,7 +92,7 @@ export function useActiveBucket(userId: string | null | undefined) {
     return () => document.removeEventListener("visibilitychange", on);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
-  const rawNow = q.data as { list?: Record<string, unknown> | null; codes?: string[]; enforced?: Record<string, unknown> | null; enforcementVersion?: number } | undefined;
+  const rawNow = q.data as Parameters<typeof scopeSignature>[0] | undefined;
   const sigNow = q.isSuccess && rawNow ? scopeSignature(rawNow) : null;
   useEffect(() => {
     const who = userId ?? "anonymous";
@@ -105,21 +110,24 @@ export function useActiveBucket(userId: string | null | undefined) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, sigNow]);
-  const raw = q.data as { list?: Record<string, unknown> | null; enforced?: Record<string, unknown> | null;
-    banner?: string | null; noCompetitorPriceCount?: number } | undefined;
-  const info = (l: Record<string, unknown> | null | undefined): ActiveBucketInfo | null => l ? {
+  const raw = q.data as { list?: Raw | null; enforced?: Raw | null; included?: Raw | null; excluded?: Raw[];
+    personalLists?: Raw[]; banner?: string | null; noCompetitorPriceCount?: number } | undefined;
+  const info = (l: Raw | null | undefined): ActiveBucketInfo | null => l ? {
     id: String(l.id), name: String(l.name), type: l.type as "included" | "excluded",
     count: Number(l.activeCount ?? l.count ?? 0), competitorCount: Number(l.competitorCount ?? 0),
     competitorRules: l.competitorRules as ActiveBucketInfo["competitorRules"],
     noCompetitorPriceCount: Number(l.noCompetitorPriceCount ?? 0), productFilterApplied: l.productFilterApplied !== false,
   } : null;
-  const personalList = info(raw?.list), enforcedList = info(raw?.enforced);
-  // Existing export consumers receive the EFFECTIVE disclosure even with no
-  // personal selection. Header/picker use personalList explicitly.
+  const includedList = info(raw?.included);
+  const excludedLists = asArr(raw?.excluded).map(info).filter((x): x is ActiveBucketInfo => !!x);
+  const personalLists = asArr(raw?.personalLists).map(info).filter((x): x is ActiveBucketInfo => !!x);
+  const personalList = info(raw?.list) ?? includedList ?? excludedLists[0] ?? null, enforcedList = info(raw?.enforced);
+  // Legacy export consumers get the full server banner, never just the primary name.
   const primary = personalList ?? enforcedList;
   const list = primary ? { ...primary, exportDisclosure: raw?.banner ?? undefined,
     noCompetitorPriceCount: Number(raw?.noCompetitorPriceCount ?? 0) } : null;
-  return { list, personalList, enforcedList, noCompetitorPriceCount: Number(raw?.noCompetitorPriceCount ?? 0),
+  return { list, personalList, includedList, excludedLists, personalLists, enforcedList,
+    noCompetitorPriceCount: Number(raw?.noCompetitorPriceCount ?? 0),
     banner: raw?.banner ?? null, isLoading: q.isLoading, data: raw, scopeKey: sigNow };
 }
 
@@ -128,16 +136,19 @@ export function useSetActiveBucket() {
   const m = useSetActiveBucketList({
     mutation: { onSuccess: () => { void qc.invalidateQueries(); } },
   });
+  const send = (listId: string | null, active: boolean | undefined, onDone?: (message?: string) => void, onError?: (e: unknown) => void) =>
+    m.mutate({ data: active === undefined ? { listId } : { listId, active } }, {
+      onSuccess: (r) => onDone?.((r as { message?: string } | undefined)?.message), onError: (e) => onError?.(e) });
   return {
-    setActive: (listId: string | null, onDone?: () => void, onError?: (e: unknown) => void) =>
-      m.mutate({ data: { listId } }, { onSuccess: () => onDone?.(), onError: (e) => onError?.(e) }),
+    setActive: (listId: string | null, onDone?: (message?: string) => void, onError?: (e: unknown) => void) => send(listId, undefined, onDone, onError),
+    setListActive: (listId: string, active: boolean, onDone?: (message?: string) => void, onError?: (e: unknown) => void) => send(listId, active, onDone, onError),
     isPending: m.isPending,
   };
 }
 
 /** Banner for product and comparison screens (A-K). Always offers a way to choose a list when signed in. */
 export function BucketBanner({ userId }: { userId: string | null | undefined }) {
-  const { list, banner } = useActiveBucket(userId);
+  const { list, banner, personalLists } = useActiveBucket(userId);
   const { setActive, isPending } = useSetActiveBucket();
   if (!userId) return null;
   const ret = typeof window !== "undefined" ? encodeURIComponent(window.location.pathname + window.location.search) : "";
@@ -168,9 +179,9 @@ export function BucketBanner({ userId }: { userId: string | null | undefined }) 
           <span>{list.count} items {excl ? "hidden" : "shown only"}</span>
         </>
       )}
-      <button type="button" data-testid="button-bucket-clear" disabled={isPending} onClick={() => setActive(null)} className="font-bold underline underline-offset-2">
-        Clear
-      </button>
+      {personalLists.length > 0 && <button type="button" data-testid="button-bucket-clear" disabled={isPending} onClick={() => setActive(null)} className="font-bold underline underline-offset-2">
+        Clear personal lists
+      </button>}
       <a href={chooseHref} data-testid="link-choose-bucket" className="underline underline-offset-2">Choose bucket</a>
     </div>
   );

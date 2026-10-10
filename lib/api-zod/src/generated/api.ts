@@ -13347,16 +13347,37 @@ export const PreviewBucketUploadResponse = zod.record(zod.string(), zod.unknown(
 
 
 /**
- * @summary Company-enforced and optional personal layers; anonymous has no personal list
+ * @summary Automatic company enforcement, one personal Included and all active personal Excluded lists
  */
-export const GetActiveBucketListResponse = zod.record(zod.string(), zod.unknown())
-
-
-export const SetActiveBucketListBody = zod.object({
-  "listId": zod.string().nullable()
+export const GetActiveBucketListResponse = zod.object({
+  "list": zod.record(zod.string(), zod.unknown()).nullish().describe('Compatibility primary personal list; use banner for the full effective disclosure.'),
+  "included": zod.record(zod.string(), zod.unknown()).nullable(),
+  "excluded": zod.array(zod.record(zod.string(), zod.unknown())),
+  "personalLists": zod.array(zod.record(zod.string(), zod.unknown())),
+  "enforced": zod.record(zod.string(), zod.unknown()).nullable(),
+  "banner": zod.string().nullish(),
+  "noCompetitorPriceCount": zod.number(),
+  "message": zod.string().optional().describe('One-line notice when a second Included list replaces the first.')
 })
 
-export const SetActiveBucketListResponse = zod.record(zod.string(), zod.unknown())
+
+export const setActiveBucketListBodyActiveDefault = true;
+
+export const SetActiveBucketListBody = zod.object({
+  "listId": zod.string().nullable(),
+  "active": zod.boolean().default(setActiveBucketListBodyActiveDefault).describe('Select or remove this personal list; null clears only personal choices.')
+})
+
+export const SetActiveBucketListResponse = zod.object({
+  "list": zod.record(zod.string(), zod.unknown()).nullish().describe('Compatibility primary personal list; use banner for the full effective disclosure.'),
+  "included": zod.record(zod.string(), zod.unknown()).nullable(),
+  "excluded": zod.array(zod.record(zod.string(), zod.unknown())),
+  "personalLists": zod.array(zod.record(zod.string(), zod.unknown())),
+  "enforced": zod.record(zod.string(), zod.unknown()).nullable(),
+  "banner": zod.string().nullish(),
+  "noCompetitorPriceCount": zod.number(),
+  "message": zod.string().optional().describe('One-line notice when a second Included list replaces the first.')
+})
 
 
 export const GetBucketEnforcementResponse = zod.object({

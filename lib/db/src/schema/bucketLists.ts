@@ -44,6 +44,9 @@ export const bucketListsTable = pgTable("bucket_lists", {
 export const bucketPreferencesTable = pgTable("bucket_preferences", {
   userId: varchar("user_id").primaryKey().references(() => usersTable.id),
   activeListId: uuid("active_list_id").references(() => bucketListsTable.id, { onDelete: "set null" }),
+  // The old ID remains readable for legacy one-list preferences. New writes
+  // keep the Included ID here and all Excluded IDs in this independent set.
+  excludedListIds: jsonb("excluded_list_ids").$type<string[]>().notNull().default([]),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

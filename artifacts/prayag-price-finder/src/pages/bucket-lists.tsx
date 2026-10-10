@@ -54,7 +54,7 @@ export default function BucketListsPage() {
     query: { queryKey: [...getGetBucketListsQueryKey(), user?.id ?? "none"], enabled: signedIn },
   });
   const active = useActiveBucket(user?.id);
-  const { setActive, isPending: settingActive } = useSetActiveBucket();
+  const { setListActive, isPending: settingActive } = useSetActiveBucket();
   const deleteM = useDeleteBucketList();
   const updateM = useUpdateBucketList();
 
@@ -143,8 +143,12 @@ export default function BucketListsPage() {
             <tbody className="divide-y">
               {rows.map((l) => {
                 const ho = l.visibility === "everyone";
-                const isActive = active.personalList?.id === l.id;
+                const isActive = active.personalLists.some((p) => p.id === l.id);
+                const enforcedHere = !!l.isEnforced || active.enforcedList?.id === l.id;
+                const comps = Array.from(new Set((l.competitorRules ?? []).map((r) => r.competitor).filter(Boolean))) as string[];
+                const nComp = l.competitorCount ?? comps.length;
                 const divs = (l.divisions ?? []).map((d) => `${d.division} (${d.count})`);
+                const divText = divs.length ? divs.join(", ") : comps.length ? comps.join(", ") : "\u2014";
                 return (
                   <tr key={l.id} data-testid={`row-bucket-${l.id}`} className={cn("align-top", isActive && "bg-primary/5")}>
                     <td className="px-3 py-3">
@@ -159,22 +163,26 @@ export default function BucketListsPage() {
                         {ho ? "HO" : "Mine"}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-right font-mono">{l.count}</td>
-                    <td className="max-w-[220px] px-3 py-3 text-xs text-muted-foreground">{divs.join(", ") || "None"}</td>
+                    <td className="px-3 py-3 text-right font-mono" data-testid={`text-items-${l.id}`}>{`${l.count} ${l.count === 1 ? "product" : "products"} \u00b7 ${nComp} ${nComp === 1 ? "competitor" : "competitors"}`}</td>
+                    <td className="max-w-[220px] px-3 py-3 text-xs text-muted-foreground">{divText}</td>
                     <td className="px-3 py-3 text-xs text-muted-foreground">
                       {l.updatedBy ?? ""}<br />{l.updatedAt ? new Date(l.updatedAt).toLocaleString() : ""}
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-1">
-                        <Button size="sm" variant={isActive ? "secondary" : "default"} disabled={settingActive || isActive}
-                          data-testid={`button-use-${l.id}`}
-                          onClick={() => setActive(l.id, () => {
-                            toast({ title: `Now filtering with ${l.name}` });
-                            const ret = new URLSearchParams(window.location.search).get("return");
-                            if (ret && ret.startsWith("/") && !ret.startsWith("//")) window.location.assign(ret);
-                          })}>
-                          {isActive ? <><Check className="mr-1 h-3.5 w-3.5" />In use</> : "Use as filter"}
-                        </Button>
+                        {enforcedHere ? (
+                          <span className="inline-flex h-8 items-center rounded-md border px-2.5 text-xs font-semibold text-muted-foreground" data-testid={`text-enforced-${l.id}`}>Enforced by Head Office</span>
+                        ) : (
+                          <Button size="sm" variant={isActive ? "secondary" : "default"} disabled={settingActive}
+                            data-testid={`button-use-${l.id}`}
+                            onClick={() => setListActive(l.id, !isActive, (message) => {
+                              toast({ title: isActive ? `Removed ${l.name}` : `Now filtering with ${l.name}`, description: message });
+                              const ret = new URLSearchParams(window.location.search).get("return");
+                              if (!isActive && ret && ret.startsWith("/") && !ret.startsWith("//")) window.location.assign(ret);
+                            }, (e) => toast({ title: "Could not change filter", description: errMessage(e), variant: "destructive" }))}>
+                            {isActive ? <><Check className="mr-1 h-3.5 w-3.5" />In use - remove</> : l.type === "excluded" ? "Add as exclusion" : "Use as filter"}
+                          </Button>
+                        )}
                         <Link href={`/bucket-lists/edit?id=${l.id}&view=1`} className="inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-xs font-medium hover:bg-accent" data-testid={`link-view-${l.id}`}>
                           <Eye className="h-3.5 w-3.5" /> View items
                         </Link>

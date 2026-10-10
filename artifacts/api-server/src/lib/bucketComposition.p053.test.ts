@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db, type BucketListRecord } from "@workspace/db";
 import { loadBucketWorld, type BucketWorld } from "./bucketLists";
-import { BucketError } from "./bucketMembership";
+import { BucketError, isLiveBucketProduct } from "./bucketMembership";
+import { normCode } from "./catalog";
 import { competitorImpact, compileCompetitorRules } from "./bucketCompetitors";
 import { composedProductAllowed, composedQuoteAllowed, composedProductSql, composedQuoteSql, composedDisclosure, type BucketLayer } from "./bucketComposition";
 import { assertEnforcedDelete, assertEnforcedEdit, assertEnforcementAdmin, changeBucketEnforcement } from "./bucketEnforcement";
@@ -137,8 +138,20 @@ describe("P053 Step 3 simple company and personal restrictions", () => {
     const rows = [["item_code", "mrp"], [a, 100]];
     expect(withBucketFilterContext(null, () => bucketExportRows(rows))).toEqual(rows);
   });
-  it.each([["Apollo", 67], ["Ashirvad", 84], ["Prince", 217], ["Sparsh Pearl", 150]] as const)(
-    "%s last-quote loss matches the existing development reference (%i)", (competitor, expected) => {
+  it.each(["Apollo", "Ashirvad", "Prince", "Sparsh Pearl"])(
+    "%s last-quote loss is computed from current coverage, not pre-import counts", (competitor) => {
+      // Astral/Jindal legitimately changed overlap. An independent quote-set
+      // oracle must follow that coverage rather than freezing the old totals.
+      const live = new Set(world.catalogue.filter(p => isLiveBucketProduct(p)).map(p => normCode(p.itemCode)));
+      const byCode = new Map<string, Set<string>>();
+      for (const quote of world.quotes ?? []) {
+        if (!quote.matchedPrayagCode || quote.price == null || !(quote.price > 0)) continue;
+        const code = normCode(quote.matchedPrayagCode);
+        if (!live.has(code)) continue;
+        const brands = byCode.get(code) ?? new Set<string>();
+        brands.add(quote.competitor); byCode.set(code, brands);
+      }
+      const expected = [...byCode.values()].filter(brands => brands.size === 1 && brands.has(competitor)).length;
       const impact = competitorImpact("excluded", [{ competitor, scope: "everywhere" }], world.catalogue, world.quotes!);
       expect(impact.noCompetitorPriceCount).toBe(expected);
     });

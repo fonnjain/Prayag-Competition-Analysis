@@ -7,9 +7,8 @@ export type BucketLayer = {
   type: "included" | "excluded"; codes: Set<string>;
   productFilterApplied?: boolean; clauses?: CompetitorClause[];
 };
-/** P053 Step 4 composition order: catalogue -> enforced layer -> personal
- * layer. Each layer restricts the previous survivors; neither can restore an
- * excluded product or quote. AND, never a union of the two whitelists. */
+/** P053 Step 5: catalogue -> enforced -> Included -> every Excluded.
+ * Each layer only restricts survivors. AND, never a union of whitelists. */
 export function composedProductAllowed(layers: BucketLayer[], code: string | null | undefined) {
   return layers.every(layer => layer.productFilterApplied === false || bucketAllowsCode(layer.type, layer.codes, code));
 }
@@ -49,8 +48,9 @@ function disclosure(list: DisclosureList) {
     + (list.competitorRules?.length ? `; ${list.competitorRules.map(rule => competitorScopeText(rule, list.type)).join("; ")}` : "")
     + (list.productFilterApplied === false ? "; no product filter applied" : "");
 }
-export function composedDisclosure(enforced: DisclosureList | null, personal: DisclosureList | null) {
-  if (!enforced) return personal ? disclosure(personal) : "";
+export function composedDisclosure(enforced: DisclosureList | null, personal: DisclosureList | DisclosureList[] | null) {
+  const lists = Array.isArray(personal) ? personal : personal ? [personal] : [];
+  if (!enforced) return lists.map(disclosure).join(" · Also: ");
   const company = `Showing: Enforced: ${disclosure(enforced).replace(/^Showing:\s*/, "")}`;
-  return company + (personal ? ` · Also: ${disclosure(personal).replace(/^Showing:\s*/, "")}` : "");
+  return company + lists.map(list => ` · Also: ${disclosure(list).replace(/^Showing:\s*/, "")}`).join("");
 }

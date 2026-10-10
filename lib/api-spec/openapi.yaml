@@ -2981,13 +2981,13 @@ paths:
   /bucket-lists/active:
     get:
       operationId: getActiveBucketList
-      summary: Company-enforced and optional personal layers; anonymous has no personal list
+      summary: Automatic company enforcement, one personal Included and all active personal Excluded lists
       responses:
         '200':
           description: Active selection and disclosure
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema: {$ref: '#/components/schemas/BucketActiveSelection'}
     put:
       operationId: setActiveBucketList
       requestBody:
@@ -2996,15 +2996,17 @@ paths:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               required: [listId]
               properties:
                 listId: {type: [string, 'null']}
+                active: {type: boolean, default: true, description: 'Select or remove this personal list; null clears only personal choices.'}
       responses:
         '200':
-          description: Replaced or cleared selection
+          description: Updated personal choices; company enforcement cannot be altered by this endpoint
           content:
             application/json:
-              schema: {type: object, additionalProperties: true}
+              schema: {$ref: '#/components/schemas/BucketActiveSelection'}
   /bucket-lists/enforcement:
     get:
       operationId: getBucketEnforcement
@@ -3186,6 +3188,19 @@ components:
         type: string
         format: date
   schemas:
+    BucketActiveSelection:
+      type: object
+      additionalProperties: true
+      required: [included, excluded, personalLists, enforced, noCompetitorPriceCount]
+      properties:
+        list: {type: [object, 'null'], additionalProperties: true, description: 'Compatibility primary personal list; use banner for the full effective disclosure.'}
+        included: {type: [object, 'null'], additionalProperties: true}
+        excluded: {type: array, items: {type: object, additionalProperties: true}}
+        personalLists: {type: array, items: {type: object, additionalProperties: true}}
+        enforced: {type: [object, 'null'], additionalProperties: true}
+        banner: {type: [string, 'null']}
+        noCompetitorPriceCount: {type: integer}
+        message: {type: string, description: 'One-line notice when a second Included list replaces the first.'}
     MultiWorkbookBatch:
       type: object
       required: [id, status, brands, fileName, contentFingerprint, createdAt, summary, refused, unitSummary, nameResolutions, blockers]

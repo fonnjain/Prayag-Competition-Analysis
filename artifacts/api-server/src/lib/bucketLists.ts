@@ -8,6 +8,7 @@ import { normCode } from "./catalog";
 import { compileCompetitorRules, competitorImpact, competitorOptions, hasProductDefinition, resolveCompetitorRules, type CompetitorQuote } from "./bucketCompetitors";
 import { assertEnforcedDelete, assertEnforcedEdit, enforcedAffected, enforcementSnapshot, recordEnforcedEdit } from "./bucketEnforcement";
 import { composedProductAllowed, composedQuoteAllowed, composedDisclosure, type BucketLayer } from "./bucketComposition";
+import { resolvePersonalSelection, updatePersonalSelection } from "./bucketSelection";
 
 export type BucketActor = { id: string; admin: boolean; label: string };
 export const bucketDraftSchema = PreviewBucketListBody.strict().superRefine((draft, ctx) => {
@@ -236,6 +237,8 @@ export async function deleteBucket(id: string, actor: BucketActor) {
     assertOwner(list, actor);
     assertEnforcedDelete(id, world);
     const detachedChildren = await freezeChildren(list, world, tx, actor);
+    await tx.execute(sql`UPDATE bucket_preferences SET excluded_list_ids = excluded_list_ids - ${list.id}
+      WHERE excluded_list_ids ? ${list.id}`);
     await tx.delete(bucketListsTable).where(eq(bucketListsTable.id, list.id));
     return { deleted: true, detachedChildren, message: "Only the bucket list was deleted. No products or prices were deleted." };
   });
@@ -250,7 +253,11 @@ export async function deleteBucketDataForAccount(userId: string, label: string, 
   for (const list of owned) await freezeChildren(list, world, executor, { id: userId, admin: true, label },
     child => child.ownerId !== userId, "The original owner's account was deleted");
   await executor.delete(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, userId));
-  for (const list of owned) await executor.delete(bucketListsTable).where(eq(bucketListsTable.id, list.id));
+  for (const list of owned) {
+    await executor.execute(sql`UPDATE bucket_preferences SET excluded_list_ids = excluded_list_ids - ${list.id}
+      WHERE excluded_list_ids ? ${list.id}`);
+    await executor.delete(bucketListsTable).where(eq(bucketListsTable.id, list.id));
+  }
 }
 export async function detachBucket(id: string, actor: BucketActor, input: unknown = {}) {
   return db.transaction(async tx => {
@@ -273,41 +280,50 @@ export async function detachBucket(id: string, actor: BucketActor, input: unknow
 export async function getActiveBucket(actor: BucketActor | null, forFilter = false) {
   const [state] = await db.select().from(bucketEnforcementTable).where(eq(bucketEnforcementTable.id, 1));
   const [preference] = actor ? await db.select().from(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, actor.id)) : [];
-  if (!state?.listId && !preference?.activeListId)
-    return { list: null, enforced: null, banner: null, codes: [] as string[], layers: [] as BucketLayer[],
+  if (!state?.listId && !preference?.activeListId && !preference?.excludedListIds.length)
+    return { list: null, included: null, excluded: [], personalLists: [], enforced: null, banner: null, codes: [] as string[], layers: [] as BucketLayer[],
       enforcementVersion: state?.version ?? 0, noCompetitorPriceCount: 0 };
   const world = await loadBucketWorld();
   const viewer = actor ?? { id: "", admin: false, label: "" };
   const forced = world.enforcement?.listId ? world.byId.get(world.enforcement.listId) : null;
   if (world.enforcement?.listId && (!forced || forced.visibility !== "everyone"))
     throw new BucketError("Invalid company enforcement; refusing an unfiltered fallback.", 500, "ENFORCEMENT_INVALID");
-  const candidate = preference?.activeListId ? world.byId.get(preference.activeListId) : null;
-  const personal = actor && candidate && canReadBucket(candidate, actor) ? candidate : null;
+  const selection = resolvePersonalSelection(preference, world.byId, viewer.id, forced?.id ?? null);
   const enforced = forced ? describeBucket(forced, world, viewer) : null;
-  if (personal) await observeBucketMembership(personal, world);
-  const detail = personal ? describeBucket(personal, world, viewer) : null;
-  // Company restriction FIRST, optional personal restriction SECOND.
-  const details = [enforced, detail].filter((value): value is NonNullable<typeof value> => !!value);
+  for (const personal of selection.personalLists) await observeBucketMembership(world.byId.get(personal.id)!, world);
+  const personalLists = selection.personalLists.map(list => describeBucket(world.byId.get(list.id)!, world, viewer));
+  const included = personalLists.find(list => list.type === "included") ?? null;
+  const excluded = personalLists.filter(list => list.type === "excluded");
+  // Company is independent of user selection, always first and never clearable.
+  const details = [...(enforced ? [enforced] : []), ...personalLists];
   const layers: BucketLayer[] = details.map(value => ({
     type: value.type, codes: new Set(value.members.map(member => normCode(member.itemCode))),
     productFilterApplied: value.productFilterApplied, clauses: compileCompetitorRules(value.competitorRules, world.catalogue),
   }));
   const impact = competitorImpact("excluded", [], world.catalogue, world.quotes ?? [],
     code => composedProductAllowed(layers, code), (brand, code) => composedQuoteAllowed(layers, brand, code));
-  const banner = details.length ? composedDisclosure(enforced, detail) : null;
-  return { list: detail, enforced, banner, codes: detail?.members.map(member => member.itemCode) ?? [],
+  const banner = details.length ? composedDisclosure(enforced, personalLists) : null;
+  return { list: included ?? excluded[0] ?? null, included, excluded, personalLists, enforced, banner,
+    codes: [...new Set(personalLists.flatMap(list => list.members.map(member => member.itemCode)))],
     layers: forFilter ? layers : [], clauses: forFilter ? layers.at(-1)?.clauses : undefined,
     enforcementVersion: world.enforcement?.version ?? 0, ...impact };
 }
-export async function setActiveBucket(actor: BucketActor, id: string | null) {
+export async function setActiveBucket(actor: BucketActor, id: string | null, active = true) {
   // Serialize against deletion/visibility changes, so a stale selection cannot
   // bypass privacy or race a foreign-key failure.
-  await db.transaction(async tx => {
+  const message = await db.transaction(async tx => {
     await lockBuckets(tx);
-    if (id) assertBucketVisible(id, actor, await loadBucketWorld(tx));
-    await tx.insert(bucketPreferencesTable).values({ userId: actor.id, activeListId: id }).onConflictDoUpdate({
-      target: bucketPreferencesTable.userId, set: { activeListId: id, updatedAt: new Date() },
+    const world = await loadBucketWorld(tx);
+    const target = id ? assertBucketVisible(id, actor, world) : null;
+    if (id && id === world.enforcement?.listId)
+      throw new BucketError("The enforced list applies automatically and cannot be selected or cleared here.", 403, "BUCKET_ENFORCED");
+    const [preference] = await tx.select().from(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, actor.id));
+    const current = resolvePersonalSelection(preference, world.byId, actor.id, world.enforcement?.listId ?? null);
+    const { message, ...next } = updatePersonalSelection(current, target, active);
+    await tx.insert(bucketPreferencesTable).values({ userId: actor.id, ...next }).onConflictDoUpdate({
+      target: bucketPreferencesTable.userId, set: { ...next, updatedAt: new Date() },
     });
+    return message;
   });
-  return getActiveBucket(actor);
+  return { ...await getActiveBucket(actor), ...(message ? { message } : {}) };
 }

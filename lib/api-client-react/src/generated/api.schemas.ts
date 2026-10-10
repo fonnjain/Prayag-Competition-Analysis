@@ -5,6 +5,46 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+/**
+ * Compatibility primary personal list; use banner for the full effective disclosure.
+ * @nullable
+ */
+export type BucketActiveSelectionList = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type BucketActiveSelectionIncluded = { [key: string]: unknown } | null;
+
+export type BucketActiveSelectionExcludedItem = { [key: string]: unknown };
+
+export type BucketActiveSelectionPersonalListsItem = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type BucketActiveSelectionEnforced = { [key: string]: unknown } | null;
+
+export interface BucketActiveSelection {
+  /**
+     * Compatibility primary personal list; use banner for the full effective disclosure.
+     * @nullable
+     */
+  list?: BucketActiveSelectionList;
+  /** @nullable */
+  included: BucketActiveSelectionIncluded;
+  excluded: BucketActiveSelectionExcludedItem[];
+  personalLists: BucketActiveSelectionPersonalListsItem[];
+  /** @nullable */
+  enforced: BucketActiveSelectionEnforced;
+  /** @nullable */
+  banner?: string | null;
+  noCompetitorPriceCount: number;
+  /** One-line notice when a second Included list replaces the first. */
+  message?: string;
+  [key: string]: unknown;
+ }
+
 export type MultiWorkbookBatchStatus = typeof MultiWorkbookBatchStatus[keyof typeof MultiWorkbookBatchStatus];
 
 
@@ -5638,14 +5678,12 @@ export type PreviewBucketUploadBody = {
 
 export type PreviewBucketUpload200 = { [key: string]: unknown };
 
-export type GetActiveBucketList200 = { [key: string]: unknown };
-
 export type SetActiveBucketListBody = {
   /** @nullable */
   listId: string | null;
+  /** Select or remove this personal list; null clears only personal choices. */
+  active?: boolean;
 };
-
-export type SetActiveBucketList200 = { [key: string]: unknown };
 
 export type DeleteBucketList200 = { [key: string]: unknown };
 

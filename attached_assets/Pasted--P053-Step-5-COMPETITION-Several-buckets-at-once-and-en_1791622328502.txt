@@ -1,0 +1,95 @@
+# P053 — Step 5 — COMPETITION — Several buckets at once, and enforcement that actually enforces
+
+> **P053 Step 5** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** No product, price, competitor row or classification changes.
+> Internal tool. Keep it simple.
+> Quote `P053 Step 5` when reporting back.
+
+Two things are wrong in what is live.
+
+---
+
+# 1. More than one bucket list can be active
+
+The one-at-a-time rule was mine and it was wrong. Exclusions add up; there is nothing to be confused about in "hide these 184 products **and** ignore Ashirvad".
+
+**1.1 Any number of Excluded lists can be active at once.** A product or competitor excluded by any of them is gone. Order does not matter.
+
+**1.2 At most one Included list at a time.** Two Included lists have no obvious meaning, so choosing a second replaces the first. Say so in one line when it happens.
+
+**1.3 The order:**
+
+```
+catalogue
+  -> the Included list, if one is active   (narrows to its products)
+  -> every active Excluded list            (removes, in any order)
+  -> what is shown
+```
+
+**1.4** In the dropdown, Excluded lists get a **checkbox** — tick as many as you like. Included lists stay single-choice. Keep the existing two headings.
+
+**1.5** The control shows each active list on its own line, each with its own ×. The lost-competitor count is computed once across everything active, not per list.
+
+---
+
+# 2. An enforced list applies on its own
+
+Right now **HO Enforced** is a tab you can filter by and a list you have to choose. That is not enforcement.
+
+**2.1 The enforced list applies to every user automatically**, from the moment it is put in force. Nobody chooses it, nobody switches it on, and no user can clear it.
+
+**2.2** It is **not** an option in the dropdown and **not** one of the lists a user picks. It sits above them in the control, marked **Enforced**, with no ×.
+
+**2.3** It applies on top of whatever the user has chosen themselves:
+
+```
+catalogue
+  -> the enforced list        (always, first, cannot be cleared)
+  -> the user's Included list, if any
+  -> the user's Excluded lists, any number
+```
+
+**2.4** A non-admin cannot remove it from the screen or from the endpoint.
+
+**2.5 Keep the HO Enforced tab**, but only as a place to see and manage what is in force. It is not a filter chip.
+
+---
+
+# 3. Small fix in the list table
+
+A competitor-only list shows **0 items** and **Divisions: None**, which reads as empty. Show what it actually holds:
+
+```
+ITEMS        0 products · 1 competitor
+DIVISIONS    —  (or the competitor names)
+```
+
+---
+
+# Rules
+
+1. No product, price, competitor row, mapping or classification changes.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums.
+3. Exports keep naming everything that is applied: the enforced list, the Included list, every active Excluded list, and the lost-competitor count.
+4. Development first, then publish.
+
+# Tests
+
+```
+1. Two Excluded lists active together: both sets of exclusions apply
+2. Choosing a second Included list replaces the first and says so
+3. An enforced list applies with no user action, on a fresh sign-in,
+   for a user who has chosen nothing
+4. A non-admin cannot clear the enforced list from the screen or the
+   endpoint
+5. Enforced + Included + two Excluded compose in the order in §2.3
+6. The control shows every active list, each clearable except the
+   enforced one
+7. The export disclosure names all of them
+8. A competitor-only list reads as "0 products · 1 competitor"
+9. mrp_price_history count and checksum unchanged, both environments
+```
+
+# Report
+
+Short. Screenshots of the control with two Excluded lists active, and with an enforced list plus a personal one. One exported CSV. Test results. Figures before and after in one line.

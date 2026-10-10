@@ -102,11 +102,12 @@ router.get("/bucket-lists/template", handler(async (_req, res) => {
   sendExcel(res, [["item_code"], ...examples], "bucket-list-template");
 }));
 router.put("/bucket-lists/active", handler(async (req, res) => {
-  if (Object.keys(req.body ?? {}).some(key => key !== "listId"))
+    if (Object.keys(req.body ?? {}).some(key => key !== "listId" && key !== "active"))
     throw new BucketError("This selector changes only your personal list, not Head Office enforcement.");
   const value = req.body?.listId;
   if (value !== null && (typeof value !== "string" || !/^[0-9a-f-]{36}$/i.test(value))) throw new BucketError("listId must be a list ID or null.");
-  res.json(await setActiveBucket(bucketActor(req), value));
+  if (req.body.active !== undefined && typeof req.body.active !== "boolean") throw new BucketError("active must be true or false.");
+  res.json(await setActiveBucket(bucketActor(req), value, req.body.active ?? true));
 }));
 router.post("/bucket-lists", handler(async (req, res) => {
   res.status(201).json(await saveBucket(req.body, bucketActor(req)));

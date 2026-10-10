@@ -53,6 +53,7 @@ import type {
   AutoAcceptRequest,
   AutoAcceptResult,
   BeginBrowserLoginParams,
+  BucketActiveSelection,
   BucketDraft,
   BucketEnforcementInput,
   BucketEnforcementReleaseInput,
@@ -104,7 +105,6 @@ import type {
   ExternalGetComparisonParams,
   ExternalGetProductParams,
   ExternalListProductsParams,
-  GetActiveBucketList200,
   GetAdminActivityDetailParams,
   GetAdminActivitySummaryParams,
   GetAnalysisByBrandParams,
@@ -226,7 +226,6 @@ import type {
   RunMrpGeneratorScenarioParams,
   SanitarywareVariantReconciliationResult,
   SearchCatalogNameChangeProductsParams,
-  SetActiveBucketList200,
   SetActiveBucketListBody,
   UndoMultiWorkbookBody,
   UpdateUserRoleBody,
@@ -10885,11 +10884,11 @@ export const getGetActiveBucketListUrl = () => {
 }
 
 /**
- * @summary Company-enforced and optional personal layers; anonymous has no personal list
+ * @summary Automatic company enforcement, one personal Included and all active personal Excluded lists
  */
-export const getActiveBucketList = async ( options?: RequestInit): Promise<GetActiveBucketList200> => {
+export const getActiveBucketList = async ( options?: RequestInit): Promise<BucketActiveSelection> => {
 
-  return customFetch<GetActiveBucketList200>(getGetActiveBucketListUrl(),
+  return customFetch<BucketActiveSelection>(getGetActiveBucketListUrl(),
   {
     ...options,
     method: 'GET'
@@ -10932,7 +10931,7 @@ export type GetActiveBucketListQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Company-enforced and optional personal layers; anonymous has no personal list
+ * @summary Automatic company enforcement, one personal Included and all active personal Excluded lists
  */
 
 export function useGetActiveBucketList<TData = Awaited<ReturnType<typeof getActiveBucketList>>, TError = ErrorType<unknown>>(
@@ -10961,9 +10960,9 @@ export const getSetActiveBucketListUrl = () => {
   return `/api/bucket-lists/active`
 }
 
-export const setActiveBucketList = async (setActiveBucketListBody: SetActiveBucketListBody, options?: RequestInit): Promise<SetActiveBucketList200> => {
+export const setActiveBucketList = async (setActiveBucketListBody: SetActiveBucketListBody, options?: RequestInit): Promise<BucketActiveSelection> => {
 
-  return customFetch<SetActiveBucketList200>(getSetActiveBucketListUrl(),
+  return customFetch<BucketActiveSelection>(getSetActiveBucketListUrl(),
   {
     ...options,
     method: 'PUT',
