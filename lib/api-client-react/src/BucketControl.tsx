@@ -22,7 +22,7 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
   const [err, setErr] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  const lists = useGetBucketLists({
+  const lists = useGetBucketLists(undefined, {
     query: { queryKey: [...getGetBucketListsQueryKey(), userId ?? "none"], enabled: !!userId && open },
   });
 

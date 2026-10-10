@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, bucketEnforcementTable, bucketEnforcementHistoryTable, type BucketListRecord } from "@workspace/db";
 import { EnforceBucketListBody, ReleaseBucketEnforcementBody } from "@workspace/api-zod";
 import { BucketError, resolveBucketCodes } from "./bucketMembership";
-import { describeBucket, loadBucketWorld, lockBuckets, type BucketActor, type BucketWorld, type BucketExecutor } from "./bucketLists";
+import { assertBucketVisible, describeBucket, loadBucketWorld, lockBuckets, moveBucketInside, type BucketActor, type BucketWorld, type BucketExecutor } from "./bucketLists";
 import { compileCompetitorRules } from "./bucketCompetitors";
 
 export function enforcedAffected(id: string, world: BucketWorld): boolean {
@@ -74,8 +74,9 @@ export async function getBucketEnforcement(actor: BucketActor) {
 export async function changeBucketEnforcement(input: unknown, actor: BucketActor, release = false) {
   assertEnforcementAdmin(actor);
   const parsed = (release ? ReleaseBucketEnforcementBody : EnforceBucketListBody).safeParse(input);
-  if (!parsed.success) throw new BucketError("Choose a Head Office list; refresh if company enforcement changed.");
+  if (!parsed.success) throw new BucketError("Choose a list you can see; refresh if company enforcement changed.");
   const body = parsed.data;
+  let message: string | undefined;
   await db.transaction(async tx => {
     await lockBuckets(tx);
     const world = await loadBucketWorld(tx), state = world.enforcement;
@@ -83,9 +84,12 @@ export async function changeBucketEnforcement(input: unknown, actor: BucketActor
       throw new BucketError("Company enforcement changed. Refresh and try again.", 409, "ENFORCEMENT_STALE");
     const previous = state?.listId ? world.byId.get(state.listId) : null;
     const id = !release ? EnforceBucketListBody.parse(input).listId : null;
-    const next = !release && id ? world.byId.get(id) : null;
-    if (!release && !next) throw new BucketError("Head Office list not found.", 404, "BUCKET_NOT_FOUND");
-    if (next && next.visibility !== "everyone") throw new BucketError("A private list cannot be enforced. Choose an Everyone (Head Office) list.");
+    let next = !release && id ? assertBucketVisible(id, actor, world) : null;
+    if (!release && !next) throw new BucketError("List not found.", 404, "BUCKET_NOT_FOUND");
+    if (next?.visibility === "only_me") {
+      next = await moveBucketInside(tx, actor, world, next.id, "everyone");
+      message = `"${next.name}" has been put in force, and is now an HO list so everyone can see what is being applied.`;
+    }
     if (release && !previous) throw new BucketError("No list is in force.");
     const list = (release ? previous : next)!;
     const snapshot = enforcementSnapshot(list, world, actor);
@@ -100,5 +104,5 @@ export async function changeBucketEnforcement(input: unknown, actor: BucketActor
       previousListName: previous?.name ?? null, beforeSnapshot: previous ? enforcementSnapshot(previous, world, actor) : null, snapshot,
     });
   });
-  return getBucketEnforcement(actor);
+   return { ...await getBucketEnforcement(actor), ...(message ? { message } : {}) };
 }

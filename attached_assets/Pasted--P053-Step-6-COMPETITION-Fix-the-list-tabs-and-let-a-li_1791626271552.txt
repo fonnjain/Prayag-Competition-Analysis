@@ -1,0 +1,101 @@
+# P053 — Step 6 — COMPETITION — Fix the list tabs, and let a list change hands
+
+> **P053 Step 6** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** No product, price, competitor row or classification changes.
+> Internal tool. Keep it simple — no approval flows, no typed reasons.
+> Quote `P053 Step 6` when reporting back.
+
+---
+
+# 1. The tabs do not separate anything
+
+On production now, **All**, **HO lists** and **My lists** each return the same two rows, and both rows carry the **HO** owner badge. A list owned by HO must not appear under My lists.
+
+**1.1 Two definitions, and they must not overlap:**
+
+```
+HO lists    visibility = Everyone
+My lists    owner = the signed-in user AND visibility = Only me
+All         both of the above
+```
+
+A list only you can see is yours; a list everyone can see is HO's. Every list falls in exactly one of the two.
+
+**1.2** Another user's private list never appears for anyone else, on any tab, including for an admin.
+
+**1.3** Check the **All / Included / Excluded** type filter at the same time — it is beside the owner tabs and has not been verified. Both filters must apply together: *My lists + Excluded* means both conditions, not either.
+
+**1.4** When a tab has nothing in it, say so in one line rather than showing an empty table.
+
+---
+
+# 2. Moving a list between owners
+
+A list made by one person often turns out to be worth sharing. Today the only way is Copy and edit, which makes a second list that then drifts from the first. Let the same list change hands instead.
+
+**2.1 Two actions in the row's action set**, shown only when they apply:
+
+```
+Move to HO lists     a private list becomes visible to everyone
+Move to my lists     an HO list becomes private to the person doing it
+```
+
+**2.2 Admin only.** Non-admins do not see either action and the endpoint returns 403 for them. A non-admin cannot publish a list to the whole company, and cannot take a shared one away.
+
+**2.3** Moving changes the **same list** — its id, its items, its competitor rules and its history all stay. It is not a copy. Anyone who already had it switched on as a filter keeps it switched on.
+
+**2.4** No confirmation dialog. One click, and a line saying what happened:
+
+> *"No Ashirwad" is now an HO list, visible to everyone.*
+
+**2.5** A list **in force cannot be moved to my lists.** Refuse, saying it must be taken out of force first — the same rule that already stops it being deleted.
+
+---
+
+# 3. Enforcing any list, not only an HO one
+
+The **Enforce a list** picker offers HO lists only. That is a needless stop: an admin who wants to enforce their own list has to move it first and then come back.
+
+**3.1 The picker offers every list the admin can see**, their own private ones included.
+
+**3.2 Enforcing a private list moves it to HO lists in the same action.** It has to — a list everyone is being filtered by cannot be one only one person can open. Say so in the line, do not ask:
+
+> *"CP review" has been put in force, and is now an HO list so everyone can see what is being applied.*
+
+**3.3** Everything else about enforcement stays as it is: one list at a time, applied automatically, no × for the user, absent from the picker on the filter control.
+
+---
+
+# 4. One rename
+
+`HO (Plumbing) — Excluded,` carries a trailing comma from the day it was made. Drop it: **`HO (Plumbing) — Excluded`**. Rename only — do not touch its 184 items.
+
+---
+
+# Rules
+
+1. No product, price, competitor row, mapping or classification changes.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums.
+3. Reuse the existing admin check and the existing bucket model. No second copy of either.
+4. Do not enforce anything. Build it; putting a list in force is my action.
+5. Development first, then publish.
+
+# Tests
+
+```
+1. My lists shows only the signed-in user's own private lists
+2. HO lists shows only lists visible to everyone
+3. All equals the two together, with no row appearing twice
+4. One user's private list is invisible to another user and to an admin
+5. Owner tab and type filter apply together
+6. Move to HO: the list keeps its id, items, competitor rules and history
+7. A user who had the list switched on still has it switched on after it moves
+8. A non-admin sees neither move action; both endpoints return 403
+9. A list in force cannot be moved to my lists
+10. Enforcing a private list puts it in force and makes it an HO list
+11. mrp_price_history count and checksum unchanged, both environments
+```
+
+# Report
+
+Short. The two tab queries quoted from the code, screenshots of all three owner tabs holding different rows, test results, and the before/after figures in one line.

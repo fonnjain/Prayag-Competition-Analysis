@@ -59,6 +59,7 @@ import type {
   BucketEnforcementReleaseInput,
   BucketEnforcementState,
   BucketList,
+  BucketMoveResult,
   BulkMappingResult,
   BulkMappingUpdate,
   CatalogDataHealth,
@@ -115,6 +116,7 @@ import type {
   GetAnalysisPositioningParams,
   GetAutoAcceptPreviewParams,
   GetBucketCatalogue200,
+  GetBucketListsParams,
   GetCatalogProductParams,
   GetCatalogProductsParams,
   GetComparisonByProductParams,
@@ -10434,20 +10436,27 @@ export const useUndoP029UgdClassification = <TError = ErrorType<void>,
       return useMutation(getUndoP029UgdClassificationMutationOptions(options));
     }
 
-export const getGetBucketListsUrl = () => {
+export const getGetBucketListsUrl = (params?: GetBucketListsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/bucket-lists`
+  return stringifiedParams.length > 0 ? `/api/bucket-lists?${stringifiedParams}` : `/api/bucket-lists`
 }
 
 /**
  * @summary Lists visible to the signed-in user
  */
-export const getBucketLists = async ( options?: RequestInit): Promise<BucketList[]> => {
+export const getBucketLists = async (params?: GetBucketListsParams, options?: RequestInit): Promise<BucketList[]> => {
 
-  return customFetch<BucketList[]>(getGetBucketListsUrl(),
+  return customFetch<BucketList[]>(getGetBucketListsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -10460,23 +10469,23 @@ export const getBucketLists = async ( options?: RequestInit): Promise<BucketList
 
 
 
-export const getGetBucketListsQueryKey = () => {
+export const getGetBucketListsQueryKey = (params?: GetBucketListsParams,) => {
     return [
-    `/api/bucket-lists`
+    `/api/bucket-lists`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetBucketListsQueryOptions = <TData = Awaited<ReturnType<typeof getBucketLists>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBucketLists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetBucketListsQueryOptions = <TData = Awaited<ReturnType<typeof getBucketLists>>, TError = ErrorType<unknown>>(params?: GetBucketListsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBucketLists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetBucketListsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetBucketListsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBucketLists>>> = ({ signal }) => getBucketLists({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBucketLists>>> = ({ signal }) => getBucketLists(params, { signal, ...requestOptions });
 
 
 
@@ -10494,11 +10503,11 @@ export type GetBucketListsQueryError = ErrorType<unknown>
  */
 
 export function useGetBucketLists<TData = Awaited<ReturnType<typeof getBucketLists>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBucketLists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetBucketListsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBucketLists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetBucketListsQueryOptions(options)
+  const queryOptions = getGetBucketListsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -11417,6 +11426,146 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteBucketListMutationOptions(options));
+    }
+
+export const getMoveBucketToHoUrl = (id: string,) => {
+
+
+
+
+  return `/api/bucket-lists/${id}/move-to-ho`
+}
+
+/**
+ * @summary Admin-only move of an existing private list to Everyone
+ */
+export const moveBucketToHo = async (id: string, options?: RequestInit): Promise<BucketMoveResult> => {
+
+  return customFetch<BucketMoveResult>(getMoveBucketToHoUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMoveBucketToHoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moveBucketToHo>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof moveBucketToHo>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['moveBucketToHo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof moveBucketToHo>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  moveBucketToHo(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MoveBucketToHoMutationResult = NonNullable<Awaited<ReturnType<typeof moveBucketToHo>>>
+
+    export type MoveBucketToHoMutationError = ErrorType<void>
+
+    /**
+ * @summary Admin-only move of an existing private list to Everyone
+ */
+export const useMoveBucketToHo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moveBucketToHo>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof moveBucketToHo>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getMoveBucketToHoMutationOptions(options));
+    }
+
+export const getMoveBucketToMyUrl = (id: string,) => {
+
+
+
+
+  return `/api/bucket-lists/${id}/move-to-my`
+}
+
+/**
+ * @summary Admin-only move of an existing shared list to the acting admin
+ */
+export const moveBucketToMy = async (id: string, options?: RequestInit): Promise<BucketMoveResult> => {
+
+  return customFetch<BucketMoveResult>(getMoveBucketToMyUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMoveBucketToMyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moveBucketToMy>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof moveBucketToMy>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['moveBucketToMy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof moveBucketToMy>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  moveBucketToMy(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MoveBucketToMyMutationResult = NonNullable<Awaited<ReturnType<typeof moveBucketToMy>>>
+
+    export type MoveBucketToMyMutationError = ErrorType<void>
+
+    /**
+ * @summary Admin-only move of an existing shared list to the acting admin
+ */
+export const useMoveBucketToMy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moveBucketToMy>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof moveBucketToMy>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getMoveBucketToMyMutationOptions(options));
     }
 
 export const getDetachBucketListUrl = (id: string,) => {

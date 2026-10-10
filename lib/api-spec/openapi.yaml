@@ -2904,6 +2904,9 @@ paths:
     get:
       operationId: getBucketLists
       summary: Lists visible to the signed-in user
+      parameters:
+        - {name: owner, in: query, schema: {type: string, enum: [all, ho, mine], default: all}}
+        - {name: type, in: query, schema: {type: string, enum: [all, included, excluded], default: all}}
       responses:
         '200':
           description: Visible lists with resolved membership
@@ -3084,6 +3087,35 @@ paths:
           content:
             application/json:
               schema: {type: object, additionalProperties: true}
+  /bucket-lists/{id}/move-to-ho:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: moveBucketToHo
+      summary: Admin-only move of an existing private list to Everyone
+      responses:
+        '200':
+          description: Same list moved; items, rules and existing selections preserved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketMoveResult'}
+        '403': {description: Administrator required}
+        '404': {description: List not visible}
+  /bucket-lists/{id}/move-to-my:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: moveBucketToMy
+      summary: Admin-only move of an existing shared list to the acting admin
+      responses:
+        '200':
+          description: Same list moved; existing active filters retained without granting management access
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BucketMoveResult'}
+        '403': {description: Administrator required}
+        '404': {description: List not visible}
+        '409': {description: List is in force or destination name conflicts}
   /bucket-lists/{id}/detach:
     parameters:
       - name: id
@@ -3351,10 +3383,17 @@ components:
         occurredAt: {type: string}
         snapshot: {type: object, additionalProperties: true}
         beforeSnapshot: {type: [object, 'null'], additionalProperties: true}
+    BucketMoveResult:
+      type: object
+      required: [list, message]
+      properties:
+        list: {$ref: '#/components/schemas/BucketList'}
+        message: {type: string}
     BucketEnforcementState:
       type: object
       required: [version, enforced, history]
       properties:
+        message: {type: string}
         version: {type: integer}
         enforced:
           anyOf:

@@ -1,7 +1,7 @@
 import type { BucketListRecord } from "@workspace/db";
 
 type SelectableList = Pick<BucketListRecord, "id" | "name" | "type" | "ownerId" | "visibility">;
-type Preference = { activeListId?: string | null; excludedListIds?: string[] };
+type Preference = { activeListId?: string | null; excludedListIds?: string[]; retainedActiveListIds?: string[] };
 
 /** P053 Step 5: read old preferences without rewriting them. The singleton ID
  * may still name an Excluded list; new writes store only Included there. */
@@ -12,7 +12,8 @@ export function resolvePersonalSelection(
   const visible = (id: string | null | undefined) => {
     const list = id ? lists.get(id) : null;
     return list && list.id !== enforcedId
-      && (list.ownerId === actorId || list.visibility === "everyone") ? list : null;
+      && (list.ownerId === actorId || list.visibility === "everyone"
+        || preference?.retainedActiveListIds?.includes(list.id)) ? list : null;
   };
   const legacy = visible(preference?.activeListId);
   const included = legacy?.type === "included" ? legacy : null;

@@ -7,6 +7,7 @@ import {
   assertBucketVisible, canReadBucket, describeBucket, detachBucket, deleteBucket,
   getActiveBucket, loadBucketWorld, prepareBucketDraft, saveBucket, setActiveBucket,
   observeBucketMembership,
+  bucketInOwnerTab, moveBucket,
   type BucketActor,
 } from "../lib/bucketLists";
 import { BucketError, classifyBucketUpload, resolveBucketCodes } from "../lib/bucketMembership";
@@ -60,7 +61,13 @@ router.use("/bucket-lists", requireWorkspaceReadAccess, (req, res, next) => {
 });
 router.get("/bucket-lists", handler(async (req, res) => {
   const actor = bucketActor(req), world = await loadBucketWorld();
-  const visible = world.lists.filter(list => canReadBucket(list, actor));
+  const owner = req.query.owner ?? "all", type = req.query.type ?? "all";
+  if (Object.keys(req.query).some(key => key !== "owner" && key !== "type")
+    || typeof owner !== "string" || !["all", "ho", "mine"].includes(owner)
+    || typeof type !== "string" || !["all", "included", "excluded"].includes(type))
+    throw new BucketError("Choose a valid owner tab and list type.");
+  const visible = world.lists.filter(list => bucketInOwnerTab(list, actor, owner as "all" | "ho" | "mine")
+    && (type === "all" || list.type === type));
   for (const list of visible) await observeBucketMembership(world.byId.get(list.id)!, world);
   res.json(visible.map(list => describeBucket(world.byId.get(list.id)!, world, actor)));
 }));
@@ -121,6 +128,12 @@ router.post("/bucket-lists/enforcement", handler(async (req, res) => {
 }));
 router.post("/bucket-lists/enforcement/release", handler(async (req, res) => {
   return res.json(await changeBucketEnforcement(req.body, bucketActor(req), true));
+}));
+router.post("/bucket-lists/:id/move-to-ho", handler(async (req, res) => {
+  return res.json(await moveBucket(String(req.params.id), "everyone", bucketActor(req)));
+}));
+router.post("/bucket-lists/:id/move-to-my", handler(async (req, res) => {
+  return res.json(await moveBucket(String(req.params.id), "only_me", bucketActor(req)));
 }));
 router.get("/bucket-lists/:id", handler(async (req, res) => {
   const actor = bucketActor(req), world = await loadBucketWorld();

@@ -6,7 +6,7 @@ import { normalizeVocabularyKey } from "./priceEditorVocabulary";
 import { BucketError, bucketAllowsCode, isLiveBucketProduct, matchesBucketRule, resolveBucketCodes, type BucketDefinition, type BucketProduct } from "./bucketMembership";
 import { normCode } from "./catalog";
 import { compileCompetitorRules, competitorImpact, competitorOptions, hasProductDefinition, resolveCompetitorRules, type CompetitorQuote } from "./bucketCompetitors";
-import { assertEnforcedDelete, assertEnforcedEdit, enforcedAffected, enforcementSnapshot, recordEnforcedEdit } from "./bucketEnforcement";
+import { assertEnforcedDelete, assertEnforcedEdit, assertEnforcementAdmin, enforcedAffected, enforcementSnapshot, recordEnforcedEdit } from "./bucketEnforcement";
 import { composedProductAllowed, composedQuoteAllowed, composedDisclosure, type BucketLayer } from "./bucketComposition";
 import { resolvePersonalSelection, updatePersonalSelection } from "./bucketSelection";
 
@@ -64,6 +64,12 @@ export async function loadBucketWorld(executor: Executor = db): Promise<BucketWo
 export function canReadBucket(list: BucketListRecord, actor: BucketActor) {
   return list.ownerId === actor.id || list.visibility === "everyone";
 }
+export function bucketInOwnerTab(list: BucketListRecord, actor: BucketActor, owner: "all" | "ho" | "mine") {
+  if (!canReadBucket(list, actor)) return false;
+  const ho = list.visibility === "everyone";
+  const mine = list.ownerId === actor.id && list.visibility === "only_me";
+  return owner === "ho" ? ho : owner === "mine" ? mine : ho || mine;
+}
 export function assertBucketVisible(id: string, actor: BucketActor, world: BucketWorld) {
   const list = world.byId.get(id);
   if (!list || !canReadBucket(list, actor)) throw new BucketError("Bucket list not found.", 404, "BUCKET_NOT_FOUND");
@@ -116,7 +122,7 @@ export function describeBucket(definition: BucketDefinition & Partial<BucketList
     code => !productFilterApplied || bucketAllowsCode(type, normalizedCodes, code));
   return {
     ...definition, id: definition.id ?? "", name: definition.name ?? "", type: definition.type ?? "excluded",
-    visibility: definition.visibility ?? "only_me", parentName: parent?.name ?? null,
+    visibility: definition.visibility ?? "only_me", parentName: parent && canReadBucket(parent, actor) ? parent.name : null,
     canEdit: definition.ownerId === actor.id && (definition.visibility !== "everyone" || actor.admin),
     isEnforced: !!definition.id && definition.id === world.enforcement?.listId,
     affectsEnforced: !!definition.id && enforcedAffected(definition.id, world),
@@ -160,8 +166,10 @@ export function prepareBucketDraft(input: unknown, actor: BucketActor, world: Bu
   if (previous && definition.parentId !== previous.parentId)
     throw new BucketError("Use Detach from the original to freeze these members. To relink, start a new copy.");
   if (definition.parentId) {
-    const parent = assertBucketVisible(definition.parentId, actor, world);
-    if (definition.visibility === "everyone" && parent.visibility !== "everyone")
+    const parent = previous?.parentId === definition.parentId && previous.ownerId === actor.id
+      ? world.byId.get(definition.parentId) : assertBucketVisible(definition.parentId, actor, world);
+    if (!parent) throw new BucketError("Original list not found.", 404, "BUCKET_NOT_FOUND");
+    if (definition.visibility === "everyone" && parent.visibility !== "everyone" && previous?.visibility !== "everyone")
       throw new BucketError("Detach from a private original before sharing a Head Office list.");
     if (previous && parent.id === previous.id) throw new BucketError("A list cannot be its own original.");
   }
@@ -195,6 +203,7 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
     // A zero-match rule remains a valid definition: keep it and warn in the UI.
     if (!codes.size && !draft.rules.length && !draft.parentId) throw new BucketError("Add at least one item or rule.");
     if (previous?.visibility === "everyone" && draft.visibility === "only_me") {
+      await retainActiveSelections(tx, previous.id);
       await freezeChildren(previous, world, tx, actor, child => child.ownerId !== actor.id || child.visibility === "everyone",
         "The original became private");
     }
@@ -208,6 +217,45 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
     world.byId.set(saved.id, saved);
     if (before) await recordEnforcedEdit(tx, actor, world, before, saved.name);
     return describeBucket(saved, world, actor);
+  });
+}
+async function retainActiveSelections(tx: Executor, id: string) {
+  // Server-owned grants cover only preferences already switched on under Everyone.
+  // They never make the now-private list readable or selectable by another user.
+  await tx.execute(sql`UPDATE bucket_preferences SET retained_active_list_ids =
+    CASE WHEN retained_active_list_ids ? ${id} THEN retained_active_list_ids
+      ELSE retained_active_list_ids || ${JSON.stringify([id])}::jsonb END
+    WHERE active_list_id = ${id}::uuid OR excluded_list_ids ? ${id}`);
+}
+export async function moveBucketInside(tx: Executor, actor: BucketActor, world: BucketWorld,
+  id: string, visibility: "everyone" | "only_me") {
+  assertEnforcementAdmin(actor);
+  const list = assertBucketVisible(id, actor, world);
+  if (visibility === "only_me" && enforcedAffected(id, world))
+    throw new BucketError("This list or its original is in force. Take it out of force before moving it to My lists.", 409, "ENFORCED_MOVE_FORBIDDEN");
+  const ownerId = visibility === "only_me" ? actor.id : list.ownerId;
+  if (world.lists.some(other => other.id !== id && other.ownerId === ownerId && other.nameKey === list.nameKey))
+    throw new BucketError("You already have a list with this name. Rename one before moving.", 409, "BUCKET_NAME_EXISTS");
+  if (list.visibility === "everyone" && visibility === "only_me") {
+    await retainActiveSelections(tx, id);
+    await freezeChildren(list, world, tx, actor, child => child.ownerId !== actor.id || child.visibility === "everyone", "The original became private");
+  }
+  const [saved] = await tx.update(bucketListsTable).set({
+    visibility, ownerId, updatedBy: actor.label, updatedAt: new Date(),
+  }).where(eq(bucketListsTable.id, id)).returning();
+  world.byId.set(saved.id, saved);
+  return saved;
+}
+export async function moveBucket(id: string, visibility: "everyone" | "only_me", actor: BucketActor) {
+  assertEnforcementAdmin(actor);
+  return db.transaction(async tx => {
+    await lockBuckets(tx);
+    const world = await loadBucketWorld(tx);
+    const saved = await moveBucketInside(tx, actor, world, id, visibility);
+    return { list: describeBucket(saved, world, actor),
+      message: visibility === "everyone"
+        ? `"${saved.name}" is now an HO list, visible to everyone.`
+        : `"${saved.name}" is now in My lists, visible only to you.` };
   });
 }
 function frozenCompetitorRules(definition: Parameters<typeof resolveCompetitorRules>[0], world: BucketWorld, codes: string[]) {
@@ -237,8 +285,9 @@ export async function deleteBucket(id: string, actor: BucketActor) {
     assertOwner(list, actor);
     assertEnforcedDelete(id, world);
     const detachedChildren = await freezeChildren(list, world, tx, actor);
-    await tx.execute(sql`UPDATE bucket_preferences SET excluded_list_ids = excluded_list_ids - ${list.id}
-      WHERE excluded_list_ids ? ${list.id}`);
+    await tx.execute(sql`UPDATE bucket_preferences SET excluded_list_ids = excluded_list_ids - ${list.id},
+      retained_active_list_ids = retained_active_list_ids - ${list.id}
+      WHERE excluded_list_ids ? ${list.id} OR retained_active_list_ids ? ${list.id}`);
     await tx.delete(bucketListsTable).where(eq(bucketListsTable.id, list.id));
     return { deleted: true, detachedChildren, message: "Only the bucket list was deleted. No products or prices were deleted." };
   });
@@ -314,14 +363,19 @@ export async function setActiveBucket(actor: BucketActor, id: string | null, act
   const message = await db.transaction(async tx => {
     await lockBuckets(tx);
     const world = await loadBucketWorld(tx);
-    const target = id ? assertBucketVisible(id, actor, world) : null;
     if (id && id === world.enforcement?.listId)
       throw new BucketError("The enforced list applies automatically and cannot be selected or cleared here.", 403, "BUCKET_ENFORCED");
     const [preference] = await tx.select().from(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, actor.id));
     const current = resolvePersonalSelection(preference, world.byId, actor.id, world.enforcement?.listId ?? null);
+    // The owner tabs/private-detail endpoint remain strict. A former shared-list
+    // user may only turn OFF an already-retained filter, never select it anew.
+    const target = id ? (!active && current.personalLists.some(list => list.id === id)
+      ? world.byId.get(id)! : assertBucketVisible(id, actor, world)) : null;
     const { message, ...next } = updatePersonalSelection(current, target, active);
-    await tx.insert(bucketPreferencesTable).values({ userId: actor.id, ...next }).onConflictDoUpdate({
-      target: bucketPreferencesTable.userId, set: { ...next, updatedAt: new Date() },
+    const retainedActiveListIds = (preference?.retainedActiveListIds ?? [])
+      .filter(listId => next.activeListId === listId || next.excludedListIds.includes(listId));
+    await tx.insert(bucketPreferencesTable).values({ userId: actor.id, ...next, retainedActiveListIds }).onConflictDoUpdate({
+      target: bucketPreferencesTable.userId, set: { ...next, retainedActiveListIds, updatedAt: new Date() },
     });
     return message;
   });

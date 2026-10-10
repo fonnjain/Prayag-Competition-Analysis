@@ -42,13 +42,32 @@ every applied list in exports and count newly lost last quotes once across the
 combined predicates. Competitor-only lists disclose their competitor count,
 not an apparently empty product-only count.
 
-**How to apply:** Only existing Everyone lists are eligible; enforce/release
+**How to apply:** An admin may enforce any list they can see, including their
+own private list; enforcing a private list must publish that same list to
+Everyone atomically. Another user's private list remains invisible even to an
+admin. Enforce/release
 need admin authority but no typed reason, approval or extra confirmation. Keep immutable event-time definitions,
 resolved scope and counts so later edits cannot rewrite the explanation of an
 old report. Admin edits apply immediately without confirmation, including linked
 originals; require release before deletion. Show company then personal in
 headers/exports, and compute last-quote loss once over the combined predicates.
 Show no inactive enforcement placeholder outside its management tab.
+
+HO means Everyone, not a special owner identity. My lists means the viewer's
+own Only me lists; shared lists owned by the viewer belong only to HO, and All
+is the union. Moving a shared list to My lists transfers ownership to the
+acting admin. Moves retain the same definition and existing active selections,
+but retained use must not grant another user management/read access or let
+them reactivate it after clearing it. An in-force list or its linked original
+must be taken out of force before becoming private.
+
+**Why:** The user explicitly requires non-overlapping visibility tabs and
+continued active filters after a move, while keeping other people's private
+lists hidden, even from administrators.
+
+**How to apply:** Treat active-use retention separately from list visibility.
+Do not clear other users' selected filters on a visibility move, broaden
+private-list browsing, or make an extra copy of the list.
 
 The superseding combined specification requires simple action/list/who/when
 history, and one-line export disclosure naming company first then personal.

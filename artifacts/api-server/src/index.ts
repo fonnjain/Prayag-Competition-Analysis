@@ -4,6 +4,7 @@ import { seedCatalogIfEmpty, backfillCatalogSizes, seedVariantPricesIfEmpty } fr
 import { seedAdminUser } from "./lib/adminSeed";
 import { applyChValveNameCorrections } from "./lib/chValveNameCorrections";
 import { isProductionCatalogueRuntime } from "./lib/catalogueMaintenancePolicy";
+import { applyApprovedBucketNameCorrection } from "./lib/bucketNameCorrection";
 
 const rawPort = process.env["PORT"];
 
@@ -53,6 +54,7 @@ async function prepareCatalog() {
 
 async function startServer() {
   await prepareCatalog();
+  logger.info(await applyApprovedBucketNameCorrection(), "Applied approved bucket-list name correction");
   app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");

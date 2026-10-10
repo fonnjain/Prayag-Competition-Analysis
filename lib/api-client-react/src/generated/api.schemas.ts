@@ -252,7 +252,13 @@ export interface BucketEnforcementEvent {
   beforeSnapshot?: BucketEnforcementEventBeforeSnapshot;
 }
 
+export interface BucketMoveResult {
+  list: BucketList;
+  message: string;
+}
+
 export interface BucketEnforcementState {
+  message?: string;
   version: number;
   enforced: BucketEnforcedInfo | null;
   history: BucketEnforcementEvent[];
@@ -5667,6 +5673,29 @@ export type PreflightCataloguePdfBody = {
   effectiveDate?: string;
   extractionPath?: ExtractionPath;
 };
+
+export type GetBucketListsParams = {
+owner?: GetBucketListsOwner;
+type?: GetBucketListsType;
+};
+
+export type GetBucketListsOwner = typeof GetBucketListsOwner[keyof typeof GetBucketListsOwner];
+
+
+export const GetBucketListsOwner = {
+  all: 'all',
+  ho: 'ho',
+  mine: 'mine',
+} as const;
+
+export type GetBucketListsType = typeof GetBucketListsType[keyof typeof GetBucketListsType];
+
+
+export const GetBucketListsType = {
+  all: 'all',
+  included: 'included',
+  excluded: 'excluded',
+} as const;
 
 export type GetBucketCatalogue200 = { [key: string]: unknown };
 

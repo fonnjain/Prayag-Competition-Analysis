@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useEnforceBucketList, getGetBucketEnforcementQueryKey, useGetBucketEnforcement, useGetBucketLists, useReleaseBucketEnforcement,
+  useEnforceBucketList, getGetBucketEnforcementQueryKey, useGetBucketEnforcement, useGetBucketLists, getGetBucketListsQueryKey, useReleaseBucketEnforcement,
   bucketEffectShort, type BucketList, type BucketEnforcementEvent,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -42,11 +42,11 @@ function HistoryRow({ e }: { e: BucketEnforcementEvent }) {
   );
 }
 
-export function EnforcementTab({ isAdmin }: { isAdmin: boolean }) {
+export function EnforcementTab({ isAdmin, userId }: { isAdmin: boolean; userId?: string }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const q = useGetBucketEnforcement({ query: { queryKey: getGetBucketEnforcementQueryKey(), refetchInterval: 5000, refetchOnWindowFocus: true, staleTime: 0 } });
-  const lists = useGetBucketLists({ query: { enabled: isAdmin, queryKey: ["bucket-lists-enforce-picker"] } });
+  const q = useGetBucketEnforcement({ query: { queryKey: [...getGetBucketEnforcementQueryKey(), userId ?? "none"], refetchInterval: 5000, refetchOnWindowFocus: true, staleTime: 0 } });
+  const lists = useGetBucketLists(undefined, { query: { enabled: isAdmin, queryKey: [...getGetBucketListsQueryKey(), "enforce-picker", userId ?? "none"], refetchOnMount: "always", staleTime: 0, refetchInterval: 5000 } });
   const enforceM = useEnforceBucketList();
   const releaseM = useReleaseBucketEnforcement();
   const [showPicker, setShowPicker] = useState(false);
@@ -57,15 +57,15 @@ export function EnforcementTab({ isAdmin }: { isAdmin: boolean }) {
     return <div className="p-8 text-center"><p className="font-semibold text-destructive">Could not load enforcement.</p><Button variant="outline" className="mt-3" onClick={() => q.refetch()}>Retry</Button></div>;
   }
   const { enforced, history, version } = q.data;
-  const choices = (lists.data ?? []).filter((l) => l.visibility === "everyone" && l.id !== enforced?.list.id);
+  const choices = (lists.data ?? []).filter((l) => l.id !== enforced?.list.id);
   const picked = choices.find((l) => l.id === pick);
   const close = () => { setShowPicker(false); setPick(""); };
-  const done = (t: string) => { void qc.invalidateQueries(); toast({ title: t }); close(); };
+  const done = (t: string, m?: string) => { void qc.invalidateQueries(); toast({ title: m || t }); close(); };
   const fail = (e: unknown) => { void qc.invalidateQueries(); toast({ title: "Action failed", description: errMessage(e), variant: "destructive" }); };
   const busy = enforceM.isPending || releaseM.isPending;
   const enforce = () => {
     if (!picked || busy) return;
-    enforceM.mutate({ data: { listId: picked.id, expectedVersion: version } }, { onSuccess: () => done("List put in force"), onError: fail });
+    enforceM.mutate({ data: { listId: picked.id, expectedVersion: version } }, { onSuccess: (r) => done("List put in force", r?.message), onError: fail });
   };
   const release = () => {
     if (busy) return;
@@ -97,14 +97,14 @@ export function EnforcementTab({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && showPicker && (
         <div className="mt-3 space-y-2 rounded-lg border p-3">
-          <label className="block text-sm font-medium" htmlFor="ho-enforce-list">Head Office list</label>
+          <label className="block text-sm font-medium" htmlFor="ho-enforce-list">List</label>
           <select id="ho-enforce-list" value={pick} onChange={e => setPick(e.target.value)} disabled={busy}
             className="h-9 w-full rounded-md border bg-background px-2 text-sm" data-testid="select-enforce-list">
             <option value="">Choose a list</option>
             {choices.map(l => <option key={l.id} value={l.id}>{l.name} — {l.type === "excluded" ? "Excluded" : "Included"}</option>)}
           </select>
           {picked && <p className="text-sm" data-testid="text-pick-effect">{enforcedEffectText(picked)}</p>}
-          {choices.length === 0 && <p className="text-sm text-muted-foreground">No other Head Office lists are available.</p>}
+          {choices.length === 0 && <p className="text-sm text-muted-foreground">No other lists are available.</p>}
           <div className="flex gap-2">
             <Button disabled={!picked || busy} onClick={enforce} data-testid="button-apply-enforcement">{enforced ? "Replace" : "Enforce"}</Button>
             <Button variant="outline" disabled={busy} onClick={close}>Cancel</Button>

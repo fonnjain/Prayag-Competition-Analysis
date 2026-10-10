@@ -47,6 +47,9 @@ export const bucketPreferencesTable = pgTable("bucket_preferences", {
   // The old ID remains readable for legacy one-list preferences. New writes
   // keep the Included ID here and all Excluded IDs in this independent set.
   excludedListIds: jsonb("excluded_list_ids").$type<string[]>().notNull().default([]),
+  // A move to Only me preserves already-selected filters, not read/edit access.
+  // Clearing the selection also removes this narrow retained-use grant.
+  retainedActiveListIds: jsonb("retained_active_list_ids").$type<string[]>().notNull().default([]),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

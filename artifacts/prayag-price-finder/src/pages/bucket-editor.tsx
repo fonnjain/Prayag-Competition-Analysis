@@ -63,7 +63,7 @@ export default function BucketEditorPage() {
   const existing = useGetBucketList(editId ?? "", {
     query: { queryKey: [...getGetBucketListQueryKey(editId ?? ""), user?.id ?? "none"], enabled: signedIn && !!editId },
   });
-  const allLists = useGetBucketLists({ query: { enabled: signedIn, queryKey: ["bucket-lists-all", user?.id ?? "none"] } });
+  const allLists = useGetBucketLists(undefined, { query: { enabled: signedIn, queryKey: ["bucket-lists-all", user?.id ?? "none"] } });
   const catalogue = useGetBucketCatalogue({ query: { enabled: signedIn, queryKey: ["bucket-catalogue", user?.id ?? "none"] } });
 
   const [draft, setDraft] = useState<BucketDraft>({

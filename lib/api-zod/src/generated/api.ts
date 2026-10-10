@@ -13173,6 +13173,14 @@ export const UndoP029UgdClassificationResponse = zod.object({
 /**
  * @summary Lists visible to the signed-in user
  */
+export const getBucketListsQueryOwnerDefault = `all`;
+export const getBucketListsQueryTypeDefault = `all`;
+
+export const GetBucketListsQueryParams = zod.object({
+  "owner": zod.enum(['all', 'ho', 'mine']).default(getBucketListsQueryOwnerDefault),
+  "type": zod.enum(['all', 'included', 'excluded']).default(getBucketListsQueryTypeDefault)
+})
+
 export const GetBucketListsResponseItem = zod.object({
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
@@ -13381,6 +13389,7 @@ export const SetActiveBucketListResponse = zod.object({
 
 
 export const GetBucketEnforcementResponse = zod.object({
+  "message": zod.string().optional(),
   "version": zod.number(),
   "enforced": zod.union([zod.object({
   "list": zod.object({
@@ -13466,6 +13475,7 @@ export const EnforceBucketListBody = zod.object({
 })
 
 export const EnforceBucketListResponse = zod.object({
+  "message": zod.string().optional(),
   "version": zod.number(),
   "enforced": zod.union([zod.object({
   "list": zod.object({
@@ -13550,6 +13560,7 @@ export const ReleaseBucketEnforcementBody = zod.object({
 })
 
 export const ReleaseBucketEnforcementResponse = zod.object({
+  "message": zod.string().optional(),
   "version": zod.number(),
   "enforced": zod.union([zod.object({
   "list": zod.object({
@@ -13766,6 +13777,134 @@ export const DeleteBucketListParams = zod.object({
 })
 
 export const DeleteBucketListResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Admin-only move of an existing private list to Everyone
+ */
+export const MoveBucketToHoParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MoveBucketToHoResponse = zod.object({
+  "list": zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "retainProductFilter": zod.boolean().optional().describe('Internal preservation of an empty inherited product selection when detaching or deleting a parent.'),
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional(),
+  "competitor": zod.string().optional(),
+  "scope": zod.enum(['everywhere', 'division', 'category']).optional(),
+  "divisions": zod.array(zod.string()).optional(),
+  "categories": zod.array(zod.string()).optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "isEnforced": zod.boolean().optional(),
+  "affectsEnforced": zod.boolean().optional(),
+  "enforcedListName": zod.string().nullish(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "competitorRules": zod.array(zod.object({
+  "retainProductFilter": zod.boolean().optional().describe('Internal preservation of an empty inherited product selection when detaching or deleting a parent.'),
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional(),
+  "competitor": zod.string().optional(),
+  "scope": zod.enum(['everywhere', 'division', 'category']).optional(),
+  "divisions": zod.array(zod.string()).optional(),
+  "categories": zod.array(zod.string()).optional()
+})).optional(),
+  "competitorCount": zod.number().optional(),
+  "competitorPriceCount": zod.number().optional(),
+  "noCompetitorPriceCount": zod.number().optional(),
+  "productFilterApplied": zod.boolean().optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+})),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Admin-only move of an existing shared list to the acting admin
+ */
+export const MoveBucketToMyParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MoveBucketToMyResponse = zod.object({
+  "list": zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().nullish(),
+  "type": zod.enum(['included', 'excluded']).optional(),
+  "visibility": zod.enum(['everyone', 'only_me']).optional(),
+  "parentId": zod.string().nullish(),
+  "rules": zod.array(zod.object({
+  "retainProductFilter": zod.boolean().optional().describe('Internal preservation of an empty inherited product selection when detaching or deleting a parent.'),
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional(),
+  "competitor": zod.string().optional(),
+  "scope": zod.enum(['everywhere', 'division', 'category']).optional(),
+  "divisions": zod.array(zod.string()).optional(),
+  "categories": zod.array(zod.string()).optional()
+})).optional(),
+  "addedCodes": zod.array(zod.string()).optional(),
+  "removedCodes": zod.array(zod.string()).optional()
+}).and(zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string().optional(),
+  "parentName": zod.string().nullish(),
+  "count": zod.number(),
+  "activeCount": zod.number().optional(),
+  "missingCount": zod.number().optional(),
+  "totalProducts": zod.number().optional(),
+  "canEdit": zod.boolean(),
+  "isEnforced": zod.boolean().optional(),
+  "affectsEnforced": zod.boolean().optional(),
+  "enforcedListName": zod.string().nullish(),
+  "members": zod.array(zod.record(zod.string(), zod.unknown())),
+  "divisions": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "ruleCounts": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  "competitorRules": zod.array(zod.object({
+  "retainProductFilter": zod.boolean().optional().describe('Internal preservation of an empty inherited product selection when detaching or deleting a parent.'),
+  "division": zod.string().optional(),
+  "category": zod.string().optional(),
+  "range": zod.string().optional(),
+  "competitor": zod.string().optional(),
+  "scope": zod.enum(['everywhere', 'division', 'category']).optional(),
+  "divisions": zod.array(zod.string()).optional(),
+  "categories": zod.array(zod.string()).optional()
+})).optional(),
+  "competitorCount": zod.number().optional(),
+  "competitorPriceCount": zod.number().optional(),
+  "noCompetitorPriceCount": zod.number().optional(),
+  "productFilterApplied": zod.boolean().optional(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional(),
+  "updatedBy": zod.string().optional(),
+  "detachedNotice": zod.string().nullish()
+})),
+  "message": zod.string()
+})
 
 
 export const DetachBucketListParams = zod.object({

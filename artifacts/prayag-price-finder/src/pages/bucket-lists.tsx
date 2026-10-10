@@ -7,6 +7,8 @@ import {
   useActiveBucket,
   useDeleteBucketList,
   useGetBucketLists,
+  useMoveBucketToHo,
+  useMoveBucketToMy,
   useSetActiveBucket,
   useUpdateBucketList,
   BUCKET_TYPE,
@@ -50,9 +52,24 @@ export default function BucketListsPage() {
   const [newName, setNewName] = useState("");
   const signedIn = !!user;
 
-  const { data, isLoading, isError, refetch } = useGetBucketLists({
-    query: { queryKey: [...getGetBucketListsQueryKey(), user?.id ?? "none"], enabled: signedIn },
+  const params = {
+    owner: chip === "ho" ? "ho" : chip === "mine" ? "mine" : "all",
+    type: typeChip,
+  } as const;
+  const { data, isLoading, isError, refetch } = useGetBucketLists(params, {
+    query: { queryKey: [...getGetBucketListsQueryKey(params), user?.id ?? "none"], enabled: signedIn },
   });
+  const moveHo = useMoveBucketToHo();
+  const moveMy = useMoveBucketToMy();
+  const isAdmin = user?.role === "admin";
+  const moving = moveHo.isPending || moveMy.isPending;
+  const move = (l: BucketList, toHo: boolean) => {
+    if (moving) return;
+    (toHo ? moveHo : moveMy).mutate({ id: l.id }, {
+      onSuccess: (r) => { toast({ title: r.message }); void qc.invalidateQueries(); },
+      onError: (e) => { toast({ title: "Could not move list", description: errMessage(e), variant: "destructive" }); void qc.invalidateQueries(); },
+    });
+  };
   const active = useActiveBucket(user?.id);
   const { setListActive, isPending: settingActive } = useSetActiveBucket();
   const deleteM = useDeleteBucketList();
@@ -64,7 +81,7 @@ export default function BucketListsPage() {
       const ho = l.visibility === "everyone";
       if (typeChip !== "all" && bucketKind(l.type) !== typeChip) return false;
       if (chip === "ho" && !ho) return false;
-      if (chip === "mine" && ho && l.ownerId !== user?.id) return false;
+      if (chip === "mine" && (ho || l.ownerId !== user?.id || l.visibility !== "only_me")) return false;
       return !q || (l.name ?? "").toLowerCase().includes(q);
     });
   }, [data, chip, typeChip, search, user?.id]);
@@ -96,7 +113,7 @@ export default function BucketListsPage() {
             {label}
           </button>
         ))}
-        <span className="mx-1 hidden h-5 w-px bg-border sm:inline-block" aria-hidden />
+        {chip !== "enforced" && <><span className="mx-1 hidden h-5 w-px bg-border sm:inline-block" aria-hidden />
         {([["all", "All"], ["included", "Included"], ["excluded", "Excluded"]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTypeChip(k)} data-testid={`chip-type-${k}`}
             className={cn("rounded-full border-2 px-3.5 py-1 text-sm font-semibold transition-colors",
@@ -105,20 +122,20 @@ export default function BucketListsPage() {
                 : "bg-card hover:bg-accent")}>
             {label}
           </button>
-        ))}
+        ))}</>}
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name"
           className="ml-auto h-9 w-full sm:w-64" data-testid="input-search-bucket" />
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-xl border bg-card shadow-sm">
-        {chip === "enforced" ? <EnforcementTab isAdmin={user?.role === "admin"} /> : isLoading ? (
+        {chip === "enforced" ? <EnforcementTab isAdmin={user?.role === "admin"} userId={user?.id} /> : isLoading ? (
           <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : isError ? (
           <div className="p-8 text-center">
             <p className="font-semibold text-destructive">Could not load bucket lists.</p>
             <Button variant="outline" className="mt-3" onClick={() => refetch()}>Retry</Button>
           </div>
-        ) : (data ?? []).length === 0 ? (
+        ) : (data ?? []).length === 0 && chip === "all" && typeChip === "all" && !search.trim() ? (
           <div className="p-10 text-center" data-testid="empty-bucket-lists">
             <Bookmark className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 font-bold">No bucket lists yet</p>
@@ -130,7 +147,7 @@ export default function BucketListsPage() {
             </Link>
           </div>
         ) : rows.length === 0 ? (
-          <p className="p-8 text-center text-sm text-muted-foreground">No lists match this filter.</p>
+          <p className="p-8 text-center text-sm text-muted-foreground">{chip === "ho" ? "No HO lists" : chip === "mine" ? "No lists of yours" : "No lists"}{typeChip !== "all" ? ` of type ${typeChip}` : ""}{search.trim() ? " match this search" : ""}.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -192,6 +209,13 @@ export default function BucketListsPage() {
                         <a href={getExportBucketListUrl(l.id)} download className="inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-xs font-medium hover:bg-accent" data-testid={`link-export-${l.id}`}>
                           <Download className="h-3.5 w-3.5" /> Export to Excel
                         </a>
+                        {isAdmin && (ho ? (
+                          enforcedHere || l.affectsEnforced
+                            ? <span className="text-xs text-muted-foreground" data-testid={`text-move-blocked-${l.id}`}>Take it out of force before moving to My lists.</span>
+                            : <Button size="sm" variant="outline" disabled={moving} data-testid={`button-move-my-${l.id}`} onClick={() => move(l, false)}>Move to my lists</Button>
+                        ) : (
+                          <Button size="sm" variant="outline" disabled={moving} data-testid={`button-move-ho-${l.id}`} onClick={() => move(l, true)}>Move to HO lists</Button>
+                        ))}
                         {l.canEdit && (
                           <>
                             <Link href={`/bucket-lists/edit?id=${l.id}`} className="inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-xs font-medium hover:bg-accent" data-testid={`link-edit-${l.id}`}>
