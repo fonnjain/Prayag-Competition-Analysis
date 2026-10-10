@@ -70,6 +70,10 @@ changes during read-only confirmation.
 
 **How to apply:** Inspect the existing state without selecting or clearing a
 list. Do not treat a screenshot request as permission to write a preference.
+Read-only production UI checks also forbid automatic membership-observation
+and activity writes, not only explicit Save actions. Preflight handlers before
+allowing requests; a GET method alone is not proof of read-only behaviour.
+An unsaved editor may be inspected without creating a stored list.
 
 Competitor rules filter prices without changing source products. Preserve each
 screen's existing no-competitor display rule; do not add synthetic no-price rows.
