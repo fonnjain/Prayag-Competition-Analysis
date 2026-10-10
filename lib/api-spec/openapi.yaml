@@ -3327,6 +3327,8 @@ components:
           properties:
             id: {type: string}
             ownerId: {type: string}
+            creatorId: {type: [string, 'null']}
+            ownerName: {type: string}
             parentName: {type: [string, 'null']}
             count: {type: integer}
             activeCount: {type: integer}

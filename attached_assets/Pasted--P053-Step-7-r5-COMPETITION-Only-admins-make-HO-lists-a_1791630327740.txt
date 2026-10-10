@@ -1,0 +1,122 @@
+# P053 — Step 7 r5 — COMPETITION — Only admins make HO lists, and what an admin can reach
+
+> **P053 Step 7 r5** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT CHANGES CODE.** No product, price, competitor row or classification changes.
+> **This replaces Step 7, r2, r3 and r4. Build this one.**
+> Internal tool. Keep it simple.
+> Quote `P053 Step 7 r5` when reporting back.
+
+**Enforcement works correctly — do not change how it works.** The Move control is correct as built — do not redesign it. Four changes.
+
+---
+
+# 1. Only an admin can make an HO list
+
+**1.1 A non-admin's list is always their own.** Every list they create or edit is **Only me**. They have no visibility choice.
+
+**1.2 Do not show them a disabled toggle.** Replace the Visibility control with one line:
+
+```
+Visibility    Only you can see this list. An admin can share it with everyone.
+```
+
+**1.3 An admin gets both options, defaulting to Everyone (Head Office list).** An admin almost always makes a company list; leave Only me one click away.
+
+**1.4 Enforce this on the endpoint, not only on screen.** A create or edit request from a non-admin that sets visibility to Everyone is refused with 403, whatever the form sent.
+
+**1.5** When **editing** an existing list, an admin's control shows that list's current visibility. No default applies.
+
+---
+
+# 2. What a non-admin can do
+
+**2.1 Make as many lists as they like** — products, competitors or both, hand-picked or uploaded. All private to them.
+
+**2.2 Edit, rename and delete their own.**
+
+**2.3 Use any list they can see as a filter** — their own, and every HO list.
+
+**2.4 Start a new list from an HO list** and save it under their own name, as now. The copy is theirs and private.
+
+**2.5 They cannot enforce or un-enforce anything.** No control on screen; 403 on the endpoint.
+
+**2.6 They cannot move or publish any list**, their own included. No control; 403 on the endpoint.
+
+**2.7 They cannot see, edit or delete another user's list.**
+
+---
+
+# 3. What an admin can reach
+
+**3.1 An admin can see every list** — HO lists and every user's private list. This is a change: today a private list is hidden from admins too.
+
+It follows from §3.2. An admin cannot enforce a list they cannot see, and cannot answer "why is this product missing from my report" if the list doing it is invisible to them.
+
+**3.2 An admin can enforce any list** — an HO list, or any user's list. One list in force at a time, company-wide, exactly as it works now.
+
+**3.3 Enforcing a private list publishes it to HO in the same action.** It has to: every export names the list in force, and 181 people cannot be filtered by something only one of them can open. Say so afterwards, do not ask:
+
+> *"CP review" is in force, and is now an HO list so everyone can see what is being applied.*
+
+**3.4 A user's private list shows its owner's name** wherever an admin sees it, so it is clear whose it is.
+
+**3.5 Moving a user's list to HO lists is admin only**, and works as built.
+
+**3.6** Through any move or enforcement the list keeps its **id, items, competitor rules and history**. Never a copy. **The creator keeps the right to edit it**, and so does any admin.
+
+---
+
+# 4. "Last changed" is showing a reason instead of a person
+
+Not a design change — a defect. On production now:
+
+```
+No Ashirwad                  CEO Prayag                      10/10/2026, 2:17:05 PM
+HO (Plumbing) — Excluded     Approved list-name correction   10/10/2026, 4:07:57 PM
+```
+
+The second is not a person. The rename wrote its own description into the actor field.
+
+**4.1** That column answers **who changed this and when**. It holds the acting user — nothing else, ever.
+
+**4.2** Correct the row the rename wrote: the change was made by the signed-in admin.
+
+**4.3** Check every other path that writes this field — create, edit, rename, upload, move, enforce — and make sure each stores the acting user, not a description of the action.
+
+---
+
+# Rules
+
+1. No product, price, competitor row, mapping or classification changes.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums.
+3. Do not change how enforcement works. Do not redesign the Move control.
+4. Do not enforce or un-enforce anything. Putting a list in force is my action.
+5. Development first, then publish.
+
+# Tests
+
+```
+ 1. A non-admin sees no visibility toggle, only the line in §1.2
+ 2. Every list a non-admin creates or edits is Only me
+ 3. A non-admin POST or PATCH setting visibility to Everyone returns 403
+ 4. An admin gets both options, defaulting to Everyone
+ 5. Editing an existing list shows its own visibility, not a default
+ 6. A non-admin can create, edit, rename and delete their own lists, and
+    start one from an HO list
+ 7. A non-admin cannot enforce, un-enforce, move or publish anything; 403 on each
+ 8. A non-admin cannot see or touch another user's list
+ 9. An admin sees every list, including users' private ones, with the
+    owner's name against each
+10. An admin can enforce a user's private list directly
+11. Enforcing a private list publishes it to HO in the same action
+12. A moved or enforced list keeps its id, items, competitor rules and history
+13. The creator can still edit their list after it is moved or enforced
+14. Last changed holds a user on every row, after create, edit, rename,
+    upload, move and enforce
+15. The row the rename corrupted now shows the admin who made it
+16. mrp_price_history count and checksum unchanged, both environments
+```
+
+# Report
+
+Short. Screenshots of the create page as an admin and as a non-admin, the admin's list view showing a user's private list with its owner, and the Last changed column with a person on every row. Test results and the before/after figures in one line.

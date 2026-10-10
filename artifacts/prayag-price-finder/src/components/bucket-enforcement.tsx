@@ -101,7 +101,7 @@ export function EnforcementTab({ isAdmin, userId }: { isAdmin: boolean; userId?:
           <select id="ho-enforce-list" value={pick} onChange={e => setPick(e.target.value)} disabled={busy}
             className="h-9 w-full rounded-md border bg-background px-2 text-sm" data-testid="select-enforce-list">
             <option value="">Choose a list</option>
-            {choices.map(l => <option key={l.id} value={l.id}>{l.name} — {l.type === "excluded" ? "Excluded" : "Included"}</option>)}
+            {choices.map(l => <option key={l.id} value={l.id}>{l.name}{l.visibility === "only_me" ? ` (${l.ownerName})` : ""} — {l.type === "excluded" ? "Excluded" : "Included"}</option>)}
           </select>
           {picked && <p className="text-sm" data-testid="text-pick-effect">{enforcedEffectText(picked)}</p>}
           {choices.length === 0 && <p className="text-sm text-muted-foreground">No other lists are available.</p>}

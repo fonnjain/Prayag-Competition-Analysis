@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { PreviewBucketListBody } from "@workspace/api-zod";
-import { db, bucketListsTable, bucketPreferencesTable, catalogProductsTable, competitorPricesTable, bucketEnforcementTable, type BucketEnforcementRecord, type BucketListRecord } from "@workspace/db";
+import { db, bucketListsTable, bucketPreferencesTable, catalogProductsTable, competitorPricesTable, bucketEnforcementTable, usersTable, type BucketEnforcementRecord, type BucketListRecord } from "@workspace/db";
 import { supportsCatalogRange } from "@workspace/formatting";
 import { normalizeVocabularyKey } from "./priceEditorVocabulary";
 import { BucketError, bucketAllowsCode, isLiveBucketProduct, matchesBucketRule, resolveBucketCodes, type BucketDefinition, type BucketProduct } from "./bucketMembership";
@@ -38,10 +38,11 @@ type Draft = typeof bucketDraftSchema["_output"];
 type Executor = Pick<typeof db, "select" | "insert" | "update" | "delete" | "execute">;
 export type BucketExecutor = Executor;
 export type BucketWorld = { catalogue: BucketProduct[]; lists: BucketListRecord[]; byId: Map<string, BucketListRecord>;
+  ownerNames?: Map<string, string>;
   competitorNames?: string[]; quotes?: CompetitorQuote[]; enforcement?: BucketEnforcementRecord };
 
 export async function loadBucketWorld(executor: Executor = db): Promise<BucketWorld> {
-  const [catalogue, lists, names, currentQuotes, enforcement] = await Promise.all([
+  const [catalogue, lists, names, currentQuotes, enforcement, owners] = await Promise.all([
     executor.select({
       itemCode: catalogProductsTable.itemCode, productName: catalogProductsTable.productName,
       division: catalogProductsTable.division, category: catalogProductsTable.category,
@@ -57,18 +58,20 @@ export async function loadBucketWorld(executor: Executor = db): Promise<BucketWo
         AND effective_date <= CURRENT_DATE AND price IS NOT NULL
       ORDER BY competitor, matched_prayag_code, effective_date DESC, id DESC`),
     executor.select().from(bucketEnforcementTable).where(eq(bucketEnforcementTable.id, 1)),
+    executor.select({id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName}).from(usersTable),
   ]);
   return { catalogue, lists, byId: new Map(lists.map(list => [list.id, list])),
+    ownerNames: new Map(owners.map(user => [user.id, [user.firstName,user.lastName].filter(Boolean).join(" ").trim() || user.id])),
     competitorNames: names.map(row => row.competitor).sort(), quotes: currentQuotes.rows, enforcement: enforcement[0] };
 }
 export function canReadBucket(list: BucketListRecord, actor: BucketActor) {
-  return list.ownerId === actor.id || list.visibility === "everyone";
+  return actor.admin || list.ownerId === actor.id || list.creatorId === actor.id || list.visibility === "everyone";
 }
 export function bucketInOwnerTab(list: BucketListRecord, actor: BucketActor, owner: "all" | "ho" | "mine") {
   if (!canReadBucket(list, actor)) return false;
   const ho = list.visibility === "everyone";
   const mine = list.ownerId === actor.id && list.visibility === "only_me";
-  return owner === "ho" ? ho : owner === "mine" ? mine : ho || mine;
+  return owner === "ho" ? ho : owner === "mine" ? mine : true;
 }
 export function assertBucketVisible(id: string, actor: BucketActor, world: BucketWorld) {
   const list = world.byId.get(id);
@@ -76,7 +79,7 @@ export function assertBucketVisible(id: string, actor: BucketActor, world: Bucke
   return list;
 }
 function assertOwner(list: BucketListRecord, actor: BucketActor) {
-  if (list.ownerId !== actor.id || (list.visibility === "everyone" && !actor.admin))
+  if (!actor.admin && list.ownerId !== actor.id && list.creatorId !== actor.id)
     throw new BucketError("You cannot change a bucket list you do not own.", 403, "BUCKET_FORBIDDEN");
 }
 function ownBucketCodes(definition: BucketDefinition, world: BucketWorld) {
@@ -123,7 +126,9 @@ export function describeBucket(definition: BucketDefinition & Partial<BucketList
   return {
     ...definition, id: definition.id ?? "", name: definition.name ?? "", type: definition.type ?? "excluded",
     visibility: definition.visibility ?? "only_me", parentName: parent && canReadBucket(parent, actor) ? parent.name : null,
-    canEdit: definition.ownerId === actor.id && (definition.visibility !== "everyone" || actor.admin),
+    ownerName: world.ownerNames?.get(definition.ownerId ?? "") ??
+      (definition.ownerId === actor.id ? actor.label : (definition as BucketListRecord).createdBy ?? definition.ownerId ?? ""),
+    canEdit: actor.admin || definition.ownerId === actor.id || (definition as BucketListRecord).creatorId === actor.id,
     isEnforced: !!definition.id && definition.id === world.enforcement?.listId,
     affectsEnforced: !!definition.id && enforcedAffected(definition.id, world),
     enforcedListName: world.enforcement?.listId ? world.byId.get(world.enforcement.listId)?.name ?? null : null,
@@ -161,8 +166,8 @@ export function prepareBucketDraft(input: unknown, actor: BucketActor, world: Bu
     observedCodes: previous?.observedCodes ?? [],
     ...(previous ? { id: previous.id } : {}),
   };
-  if (definition.visibility === "everyone" && !actor.admin)
-    throw new BucketError("Admin access required to share a Head Office list.", 403, "BUCKET_FORBIDDEN");
+  if (previous && definition.visibility !== previous.visibility && !actor.admin)
+    throw new BucketError("Only administrators can move existing lists.", 403, "BUCKET_FORBIDDEN");
   if (previous && definition.parentId !== previous.parentId)
     throw new BucketError("Use Detach from the original to freeze these members. To relink, start a new copy.");
   if (definition.parentId) {
@@ -192,7 +197,8 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
     if (draft.parentId) await observeBucketMembership(world.byId.get(draft.parentId)!, world, tx);
     if (!draft.name || !normalizeVocabularyKey(draft.name)) throw new BucketError("A name is required.");
     const nameKey = normalizeVocabularyKey(draft.name);
-    const conflict = world.lists.find(list => list.ownerId === actor.id && list.nameKey === nameKey && list.id !== id);
+    const ownerId = previous?.ownerId ?? actor.id;
+    const conflict = world.lists.find(list => list.ownerId === ownerId && list.nameKey === nameKey && list.id !== id);
     if (conflict) throw new BucketError("You already have a list with this name.", 409, "BUCKET_NAME_EXISTS", { existingList: { id: conflict.id, name: conflict.name } });
     const codes = resolveBucketCodes(draft, world.byId, world.catalogue);
     const catalogueCodes = new Set(world.catalogue.map(p => p.itemCode));
@@ -208,12 +214,12 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
         "The original became private");
     }
     const values = {
-      ...draft, nameKey, ownerId: actor.id, updatedBy: actor.label, updatedAt: new Date(),
+      ...draft, nameKey, ownerId, updatedBy: actor.label, updatedAt: new Date(),
       observedCodes: [...new Set([...draft.observedCodes, ...ownBucketCodes(draft, world)])],
     };
     const [saved] = previous
       ? await tx.update(bucketListsTable).set(values).where(eq(bucketListsTable.id, previous.id)).returning()
-      : await tx.insert(bucketListsTable).values({ ...values, createdBy: actor.label }).returning();
+      : await tx.insert(bucketListsTable).values({ ...values, creatorId: actor.id, createdBy: actor.label }).returning();
     world.byId.set(saved.id, saved);
     if (before) await recordEnforcedEdit(tx, actor, world, before, saved.name);
     return describeBucket(saved, world, actor);
@@ -337,7 +343,7 @@ export async function getActiveBucket(actor: BucketActor | null, forFilter = fal
   const forced = world.enforcement?.listId ? world.byId.get(world.enforcement.listId) : null;
   if (world.enforcement?.listId && (!forced || forced.visibility !== "everyone"))
     throw new BucketError("Invalid company enforcement; refusing an unfiltered fallback.", 500, "ENFORCEMENT_INVALID");
-  const selection = resolvePersonalSelection(preference, world.byId, viewer.id, forced?.id ?? null);
+  const selection = resolvePersonalSelection(preference, world.byId, viewer.id, forced?.id ?? null, viewer.admin);
   const enforced = forced ? describeBucket(forced, world, viewer) : null;
   for (const personal of selection.personalLists) await observeBucketMembership(world.byId.get(personal.id)!, world);
   const personalLists = selection.personalLists.map(list => describeBucket(world.byId.get(list.id)!, world, viewer));
@@ -366,7 +372,7 @@ export async function setActiveBucket(actor: BucketActor, id: string | null, act
     if (id && id === world.enforcement?.listId)
       throw new BucketError("The enforced list applies automatically and cannot be selected or cleared here.", 403, "BUCKET_ENFORCED");
     const [preference] = await tx.select().from(bucketPreferencesTable).where(eq(bucketPreferencesTable.userId, actor.id));
-    const current = resolvePersonalSelection(preference, world.byId, actor.id, world.enforcement?.listId ?? null);
+    const current = resolvePersonalSelection(preference, world.byId, actor.id, world.enforcement?.listId ?? null, actor.admin);
     // The owner tabs/private-detail endpoint remain strict. A former shared-list
     // user may only turn OFF an already-retained filter, never select it anew.
     const target = id ? (!active && current.personalLists.some(list => list.id === id)

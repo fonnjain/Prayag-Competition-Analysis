@@ -177,8 +177,9 @@ export default function BucketListsPage() {
                     <td className="px-3 py-3"><TypeBadge type={l.type} /></td>
                     <td className="px-3 py-3">
                       <span className={cn("rounded px-2 py-0.5 text-[11px] font-bold", ho ? "bg-indigo-200 text-indigo-950" : "bg-emerald-200 text-emerald-950")}>
-                        {ho ? "HO" : "Mine"}
+                        {ho ? "HO" : l.ownerId === user?.id ? "Mine" : "Private"}
                       </span>
+                      {!ho && <div className="mt-1 text-xs" data-testid={`owner-name-${l.id}`}>{l.ownerName}</div>}
                     </td>
                     <td className="px-3 py-3 text-right font-mono" data-testid={`text-items-${l.id}`}>{`${l.count} ${l.count === 1 ? "product" : "products"} \u00b7 ${nComp} ${nComp === 1 ? "competitor" : "competitors"}`}</td>
                     <td className="max-w-[220px] px-3 py-3 text-xs text-muted-foreground">{divText}</td>

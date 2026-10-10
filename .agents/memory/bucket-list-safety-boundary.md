@@ -43,9 +43,10 @@ combined predicates. Competitor-only lists disclose their competitor count,
 not an apparently empty product-only count.
 
 **How to apply:** An admin may enforce any list they can see, including their
-own private list; enforcing a private list must publish that same list to
-Everyone atomically. Another user's private list remains invisible even to an
-admin. Enforce/release
+own private list or another user's private list; admins can see every list,
+with the owner's name on private lists. Enforcing a private list must publish
+that same list to Everyone atomically. Non-admins create private lists only
+and cannot move, publish, enforce or release a list. Enforce/release
 need admin authority but no typed reason, approval or extra confirmation. Keep immutable event-time definitions,
 resolved scope and counts so later edits cannot rewrite the explanation of an
 old report. Admin edits apply immediately without confirmation, including linked
@@ -62,8 +63,9 @@ them reactivate it after clearing it. An in-force list or its linked original
 must be taken out of force before becoming private.
 
 **Why:** The user explicitly requires non-overlapping visibility tabs and
-continued active filters after a move, while keeping other people's private
-lists hidden, even from administrators.
+continued active filters after a move. The superseding permission rule lets
+administrators inspect every private list to explain missing report products,
+while other non-admins still cannot inspect another user's private list.
 
 **How to apply:** Treat active-use retention separately from list visibility.
 Do not clear other users' selected filters on a visibility move, broaden

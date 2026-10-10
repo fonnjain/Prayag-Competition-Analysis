@@ -19,7 +19,9 @@ export function assertEnforcementAdmin(actor: BucketActor) {
 }
 export function assertEnforcedEdit(id: string, _input: unknown, actor: BucketActor, world: BucketWorld) {
   if (!enforcedAffected(id, world)) return false;
-  assertEnforcementAdmin(actor);
+  const list = world.byId.get(id);
+  if (!actor.admin && list?.creatorId !== actor.id && list?.ownerId !== actor.id)
+    throw new BucketError("You cannot edit this enforced list.", 403, "BUCKET_FORBIDDEN");
   return true;
 }
 export function assertEnforcedDelete(id: string, world: BucketWorld) {
@@ -88,7 +90,7 @@ export async function changeBucketEnforcement(input: unknown, actor: BucketActor
     if (!release && !next) throw new BucketError("List not found.", 404, "BUCKET_NOT_FOUND");
     if (next?.visibility === "only_me") {
       next = await moveBucketInside(tx, actor, world, next.id, "everyone");
-      message = `"${next.name}" has been put in force, and is now an HO list so everyone can see what is being applied.`;
+      message = `"${next.name}" is in force, and is now an HO list so everyone can see what is being applied.`;
     }
     if (release && !previous) throw new BucketError("No list is in force.");
     const list = (release ? previous : next)!;

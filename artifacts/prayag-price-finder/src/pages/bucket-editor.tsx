@@ -127,7 +127,7 @@ export default function BucketEditorPage() {
   // Init once per route target
   useEffect(() => {
     if (!signedIn) return;
-    const key = `${editId ?? ""}|${parentParam ?? ""}|${codeParams.join(",")}`;
+    const key = `${user?.id}|${editId ?? ""}|${parentParam ?? ""}|${codeParams.join(",")}`;
     if (editId) {
       if (detail && initFor.current !== key) {
         initFor.current = key;
@@ -140,10 +140,10 @@ export default function BucketEditorPage() {
       }
     } else if (initFor.current !== key) {
       initFor.current = key;
-      setDraft((d) => ({ ...d, parentId: parentParam, addedCodes: parentParam ? [] : uniq(codeParams), removedCodes: [] }));
+      setDraft((d) => ({ ...d, visibility: isAdmin ? "everyone" : "only_me", parentId: parentParam, addedCodes: parentParam ? [] : uniq(codeParams), removedCodes: [] }));
       setReady(true);
     }
-  }, [signedIn, editId, detail, parentParam, codeParams]);
+  }, [signedIn, user?.id, isAdmin, editId, detail, parentParam, codeParams]);
 
   // Live server-resolved preview
   const draftKey = JSON.stringify(draft);
@@ -305,7 +305,7 @@ export default function BucketEditorPage() {
             </div>
             <div className="mt-3">
               <label className="text-sm font-semibold">Visibility</label>
-              {isAdmin && !readOnly ? (
+              {(!editId || isAdmin) && !readOnly ? (
                 <div className="mt-1 flex gap-2">
                   {([["only_me", "Only me"], ["everyone", "Everyone (Head Office list)"]] as const).map(([v, l]) => (
                     <button key={v} type="button" onClick={() => set({ visibility: v })} data-testid={`button-visibility-${v}`}
@@ -315,7 +315,7 @@ export default function BucketEditorPage() {
               ) : (
                 <p className="mt-1 text-sm" data-testid="text-visibility-fixed">
                   <strong>{draft.visibility === "everyone" ? "Everyone" : "Only me"}</strong>
-                  <span className="text-muted-foreground"> - {isAdmin ? "" : "Your lists are private to you. Only an administrator can share a list with everyone."}</span>
+                  <span className="text-muted-foreground"> — Only an administrator can move an existing list.</span>
                 </p>
               )}
             </div>
