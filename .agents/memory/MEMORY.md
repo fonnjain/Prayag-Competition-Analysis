@@ -51,3 +51,4 @@
 - [Bucket-list safety](bucket-list-safety-boundary.md) — company restricts before personal; A–K exports disclose both; never activate production or seed HO lists.
 - [Export round-trip verification](export-round-trip-verification.md) — test exact disclosed files through importers; reload checks must include initial totals, not just restored banners.
 - [Logout revocation boundary](logout-revocation-boundary.md) — confirm server revocation before clearing bearer identity; local sign-out alone is not security proof.
+- [Large SQL transport](large-sql-transport.md) — oversized inline SQL can fail with E2BIG before execution; use a guarded development client for large approved payloads.

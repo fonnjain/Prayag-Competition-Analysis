@@ -32,3 +32,9 @@ Audit units across every selected sheet, not only PPR. Read the already-correct 
 **Why:** Prayag explicitly extended the Astral correction to every sheet. These workbooks include 5-m pipes and short SWR lengths as well as 3-m and 6-m pipes; forcing one unit per worksheet would misstate valid prices.
 
 **How to apply:** Compare each represented length against existing stored/source evidence. Where there is no existing comparator, report that exception and the source-based unit choice honestly rather than claiming a verified match.
+
+Prayag accepted Jindal PE-AL-PE fittings as **"each, no comparator, accepted on analysis"**. Preserve that qualification rather than relabelling the decision as a verified comparison against an existing competitor.
+
+**Why:** The user confirmed these are individual fittings and supplied an independent 24% median spread, which did not indicate a 3x/6x unit mismatch.
+
+**How to apply:** Keep this acceptance attached to the approved workbook's provenance; do not generalize it to other Jindal categories or later workbooks without checking their units.
