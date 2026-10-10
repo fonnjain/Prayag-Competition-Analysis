@@ -266,7 +266,9 @@ export default function BucketEditorPage() {
     </div>
   );
 
-  const parentName = detail?.parentName ?? preview?.parentName ?? (allLists.data ?? []).find((l) => l.id === draft.parentId)?.name;
+  const parentList = (allLists.data ?? []).find((l) => l.id === draft.parentId);
+  const parentLabel = detail?.parentName ?? preview?.parentName ?? parentList?.name;
+  const parentName = parentLabel && parentList?.visibility === "only_me" ? `${parentLabel} (${parentList.ownerName})` : parentLabel;
 
   return (
     <div className="mx-auto max-w-[1400px] p-4 md:p-6">
@@ -276,7 +278,10 @@ export default function BucketEditorPage() {
       <h1 className="mb-4 mt-1 text-2xl font-black tracking-tight">
         {readOnly ? "View bucket list" : editId ? "Edit bucket list" : "New bucket list"}
       </h1>
-      {readOnly && <p className="mb-3 rounded border bg-muted p-3 text-sm" data-testid="text-readonly">You are viewing this list read-only. Only the owner can edit it. Use Copy and edit to start your own.</p>}
+      {detail?.visibility === "only_me" && <p className="mb-3 text-sm" data-testid="text-private-owner">Owner: {detail.ownerName}</p>}
+      {readOnly && <p className="mb-3 rounded border bg-muted p-3 text-sm" data-testid="text-readonly">{detail?.visibility === "everyone" && !isAdmin
+        ? "This list is now shared by Head Office. Use Copy and edit to make your own version."
+        : "You are viewing this list read-only. Use Copy and edit to start your own."}</p>}
       {detail?.detachedNotice && <p className="mb-3 rounded border border-amber-400 bg-amber-100 p-3 text-sm text-amber-950" data-testid="text-detached-notice">{detail.detachedNotice}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -305,7 +310,7 @@ export default function BucketEditorPage() {
             </div>
             <div className="mt-3">
               <label className="text-sm font-semibold">Visibility</label>
-              {(!editId || isAdmin) && !readOnly ? (
+              {isAdmin && !readOnly ? (
                 <div className="mt-1 flex gap-2">
                   {([["only_me", "Only me"], ["everyone", "Everyone (Head Office list)"]] as const).map(([v, l]) => (
                     <button key={v} type="button" onClick={() => set({ visibility: v })} data-testid={`button-visibility-${v}`}
@@ -314,8 +319,7 @@ export default function BucketEditorPage() {
                 </div>
               ) : (
                 <p className="mt-1 text-sm" data-testid="text-visibility-fixed">
-                  <strong>{draft.visibility === "everyone" ? "Everyone" : "Only me"}</strong>
-                  <span className="text-muted-foreground"> — Only an administrator can move an existing list.</span>
+                  {draft.visibility === "everyone" ? "Everyone (Head Office list)" : "Only you can see this list. An admin can share it with everyone."}
                 </p>
               )}
             </div>
@@ -325,7 +329,7 @@ export default function BucketEditorPage() {
                 <select value={draft.parentId ?? ""} disabled={!!editId} onChange={(e) => set({ parentId: e.target.value || null, addedCodes: [], removedCodes: [] })}
                   className="mt-1 block h-9 w-full rounded-md border bg-background px-2 text-sm" data-testid="select-parent">
                   <option value="">Blank</option>
-                  {(allLists.data ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} - {l.type === "excluded" ? "Excluded" : "Included"}</option>)}
+                  {(allLists.data ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}{l.visibility === "only_me" ? ` (${l.ownerName})` : ""} - {l.type === "excluded" ? "Excluded" : "Included"}</option>)}
                 </select>
               </div>
             )}

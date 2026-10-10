@@ -19,9 +19,7 @@ export function assertEnforcementAdmin(actor: BucketActor) {
 }
 export function assertEnforcedEdit(id: string, _input: unknown, actor: BucketActor, world: BucketWorld) {
   if (!enforcedAffected(id, world)) return false;
-  const list = world.byId.get(id);
-  if (!actor.admin && list?.creatorId !== actor.id && list?.ownerId !== actor.id)
-    throw new BucketError("You cannot edit this enforced list.", 403, "BUCKET_FORBIDDEN");
+  assertEnforcementAdmin(actor);
   return true;
 }
 export function assertEnforcedDelete(id: string, world: BucketWorld) {

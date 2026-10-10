@@ -9,6 +9,8 @@ import {
 export interface ActiveBucketInfo {
   id: string;
   name: string;
+  visibility?: "only_me" | "everyone";
+  ownerName?: string;
   type: "included" | "excluded";
   count: number;
   competitorCount?: number;
@@ -114,6 +116,7 @@ export function useActiveBucket(userId: string | null | undefined) {
     personalLists?: Raw[]; banner?: string | null; noCompetitorPriceCount?: number } | undefined;
   const info = (l: Raw | null | undefined): ActiveBucketInfo | null => l ? {
     id: String(l.id), name: String(l.name), type: l.type as "included" | "excluded",
+    visibility: l.visibility as "only_me" | "everyone", ownerName: String(l.ownerName ?? ""),
     count: Number(l.activeCount ?? l.count ?? 0), competitorCount: Number(l.competitorCount ?? 0),
     competitorRules: l.competitorRules as ActiveBucketInfo["competitorRules"],
     noCompetitorPriceCount: Number(l.noCompetitorPriceCount ?? 0), productFilterApplied: l.productFilterApplied !== false,

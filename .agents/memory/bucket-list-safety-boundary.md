@@ -54,6 +54,27 @@ originals; require release before deletion. Show company then personal in
 headers/exports, and compute last-quote loss once over the combined predicates.
 Show no inactive enforcement placeholder outside its management tab.
 
+Only administrators may create Head Office lists or edit, rename or delete any
+shared/enforced list, even when a non-admin originally created it. Non-admins
+may edit their own private lists and create private copies of visible HO lists.
+Admin creation defaults to Everyone; editing keeps the stored visibility.
+
+**Why:** The user reversed creator editing rights after publication: editing a
+shared list has the same company-wide power as publishing it.
+
+**How to apply:** Enforce the role boundary on endpoints as well as controls.
+Show non-admins the plain privacy explanation, not a disabled toggle. A shared
+list's original creator gets the Copy and edit explanation, never edit rights.
+
+Last changed stores the acting person, never an operation description.
+
+**Why:** An approved automated rename previously wrote its reason into the
+actor field, leaving a misleading audit attribution.
+
+**How to apply:** Keep actor and reason separate on all list write paths.
+Repair a known bad attribution only with verified person evidence, preserving
+the original event timestamp; never invent a system actor to conceal the gap.
+
 HO means Everyone, not a special owner identity. My lists means the viewer's
 own Only me lists; shared lists owned by the viewer belong only to HO, and All
 is the union. Moving a shared list to My lists transfers ownership to the
@@ -69,7 +90,7 @@ while other non-admins still cannot inspect another user's private list.
 
 **How to apply:** Treat active-use retention separately from list visibility.
 Do not clear other users' selected filters on a visibility move, broaden
-private-list browsing, or make an extra copy of the list.
+non-admin private-list browsing, or make an extra copy of the list.
 
 The superseding combined specification requires simple action/list/who/when
 history, and one-line export disclosure naming company first then personal.

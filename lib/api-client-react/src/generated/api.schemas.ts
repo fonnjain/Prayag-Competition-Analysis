@@ -166,6 +166,7 @@ export type BucketListRuleCountsItem = { [key: string]: unknown };
 export type BucketList = BucketDraft & ({
   id: string;
   ownerId?: string;
+  ownerName?: string;
   /** @nullable */
   parentName?: string | null;
   count: number;

@@ -188,6 +188,7 @@ export default function BucketListsPage() {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-1">
+                        {!isAdmin && ho && <p className="w-full text-xs text-muted-foreground" data-testid={`text-shared-readonly-${l.id}`}>This list is now shared by Head Office. Use Copy and edit to make your own version.</p>}
                         {enforcedHere ? (
                           <span className="inline-flex h-8 items-center rounded-md border px-2.5 text-xs font-semibold text-muted-foreground" data-testid={`text-enforced-${l.id}`}>Enforced by Head Office</span>
                         ) : (

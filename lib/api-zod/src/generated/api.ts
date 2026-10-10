@@ -13202,6 +13202,7 @@ export const GetBucketListsResponseItem = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13310,6 +13311,7 @@ export const PreviewBucketListResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13413,6 +13415,7 @@ export const GetBucketEnforcementResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13499,6 +13502,7 @@ export const EnforceBucketListResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13584,6 +13588,7 @@ export const ReleaseBucketEnforcementResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13661,6 +13666,7 @@ export const GetBucketListResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13739,6 +13745,7 @@ export const UpdateBucketListResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13808,6 +13815,7 @@ export const MoveBucketToHoResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13872,6 +13880,7 @@ export const MoveBucketToMyResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),
@@ -13932,6 +13941,7 @@ export const DetachBucketListResponse = zod.object({
 }).and(zod.object({
   "id": zod.string(),
   "ownerId": zod.string().optional(),
+  "ownerName": zod.string().optional(),
   "parentName": zod.string().nullish(),
   "count": zod.number(),
   "activeCount": zod.number().optional(),

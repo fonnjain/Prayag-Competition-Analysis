@@ -37,7 +37,7 @@ it("serves Step 6 owner-tab and move checks without mutating public data", async
     const actor = ["admin","other-admin","user","fresh"].includes(requested) ? requested : "admin";
     req.isAuthenticated = (() => true) as never;
     req.user = {id:`step6-browser-${actor}`,role:actor.includes("admin")?"admin":"user",
-      firstName:"Step6",lastName:"Isolated test",email:`step6-${actor}@example.test`,
+      firstName:actor==="user"?"Jordan":actor==="other-admin"?"Casey":"Avery",lastName:actor==="user"?"User":"Admin",email:`step6-${actor}@example.test`,
       profileImageUrl:null,mustChangePassword:false} as never;
     if (req.path.startsWith("/api/activity") || (["POST","PUT","PATCH","DELETE"].includes(req.method) && !req.path.startsWith("/api/bucket-lists")))
       return res.status(204).end();
@@ -50,6 +50,8 @@ it("serves Step 6 owner-tab and move checks without mutating public data", async
     }).expect(201);
     return {id:r.body.id,name:r.body.name};
   };
+  const creatorList = await create("Creator review","only_me","excluded","user");
+  await supertest(app).post(`/api/bucket-lists/${creatorList.id}/move-to-ho`).set("x-step6-test-actor","admin").expect(200);
   const sharedExcluded = await create("Shared pipes","everyone","excluded","other-admin");
   const sharedIncluded = await create("Shared fittings","everyone","included");
   const myExcluded = await create("My supplier","only_me","excluded","admin",{addedCodes:[],rules:[{competitor:"Ashirvad",scope:"everywhere"}]});
@@ -58,9 +60,9 @@ it("serves Step 6 owner-tab and move checks without mutating public data", async
   const userPrivate = await create("User private","only_me","excluded","user");
   await new Promise<void>(resolve => { server=app.listen(0,"127.0.0.1",()=>resolve()); });
   const port=(server.address() as {port:number}).port;
-  const dir="../../generated-artifacts/p053-step6";
+  const dir="../../generated-artifacts/p053-step7";
   await mkdir(dir,{recursive:true});
-  await writeFile(`${dir}/browser-context.json`,JSON.stringify({port,codes,sharedExcluded,sharedIncluded,myExcluded,myIncluded,foreignPrivate,userPrivate},null,2));
+  await writeFile(`${dir}/browser-context.json`,JSON.stringify({port,codes,creatorList,sharedExcluded,sharedIncluded,myExcluded,myIncluded,foreignPrivate,userPrivate},null,2));
   console.log(`P053_STEP6_PRIVATE_BROWSER_READY port=${port}`);
   const deadline=Date.now()+1200000;
   while(Date.now()<deadline) {

@@ -65,7 +65,7 @@ export async function loadBucketWorld(executor: Executor = db): Promise<BucketWo
     competitorNames: names.map(row => row.competitor).sort(), quotes: currentQuotes.rows, enforcement: enforcement[0] };
 }
 export function canReadBucket(list: BucketListRecord, actor: BucketActor) {
-  return actor.admin || list.ownerId === actor.id || list.creatorId === actor.id || list.visibility === "everyone";
+  return actor.admin || list.ownerId === actor.id || list.visibility === "everyone";
 }
 export function bucketInOwnerTab(list: BucketListRecord, actor: BucketActor, owner: "all" | "ho" | "mine") {
   if (!canReadBucket(list, actor)) return false;
@@ -79,7 +79,7 @@ export function assertBucketVisible(id: string, actor: BucketActor, world: Bucke
   return list;
 }
 function assertOwner(list: BucketListRecord, actor: BucketActor) {
-  if (!actor.admin && list.ownerId !== actor.id && list.creatorId !== actor.id)
+  if (!actor.admin && (list.ownerId !== actor.id || list.visibility !== "only_me"))
     throw new BucketError("You cannot change a bucket list you do not own.", 403, "BUCKET_FORBIDDEN");
 }
 function ownBucketCodes(definition: BucketDefinition, world: BucketWorld) {
@@ -128,7 +128,7 @@ export function describeBucket(definition: BucketDefinition & Partial<BucketList
     visibility: definition.visibility ?? "only_me", parentName: parent && canReadBucket(parent, actor) ? parent.name : null,
     ownerName: world.ownerNames?.get(definition.ownerId ?? "") ??
       (definition.ownerId === actor.id ? actor.label : (definition as BucketListRecord).createdBy ?? definition.ownerId ?? ""),
-    canEdit: actor.admin || definition.ownerId === actor.id || (definition as BucketListRecord).creatorId === actor.id,
+    canEdit: actor.admin || (definition.ownerId === actor.id && definition.visibility === "only_me"),
     isEnforced: !!definition.id && definition.id === world.enforcement?.listId,
     affectsEnforced: !!definition.id && enforcedAffected(definition.id, world),
     enforcedListName: world.enforcement?.listId ? world.byId.get(world.enforcement.listId)?.name ?? null : null,
@@ -166,8 +166,8 @@ export function prepareBucketDraft(input: unknown, actor: BucketActor, world: Bu
     observedCodes: previous?.observedCodes ?? [],
     ...(previous ? { id: previous.id } : {}),
   };
-  if (previous && definition.visibility !== previous.visibility && !actor.admin)
-    throw new BucketError("Only administrators can move existing lists.", 403, "BUCKET_FORBIDDEN");
+  if (!actor.admin && definition.visibility !== "only_me")
+    throw new BucketError("Only administrators can publish or edit Head Office lists.", 403, "BUCKET_FORBIDDEN");
   if (previous && definition.parentId !== previous.parentId)
     throw new BucketError("Use Detach from the original to freeze these members. To relink, start a new copy.");
   if (definition.parentId) {
@@ -219,7 +219,7 @@ export async function saveBucket(input: unknown, actor: BucketActor, id?: string
     };
     const [saved] = previous
       ? await tx.update(bucketListsTable).set(values).where(eq(bucketListsTable.id, previous.id)).returning()
-      : await tx.insert(bucketListsTable).values({ ...values, creatorId: actor.id, createdBy: actor.label }).returning();
+      : await tx.insert(bucketListsTable).values({ ...values, createdBy: actor.label }).returning();
     world.byId.set(saved.id, saved);
     if (before) await recordEnforcedEdit(tx, actor, world, before, saved.name);
     return describeBucket(saved, world, actor);

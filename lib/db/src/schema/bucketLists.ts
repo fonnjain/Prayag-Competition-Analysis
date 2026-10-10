@@ -16,8 +16,6 @@ export type BucketRule = {
 export const bucketListsTable = pgTable("bucket_lists", {
   id: uuid("id").primaryKey().defaultRandom(),
   ownerId: varchar("owner_id").notNull().references(() => usersTable.id),
-  // Immutable creator identity: a move may change owner, never edit rights.
-  creatorId: varchar("creator_id").references(() => usersTable.id),
   name: text("name").notNull(),
   nameKey: text("name_key").notNull(),
   description: text("description"),

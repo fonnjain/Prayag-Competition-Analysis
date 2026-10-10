@@ -80,7 +80,7 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
               onClick={() => setOpen((o) => !o)}
               style={{ ...base, color: t.text, display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 8px", minWidth: 0 }}>
               <span aria-hidden style={{ width: 9, height: 9, borderRadius: 9, background: t.dot, flex: "none" }} />
-              <strong data-testid="text-bucket-name" style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{l.name}</strong>
+              <strong data-testid="text-bucket-name" style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{l.name}{l.visibility === "only_me" ? ` (${l.ownerName})` : ""}</strong>
               <span data-testid="text-bucket-type" style={{ flex: "none", fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", border: `1px solid ${t.border}`, borderRadius: 3, padding: "1px 4px" }}>{t.label}</span>
               <span data-testid="text-bucket-effect" style={{ flex: "none", fontWeight: 600, whiteSpace: "nowrap" }}>{effectOf(l)}</span>
             </button>
@@ -138,7 +138,7 @@ export function BucketControl({ userId }: { userId: string | null | undefined })
                       <input type={isInc ? "radio" : "checkbox"} name={isInc ? "bucket-included" : undefined} checked={on} disabled={isPending}
                         onChange={() => toggle(l.id, !on)} onClick={isInc && on ? () => toggle(l.id, false) : undefined} />
                       {ho && <span data-testid="tag-bucket-ho" style={{ flex: "none", fontSize: 10, fontWeight: 800, background: "#c7d2fe", color: "#1e1b4b", borderRadius: 3, padding: "1px 5px" }}>HO</span>}
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}{l.visibility === "only_me" ? ` (${l.ownerName})` : ""}</span>
                       <span style={{ flex: "none", color: MUTED, fontVariantNumeric: "tabular-nums", fontSize: 12 }}>{(l.activeCount ?? l.count).toLocaleString()} products{l.competitorCount ? ` · ${l.competitorCount} competitor${l.competitorCount === 1 ? "" : "s"}` : ""}</span>
                     </label>
                   );

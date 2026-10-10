@@ -14,7 +14,7 @@ function requester(id: string, role: "admin" | "user") {
   app.use(express.json());
   app.use((req, _res, next) => {
     req.isAuthenticated = (() => true) as never;
-    req.user = { id, role, email: `${id}@example.test`, mustChangePassword: false } as never;
+    req.user = { id, role, firstName: id === "step6-user" ? "Jordan" : "Avery", lastName: id === "step6-user" ? "User" : "Admin", email: `${id}@example.test`, mustChangePassword: false } as never;
     next();
   });
   app.use("/api", routes);
@@ -60,25 +60,29 @@ describe("P053 Step 6 ownership, privacy and atomic publication", () => {
     const sharedIn = await create("Shared included","everyone","included",otherAdmin);
     const privateEx = await create("My excluded");
     const privateIn = await create("My included","only_me","included");
-    await create("Foreign private","only_me","excluded",otherAdmin);
+    const foreign = await create("Foreign private","only_me","excluded",otherAdmin);
     const ho = await listIds("ho"), mine = await listIds("mine"), all = await listIds();
     expect(ho).toEqual([sharedEx.id,sharedIn.id].sort());
     expect(mine).toEqual([privateEx.id,privateIn.id].sort());
-    expect(all).toEqual([...ho,...mine].sort());
+    expect(all).toEqual([...ho,...mine,foreign.id].sort());
     expect(new Set(all).size).toBe(all.length);
     expect(await listIds("mine","excluded")).toEqual([privateEx.id]);
     expect(await listIds("ho","included")).toEqual([sharedIn.id]);
     expect(await listIds("mine","included")).toEqual([privateIn.id]);
   });
-  it("another user's private list is absent even for an admin; direct reads and enforcement refuse", async () => {
+  it("admins see every user's private list with owner; non-admins cannot inspect another private list", async () => {
     const foreign = await create("User secret","only_me","excluded",user);
     for (const client of [admin,otherAdmin]) {
-      for (const tab of ["all","ho","mine"]) expect(await listIds(tab,"all",client)).not.toContain(foreign.id);
-      await client.get(`/api/bucket-lists/${foreign.id}`).expect(404);
-      await client.post(`/api/bucket-lists/${foreign.id}/move-to-ho`).expect(404);
-      const state = await client.get("/api/bucket-lists/enforcement").expect(200);
-      await client.post("/api/bucket-lists/enforcement").send({listId:foreign.id,expectedVersion:state.body.version}).expect(404);
+      expect(await listIds("all","all",client)).toContain(foreign.id);
+      for (const tab of ["ho","mine"]) expect(await listIds(tab,"all",client)).not.toContain(foreign.id);
+      const r = await client.get(`/api/bucket-lists/${foreign.id}`).expect(200);
+      expect(r.body.ownerName).toBe("Jordan User");
+      expect(r.body.canEdit).toBe(true);
     }
+    const secret = await create("Another person's private");
+    await user.get(`/api/bucket-lists/${secret.id}`).expect(404);
+    await user.patch(`/api/bucket-lists/${secret.id}`).send({name:"Stolen"}).expect(404);
+    await user.delete(`/api/bucket-lists/${secret.id}`).expect(404);
   });
   it("non-admins cannot use either move endpoint or publish through the editor/enforcement", async () => {
     const own = await create("User private","only_me","excluded",user);
@@ -109,7 +113,9 @@ describe("P053 Step 6 ownership, privacy and atomic publication", () => {
     const r = await otherAdmin.post(`/api/bucket-lists/${shared.id}/move-to-my`).expect(200);
     expect(r.body.list.id).toBe(shared.id); expect(r.body.list.ownerId).toBe("step6-other-admin");
     expect(await listIds("mine","all",otherAdmin)).toContain(shared.id);
-    for (const client of [admin,user]) {
+    expect(await listIds("all","all",admin)).toContain(shared.id);
+    await admin.get(`/api/bucket-lists/${shared.id}`).expect(200);
+    for (const client of [user]) {
       expect(await listIds("all","all",client)).not.toContain(shared.id);
       await client.get(`/api/bucket-lists/${shared.id}`).expect(404);
       const a = await client.get("/api/bucket-lists/active").expect(200);
@@ -148,7 +154,7 @@ describe("P053 Step 6 ownership, privacy and atomic publication", () => {
     const r = await enforce(own.id);
     expect(r.body.enforced.list.id).toBe(own.id);
     expect(r.body.enforced.list.visibility).toBe("everyone");
-    expect(r.body.message).toBe('"CP review" has been put in force, and is now an HO list so everyone can see what is being applied.');
+    expect(r.body.message).toBe('"CP review" is in force, and is now an HO list so everyone can see what is being applied.');
     expect(await listIds("ho")).toContain(own.id); expect(await listIds("mine")).not.toContain(own.id);
     const a = await user.get("/api/bucket-lists/active").expect(200);
     expect(a.body.enforced.id).toBe(own.id); expect(a.body.personalLists).toEqual([]);
@@ -167,17 +173,60 @@ describe("P053 Step 6 ownership, privacy and atomic publication", () => {
     await admin.get("/api/bucket-lists?owner[]=mine").expect(400);
     await admin.get("/api/bucket-lists?type=invalid").expect(400);
   });
-  it("the approved comma correction changes only the exact existing list's name/metadata, not its 184 items", async () => {
-    const target = await create(plumbingListCorrection.before,"everyone","excluded",admin,{addedCodes:codes});
-    await db.update(bucketListsTable).set({id:plumbingListCorrection.id}).where(sql`id=${target.id}::uuid`);
+  it("repairs the approved rename's person without altering its timestamp or 184 items", async () => {
+    const [owner] = (await db.execute<{id:string; person:string}>(sql`SELECT id, concat_ws(' ',first_name,last_name) person FROM users WHERE role='admin' AND concat_ws(' ',first_name,last_name)<>'' LIMIT 1`)).rows;
+    expect(owner).toBeDefined();
+    const target = await create(plumbingListCorrection.after,"everyone","excluded",admin,{addedCodes:codes});
+    await db.update(bucketListsTable).set({id:plumbingListCorrection.id,ownerId:owner.id,createdBy:owner.person,updatedBy:"Approved list-name correction"}).where(sql`id=${target.id}::uuid`);
     const before = (await db.select().from(bucketListsTable).where(sql`id=${plumbingListCorrection.id}::uuid`))[0];
     expect(await applyApprovedBucketNameCorrection()).toEqual({changed:1,id:plumbingListCorrection.id});
     const after = (await db.select().from(bucketListsTable).where(sql`id=${plumbingListCorrection.id}::uuid`))[0];
     expect(after.name).toBe(plumbingListCorrection.after);
-    for (const key of ["id","nameKey","ownerId","visibility","rules","addedCodes","removedCodes","observedCodes","parentId","createdAt"])
+    expect(after.updatedBy).toBe(owner.person);
+    for (const key of ["id","nameKey","ownerId","visibility","rules","addedCodes","removedCodes","observedCodes","parentId","createdAt","updatedAt"])
       expect(after[key as keyof typeof after]).toEqual(before[key as keyof typeof before]);
     expect(after.addedCodes).toHaveLength(184);
     expect(await applyApprovedBucketNameCorrection()).toEqual({changed:0});
     expect((await db.select().from(bucketEnforcementTable))[0].listId).toBeNull();
+  });
+  it("non-admin private CRUD, HO-derived copy and explicit publish refusals", async () => {
+    await user.post("/api/bucket-lists").send({name:"Forbidden shared",visibility:"everyone"}).expect(403);
+    const own = await create("User work","only_me","excluded",user);
+    const renamed = await user.patch(`/api/bucket-lists/${own.id}`).send({name:"User renamed"}).expect(200);
+    expect(renamed.body.visibility).toBe("only_me");
+    expect(renamed.body.updatedBy).toBe("Jordan User");
+    await user.delete(`/api/bucket-lists/${own.id}`).expect(200);
+    const shared = await create("Company original","everyone");
+    const copy = await create("My copy","only_me","excluded",user,{parentId:shared.id});
+    expect(copy.visibility).toBe("only_me"); expect(copy.id).not.toBe(shared.id);
+    await user.post("/api/bucket-lists/enforcement/release").send({expectedVersion:0}).expect(403);
+  });
+  it("a shared creator cannot edit, rename, delete, detach or publish; can copy privately", async () => {
+    const own = await create("Creator original","only_me","excluded",user,{rules:[{competitor:"Ashirvad",scope:"everywhere"}]});
+    const original = (await db.select().from(bucketListsTable).where(sql`id=${own.id}::uuid`))[0];
+    await admin.post(`/api/bucket-lists/${own.id}/move-to-ho`).expect(200);
+    const shared = (await user.get(`/api/bucket-lists/${own.id}`)).body;
+    expect(shared.canEdit).toBe(false); expect(shared.visibility).toBe("everyone");
+    for (const input of [{name:"Renamed"}, {rules:[]}, {visibility:"everyone"}, {visibility:"only_me"}])
+      await user.patch(`/api/bucket-lists/${own.id}`).send(input).expect(403);
+    await user.delete(`/api/bucket-lists/${own.id}`).expect(403);
+    await user.post(`/api/bucket-lists/${own.id}/detach`).expect(403);
+    const copy = await create("Creator copy","only_me","excluded",user,{parentId:own.id,addedCodes:[]});
+    expect(copy.canEdit).toBe(true); expect(copy.visibility).toBe("only_me");
+    for(const key of ["id","rules","addedCodes","removedCodes","createdBy","createdAt"])
+      expect(shared[key]).toEqual(JSON.parse(JSON.stringify(original[key as keyof typeof original])));
+    await otherAdmin.patch(`/api/bucket-lists/${own.id}`).send({name:"Admin renamed"}).expect(200);
+    expect((await user.get(`/api/bucket-lists/${own.id}`)).body.ownerId).toBe("step6-user");
+  });
+  it("admin enforces a user's private list directly; creator edits return 403 after promotion", async () => {
+    const own = await create("User enforced","only_me","excluded",user);
+    const r = await enforce(own.id);
+    expect(r.body.message).toBe('"User enforced" is in force, and is now an HO list so everyone can see what is being applied.');
+    expect(r.body.enforced.list.id).toBe(own.id);
+    expect(r.body.enforced.list.visibility).toBe("everyone");
+    await user.patch(`/api/bucket-lists/${own.id}`).send({name:"Bad edit"}).expect(403);
+    await user.delete(`/api/bucket-lists/${own.id}`).expect(403);
+    const shared = (await admin.get(`/api/bucket-lists/${own.id}`)).body;
+    expect(shared.updatedBy).toBe("Avery Admin");
   });
 });
