@@ -1,0 +1,100 @@
+# P055 — COMPETITION — Load Astral and Jindal
+
+> **P055** · app: **COMPETITION** (`prayag-price.com`)
+> **THIS PROMPT LOADS COMPETITOR DATA.** Preview first. Apply only on my word.
+> Quote `P055` when reporting back.
+
+File: **`Competitor_Master_Plumbing_Astral_FOR_UPLOAD_10Oct2026.xlsx`**, 14 sheets.
+
+This workbook holds columns for Prayag, Prince, Apollo, Ashirvad, Astral and Jindal. **Read only the Astral and Jindal columns.** Everything else in the file is already loaded and must not be touched.
+
+---
+
+# 1. Two new competitor brands
+
+Neither exists yet. Production holds four: Apollo, Ashirvad, Prince, Sparsh Pearl.
+
+**1.1** Create **Astral** and **Jindal**. Competitors are text on `competitor_prices`, with no brand table, so the stored spelling is the only identity. Use exactly `Astral` and `Jindal`.
+
+**1.2** Before creating either, check it against existing brands with the shared normaliser. If a new name normalises to an existing one, stop and report rather than creating a second spelling.
+
+---
+
+# 2. Effective dates come from the file, per sheet
+
+Each brand's date sits in its own column header on row 2. **Do not supply one date for the upload.** Astral is not on one date:
+
+```
+Astral     2026-05-01     CPVC PIPE, CPVC FITTINGS, UPVC PIPE, UPVC FITTINGS,
+                          AGRI PIPE, AGRI FITTINGS, SWR PIPE, SWR FITTINGS, UGD PIPE
+Astral     2026-09-16     PPR PIPE, PPR FITTINGS
+Jindal     2025-04-01, 2026-03-01, 2026-06-01   PE-AL-PE FITTINGS (three periods)
+```
+
+**2.1** Read the date from each sheet's own header. If a header date is missing or unreadable, refuse that sheet and name it. Do not fall back to another sheet's date.
+
+**2.2** Jindal has three price periods on one sheet. Load all three as separate periods against the same codes. Do not keep only the latest.
+
+**2.3** Enumerate the sheets from the file. AGRI SMART Fittings and CASING PIPE have no Astral or Jindal column — expect zero rows from them, and say so rather than failing.
+
+---
+
+# 3. What to load
+
+**3.1** A row loads only when it has **both** a competitor item code and a price. A code with no price is not loaded and is counted in the preview.
+
+**3.2** The expected totals are **Astral 986** and **Jindal 68** priced pairs. Report your figures against those. **If they differ, stop and report before applying** — do not adjust anything to make them match.
+
+**3.3** Some price cells are formulas such as `=ROUND(R5/3,0)`. Use the computed value, not the formula text. Report how many such cells you read.
+
+---
+
+# 4. What this load must not do
+
+1. **No Prayag product is created, changed or retired.** A Prayag code in the file that is not in the catalogue means the row is refused, not that a product is created.
+2. **No existing Prince, Apollo, Ashirvad or Sparsh Pearl row changes.** Report the count for each before and after; they must be identical.
+3. **No Prayag price changes.** `mrp_price_history` stays at **14,302** in production with its recorded checksum.
+4. Nothing is deleted.
+
+---
+
+# 5. Preview, then stop
+
+**5.1** Produce a preview and **do not apply**. The preview reports, per brand and per sheet:
+
+```
+rows read
+priced pairs to load
+code with no price           (not loaded)
+Prayag code not in catalogue (refused, list them)
+duplicate competitor code within a sheet (list them)
+effective date read from the header
+```
+
+**5.2 Report the preview and wait.** I will tell you to apply.
+
+**5.3** The apply must be undoable in one action, with its own load batch.
+
+---
+
+# Rules
+
+1. Astral and Jindal columns only.
+2. Dates per sheet, from the file.
+3. Preview, then stop.
+4. Development first. Production apply only after I confirm the development preview.
+
+# Report
+
+1. Preview figures per brand and per sheet, against the expected 986 and 68.
+2. Refused rows, with reasons, as a download.
+3. Competitor row counts before and after for all existing brands.
+4. `mrp_price_history` count and checksum.
+
+State the environment and the clock time against every figure.
+
+---
+
+## One thing to watch
+
+The workbook also carries Apollo codes in the `APG###` form, where the app holds `APUGD###`. **This load must not read them.** If your scoping is right, no Apollo row is touched and the question never arises. If your preview shows any Apollo row at all, the scoping is wrong — report it and do not apply.

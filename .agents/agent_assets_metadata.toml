@@ -1299,3 +1299,31 @@ mtime_ms = 1791602879367
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d0975a75-7bee-455d-86d3-d9ce11c66234/ff1e1389-2ab6-4f1c-980d-e142c12315af"
 storage_version_token = "1791603304320503"
 content_type = "text/csv"
+
+[[outputs]]
+id = "4jslQVxczm24RQ1lrTIS2"
+uri = "file://generated-artifacts/p055/P055-refused-rows-development.csv"
+type = "table"
+title = "P055 — refused and skipped rows"
+description = "Development, 10 October 2026 at 10:15:17 IST. All 71 refused/skipped product-period entries with sheet, Excel row, codes, date and reason."
+logical_id = "bb75c84a-3962-4d0e-aa2d-54e9e43d8f36"
+content_hash = "sha256:f6c195bfc21b7055f012a3af128e3f9caccd5d3a0696bace69cff3246d605990"
+size = 8759
+mtime_ms = 1791607521447
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/bb75c84a-3962-4d0e-aa2d-54e9e43d8f36/d1ae3918-0c83-44bc-87e7-5ed7dc837763"
+storage_version_token = "1791607558382259"
+content_type = "text/csv"
+
+[[outputs]]
+id = "vLtZ41_I5TrEiT5lV2wSy"
+uri = "file://generated-artifacts/p055/P055-sheet-preview-development.csv"
+type = "table"
+title = "P055 — sheet-by-sheet development preview"
+description = "Development, 10 October 2026 at 10:15:17 IST. Source and eligible counts, missing prices, catalogue refusals, formulas and header dates. Nothing applied."
+logical_id = "1e60a338-38ac-4253-b05a-379924ba35d1"
+content_hash = "sha256:5da5912c5cb1413dc0f541adf4d15e05a7a9a274ed7d4f14bc701b4161af7740"
+size = 1646
+mtime_ms = 1791607551132
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1e60a338-38ac-4253-b05a-379924ba35d1/9cf7ac9c-a953-4b9d-93dc-94f59561d9c3"
+storage_version_token = "1791607559642662"
+content_type = "text/csv"

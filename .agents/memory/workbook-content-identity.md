@@ -12,3 +12,11 @@ Authorize trusted spreadsheet loads using a canonical content fingerprint built 
 When one comparison master holds several competitors, dispatch parsing by the explicitly selected brand *before* running another brand's positional or date audit. Select the price column and its date from that brand's group; never treat the first numeric price or another group's audited position as its price. A grouped or brand-qualified workbook without a trusted parser must be refused rather than sent to the generic importer. Existing truly undated single-brand sheets retain an operator-supplied date, which must be identified as such rather than claimed to come from the file.
 
 **Why:** An Apollo preview once triggered Prince's March date guard against Apollo's August column. The Prince guard was correct; invoking it before brand scoping was the defect. A wrong-brand fallback could assign one supplier's prices or date to another.
+
+For multi-period previews, distinguish unique products from priced product-period pairs. Compare the requested total with the full period-aware load count, and stop on a discrepancy; never discard older periods to match a stated total.
+
+**Why:** A Jindal workbook's stated total matched one period, but its three independently dated columns contained more priced pairs in total.
+
+An absent XLSX formula cache is not proof of an absent price. Use a cached numeric result when present, or explicitly compute only a verified formula from the selected brand's own source cells; otherwise refuse with a formula-specific reason. State when results were recomputed rather than cached.
+
+**Why:** Astral per-metre PPR formulas had valid source prices but no cached results. Treating data-only blanks as missing prices would incorrectly remove coverage.
