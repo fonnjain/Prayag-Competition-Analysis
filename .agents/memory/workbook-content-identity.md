@@ -26,3 +26,9 @@ Before applying a new competitor workbook, confirm the chosen price unit against
 **Why:** Prayag required the Astral PPR unit check as an apply gate. Opposite formula directions can conceal a per-metre/per-pipe mismatch, while legacy stored unit labels may be blank or say only "MRP".
 
 **How to apply:** Verify the stored numeric prices against their own source columns/formulas, rather than treating "MRP" as a length unit. A confirmed mismatch blocks the entire approved batch until the user gives further instructions.
+
+Audit units across every selected sheet, not only PPR. Read the already-correct dated per-pipe column without converting adjacent per-metre values, and preserve each row's actual pipe length on mixed-length sheets.
+
+**Why:** Prayag explicitly extended the Astral correction to every sheet. These workbooks include 5-m pipes and short SWR lengths as well as 3-m and 6-m pipes; forcing one unit per worksheet would misstate valid prices.
+
+**How to apply:** Compare each represented length against existing stored/source evidence. Where there is no existing comparator, report that exception and the source-based unit choice honestly rather than claiming a verified match.

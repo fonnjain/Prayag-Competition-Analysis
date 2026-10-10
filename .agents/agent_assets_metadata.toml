@@ -1327,3 +1327,31 @@ mtime_ms = 1791607551132
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/1e60a338-38ac-4253-b05a-379924ba35d1/9cf7ac9c-a953-4b9d-93dc-94f59561d9c3"
 storage_version_token = "1791607559642662"
 content_type = "text/csv"
+
+[[outputs]]
+id = "zkRCbN9vVxbd1KyK89Ofr"
+uri = "file://generated-artifacts/p055-per-pipe/P055-unit-table-development.csv"
+type = "table"
+title = "P055 — revised 14-sheet unit check"
+description = "Development unit audit at 11:00:12 IST, 10 October 2026; stored data read at 10:58:25 IST. Correct dated columns, mixed pipe lengths, existing units and the Jindal no-comparator exception."
+logical_id = "82093b9c-eda7-49f6-8ea1-5e91d5b149f5"
+content_hash = "sha256:513b5245ff1345668a10d7a95b5ea45ab6b614ad9d406d3fdfc000c9ec675aa0"
+size = 3044
+mtime_ms = 1791610216315
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/82093b9c-eda7-49f6-8ea1-5e91d5b149f5/27620fe3-36bc-4d3b-be8d-7c4c17660b3d"
+storage_version_token = "1791610343694961"
+content_type = "text/csv"
+
+[[outputs]]
+id = "3ymW9EOypZVLkUMMR4lqW"
+uri = "file://generated-artifacts/p055-per-pipe/P055-refused-rows-development.csv"
+type = "table"
+title = "P055 — revised refused rows"
+description = "Development preview at 11:01:14 IST, 10 October 2026. Refusals now disclose the selected dated per-pipe source prices; nothing applied."
+logical_id = "d91076b4-2dc3-4301-9da1-b5db3b63f6aa"
+content_hash = "sha256:80cb3c596b46963eca211f7c388e9254a903c38ef8fb99446efb124720a90447"
+size = 8760
+mtime_ms = 1791610278282
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d91076b4-2dc3-4301-9da1-b5db3b63f6aa/f677eac1-7825-486a-a85f-477731767409"
+storage_version_token = "1791610345114731"
+content_type = "text/csv"
