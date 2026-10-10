@@ -5,6 +5,68 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export type MultiWorkbookBatchStatus = typeof MultiWorkbookBatchStatus[keyof typeof MultiWorkbookBatchStatus];
+
+
+export const MultiWorkbookBatchStatus = {
+  preview: 'preview',
+  applied: 'applied',
+  undone: 'undone',
+} as const;
+
+export type MultiWorkbookBatchSummaryPeriodsItem = {
+  competitor: string;
+  effectiveDate: string;
+  rows: number;
+};
+
+export type MultiWorkbookBatchSummary = {
+  eligible: number;
+  inserted: number;
+  unchanged: number;
+  conflicts: number;
+  periods: MultiWorkbookBatchSummaryPeriodsItem[];
+};
+
+export type MultiWorkbookBatchRefusedItem = {
+  sheet: string;
+  row: number;
+  competitor: string;
+  prayagCode: string;
+  competitorCode: string;
+  reason: string;
+};
+
+export type MultiWorkbookBatchUnitSummaryItem = {
+  sheet: string;
+  competitor: string;
+  columns: string[];
+  units: string[];
+};
+
+export type MultiWorkbookBatchNameResolutionsItem = {
+  requested: string;
+  stored: string;
+};
+
+export interface MultiWorkbookBatch {
+  id: number;
+  status: MultiWorkbookBatchStatus;
+  brands: string[];
+  fileName: string;
+  contentFingerprint: string;
+  fileSha256?: string | null;
+  createdAt: string;
+  appliedAt?: string | null;
+  undoneAt?: string | null;
+  expiresAt?: string | null;
+  summary: MultiWorkbookBatchSummary;
+  refused: MultiWorkbookBatchRefusedItem[];
+  unitSummary: MultiWorkbookBatchUnitSummaryItem[];
+  nameResolutions: MultiWorkbookBatchNameResolutionsItem[];
+  blockers: string[];
+}
+
 export type BucketRuleScope = typeof BucketRuleScope[keyof typeof BucketRuleScope];
 
 
@@ -4851,6 +4913,40 @@ export const CompareModeFilterParameter = {
  * ISO date (YYYY-MM-DD). Use prices effective as of this date — the latest Prayag MRP and competitor price ≤ this date. Defaults to current period (is_current = true rows).
  */
 export type EffectivePeriodFilterParameter = string;
+
+export type ListMultiWorkbookBatches200 = {
+  batches: MultiWorkbookBatch[];
+};
+
+export type InspectMultiWorkbookBody = {
+  file: Blob;
+};
+
+export type InspectMultiWorkbook200 = {
+  brands: string[];
+  sheets: string[];
+  protectedBrands: string[];
+};
+
+export type PreviewMultiWorkbookBody = {
+  file: Blob;
+  /** JSON array of workbook brand choices */
+  brands: string;
+};
+
+export type ApplyMultiWorkbookBody = {
+  file: Blob;
+  /** @pattern ^[a-f0-9]{64}$ */
+  contentFingerprint: string;
+};
+
+export type UndoMultiWorkbookBody = {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  reason: string;
+};
 
 export type ExternalListProductsParams = {
 division?: string;

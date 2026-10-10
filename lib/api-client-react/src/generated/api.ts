@@ -47,6 +47,7 @@ import type {
   ApiKeyList,
   ApplyMrpRevisionInput,
   ApplyMrpRevisionResult,
+  ApplyMultiWorkbookBody,
   AuthUserEnvelope,
   AutoAcceptPreview,
   AutoAcceptRequest,
@@ -134,7 +135,10 @@ import type {
   GetPriceHistoryParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
+  InspectMultiWorkbook200,
+  InspectMultiWorkbookBody,
   ListMrpGeneratorRunsParams,
+  ListMultiWorkbookBatches200,
   LogoutBrowserSessionParams,
   LogoutSuccess,
   MappingReviewList,
@@ -168,6 +172,7 @@ import type {
   MrpRevisionPreview,
   MrpRevisionPreviewInput,
   MrpRevisionScopes,
+  MultiWorkbookBatch,
   NewProductApplyRequest,
   NewProductApplyResponse,
   NewProductCodeCheckResponse,
@@ -190,6 +195,7 @@ import type {
   PreviewBucketUpload200,
   PreviewBucketUploadBody,
   PreviewCatalogNameChangesBody,
+  PreviewMultiWorkbookBody,
   PreviewSingleCatalogNameChangeBody,
   PriceEditorCategoryInput,
   PriceEditorCategoryResponse,
@@ -222,6 +228,7 @@ import type {
   SearchCatalogNameChangeProductsParams,
   SetActiveBucketList200,
   SetActiveBucketListBody,
+  UndoMultiWorkbookBody,
   UpdateUserRoleBody,
   VocabularyDuplicateResponse
 } from './api.schemas';
@@ -237,6 +244,454 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getListMultiWorkbookBatchesUrl = () => {
+
+
+
+
+  return `/api/catalog/workbook-loads`
+}
+
+/**
+ * @summary Admin-only multi-brand workbook batch history
+ */
+export const listMultiWorkbookBatches = async ( options?: RequestInit): Promise<ListMultiWorkbookBatches200> => {
+
+  return customFetch<ListMultiWorkbookBatches200>(getListMultiWorkbookBatchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMultiWorkbookBatchesQueryKey = () => {
+    return [
+    `/api/catalog/workbook-loads`
+    ] as const;
+    }
+
+
+export const getListMultiWorkbookBatchesQueryOptions = <TData = Awaited<ReturnType<typeof listMultiWorkbookBatches>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMultiWorkbookBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMultiWorkbookBatchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMultiWorkbookBatches>>> = ({ signal }) => listMultiWorkbookBatches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMultiWorkbookBatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMultiWorkbookBatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listMultiWorkbookBatches>>>
+export type ListMultiWorkbookBatchesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Admin-only multi-brand workbook batch history
+ */
+
+export function useListMultiWorkbookBatches<TData = Awaited<ReturnType<typeof listMultiWorkbookBatches>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMultiWorkbookBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMultiWorkbookBatchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getInspectMultiWorkbookUrl = () => {
+
+
+
+
+  return `/api/catalog/workbook-loads/inspect`
+}
+
+/**
+ * @summary Read-only grouped workbook inspection
+ */
+export const inspectMultiWorkbook = async (inspectMultiWorkbookBody: InspectMultiWorkbookBody, options?: RequestInit): Promise<InspectMultiWorkbook200> => {
+    const formData = new FormData();
+formData.append(`file`, inspectMultiWorkbookBody.file);
+
+  return customFetch<InspectMultiWorkbook200>(getInspectMultiWorkbookUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getInspectMultiWorkbookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inspectMultiWorkbook>>, TError,{data: BodyType<InspectMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inspectMultiWorkbook>>, TError,{data: BodyType<InspectMultiWorkbookBody>}, TContext> => {
+
+const mutationKey = ['inspectMultiWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inspectMultiWorkbook>>, {data: BodyType<InspectMultiWorkbookBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  inspectMultiWorkbook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InspectMultiWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof inspectMultiWorkbook>>>
+    export type InspectMultiWorkbookMutationBody = BodyType<InspectMultiWorkbookBody>
+    export type InspectMultiWorkbookMutationError = ErrorType<void>
+
+    /**
+ * @summary Read-only grouped workbook inspection
+ */
+export const useInspectMultiWorkbook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inspectMultiWorkbook>>, TError,{data: BodyType<InspectMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inspectMultiWorkbook>>,
+        TError,
+        {data: BodyType<InspectMultiWorkbookBody>},
+        TContext
+      > => {
+      return useMutation(getInspectMultiWorkbookMutationOptions(options));
+    }
+
+export const getPreviewMultiWorkbookUrl = () => {
+
+
+
+
+  return `/api/catalog/workbook-loads/preview`
+}
+
+/**
+ * @summary Immutable selected-brand multi-period preview, no price writes
+ */
+export const previewMultiWorkbook = async (previewMultiWorkbookBody: PreviewMultiWorkbookBody, options?: RequestInit): Promise<MultiWorkbookBatch> => {
+    const formData = new FormData();
+formData.append(`file`, previewMultiWorkbookBody.file);
+formData.append(`brands`, previewMultiWorkbookBody.brands);
+
+  return customFetch<MultiWorkbookBatch>(getPreviewMultiWorkbookUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewMultiWorkbookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMultiWorkbook>>, TError,{data: BodyType<PreviewMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewMultiWorkbook>>, TError,{data: BodyType<PreviewMultiWorkbookBody>}, TContext> => {
+
+const mutationKey = ['previewMultiWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewMultiWorkbook>>, {data: BodyType<PreviewMultiWorkbookBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewMultiWorkbook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewMultiWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof previewMultiWorkbook>>>
+    export type PreviewMultiWorkbookMutationBody = BodyType<PreviewMultiWorkbookBody>
+    export type PreviewMultiWorkbookMutationError = ErrorType<void>
+
+    /**
+ * @summary Immutable selected-brand multi-period preview, no price writes
+ */
+export const usePreviewMultiWorkbook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewMultiWorkbook>>, TError,{data: BodyType<PreviewMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewMultiWorkbook>>,
+        TError,
+        {data: BodyType<PreviewMultiWorkbookBody>},
+        TContext
+      > => {
+      return useMutation(getPreviewMultiWorkbookMutationOptions(options));
+    }
+
+export const getGetMultiWorkbookBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/workbook-loads/${id}`
+}
+
+/**
+ * @summary Reopen a persistent workbook batch
+ */
+export const getMultiWorkbookBatch = async (id: number, options?: RequestInit): Promise<MultiWorkbookBatch> => {
+
+  return customFetch<MultiWorkbookBatch>(getGetMultiWorkbookBatchUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMultiWorkbookBatchQueryKey = (id: number,) => {
+    return [
+    `/api/catalog/workbook-loads/${id}`
+    ] as const;
+    }
+
+
+export const getGetMultiWorkbookBatchQueryOptions = <TData = Awaited<ReturnType<typeof getMultiWorkbookBatch>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMultiWorkbookBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMultiWorkbookBatchQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMultiWorkbookBatch>>> = ({ signal }) => getMultiWorkbookBatch(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMultiWorkbookBatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMultiWorkbookBatchQueryResult = NonNullable<Awaited<ReturnType<typeof getMultiWorkbookBatch>>>
+export type GetMultiWorkbookBatchQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reopen a persistent workbook batch
+ */
+
+export function useGetMultiWorkbookBatch<TData = Awaited<ReturnType<typeof getMultiWorkbookBatch>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMultiWorkbookBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMultiWorkbookBatchQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getApplyMultiWorkbookUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/workbook-loads/${id}/apply`
+}
+
+/**
+ * @summary Atomic append-only apply scoped to previewed brands
+ */
+export const applyMultiWorkbook = async (id: number,
+    applyMultiWorkbookBody: ApplyMultiWorkbookBody, options?: RequestInit): Promise<MultiWorkbookBatch> => {
+    const formData = new FormData();
+formData.append(`file`, applyMultiWorkbookBody.file);
+formData.append(`contentFingerprint`, applyMultiWorkbookBody.contentFingerprint);
+
+  return customFetch<MultiWorkbookBatch>(getApplyMultiWorkbookUrl(id),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getApplyMultiWorkbookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyMultiWorkbook>>, TError,{id: number;data: BodyType<ApplyMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyMultiWorkbook>>, TError,{id: number;data: BodyType<ApplyMultiWorkbookBody>}, TContext> => {
+
+const mutationKey = ['applyMultiWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyMultiWorkbook>>, {id: number;data: BodyType<ApplyMultiWorkbookBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  applyMultiWorkbook(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyMultiWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof applyMultiWorkbook>>>
+    export type ApplyMultiWorkbookMutationBody = BodyType<ApplyMultiWorkbookBody>
+    export type ApplyMultiWorkbookMutationError = ErrorType<void>
+
+    /**
+ * @summary Atomic append-only apply scoped to previewed brands
+ */
+export const useApplyMultiWorkbook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyMultiWorkbook>>, TError,{id: number;data: BodyType<ApplyMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyMultiWorkbook>>,
+        TError,
+        {id: number;data: BodyType<ApplyMultiWorkbookBody>},
+        TContext
+      > => {
+      return useMutation(getApplyMultiWorkbookMutationOptions(options));
+    }
+
+export const getUndoMultiWorkbookUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/workbook-loads/${id}/undo`
+}
+
+/**
+ * @summary Any admin can undo an unchanged applied batch
+ */
+export const undoMultiWorkbook = async (id: number,
+    undoMultiWorkbookBody: UndoMultiWorkbookBody, options?: RequestInit): Promise<MultiWorkbookBatch> => {
+
+  return customFetch<MultiWorkbookBatch>(getUndoMultiWorkbookUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      undoMultiWorkbookBody,)
+  }
+);}
+
+
+
+
+export const getUndoMultiWorkbookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoMultiWorkbook>>, TError,{id: number;data: BodyType<UndoMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof undoMultiWorkbook>>, TError,{id: number;data: BodyType<UndoMultiWorkbookBody>}, TContext> => {
+
+const mutationKey = ['undoMultiWorkbook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof undoMultiWorkbook>>, {id: number;data: BodyType<UndoMultiWorkbookBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  undoMultiWorkbook(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UndoMultiWorkbookMutationResult = NonNullable<Awaited<ReturnType<typeof undoMultiWorkbook>>>
+    export type UndoMultiWorkbookMutationBody = BodyType<UndoMultiWorkbookBody>
+    export type UndoMultiWorkbookMutationError = ErrorType<void>
+
+    /**
+ * @summary Any admin can undo an unchanged applied batch
+ */
+export const useUndoMultiWorkbook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoMultiWorkbook>>, TError,{id: number;data: BodyType<UndoMultiWorkbookBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof undoMultiWorkbook>>,
+        TError,
+        {id: number;data: BodyType<UndoMultiWorkbookBody>},
+        TContext
+      > => {
+      return useMutation(getUndoMultiWorkbookMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

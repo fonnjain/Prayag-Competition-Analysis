@@ -24,6 +24,7 @@ import catalogNameChangesRouter from "./catalogNameChanges";
 import mrpProvenanceBackfillRouter from "./mrpProvenanceBackfill";
 import productRetirementRouter from "./productRetirement";
 import apolloStagedLoadRouter from "./apolloStagedLoad";
+import multiCompetitorWorkbookLoadRouter from "./multiCompetitorWorkbookLoad";
 import bucketListsRouter from "./bucketLists";
 import { bucketFilterMiddleware } from "../lib/bucketFilter";
 
@@ -51,6 +52,7 @@ router.use(apiKeysRouter);
 router.use(catalogRouter);
 router.use(catalogImportExportRouter);
 router.use(apolloStagedLoadRouter);
+router.use(multiCompetitorWorkbookLoadRouter);
 router.use(catalogSyncRouter);
 router.use(importBatchesRouter);
 router.use(mrpRevisionRouter);

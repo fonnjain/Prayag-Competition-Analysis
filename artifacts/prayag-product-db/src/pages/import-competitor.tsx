@@ -1,6 +1,7 @@
 import { formatCount } from "@workspace/formatting";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@workspace/replit-auth-web";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -111,6 +112,7 @@ function getAuthHeaders(): Record<string, string> {
 
 export default function ImportCompetitorPage() {
   const [, navigate] = useLocation();
+  const isAdmin = useAuth().user?.role === "admin";
   const [file, setFile] = useState<File | null>(null);
   const [competitor, setCompetitor] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");
@@ -663,6 +665,17 @@ export default function ImportCompetitorPage() {
           for review before prices can be committed.
         </p>
       </div>
+
+      {isAdmin && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/30 px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Loading several brands or price periods from one workbook?
+          </p>
+          <Button data-testid="link-workbook-loads" type="button" variant="outline" size="sm" onClick={() => navigate("/workbook-loads")}>
+            Open Workbook Loads
+          </Button>
+        </div>
+      )}
 
       <div className="bg-card border rounded-lg p-6">
         <form data-activity="competitor_import.upload" onSubmit={handleUpload} className="space-y-6">

@@ -1,0 +1,16 @@
+---
+name: Catalogue code identity
+description: Why whitespace-normalized catalogue codes are not globally unique identities.
+---
+
+Exact stored item codes take priority over normalized matching. Distinct valid
+catalogue codes can collapse to the same whitespace-normalized key.
+
+**Why:** Verification against the live development catalogue exposed collisions
+that a simplified fixture did not contain. Treating all normalized codes as
+globally unique incorrectly blocked an otherwise valid scoped import.
+
+**How to apply:** Preserve both products. Prefer exact source-to-catalogue identity;
+allow a normalized fallback only when it is unambiguous. Refuse unresolved
+ambiguous source rows, and never let unrelated collisions block a scoped import.
+Do not merge or rename products to make normalization unique.

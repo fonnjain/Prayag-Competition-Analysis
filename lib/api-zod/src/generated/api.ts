@@ -9,6 +9,256 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Admin-only multi-brand workbook batch history
+ */
+export const ListMultiWorkbookBatchesResponse = zod.object({
+  "batches": zod.array(zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['preview', 'applied', 'undone']),
+  "brands": zod.array(zod.string()),
+  "fileName": zod.string(),
+  "contentFingerprint": zod.string(),
+  "fileSha256": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "appliedAt": zod.string().nullish(),
+  "undoneAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "summary": zod.object({
+  "eligible": zod.number(),
+  "inserted": zod.number(),
+  "unchanged": zod.number(),
+  "conflicts": zod.number(),
+  "periods": zod.array(zod.object({
+  "competitor": zod.string(),
+  "effectiveDate": zod.string(),
+  "rows": zod.number()
+}))
+}),
+  "refused": zod.array(zod.object({
+  "sheet": zod.string(),
+  "row": zod.number(),
+  "competitor": zod.string(),
+  "prayagCode": zod.string(),
+  "competitorCode": zod.string(),
+  "reason": zod.string()
+})),
+  "unitSummary": zod.array(zod.object({
+  "sheet": zod.string(),
+  "competitor": zod.string(),
+  "columns": zod.array(zod.string()),
+  "units": zod.array(zod.string())
+})),
+  "nameResolutions": zod.array(zod.object({
+  "requested": zod.string(),
+  "stored": zod.string()
+})),
+  "blockers": zod.array(zod.string())
+}))
+})
+
+
+/**
+ * @summary Read-only grouped workbook inspection
+ */
+export const InspectMultiWorkbookBody = zod.object({
+  "file": zod.instanceof(File)
+})
+
+export const InspectMultiWorkbookResponse = zod.object({
+  "brands": zod.array(zod.string()),
+  "sheets": zod.array(zod.string()),
+  "protectedBrands": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Immutable selected-brand multi-period preview, no price writes
+ */
+export const PreviewMultiWorkbookBody = zod.object({
+  "file": zod.instanceof(File),
+  "brands": zod.string().describe('JSON array of workbook brand choices')
+})
+
+
+/**
+ * @summary Reopen a persistent workbook batch
+ */
+
+
+
+export const GetMultiWorkbookBatchParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetMultiWorkbookBatchResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['preview', 'applied', 'undone']),
+  "brands": zod.array(zod.string()),
+  "fileName": zod.string(),
+  "contentFingerprint": zod.string(),
+  "fileSha256": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "appliedAt": zod.string().nullish(),
+  "undoneAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "summary": zod.object({
+  "eligible": zod.number(),
+  "inserted": zod.number(),
+  "unchanged": zod.number(),
+  "conflicts": zod.number(),
+  "periods": zod.array(zod.object({
+  "competitor": zod.string(),
+  "effectiveDate": zod.string(),
+  "rows": zod.number()
+}))
+}),
+  "refused": zod.array(zod.object({
+  "sheet": zod.string(),
+  "row": zod.number(),
+  "competitor": zod.string(),
+  "prayagCode": zod.string(),
+  "competitorCode": zod.string(),
+  "reason": zod.string()
+})),
+  "unitSummary": zod.array(zod.object({
+  "sheet": zod.string(),
+  "competitor": zod.string(),
+  "columns": zod.array(zod.string()),
+  "units": zod.array(zod.string())
+})),
+  "nameResolutions": zod.array(zod.object({
+  "requested": zod.string(),
+  "stored": zod.string()
+})),
+  "blockers": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Atomic append-only apply scoped to previewed brands
+ */
+
+
+
+export const ApplyMultiWorkbookParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const applyMultiWorkbookBodyContentFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApplyMultiWorkbookBody = zod.object({
+  "file": zod.instanceof(File),
+  "contentFingerprint": zod.string().regex(applyMultiWorkbookBodyContentFingerprintRegExp)
+})
+
+export const ApplyMultiWorkbookResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['preview', 'applied', 'undone']),
+  "brands": zod.array(zod.string()),
+  "fileName": zod.string(),
+  "contentFingerprint": zod.string(),
+  "fileSha256": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "appliedAt": zod.string().nullish(),
+  "undoneAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "summary": zod.object({
+  "eligible": zod.number(),
+  "inserted": zod.number(),
+  "unchanged": zod.number(),
+  "conflicts": zod.number(),
+  "periods": zod.array(zod.object({
+  "competitor": zod.string(),
+  "effectiveDate": zod.string(),
+  "rows": zod.number()
+}))
+}),
+  "refused": zod.array(zod.object({
+  "sheet": zod.string(),
+  "row": zod.number(),
+  "competitor": zod.string(),
+  "prayagCode": zod.string(),
+  "competitorCode": zod.string(),
+  "reason": zod.string()
+})),
+  "unitSummary": zod.array(zod.object({
+  "sheet": zod.string(),
+  "competitor": zod.string(),
+  "columns": zod.array(zod.string()),
+  "units": zod.array(zod.string())
+})),
+  "nameResolutions": zod.array(zod.object({
+  "requested": zod.string(),
+  "stored": zod.string()
+})),
+  "blockers": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Any admin can undo an unchanged applied batch
+ */
+
+
+
+export const UndoMultiWorkbookParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const undoMultiWorkbookBodyReasonMax = 1000;
+
+
+
+export const UndoMultiWorkbookBody = zod.object({
+  "reason": zod.string().min(1).max(undoMultiWorkbookBodyReasonMax)
+})
+
+export const UndoMultiWorkbookResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['preview', 'applied', 'undone']),
+  "brands": zod.array(zod.string()),
+  "fileName": zod.string(),
+  "contentFingerprint": zod.string(),
+  "fileSha256": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "appliedAt": zod.string().nullish(),
+  "undoneAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "summary": zod.object({
+  "eligible": zod.number(),
+  "inserted": zod.number(),
+  "unchanged": zod.number(),
+  "conflicts": zod.number(),
+  "periods": zod.array(zod.object({
+  "competitor": zod.string(),
+  "effectiveDate": zod.string(),
+  "rows": zod.number()
+}))
+}),
+  "refused": zod.array(zod.object({
+  "sheet": zod.string(),
+  "row": zod.number(),
+  "competitor": zod.string(),
+  "prayagCode": zod.string(),
+  "competitorCode": zod.string(),
+  "reason": zod.string()
+})),
+  "unitSummary": zod.array(zod.object({
+  "sheet": zod.string(),
+  "competitor": zod.string(),
+  "columns": zod.array(zod.string()),
+  "units": zod.array(zod.string())
+})),
+  "nameResolutions": zod.array(zod.object({
+  "requested": zod.string(),
+  "stored": zod.string()
+})),
+  "blockers": zod.array(zod.string())
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

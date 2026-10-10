@@ -13,6 +13,7 @@ import ComparisonPage from "@/pages/comparison";
 import MappingReviewPage from "@/pages/mapping-review";
 import ImportCompetitorPage from "@/pages/import-competitor";
 import ImportReviewPage from "@/pages/import-review";
+import WorkbookLoadsPage from "@/pages/workbook-loads";
 import ApiKeysPage from "@/pages/api-keys";
 import MrpRevisionsPage from "@/pages/mrp-revisions";
 import PriceEditorPage from "@/pages/price-editor";
@@ -121,6 +122,7 @@ function Router() {
       <Route path="/comparison" component={ComparisonPage} />
       <Route path="/mapping-review" component={MappingReviewPage} />
       <Route path="/import-competitor" component={ImportCompetitorPage} />
+      <Route path="/workbook-loads" component={WorkbookLoadsPage} />
       <Route path="/import-review/:id" component={ImportReviewPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
       <Route path="/mrp-revisions" component={MrpRevisionsPage} />

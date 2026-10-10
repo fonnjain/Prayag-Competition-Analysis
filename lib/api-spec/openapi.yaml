@@ -17,6 +17,134 @@ tags:
   - name: admin
     description: Workspace user management (admin only).
 paths:
+  /catalog/workbook-loads:
+    get:
+      operationId: listMultiWorkbookBatches
+      tags: [catalog]
+      summary: Admin-only multi-brand workbook batch history
+      responses:
+        "200":
+          description: Persistent batch history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [batches]
+                properties:
+                  batches:
+                    type: array
+                    items: {$ref: "#/components/schemas/MultiWorkbookBatch"}
+        default: {description: Administration required}
+  /catalog/workbook-loads/inspect:
+    post:
+      operationId: inspectMultiWorkbook
+      tags: [catalog]
+      summary: Read-only grouped workbook inspection
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: Brand choices detected in the workbook
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [brands, sheets, protectedBrands]
+                properties:
+                  brands: {type: array, items: {type: string}}
+                  sheets: {type: array, items: {type: string}}
+                  protectedBrands: {type: array, items: {type: string}}
+        default: {description: Invalid workbook or administration required}
+  /catalog/workbook-loads/preview:
+    post:
+      operationId: previewMultiWorkbook
+      tags: [catalog]
+      summary: Immutable selected-brand multi-period preview, no price writes
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, brands]
+              properties:
+                file: {type: string, format: binary}
+                brands: {type: string, description: JSON array of workbook brand choices}
+      responses:
+        "201":
+          description: Persistent preview with fingerprint and source provenance
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MultiWorkbookBatch"}
+        default: {description: "Invalid scope, protected brand or administration required"}
+  /catalog/workbook-loads/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    get:
+      operationId: getMultiWorkbookBatch
+      tags: [catalog]
+      summary: Reopen a persistent workbook batch
+      responses:
+        "200":
+          description: Batch detail
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MultiWorkbookBatch"}
+        default: {description: Unknown batch or administration required}
+  /catalog/workbook-loads/{id}/apply:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      operationId: applyMultiWorkbook
+      tags: [catalog]
+      summary: Atomic append-only apply scoped to previewed brands
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, contentFingerprint]
+              properties:
+                file: {type: string, format: binary}
+                contentFingerprint: {type: string, pattern: "^[a-f0-9]{64}$"}
+      responses:
+        "200":
+          description: Applied batch; every inserted row carries load_batch_id
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MultiWorkbookBatch"}
+        default: {description: "Changed file, stale preview, replay, conflict or administration required"}
+  /catalog/workbook-loads/{id}/undo:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      operationId: undoMultiWorkbook
+      tags: [catalog]
+      summary: Any admin can undo an unchanged applied batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 1, maxLength: 1000}
+      responses:
+        "200":
+          description: Batch rows removed; prior flags restored; audit retained
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MultiWorkbookBatch"}
+        default: {description: "Later changes, unrelated references or administration required"}
   /healthz:
     get:
       operationId: healthCheck
@@ -3058,6 +3186,68 @@ components:
         type: string
         format: date
   schemas:
+    MultiWorkbookBatch:
+      type: object
+      required: [id, status, brands, fileName, contentFingerprint, createdAt, summary, refused, unitSummary, nameResolutions, blockers]
+      properties:
+        id: {type: integer}
+        status: {type: string, enum: [preview, applied, undone]}
+        brands: {type: array, items: {type: string}}
+        fileName: {type: string}
+        contentFingerprint: {type: string}
+        fileSha256: {type: string, nullable: true}
+        createdAt: {type: string}
+        appliedAt: {type: string, nullable: true}
+        undoneAt: {type: string, nullable: true}
+        expiresAt: {type: string, nullable: true}
+        summary:
+          type: object
+          required: [eligible, inserted, unchanged, conflicts, periods]
+          properties:
+            eligible: {type: integer}
+            inserted: {type: integer}
+            unchanged: {type: integer}
+            conflicts: {type: integer}
+            periods:
+              type: array
+              items:
+                type: object
+                required: [competitor, effectiveDate, rows]
+                properties:
+                  competitor: {type: string}
+                  effectiveDate: {type: string}
+                  rows: {type: integer}
+        refused:
+          type: array
+          items:
+            type: object
+            required: [sheet, row, competitor, prayagCode, competitorCode, reason]
+            properties:
+              sheet: {type: string}
+              row: {type: integer}
+              competitor: {type: string}
+              prayagCode: {type: string}
+              competitorCode: {type: string}
+              reason: {type: string}
+        unitSummary:
+          type: array
+          items:
+            type: object
+            required: [sheet, competitor, columns, units]
+            properties:
+              sheet: {type: string}
+              competitor: {type: string}
+              columns: {type: array, items: {type: string}}
+              units: {type: array, items: {type: string}}
+        nameResolutions:
+          type: array
+          items:
+            type: object
+            required: [requested, stored]
+            properties:
+              requested: {type: string}
+              stored: {type: string}
+        blockers: {type: array, items: {type: string}}
     BucketRule:
       type: object
       properties:
