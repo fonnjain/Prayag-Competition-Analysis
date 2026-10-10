@@ -38,3 +38,9 @@ Prayag accepted Jindal PE-AL-PE fittings as **"each, no comparator, accepted on 
 **Why:** The user confirmed these are individual fittings and supplied an independent 24% median spread, which did not indicate a 3x/6x unit mismatch.
 
 **How to apply:** Keep this acceptance attached to the approved workbook's provenance; do not generalize it to other Jindal categories or later workbooks without checking their units.
+
+Re-evaluate catalogue-based refusals in the destination environment. An approved development total is not a target to force onto production; load eligibility depends on the destination's actual catalogue.
+
+**Why:** Prayag explicitly required reconsidering an Astral code refused only because it was absent from development, since production has a different catalogue.
+
+**How to apply:** Retain genuine source-code/price refusals, independently check destination catalogue membership, report any resulting count difference, and compare production's pipe-price median gaps with the accepted development results before declaring the data live. A material discrepancy must be reported, not silently converted or concealed.
