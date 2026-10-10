@@ -1,0 +1,16 @@
+[
+  {
+    "environment": "development",
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "checked_at_ist,mrp_count,mrp_value_sha256,catalogue_count,catalogue_full_md5,classification_sha256\n2026-10-10 08:47:10,14012,4d3e971cc8d88750583741d995c51013a3c690c6a1537127cbee62f21d3401f2,6948,6be775f28feaa7cc55eb86a1d67d183f,7c5086c7df253fbcaf06dcffa69b3569803118f3e4b3b4f50070f0e5e751c577\n",
+    "success": true
+  },
+  {
+    "environment": "production",
+    "exitCode": 0,
+    "exitReason": null,
+    "output": "checked_at_ist,mrp_count,mrp_value_sha256,catalogue_count,catalogue_full_md5,classification_sha256\n2026-10-10 08:47:18,14302,e4a7f5f570e8ae6ac4eb96cd472e88e4f579572b04a63e6c8ec3cb2c238ec458,7191,63b7a4ec2434846a0b6e880773770abb,b5fbcff705b0d131d7cdbbc266e369885f3e6ac92488bfc84872135586be8376\n",
+    "success": true
+  }
+]

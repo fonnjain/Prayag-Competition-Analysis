@@ -97,10 +97,9 @@ export function hasBucketCompetitorFilter() {
   return !!context && (context.layers ?? [context]).some(layer => !!layer.clauses?.length);
 }
 export function bucketExportRows<T extends (string | number | null)[]>(rows: T[]): (string | number | null)[][] {
+  if (!storage.getStore()) return rows;
   const count = storage.getStore()?.noCompetitorPriceCount ?? 0;
-  // Separate physical worksheet/CSV records: a multiline A1 can conceal the
-  // personal disclosure when Excel displays only the first line.
-  return [...bucketExportBanner().split("\n").map(line => [line]), ...(count > 0 ? [[`${count} products have no competitor price under this filter`]] : []),
+  return [[bucketExportBanner()], ...(count > 0 ? [[`${count} products have no competitor price under this filter`]] : []),
     ["Display-only product and competitor filter; no source product or price data changed."], [], ...rows];
 }
 export function withBucketContext<T>(context: Context | null, run: () => T): T {

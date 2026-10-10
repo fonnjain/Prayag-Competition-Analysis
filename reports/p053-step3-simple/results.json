@@ -1,0 +1,90 @@
+{
+  "run": "P053 Step 3 simple DEV-only pass",
+  "environment": "DEV",
+  "completedAtIST": "10 Oct 2026 09:00:30",
+  "initial": {
+    "companyEnforcement": null,
+    "personalPreference": "Bucket: None",
+    "simplePrefixUnused": true
+  },
+  "definitions": {
+    "created": 2,
+    "company": {
+      "name": "QA-P053-SIMPLE-HO-Sparsh-Pearl-Everywhere-Renamed",
+      "type": "excluded",
+      "visibility": "everyone",
+      "competitor": "Sparsh Pearl",
+      "scope": "Everywhere",
+      "productItems": 0,
+      "competitorPriceCount": 150
+    },
+    "personal": {
+      "name": "QA-P053-SIMPLE-Personal-Sparsh-Pearl-Everywhere",
+      "type": "excluded",
+      "visibility": "only_me",
+      "competitor": "Sparsh Pearl",
+      "scope": "Everywhere",
+      "productItems": 0
+    }
+  },
+  "checks": {
+    "competitorEditor": {
+      "storedValues": [
+        "Apollo",
+        "Ashirvad",
+        "Prince",
+        "Sparsh Pearl"
+      ],
+      "noFreeTextCompetitorNameField": true
+    },
+    "enforcement": {
+      "inlinePicker": true,
+      "reasonPrompt": false,
+      "alertDialog": false,
+      "companyListPutInForce": true,
+      "editWhileEnforcedSavedWithoutConfirmation": true,
+      "deleteGuardStatus": 409,
+      "deleteGuardCode": "ENFORCED_DELETE_FORBIDDEN",
+      "releaseWasDirect": true,
+      "releaseDialog": false,
+      "historyReasonField": false,
+      "historyRetainedAfterCleanup": true
+    },
+    "cleanup": {
+      "personalPreferenceRestored": "Bucket: None",
+      "qaDefinitionsRemaining": 0,
+      "currentEnforcement": null,
+      "historyCount": 11
+    },
+    "analysisCsv": {
+      "path": "reports/p053-step3-simple/dual-layer.csv",
+      "bytes": 363040,
+      "firstDisclosureLineIndex": 0,
+      "firstContainsEnforced": true,
+      "alsoMarker": true,
+      "personalAppearsAfterAlso": true,
+      "firstContainsBothOnSameLine": true,
+      "secondLineIs150Loss": true,
+      "lossNoticeOccurrences": 1,
+      "actualAlsoLabel": "Also:"
+    }
+  },
+  "screenshots": {
+    "competitorEditor": "ouwr90",
+    "titleRow": "ejajq3",
+    "release": "ycnsx9",
+    "postCleanupHistory": "fliv0b",
+    "preferenceRestored": "sfsf1s"
+  },
+  "session": {
+    "serverLogout": {
+      "verified": true,
+      "authUserStatus": 200,
+      "userIsNull": true,
+      "localStorageSidCleared": true,
+      "atIST": "10 Oct 2026 09:01:15"
+    },
+    "privateCredentialFileRemoval": "confirmed",
+    "privateCredentialFileExistsAfterCleanup": false
+  }
+}

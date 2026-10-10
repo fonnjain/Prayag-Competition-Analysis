@@ -43,7 +43,6 @@ export const BucketDraftVisibility = {
 } as const;
 
 export interface BucketDraft {
-  confirmEnforcedEdit?: boolean;
   name?: string;
   /** @nullable */
   description?: string | null;
@@ -93,21 +92,11 @@ export type BucketList = BucketDraft & ({
 
 export interface BucketEnforcementInput {
   listId: string;
-  /**
-     * @minLength 1
-     * @maxLength 2000
-     */
-  reason: string;
   /** @minimum 0 */
   expectedVersion: number;
 }
 
 export interface BucketEnforcementReleaseInput {
-  /**
-     * @minLength 1
-     * @maxLength 2000
-     */
-  reason: string;
   /** @minimum 0 */
   expectedVersion: number;
 }
@@ -116,7 +105,6 @@ export interface BucketEnforcedInfo {
   list: BucketList;
   actorLabel: string;
   enforcedAt: string;
-  reason: string;
 }
 
 export type BucketEnforcementEventAction = typeof BucketEnforcementEventAction[keyof typeof BucketEnforcementEventAction];
@@ -149,7 +137,6 @@ export interface BucketEnforcementEvent {
   version: number;
   action: BucketEnforcementEventAction;
   actorLabel: string;
-  reason: string;
   listName: string;
   listType: BucketEnforcementEventListType;
   itemCount: number;

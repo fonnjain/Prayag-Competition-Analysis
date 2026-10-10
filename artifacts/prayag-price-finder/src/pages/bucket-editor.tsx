@@ -31,8 +31,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { enforcedEffectText } from "@/components/bucket-enforcement";
-import { getAuthHeaders } from "@workspace/replit-auth-web";
 import { SignInRequired, errMessage, isLive, normName, useBucketUser, type Member, type UploadResult, type UploadStatus } from "@/lib/bucketShared";
 
 const STATUS_LABEL: Record<UploadStatus, string> = {
@@ -79,7 +77,6 @@ export default function BucketEditorPage() {
   const [saveError, setSaveError] = useState<{ message: string; existing?: { id: string; name: string } } | null>(null);
   const [confirmZero, setConfirmZero] = useState(false);
   const [confirmDetach, setConfirmDetach] = useState(false);
-  const [confirmEnforced, setConfirmEnforced] = useState(false);
   const [tab, setTab] = useState<"pick" | "upload" | "competitors">("pick");
 
   const previewM = usePreviewBucketList();
@@ -215,12 +212,9 @@ export default function BucketEditorPage() {
   const canSave = !readOnly && !!cleanName && hasItems && !conflict && !createM.isPending && !updateM.isPending;
   const zeroIncluded = draft.type === "included" && preview?.productFilterApplied !== false && (preview?.count ?? 1) === 0;
 
-  const enforcedAffected = !!editId && !!detail && (!!detail.isEnforced || !!detail.affectsEnforced);
-  const enforcedName = detail?.isEnforced ? detail.name : detail?.enforcedListName ?? detail?.name;
-  const doSave = (confirmed = false) => {
+  const doSave = () => {
     setSaveError(null);
     const body: BucketDraft = { ...draft, name: cleanName, visibility: isAdmin ? draft.visibility : "only_me" };
-    if (confirmed === true) body.confirmEnforcedEdit = true;
     const onSuccess = () => {
       void qc.invalidateQueries();
       toast({ title: "Bucket list saved" });
@@ -236,7 +230,7 @@ export default function BucketEditorPage() {
     if (editId) updateM.mutate({ id: editId, data: body }, { onSuccess, onError });
     else createM.mutate({ data: body }, { onSuccess, onError });
   };
-  const onSaveClick = () => (enforcedAffected ? setConfirmEnforced(true) : zeroIncluded ? setConfirmZero(true) : doSave());
+  const onSaveClick = () => (zeroIncluded ? setConfirmZero(true) : doSave());
 
   if (!authLoading && !signedIn) return <SignInRequired title="Create a bucket list" />;
   if (editId && existing.isError) {
@@ -499,22 +493,6 @@ export default function BucketEditorPage() {
         </aside>
       </div>
 
-      <AlertDialog open={confirmEnforced} onOpenChange={setConfirmEnforced}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>This change reaches the enforced list "{enforcedName}"</AlertDialogTitle>
-            <AlertDialogDescription data-testid="text-enforced-edit-effect">
-              {detail?.isEnforced ? "This list is in force for every user." : `This list feeds "${enforcedName}", which is in force for every user.`}{" "}
-              Saving changes what everyone sees. {detail ? enforcedEffectText({ ...detail, type: draft.type ?? detail.type, count: preview?.count ?? detail.count, competitorRules: preview?.competitorRules ?? detail.competitorRules, competitorPriceCount: preview?.competitorPriceCount ?? detail.competitorPriceCount, noCompetitorPriceCount: preview?.noCompetitorPriceCount ?? detail.noCompetitorPriceCount, productFilterApplied: preview?.productFilterApplied ?? detail.productFilterApplied }) : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Go back</AlertDialogCancel>
-            <AlertDialogAction data-testid="button-confirm-enforced-edit" onClick={() => { setConfirmEnforced(false); doSave(true); }}>Save and apply to everyone</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog open={confirmZero} onOpenChange={setConfirmZero}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -523,7 +501,7 @@ export default function BucketEditorPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Go back</AlertDialogCancel>
-            <AlertDialogAction onClick={() => doSave(enforcedAffected)} data-testid="button-confirm-zero">Save anyway</AlertDialogAction>
+            <AlertDialogAction onClick={() => doSave()} data-testid="button-confirm-zero">Save anyway</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -547,20 +525,7 @@ export default function BucketEditorPage() {
                   toast({ title: "Detached. This list is now frozen." });
               };
               const onError = (e: unknown) => toast({ title: "Detach failed", description: errMessage(e), variant: "destructive" });
-              if (detail?.affectsEnforced) {
-                void (async () => {
-                  try {
-                    const res = await fetch(`/api/bucket-lists/${editId}/detach`, {
-                      method: "POST", credentials: "include",
-                      headers: { "Content-Type": "application/json", ...(await getAuthHeaders()) },
-                      body: JSON.stringify({ confirmEnforcedEdit: true }),
-                    });
-                    const body = await res.json().catch(() => ({}));
-                    if (!res.ok) throw { data: body };
-                    onSuccess(body as BucketList);
-                  } catch (e) { onError(e); }
-                })();
-              } else detachM.mutate({ id: editId }, { onSuccess, onError });
+              detachM.mutate({ id: editId }, { onSuccess, onError });
             }}>Detach</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

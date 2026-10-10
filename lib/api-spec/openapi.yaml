@@ -3074,7 +3074,6 @@ components:
     BucketDraft:
       type: object
       properties:
-        confirmEnforcedEdit: {type: boolean}
         name: {type: string}
         description: {type: [string, 'null']}
         type: {type: string, enum: [included, excluded]}
@@ -3114,34 +3113,30 @@ components:
             detachedNotice: {type: [string, 'null']}
     BucketEnforcementInput:
       type: object
-      required: [listId, reason, expectedVersion]
+      required: [listId, expectedVersion]
       properties:
         listId: {type: string, format: uuid}
-        reason: {type: string, minLength: 1, maxLength: 2000}
         expectedVersion: {type: integer, minimum: 0}
     BucketEnforcementReleaseInput:
       type: object
-      required: [reason, expectedVersion]
+      required: [expectedVersion]
       properties:
-        reason: {type: string, minLength: 1, maxLength: 2000}
         expectedVersion: {type: integer, minimum: 0}
     BucketEnforcedInfo:
       type: object
-      required: [list, actorLabel, enforcedAt, reason]
+      required: [list, actorLabel, enforcedAt]
       properties:
         list: {$ref: '#/components/schemas/BucketList'}
         actorLabel: {type: string}
         enforcedAt: {type: string}
-        reason: {type: string}
     BucketEnforcementEvent:
       type: object
-      required: [id, version, action, actorLabel, reason, listName, listType, itemCount, competitorCount, competitorPriceCount, occurredAt]
+      required: [id, version, action, actorLabel, listName, listType, itemCount, competitorCount, competitorPriceCount, occurredAt]
       properties:
         id: {type: string}
         version: {type: integer}
         action: {type: string, enum: [enforced, replaced, released, edited]}
         actorLabel: {type: string}
-        reason: {type: string}
         listName: {type: string}
         listType: {type: string, enum: [included, excluded]}
         itemCount: {type: integer}

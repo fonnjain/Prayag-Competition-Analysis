@@ -1,0 +1,127 @@
+# P053 — Step 3 — COMPETITION — Exclude competitors, and let HO enforce a list
+
+> **P053 Step 3** · app: **COMPETITION** (`prayag-price.com`)
+> **This replaces the earlier Step 3 and Step 4 drafts. Build it all in one go.**
+> Internal tool. Keep it simple and obvious. No extra confirmations, no typed reasons, no approval flows.
+> Quote `P053 Step 3` when reporting back.
+
+Two additions to bucket lists. Part 0 is already done; go straight to building.
+
+---
+
+# PART A — Exclude a competitor
+
+A bucket list can now hold competitors as well as products.
+
+**A1. A third tab in the editor, "Competitors".** Lists the four stored competitors — Apollo, Ashirvad, Prince, Sparsh Pearl — read from the database, never typed. Each has a checkbox and a scope:
+
+```
+Apollo         Everywhere
+Prince         By division ▾     Pipes & Fittings
+Ashirvad       By category ▾     SWR Fittings, Pipe Clip
+```
+
+Division and category pickers offer only values where that competitor has prices, with counts. Category matching uses the existing P051 normaliser. A competitor may have more than one rule; they add up.
+
+**A2. Excluding a competitor does not remove Prayag products.** It removes that competitor's prices from the comparison. The product row behaves exactly as it does today for a product with no competitor.
+
+**A3. The one thing that must be right: an excluded competitor leaves every total.** Widest gap, positioning, coverage, by-brand, by-category, opportunities, rival counts, medians. Filter at the source of each aggregate, not on the rendered rows. A total that still counts a competitor the user excluded is a wrong number, and that is the only reason this feature exists.
+
+**A4. Show what was lost, as one line**, on screen and in the export, computed and hidden when zero:
+
+```
+67 products have no competitor price under this filter
+```
+
+Reference counts if every competitor were excluded in turn: Apollo 67, Ashirvad 84, Prince 217, Sparsh Pearl 150.
+
+**A5. Included lists**: a competitor rule means "show only these competitors". A list naming no competitor says nothing about competitors — all are shown.
+
+---
+
+# PART B — HO Enforced
+
+**B1. A fourth tab on the Bucket Lists page: "HO Enforced".**
+
+- Nothing in force: says so. Admins get **Enforce a list**, picking from HO lists only.
+- Something in force: name, type, effect, who, when. Admins get **Take out of force**.
+- Non-admins see the tab read-only, so they can tell what is being applied to them.
+- Below, a plain list of the last changes: action, list, who, when. No reason field.
+
+**B2. One enforced list at a time, company-wide.** Enforcing another replaces it. Admin only; the endpoint returns 403 for everyone else.
+
+**B3. How it combines.** The enforced list always applies and a user cannot clear it. A user may apply one of their own lists as well, and both take effect. **Exclusions win**: an Included personal list can only pick from what survived the enforced list.
+
+```
+catalogue -> enforced list -> the user's own list -> what they see
+```
+
+**B4. Admins are subject to it too.** To see everything, take it out of force.
+
+**B5. A list in force cannot be deleted.** Refuse, saying to take it out of force first. Editing one in force is allowed and takes effect immediately; no confirmation dialog.
+
+---
+
+# PART C — Showing it
+
+**C1. The filter control** shows the enforced list above the personal one:
+
+```
+🔒 HO (Plumbing)   184 hidden · 2 competitors   Enforced
+●  My CP view      only 312 shown               ×
+```
+
+**C2. The export disclosure names whatever applies**, in the existing one-line style, enforced first:
+
+```
+Showing: Enforced: "HO (Plumbing) — Excluded" · 184 items hidden; Apollo
+excluded everywhere · Also: "My CP view" · only 312 products shown
+67 products have no competitor price under this filter
+```
+
+**C3.** With nothing enforced and no list chosen, none of this appears. No empty banners.
+
+**C4.** Same screens as before: A–K. L–T keep their "Bucket lists do not apply here" notice.
+
+---
+
+# Rules
+
+1. No product, price, competitor row, mapping or classification changes. Display only.
+2. `mrp_price_history` stays **development 14,012 / production 14,302** with the recorded checksums; classification snapshot byte-identical. One line in the report is enough.
+3. Reuse the existing bucket model, the P048 admin check and normaliser, the P049 division list, the P051 category matching.
+4. Do not enforce anything in production. Build it; I will put a list in force.
+5. Development, then publish, then a short production check.
+
+# Tests
+
+```
+1. Excluding a competitor removes its prices and leaves it out of every
+   total, ranking and average
+2. No Prayag product row behaves differently from one that never had a
+   competitor
+3. The "no competitor price under this filter" count is right
+4. A division-scoped and a category-scoped rule each apply only in scope
+5. Non-admin cannot enforce, un-enforce, or clear an enforced list — 403
+6. Enforced plus personal compose correctly; exclusions win
+7. A list in force cannot be deleted
+8. The export disclosure names the enforced list, the personal list and
+   the lost-competitor count
+9. mrp_price_history and classification unchanged, both environments
+```
+
+# Report
+
+Short. What you built, the test results, two screenshots (the Competitors tab and the control showing both lines), one exported CSV, and the before/after figures in one line.
+
+---
+
+## Known data problems — do not try to fix them
+
+Prayag is auditing these and will send answers. Build around them; none of them blocks this work.
+
+- **Astral and Jindal are not loaded.** Only the four competitors above exist.
+- **Sparsh Pearl**: production has 10 price rows with no price (row ids 119–128, BCB-311 to AP-250, effective 2026-03-05, no load batch). Development has prices for all 300. Leave them.
+- **Apollo** codes are hand-assigned; **Ashirvad**'s list is from March 2025 and its pipe clips read 7 to 17 times Prayag's price.
+
+Being able to set a competitor aside in one click is the practical answer to all of these until the audit lands.

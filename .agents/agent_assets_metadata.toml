@@ -1285,3 +1285,17 @@ mtime_ms = 1791553498338
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/27c2cdfa-58d8-471a-b6fd-2bbab290d438/05af6882-3538-4db4-a701-e8f2429dc661"
 storage_version_token = "1791555254515150"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "mN4ItPEUY_qfu-E685f2Y"
+uri = "file://reports/p053-step3-simple/dual-layer.csv"
+type = "table"
+title = "P053 Step 3 — development CSV"
+description = "Native Analysis export: enforced and personal lists disclosed on one line; the computed lost-competitor count appears once below it."
+logical_id = "d0975a75-7bee-455d-86d3-d9ce11c66234"
+content_hash = "sha256:03d0c7ffd59a566072c6ecc151871a974ed9f1b4737472724de7a84c3aaf1be2"
+size = 363040
+mtime_ms = 1791602879367
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/d0975a75-7bee-455d-86d3-d9ce11c66234/ff1e1389-2ab6-4f1c-980d-e142c12315af"
+storage_version_token = "1791603304320503"
+content_type = "text/csv"

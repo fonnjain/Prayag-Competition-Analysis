@@ -50,7 +50,7 @@ function disclosure(list: DisclosureList) {
     + (list.productFilterApplied === false ? "; no product filter applied" : "");
 }
 export function composedDisclosure(enforced: DisclosureList | null, personal: DisclosureList | null) {
-  if (!enforced) return personal ? disclosure(personal) : "Bucket lists: none applied.";
-  const company = `Showing: Enforced by Head Office: ${disclosure(enforced).replace(/^Showing:\s*/, "")}`;
-  return company + (personal ? `\nAlso applied: your list ${disclosure(personal).replace(/^Showing:\s*/, "")}` : "");
+  if (!enforced) return personal ? disclosure(personal) : "";
+  const company = `Showing: Enforced: ${disclosure(enforced).replace(/^Showing:\s*/, "")}`;
+  return company + (personal ? ` · Also: ${disclosure(personal).replace(/^Showing:\s*/, "")}` : "");
 }

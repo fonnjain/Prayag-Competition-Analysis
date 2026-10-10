@@ -5,8 +5,9 @@ import { loadBucketWorld, type BucketWorld } from "./bucketLists";
 import { BucketError } from "./bucketMembership";
 import { competitorImpact, compileCompetitorRules } from "./bucketCompetitors";
 import { composedProductAllowed, composedQuoteAllowed, composedProductSql, composedQuoteSql, composedDisclosure, type BucketLayer } from "./bucketComposition";
-import { assertEnforcedDelete, assertEnforcedEdit, assertEnforcementAdmin } from "./bucketEnforcement";
-import { bucketCodeAllowed, bucketCompetitorAllowed, withBucketContext as withBucketFilterContext } from "./bucketFilter";
+import { assertEnforcedDelete, assertEnforcedEdit, assertEnforcementAdmin, changeBucketEnforcement } from "./bucketEnforcement";
+import { bucketCodeAllowed, bucketCompetitorAllowed, bucketExportRows, withBucketContext as withBucketFilterContext } from "./bucketFilter";
+import { EnforceBucketListBody, ReleaseBucketEnforcementBody } from "@workspace/api-zod";
 
 /** No source fixtures/inserts. These tests SELECT the existing catalogue and
  * prices, then exercise only in-memory predicates and read-only SQL. */
@@ -21,7 +22,7 @@ beforeAll(async () => {
   [brand, other] = world.competitorNames!;
   if (!a || !b || !brand || !other) throw new Error("Existing catalogue/competitor evidence unavailable.");
 });
-describe("P053 Step 4 independent restrictions", () => {
+describe("P053 Step 3 simple company and personal restrictions", () => {
   it("two Included product whitelists intersect", () => {
     const layers = [layer("included", [a, b]), layer("included", [b])];
     expect(composedProductAllowed(layers, a)).toBe(false);
@@ -98,24 +99,47 @@ describe("P053 Step 4 independent restrictions", () => {
     const text = composedDisclosure({ name: "Company", type: "excluded", count: 2,
       competitorRules: [{ competitor: brand, scope: "category", categories: ["Pipes"] }] },
     { name: "Personal", type: "included", count: 1 });
-    expect(text).toContain("Enforced by Head Office");
-    expect(text).toContain("Also applied: your list");
+    expect(text).toContain("Showing: Enforced:");
+    expect(text).toContain(" · Also:");
+    expect(text).not.toContain("\n");
     expect(text.indexOf("Company")).toBeLessThan(text.indexOf("Personal"));
     expect(text).toContain("Pipes");
     expect(composedDisclosure(null, { name: "Personal", type: "included", count: 1 })).not.toContain("Enforced");
+    expect(composedDisclosure(null, null)).toBe("");
   });
-  it("admin check rejects a genuine non-admin actor shape", () => {
-    expect(() => assertEnforcementAdmin({ id: "reader", admin: false, label: "reader" })).toThrow(BucketError);
+  it("non-admin service guards return 403 before enforcing, releasing or clearing", async () => {
+    const actor = { id: "reader", admin: false, label: "reader" };
+    expect(() => assertEnforcementAdmin(actor)).toThrow(BucketError);
+    await expect(changeBucketEnforcement({ listId: "12345678-1234-4234-8234-123456789abc", expectedVersion: 0 }, actor))
+      .rejects.toMatchObject({ status: 403 });
+    await expect(changeBucketEnforcement({ expectedVersion: 0 }, actor, true))
+      .rejects.toMatchObject({ status: 403 });
+    await expect(changeBucketEnforcement({ listId: null, expectedVersion: 0 }, actor))
+      .rejects.toMatchObject({ status: 403 });
   });
-  it("edit acknowledgement and delete guard also protect linked originals", () => {
+  it("admin edits need no acknowledgement; deletion and non-admin edit stay guarded", () => {
     const parent = { ...world.lists[0], id: "parent", name: "Original", parentId: null };
     const forced = { ...parent, id: "forced", name: "Company", parentId: "parent" };
     const isolated = { ...world, byId: new Map<string, BucketListRecord>([["parent", parent], ["forced", forced]]),
       enforcement: { ...world.enforcement, listId: "forced", version: 1 } } as BucketWorld;
     const admin = { id: "admin", admin: true, label: "admin" };
-    expect(() => assertEnforcedEdit("parent", {}, admin, isolated)).toThrow(/all users/);
-    expect(assertEnforcedEdit("forced", { confirmEnforcedEdit: true }, admin, isolated)).toBe(true);
+    expect(assertEnforcedEdit("parent", {}, admin, isolated)).toBe(true);
+    expect(assertEnforcedEdit("forced", {}, admin, isolated)).toBe(true);
+    expect(() => assertEnforcedEdit("forced", {}, { ...admin, admin: false }, isolated)).toThrow(BucketError);
     expect(() => assertEnforcedDelete("forced", isolated)).toThrow(/Take it out of force/);
     expect(() => assertEnforcedDelete("parent", isolated)).toThrow(/Take it out of force/);
   });
+  it("enforce and release contracts require no reason or confirmation", () => {
+    expect(EnforceBucketListBody.safeParse({ listId: "12345678-1234-4234-8234-123456789abc", expectedVersion: 0 }).success).toBe(true);
+    expect(ReleaseBucketEnforcementBody.safeParse({ expectedVersion: 1 }).success).toBe(true);
+  });
+  it("an unfiltered export has no bucket banner or empty disclosure", () => {
+    const rows = [["item_code", "mrp"], [a, 100]];
+    expect(withBucketFilterContext(null, () => bucketExportRows(rows))).toEqual(rows);
+  });
+  it.each([["Apollo", 67], ["Ashirvad", 84], ["Prince", 217], ["Sparsh Pearl", 150]] as const)(
+    "%s last-quote loss matches the existing development reference (%i)", (competitor, expected) => {
+      const impact = competitorImpact("excluded", [{ competitor, scope: "everywhere" }], world.catalogue, world.quotes!);
+      expect(impact.noCompetitorPriceCount).toBe(expected);
+    });
 });

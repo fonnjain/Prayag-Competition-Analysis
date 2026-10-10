@@ -29,6 +29,8 @@ export function CompetitorsTab({ options, loading, error, retry, onAdd }: {
   const [rows, setRows] = useState<Record<string, Row>>({});
   if (loading) return <Skeleton className="h-32 w-full" />;
   if (error) return <div className="text-sm"><span className="text-destructive">Could not load competitors.</span> <button type="button" className="underline" onClick={retry}>Retry</button></div>;
+  // Competitors are text on price rows, with no brand master. Database-provided
+  // choices and no free-text entry are the guard against a second spelling.
   if (options.length === 0) return <p className="text-sm text-muted-foreground" data-testid="text-no-competitors">No competitor prices are attached to active products yet.</p>;
 
   const get = (n: string) => rows[n] ?? blank();

@@ -30,12 +30,22 @@ bypass. Treating two Included lists as a union, or dropping the company rule
 when signed out, would violate that boundary.
 
 **How to apply:** Only existing Everyone lists are eligible; enforce/release
-need admin authority and typed reasons. Keep immutable event-time definitions,
+need admin authority but no typed reason, approval or extra confirmation. Keep immutable event-time definitions,
 resolved scope and counts so later edits cannot rewrite the explanation of an
-old report. Confirm edits affecting an in-force list, including linked
+old report. Admin edits apply immediately without confirmation, including linked
 originals; require release before deletion. Show company then personal in
 headers/exports, and compute last-quote loss once over the combined predicates.
 Show no inactive enforcement placeholder outside its management tab.
+
+The superseding combined specification requires simple action/list/who/when
+history, and one-line export disclosure naming company first then personal.
+The lost-last-quote count is a separate line, omitted at zero.
+
+**Why:** The user replaced both earlier drafts and explicitly removed typed
+reasons, enforcement/edit confirmations and approval flows for this internal tool.
+
+**How to apply:** Do not reintroduce those gates. Preserve existing historical
+records without displaying legacy reason fields; do not seed or activate production.
 
 Saved names may literally be `Excluded` or end in `— Excluded`. Treat the name
 as a name, never as type metadata. The interface shows name, type and effect as
@@ -102,7 +112,8 @@ surfaces; maintenance membership must not silently shrink.
 Distinguish immutable full-scope audit counts from filtered display totals.
 
 Bucket browse/editor pages belong in Price Finder and both require sign-in.
-Anonymous Price Finder prices remain public, without an active bucket. Do not
+Anonymous Price Finder prices remain public, without a personal selection;
+company-wide enforcement still applies. Do not
 carve a bucket exception into the Product Database access gate.
 
 **Why:** This was the user's explicit page-placement and access decision.

@@ -22,7 +22,7 @@ export interface ActiveBucketInfo {
 export function bucketEffectText(list: ActiveBucketInfo | null): string {
   if (list?.exportDisclosure) return list.exportDisclosure
     + (list.noCompetitorPriceCount ? `\n${list.noCompetitorPriceCount} products have no competitor price under this filter` : "");
-  const base = formatBucketExportDisclosure(list);
+  const base = list ? formatBucketExportDisclosure(list) : "";
   if (!list) return base;
   const rules = (list.competitorRules ?? []).map(rule => `${rule.competitor} ${list.type === "excluded" ? "excluded" : "included"} ${
     !rule.scope || rule.scope === "everywhere" ? "everywhere" : `in ${(rule.scope === "division" ? rule.divisions : rule.categories)?.join(", ")}`

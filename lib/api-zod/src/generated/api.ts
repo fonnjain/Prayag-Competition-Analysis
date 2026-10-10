@@ -12924,7 +12924,6 @@ export const UndoP029UgdClassificationResponse = zod.object({
  * @summary Lists visible to the signed-in user
  */
 export const GetBucketListsResponseItem = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -12983,7 +12982,6 @@ export const GetBucketListsResponse = zod.array(GetBucketListsResponseItem)
  * @summary Create an owned bucket list
  */
 export const CreateBucketListBody = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13014,7 +13012,6 @@ export const GetBucketCatalogueResponse = zod.record(zod.string(), zod.unknown()
  * @summary Resolve a draft without saving anything
  */
 export const PreviewBucketListBody = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13035,7 +13032,6 @@ export const PreviewBucketListBody = zod.object({
 })
 
 export const PreviewBucketListResponse = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13117,7 +13113,6 @@ export const GetBucketEnforcementResponse = zod.object({
   "version": zod.number(),
   "enforced": zod.union([zod.object({
   "list": zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13170,15 +13165,13 @@ export const GetBucketEnforcementResponse = zod.object({
   "detachedNotice": zod.string().nullish()
 })),
   "actorLabel": zod.string(),
-  "enforcedAt": zod.string(),
-  "reason": zod.string()
+  "enforcedAt": zod.string()
 }),zod.null()]),
   "history": zod.array(zod.object({
   "id": zod.string(),
   "version": zod.number(),
   "action": zod.enum(['enforced', 'replaced', 'released', 'edited']),
   "actorLabel": zod.string(),
-  "reason": zod.string(),
   "listName": zod.string(),
   "listType": zod.enum(['included', 'excluded']),
   "itemCount": zod.number(),
@@ -13191,8 +13184,6 @@ export const GetBucketEnforcementResponse = zod.object({
 }))
 })
 
-
-export const enforceBucketListBodyReasonMax = 2000;
 
 export const enforceBucketListBodyExpectedVersionMin = 0;
 
@@ -13200,7 +13191,6 @@ export const enforceBucketListBodyExpectedVersionMin = 0;
 
 export const EnforceBucketListBody = zod.object({
   "listId": zod.string().uuid(),
-  "reason": zod.string().min(1).max(enforceBucketListBodyReasonMax),
   "expectedVersion": zod.number().min(enforceBucketListBodyExpectedVersionMin)
 })
 
@@ -13208,7 +13198,6 @@ export const EnforceBucketListResponse = zod.object({
   "version": zod.number(),
   "enforced": zod.union([zod.object({
   "list": zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13261,15 +13250,13 @@ export const EnforceBucketListResponse = zod.object({
   "detachedNotice": zod.string().nullish()
 })),
   "actorLabel": zod.string(),
-  "enforcedAt": zod.string(),
-  "reason": zod.string()
+  "enforcedAt": zod.string()
 }),zod.null()]),
   "history": zod.array(zod.object({
   "id": zod.string(),
   "version": zod.number(),
   "action": zod.enum(['enforced', 'replaced', 'released', 'edited']),
   "actorLabel": zod.string(),
-  "reason": zod.string(),
   "listName": zod.string(),
   "listType": zod.enum(['included', 'excluded']),
   "itemCount": zod.number(),
@@ -13283,14 +13270,11 @@ export const EnforceBucketListResponse = zod.object({
 })
 
 
-export const releaseBucketEnforcementBodyReasonMax = 2000;
-
 export const releaseBucketEnforcementBodyExpectedVersionMin = 0;
 
 
 
 export const ReleaseBucketEnforcementBody = zod.object({
-  "reason": zod.string().min(1).max(releaseBucketEnforcementBodyReasonMax),
   "expectedVersion": zod.number().min(releaseBucketEnforcementBodyExpectedVersionMin)
 })
 
@@ -13298,7 +13282,6 @@ export const ReleaseBucketEnforcementResponse = zod.object({
   "version": zod.number(),
   "enforced": zod.union([zod.object({
   "list": zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13351,15 +13334,13 @@ export const ReleaseBucketEnforcementResponse = zod.object({
   "detachedNotice": zod.string().nullish()
 })),
   "actorLabel": zod.string(),
-  "enforcedAt": zod.string(),
-  "reason": zod.string()
+  "enforcedAt": zod.string()
 }),zod.null()]),
   "history": zod.array(zod.object({
   "id": zod.string(),
   "version": zod.number(),
   "action": zod.enum(['enforced', 'replaced', 'released', 'edited']),
   "actorLabel": zod.string(),
-  "reason": zod.string(),
   "listName": zod.string(),
   "listType": zod.enum(['included', 'excluded']),
   "itemCount": zod.number(),
@@ -13378,7 +13359,6 @@ export const GetBucketListParams = zod.object({
 })
 
 export const GetBucketListResponse = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13437,7 +13417,6 @@ export const UpdateBucketListParams = zod.object({
 })
 
 export const UpdateBucketListBody = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13458,7 +13437,6 @@ export const UpdateBucketListBody = zod.object({
 })
 
 export const UpdateBucketListResponse = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
@@ -13524,7 +13502,6 @@ export const DetachBucketListParams = zod.object({
 })
 
 export const DetachBucketListResponse = zod.object({
-  "confirmEnforcedEdit": zod.boolean().optional(),
   "name": zod.string().optional(),
   "description": zod.string().nullish(),
   "type": zod.enum(['included', 'excluded']).optional(),
