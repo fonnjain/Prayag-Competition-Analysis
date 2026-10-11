@@ -1593,3 +1593,31 @@ mtime_ms = 1791707814643
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/70ee13ab-f2b8-4ca3-a508-39dbb7f21e27/33260ea9-5295-469d-a18e-bb3cd4fa595c"
 storage_version_token = "1791707825990674"
 content_type = "text/plain"
+
+[[outputs]]
+id = "tBOrKxZdQp8_8CQfdtqYj"
+uri = "file://generated-artifacts/app-guide/Application_Overview_and_Capabilities.doc"
+type = "word_document"
+title = "Detailed application guide — Word DOC"
+description = "32-page document covering the app’s purpose, all six modules, built-in capabilities, roles, workflows, imports, exports, pricing safeguards and glossary. Includes six logo-free screenshots. Verified by opening and rendering in an office viewer."
+logical_id = "679db0a9-22a1-4c83-8c07-0eea1248d9d6"
+content_hash = "sha256:0fd6d8f45663fa305df6decccb203aca93542504436a61f243efb74a577873af"
+size = 605184
+mtime_ms = 1791715541609
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/679db0a9-22a1-4c83-8c07-0eea1248d9d6/87869805-8e86-4e22-b585-8feb07bd7756"
+storage_version_token = "1791715616117835"
+content_type = "application/msword"
+
+[[outputs]]
+id = "RDTXbaLeprTLH4hsHNIa_"
+uri = "file://generated-artifacts/app-guide/Application_Overview_and_Capabilities.docx"
+type = "word_document"
+title = "Detailed application guide — Word DOCX"
+description = "The same editable guide in modern Microsoft Word format."
+logical_id = "c6760fe2-0fe6-4c79-bcba-788908a8b2da"
+content_hash = "sha256:480c7afe7842d9e6faa11a0851316ff9247d738467a3fac323d702d09930bfe5"
+size = 454538
+mtime_ms = 1791715528021
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c6760fe2-0fe6-4c79-bcba-788908a8b2da/b26dd2ee-5e33-48ef-9c89-c7a3c88f276d"
+storage_version_token = "1791715617598979"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
