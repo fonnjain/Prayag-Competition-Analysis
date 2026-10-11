@@ -1,0 +1,117 @@
+# P056 — COMPETITION — A presentation for every page, documenting each page and its tabs
+
+> **P056** · app: **COMPETITION** (`prayag-price.com`)
+> **READ-ONLY.** This prompt changes no code, no data and no configuration. It produces files.
+> Quote `P056` when reporting back.
+
+Document the application as it is actually built: every page, every tab within every page, and what each one does.
+
+---
+
+# 1. Enumerate from the code, not from memory
+
+**1.1** Read the router and the page components and list every page the application serves. Do not work from a remembered list, and do not work from the navigation bar alone — a page reachable only by link or by role still counts.
+
+**1.2** For each page, list its tabs, sub-tabs and panels from the component, with the exact label each one carries on screen.
+
+**1.3** Note which role can reach each page and each tab — admin, user, counter. Where a tab is admin-only, say so.
+
+**1.4** No approval step. Enumerate and go straight to building.
+
+---
+
+# 2. One presentation per page
+
+**2.1** One file per **top-level navigation entry**. Where an entry has sub-pages — Price Finder has several — each sub-page is a section inside that entry's deck, not a file of its own.
+
+**2.2** Name them in navigation order:
+
+```
+01_Home.pptx
+02_Product_Database.pptx
+03_Competition_Analysis.pptx
+04_MRP_Generator.pptx
+05_Price_Finder.pptx
+06_Admin.pptx
+```
+
+Use the real page names from the code. The list above is what the navigation shows today; correct it if the code differs.
+
+**2.3 Use as many slides as the page needs.** Do not compress a page with nine tabs into one slide, and do not pad a page with one tab. One tab per slide is the usual shape.
+
+---
+
+# 3. What goes in each deck
+
+**3.1 A title slide**: the page name and its route.
+
+**3.2 A "what this page is for" slide**: two or three sentences in plain English, then who can reach it.
+
+**3.3 One slide per tab**, each carrying:
+
+```
+Tab name          exactly as it appears on screen
+What it does      two or three sentences, plain English
+What it shows     the main table, chart or figures on it
+What you can do   the actions available - buttons, uploads, exports
+Who can use it    all users, or admin only
+```
+
+**3.4 A last slide for anything page-wide**: filters that apply across the tabs, exports, and whether bucket lists affect what is shown on that page.
+
+**3.5 Write for someone who has never opened the application.** Avoid internal words — route names, component names, table names, endpoint paths. "The list of products you can search" beats "the catalogue query surface".
+
+---
+
+# 4. What must be true
+
+**4.1 Describe only what is built.** Every sentence comes from the code or from the live screen in development. If something is half-built or unclear, leave it out rather than describing what it is meant to do. A document that describes an intention as a feature is worse than one that omits it.
+
+**4.2** If a tab exists but does nothing yet, say exactly that in one line.
+
+**4.3** Use the labels the screen uses. Where the code and the screen disagree, use the screen's wording and note the difference in one line.
+
+---
+
+# 5. Appearance
+
+**5.1 No company branding.** No logo, no company name in headers or footers, no workspace name, no brand colours. A plain neutral template.
+
+**5.2 Automatic layout.** Built-in layouts and default fonts. Do not hand-position anything, and do not spend effort on design.
+
+**5.3** No cover image, no closing slide, no "thank you".
+
+---
+
+# 6. Screenshots
+
+**6.1** One screenshot per tab, from **development**, placed on that tab's slide.
+
+**6.2** Crop or blank the company name and logo out of every one, in keeping with §5.1.
+
+**6.3** If a screen cannot be captured, leave the slide text-only and list it in the report. Do not hold up the whole job for one screenshot.
+
+---
+
+# 7. Delivery
+
+**7.1** All decks in one zip: **`Prayag_Price_App_Pages_11Oct2026.zip`**.
+
+**7.2** The individual `.pptx` files as well, so a single page can be opened without unzipping.
+
+---
+
+# Rules
+
+1. **Read-only.** No code change, no data change, no configuration change, no migration.
+2. Nothing is written to production. Development only, and read-only there too.
+3. Create no products, prices, lists, batches or users while capturing screens.
+4. `mrp_price_history` stays **development 14,012 / production 14,302**. Confirm in one line at the end.
+
+# Report
+
+1. The page and tab list you enumerated, as a plain list, with the slide count per deck.
+2. Anything you found half-built, unclear or unreachable, and what you did about it.
+3. Any screen you could not capture.
+4. The zip and the individual files.
+5. `mrp_price_history` count, both environments, with the clock time.
