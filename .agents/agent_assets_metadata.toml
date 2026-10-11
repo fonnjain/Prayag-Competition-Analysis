@@ -1481,3 +1481,115 @@ mtime_ms = 1791700435068
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e0913860-0310-40e9-9592-10da27607282/f0cc0f3d-c77b-40d7-ad19-ebe09565303c"
 storage_version_token = "1791700446249772"
 content_type = "text/plain"
+
+[[outputs]]
+id = "MLJRvG3AMseqGBX0bZQyY"
+uri = "file://generated-artifacts/p056/P056_Checked_Presentations.zip"
+type = "unspecified"
+title = "All six corrected PowerPoints"
+description = "Download this replacement ZIP. Six decks, 236 slides; all six opened and rendered successfully."
+logical_id = "9ac87e5c-15b9-41ca-a265-15485cf8ba75"
+content_hash = "sha256:0b0d4c749043dea1112920baaa6c28a4114804721ca9eaeafa7bfdc3c779b5c6"
+size = 8041204
+mtime_ms = 1791707708368
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/9ac87e5c-15b9-41ca-a265-15485cf8ba75/f6b671e1-3fa6-43f4-b644-d19b6cc6edf7"
+storage_version_token = "1791707816904002"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "UYDEjuIszmSD4AHsIOXwG"
+uri = "file://generated-artifacts/p056/01_Home_Checked.pptx"
+type = "slides"
+title = "Home — corrected PowerPoint"
+description = "12 slides, each with an embedded screenshot."
+logical_id = "7289678e-9b5b-4c9b-921a-b2f18b8780f1"
+content_hash = "sha256:ea1c2c0c4580a8fc4e12f5c711e469dc881bfdba45438b14a7a7b1361582cf2b"
+size = 231296
+mtime_ms = 1791707703592
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/7289678e-9b5b-4c9b-921a-b2f18b8780f1/8df8a9db-ac45-4509-b0a3-739ba88140a8"
+storage_version_token = "1791707818209335"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "0qD1S6aPJ0zCWDUTFyDbm"
+uri = "file://generated-artifacts/p056/02_Product_Database_Checked.pptx"
+type = "slides"
+title = "Product Database — corrected PowerPoint"
+description = "92 slides; delayed comparison captures replaced with fully loaded tables."
+logical_id = "153b6fef-3683-40e7-a8db-71dd16d211a3"
+content_hash = "sha256:97baf9e0181bc838f4d564c433fb5134f492699cb1e4ab5e67c1af8abea70858"
+size = 3629298
+mtime_ms = 1791707705264
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/153b6fef-3683-40e7-a8db-71dd16d211a3/bfafd032-e2ae-490a-88b6-578a5ab96033"
+storage_version_token = "1791707819547732"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "ZIrinAhJRkDBnFY7yku9T"
+uri = "file://generated-artifacts/p056/03_Competition_Analysis_Checked.pptx"
+type = "slides"
+title = "Competition Analysis — corrected PowerPoint"
+description = "23 slides with screenshots; dashboard panels rechecked."
+logical_id = "b252e4e0-aa2f-4cce-81a8-677d12c3d098"
+content_hash = "sha256:aa5d590df8b9eb0f0f3667e78f88d69a5995dc3bc1f84edf4ecc41516402ad37"
+size = 624204
+mtime_ms = 1791707705844
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b252e4e0-aa2f-4cce-81a8-677d12c3d098/e3f18b88-f170-4b37-b2e3-9fbd1a8948f5"
+storage_version_token = "1791707820855069"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "9EU1WQbYVxhA1YmmCugqZ"
+uri = "file://generated-artifacts/p056/04_MRP_Generator_Checked.pptx"
+type = "slides"
+title = "MRP Generator — corrected PowerPoint"
+description = "47 slides; comparison snapshots show completed results."
+logical_id = "f3b690a6-2eb3-48c8-a299-967c03595800"
+content_hash = "sha256:6c3f4cb93c2006c0c0003637cb923b95b393c52de9c4b3c506712266df402eee"
+size = 1719950
+mtime_ms = 1791707706668
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/f3b690a6-2eb3-48c8-a299-967c03595800/70b3a4ab-de8d-4142-be07-f716e44ff64b"
+storage_version_token = "1791707822145440"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "LciKFAPvaX8s2LBMIj-_O"
+uri = "file://generated-artifacts/p056/05_Price_Finder_Checked.pptx"
+type = "slides"
+title = "Price Finder — corrected PowerPoint"
+description = "45 slides with screenshots; list views rechecked."
+logical_id = "6ea27d05-1c89-4efa-ad0a-e312a464ffb7"
+content_hash = "sha256:913e590347ae1b9e53236cf159c103c45f83e5197cf53909e6b8fa1083984a04"
+size = 1371749
+mtime_ms = 1791707707500
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/6ea27d05-1c89-4efa-ad0a-e312a464ffb7/00ca832d-33a7-4f59-b5b1-fe8f1c460ff2"
+storage_version_token = "1791707823476241"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "wlOrgwTMbTTQD3TZXQ4mv"
+uri = "file://generated-artifacts/p056/06_Admin_Checked.pptx"
+type = "slides"
+title = "Admin — corrected PowerPoint"
+description = "17 slides with screenshots; account details anonymized."
+logical_id = "c8839d7f-7ea5-4d98-8c40-efe7803c4a29"
+content_hash = "sha256:a42fda6d0c316fc98b35d2cddbe18960d3e9a136c4b00bd3d2f48a10c961d1c1"
+size = 547259
+mtime_ms = 1791707707904
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c8839d7f-7ea5-4d98-8c40-efe7803c4a29/37e31411-7e4b-4d5f-be3a-6460eda6a175"
+storage_version_token = "1791707824731467"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "8_48MnR-TlAI8QLwTrG6P"
+uri = "file://generated-artifacts/p056/P056_Checked_Capture_Report.txt"
+type = "text"
+title = "Opening and screenshot check report"
+description = "Office-render verification, screenshot readiness checks and conditional-state limitations."
+logical_id = "70ee13ab-f2b8-4ca3-a508-39dbb7f21e27"
+content_hash = "sha256:0e5edcdf42978b2eb9b1be7addb6050ea2010fcf2131c3e59ef0a478b634764e"
+size = 3814
+mtime_ms = 1791707814643
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/70ee13ab-f2b8-4ca3-a508-39dbb7f21e27/33260ea9-5295-469d-a18e-bb3cd4fa595c"
+storage_version_token = "1791707825990674"
+content_type = "text/plain"

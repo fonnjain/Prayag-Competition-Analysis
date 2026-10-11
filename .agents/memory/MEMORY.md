@@ -54,3 +54,4 @@
 - [Large SQL transport](large-sql-transport.md) — oversized inline SQL can fail with E2BIG before execution; use a guarded development client for large approved payloads.
 - [Competitor workbook operating policy](competitor-workbook-policy.md) — multi-brand, multi-period files are normal; production loads and undo must go through the admin app.
 - [Catalogue code identity](catalogue-code-identity.md) — exact codes take priority; distinct valid codes can collapse under normalization, so ambiguity checks must be scoped.
+- [Presentation compatibility](presentation-compatibility.md) — XML/ZIP checks do not prove PPTX files open; use a standard serializer and verify an actual office render.
