@@ -1369,3 +1369,115 @@ mtime_ms = 1791623810486
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/363e520c-2356-487b-8be8-3c561cf5be8f/c9f990d0-7782-4102-9e17-7c5bf5872f09"
 storage_version_token = "1791624114507814"
 content_type = "text/csv"
+
+[[outputs]]
+id = "zuaJz7QpTeO-7tsR-B-Wx"
+uri = "file://generated-artifacts/p056/01_Home.pptx"
+type = "slides"
+title = "Home"
+description = "12 slides; 11 screenshot content slides."
+logical_id = "856e4321-5972-43d1-8f91-739f4a0dda81"
+content_hash = "sha256:094fa61e814e3c0a5ad404b4db8ba68ced63552e05a6961fda98c45cc04ddcd8"
+size = 231114
+mtime_ms = 1791700290844
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/856e4321-5972-43d1-8f91-739f4a0dda81/96f6759b-ddbb-4ff6-9449-ed4c6f070472"
+storage_version_token = "1791700436847196"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "djjrrcmoUBW7sPe1L1BPm"
+uri = "file://generated-artifacts/p056/02_Product_Database.pptx"
+type = "slides"
+title = "Product Database"
+description = "92 slides; catalogue, comparisons, loaders, editors, mapping, data health and API keys."
+logical_id = "2345d0f7-5e4f-41b0-af63-6532d9937bec"
+content_hash = "sha256:3a599d36c0afad54950e0bcef1c9f2c6ec6e96547b6f6eef5918e67e3516c0a2"
+size = 3123319
+mtime_ms = 1791700291344
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/2345d0f7-5e4f-41b0-af63-6532d9937bec/713f2a25-7512-4fc8-aee0-5ae000a69783"
+storage_version_token = "1791700438149464"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "O2UA97l9WfOIrAVafLXT5"
+uri = "file://generated-artifacts/p056/03_Competition_Analysis.pptx"
+type = "slides"
+title = "Competition Analysis"
+description = "23 slides; dashboard panels, pricing modes and discount settings."
+logical_id = "54037e1b-ab99-4a29-a149-67b7d2d1d0e8"
+content_hash = "sha256:77b3dedce6a85bb6daee9f12f26b5c7a449bb0d7cf7948fd3d62830eaf38bb09"
+size = 714541
+mtime_ms = 1791700291456
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/54037e1b-ab99-4a29-a149-67b7d2d1d0e8/3060457d-d6ed-4ca2-bec8-d3a4e48b5a2b"
+storage_version_token = "1791700439423499"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "zUthMuF4eUNHcyfZW41gS"
+uri = "file://generated-artifacts/p056/04_MRP_Generator.pptx"
+type = "slides"
+title = "MRP Generator"
+description = "47 slides; scenario settings, matching, historical views, comparisons and saved run details."
+logical_id = "56fcea2b-4b59-4605-969a-93bfb8f96e33"
+content_hash = "sha256:b50ffa8936fe2986f8da48829af186a345f810efafa7a05709a92c93037c6cd3"
+size = 1615823
+mtime_ms = 1791700291672
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/56fcea2b-4b59-4605-969a-93bfb8f96e33/31905008-d334-4ebe-8546-5f30bee70183"
+storage_version_token = "1791700440891702"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "5Je7fM6bQ_XYEfm82NZMj"
+uri = "file://generated-artifacts/p056/05_Price_Finder.pptx"
+type = "slides"
+title = "Price Finder"
+description = "45 slides; search, product details/history, comparisons, list tabs and list editor."
+logical_id = "041a92f7-fe53-46c3-9041-6f84dd4d2174"
+content_hash = "sha256:3033131c5550467ed249fee77226938f962ab97aa19c4a096671022b62f5e8c0"
+size = 1344045
+mtime_ms = 1791700291872
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/041a92f7-fe53-46c3-9041-6f84dd4d2174/25f7d0ce-99fa-466f-b8b4-763d6aa9e3ba"
+storage_version_token = "1791700442117769"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "BRWxmNESvrnVOdNEVngHZ"
+uri = "file://generated-artifacts/p056/06_Admin.pptx"
+type = "slides"
+title = "Admin"
+description = "17 slides; user management forms and activity screens."
+logical_id = "b69016eb-766a-4e82-9967-9a04515836d3"
+content_hash = "sha256:18c8734d2c577fe068ca6b4e05e73034cd9ab21becf86606d1ad2a422523433c"
+size = 547045
+mtime_ms = 1791700291976
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/b69016eb-766a-4e82-9967-9a04515836d3/7b242706-fe34-4f48-b954-bd3a9092f056"
+storage_version_token = "1791700443485644"
+content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+[[outputs]]
+id = "HV2DQD8rI1Ulkpw0SQf_Q"
+uri = "file://generated-artifacts/p056/Prayag_Price_App_Pages_11Oct2026.zip"
+type = "unspecified"
+title = "All six revised PowerPoints"
+description = "Download the complete screenshot-based presentation set."
+logical_id = "63666dfd-ed90-411e-9991-bb0bfbef1d11"
+content_hash = "sha256:c12c400a2174cf0540c30838123351b7d6e74df7cc9e2916d30754db07e040f2"
+size = 7494111
+mtime_ms = 1791700292296
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/63666dfd-ed90-411e-9991-bb0bfbef1d11/1259997f-ee5c-4b52-a752-b04b24203730"
+storage_version_token = "1791700444885026"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "sBRrwtPkpZSFIhAAHzYJV"
+uri = "file://generated-artifacts/p056/P056_Page_Tab_List_and_Capture_Report.txt"
+type = "text"
+title = "P056 page/tab list and verification report"
+description = "Full inventory, slide counts, capture limitations and timed MRP-count checks."
+logical_id = "e0913860-0310-40e9-9592-10da27607282"
+content_hash = "sha256:6dc16def0b6f58b1c42fa302da32d389e3419ade6767928f0fdeb065f9b1a22d"
+size = 6245
+mtime_ms = 1791700435068
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e0913860-0310-40e9-9592-10da27607282/f0cc0f3d-c77b-40d7-ad19-ebe09565303c"
+storage_version_token = "1791700446249772"
+content_type = "text/plain"
