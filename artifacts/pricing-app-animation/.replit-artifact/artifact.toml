@@ -1,0 +1,29 @@
+kind = "video"
+videoAspectRatio = "16:9"
+previewPath = "/pricing-app-animation/"
+title = "Pricing App — Animated Walkthrough"
+description = "An animated overview of the existing pricing and competition application using its saved logo-free screenshots."
+version = "1.0.0"
+id = "artifacts/pricing-app-animation"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/pricing-app-animation/" ]
+localPort = 20939
+
+[services.development]
+run = "pnpm --filter @workspace/pricing-app-animation run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pricing-app-animation", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pricing-app-animation/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20939"
+BASE_PATH = "/pricing-app-animation/"

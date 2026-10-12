@@ -1635,3 +1635,10 @@ mtime_ms = 1791803775416
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/93bf4882-b2d6-4c34-bc3d-bf3a9423f154/97827123-5a30-4907-b021-f300b6a07b1d"
 storage_version_token = "1791803793405737"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Yt_ZyhV9tnoCJt8PBCy2K"
+uri = "file://artifacts/pricing-app-animation/public/audio/bg_music.mp3"
+type = "audio"
+title = "background music"
+description = "Generated music: Minimal driving electronic instrumental scoring a software product walkthrough. Muted plucks, warm sub bass, crisp light percussion, 118 BPM, confident and precise. Short intro, stea…"
