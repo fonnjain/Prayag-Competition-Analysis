@@ -1621,3 +1621,17 @@ mtime_ms = 1791715528021
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c6760fe2-0fe6-4c79-bcba-788908a8b2da/b26dd2ee-5e33-48ef-9c89-c7a3c88f276d"
 storage_version_token = "1791715617598979"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "_hCuNddnszL0u17hwo_fM"
+uri = "file://generated-artifacts/p056/Presentation_Screenshots_Only.zip"
+type = "unspecified"
+title = "All presentation screenshots — ZIP"
+description = "117 exact screenshot images extracted from the six corrected PowerPoints, organised into six presentation folders. Logos removed. Reused screenshots included once per presentation. No PowerPoints or documents inside."
+logical_id = "93bf4882-b2d6-4c34-bc3d-bf3a9423f154"
+content_hash = "sha256:a9c71fce7496fcb13700de689bdacd83e75cd02813024324fd81c4ca311ef452"
+size = 7672147
+mtime_ms = 1791803775416
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/93bf4882-b2d6-4c34-bc3d-bf3a9423f154/97827123-5a30-4907-b021-f300b6a07b1d"
+storage_version_token = "1791803793405737"
+content_type = "application/octet-stream"
