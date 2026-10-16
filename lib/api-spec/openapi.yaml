@@ -618,6 +618,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PriceFinderBrowseResponse"
+  /price-finder/competitors:
+    get:
+      operationId: getPriceFinderCompetitors
+      tags: [catalog]
+      summary: Currently priced competitor coverage inside the selected product scope
+      parameters:
+        - {name: itemCode, in: query, style: form, explode: true, schema: {type: array, maxItems: 50, items: {type: string}}}
+        - {name: division, in: query, schema: {type: string}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: asOf, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Bucket-aware, current matched non-null prices only
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceFinderCoverage"}
+        "400":
+          description: Invalid scope
   /price-finder/product:
     get:
       operationId: getPriceFinderProduct
@@ -674,7 +692,6 @@ paths:
             type: array
             items:
               type: string
-              enum: [Sparsh Pearl, Ashirvad, Prince, Vectus]
         - name: asOf
           in: query
           required: false
@@ -721,7 +738,6 @@ paths:
             type: array
             items:
               type: string
-              enum: [Sparsh Pearl, Ashirvad, Prince, Vectus]
         - name: asOf
           in: query
           required: false
@@ -1034,6 +1050,10 @@ paths:
       tags: [comparison]
       summary: Available competitors, categories, match statuses, and price periods for filtering
       parameters:
+        - {name: division, in: query, schema: {type: string}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: itemCode, in: query, style: form, explode: true, schema: {type: array, items: {type: string}}}
+        - {name: asOf, in: query, schema: {type: string, format: date}}
         - name: competitor
           in: query
           required: false
@@ -1417,6 +1437,11 @@ paths:
       tags: [analysis]
       summary: Available filter options
       description: Distinct competitors, Prayag divisions/categories, match confidences and statuses for the analysis filter bar.
+      parameters:
+        - {name: division, in: query, schema: {type: string}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: itemCode, in: query, style: form, explode: true, schema: {type: array, items: {type: string}}}
+        - {name: asOf, in: query, schema: {type: string, format: date}}
       responses:
         "200":
           description: Filter options
@@ -5727,7 +5752,6 @@ components:
           properties:
             competitor:
               type: string
-              enum: [Sparsh Pearl, Vectus]
             difference:
               type: ["number", "null"]
               description: Competitor price minus Prayag MRP.
@@ -5781,11 +5805,34 @@ components:
           type: array
           items:
             type: string
-            enum: [Sparsh Pearl, Vectus]
         rows:
           type: array
           items:
             $ref: "#/components/schemas/PriceFinderComparisonRow"
+    PriceFinderCoverage:
+      type: object
+      required: [asOfDate, scope, competitors, productsInScope, productsWithNoCompetitorPrice]
+      properties:
+        asOfDate: {type: string}
+        scope:
+          type: object
+          required: [itemCodes, division, category]
+          properties:
+            itemCodes: {type: array, items: {type: string}}
+            division: {type: [string, "null"]}
+            category: {type: [string, "null"]}
+        productsInScope: {type: integer}
+        productsWithNoCompetitorPrice: {type: integer}
+        competitors:
+          type: array
+          items:
+            type: object
+            required: [competitor, pricedProducts, coveragePct, effectiveDate]
+            properties:
+              competitor: {type: string}
+              pricedProducts: {type: integer}
+              coveragePct: {type: number}
+              effectiveDate: {type: [string, "null"]}
     PriceFinderProduct:
       type: object
       required:

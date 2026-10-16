@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { normCode } from "../lib/catalog";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { finderAsOf, finderScope, scopedFinderCompetitors } from "../lib/priceFinderCompetitors";
 import {
   buildRow,
   parseFilters,
@@ -391,7 +392,10 @@ async function getFilteredRows(query: Record<string, unknown>): Promise<Filtered
 // ---------------------------------------------------------------------------
 
 // GET /analysis/filters — option lists for the filter bar.
-router.get("/analysis/filters", async (_req, res) => {
+router.get("/analysis/filters", async (req, res) => {
+  let coverage;
+  try { coverage = await scopedFinderCompetitors(finderScope(req.query), finderAsOf(req.query.asOf)); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Invalid filter scope" }); return; }
   const [comps, products] = await Promise.all([
     db
       .selectDistinct({
@@ -408,7 +412,7 @@ router.get("/analysis/filters", async (_req, res) => {
       .from(catalogProductsTable).where(bucketSql(sql`${catalogProductsTable.itemCode}`)),
   ]);
 
-  const competitors = [...new Set(comps.map((c) => c.competitor))].sort();
+  const competitors = coverage.competitors.map(c => c.competitor);
   const matchStatuses = [...new Set(comps.map((c) => c.matchStatus))].sort();
   const matchConfidences = [
     ...new Set(
@@ -427,6 +431,7 @@ router.get("/analysis/filters", async (_req, res) => {
   const categories = [
     ...new Set(
       products
+        .filter(p => !coverage.scope.division || p.division === coverage.scope.division)
         .map((p) => p.category)
         .filter((v): v is string => v != null && v.trim() !== ""),
     ),

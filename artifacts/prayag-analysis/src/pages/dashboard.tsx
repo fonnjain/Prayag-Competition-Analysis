@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { BucketPageHeader } from "@/components/BucketSlot";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useGetAnalysisFilters, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
+import { useGetAnalysisFilters, getGetAnalysisFiltersQueryKey, useGetAnalysisPeriods, getExportAnalysisUrl } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@workspace/replit-auth-web";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -235,6 +236,27 @@ function FilterBar({
 }) {
   const { data, isLoading } = useGetAnalysisFilters();
   const { data: periodsData } = useGetAnalysisPeriods();
+  // Competitor brands offered are narrowed to the current division/category (P057 C.4).
+  const competitorScope = { division: filters.division, category: filters.category };
+  const { data: scopedData, isSuccess: scopedReady } = useGetAnalysisFilters(competitorScope, {
+    query: { queryKey: getGetAnalysisFiltersQueryKey(competitorScope) },
+  });
+  const scopedCompetitors = useMemo(() => scopedData?.competitors ?? [], [scopedData]);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  // Clear selected brands that are no longer covered in this scope.
+  useEffect(() => {
+    if (!scopedReady) return;
+    const current = filtersRef.current.competitor ?? [];
+    if (current.length === 0) return;
+    const available = new Set(scopedCompetitors);
+    const next = current.filter((c) => available.has(c));
+    if (next.length !== current.length) {
+      onChangeRef.current({ ...filtersRef.current, competitor: next.length > 0 ? next : undefined });
+    }
+  }, [scopedReady, scopedCompetitors]);
 
   if (isLoading || !data) {
     return <div className="space-y-2"><Skeleton className="h-16 w-full" /></div>;
@@ -273,7 +295,10 @@ function FilterBar({
             <DropdownMenuContent className="w-[200px]">
               <DropdownMenuLabel>Brands</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {data.competitors.map(c => (
+              {scopedReady && scopedCompetitors.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">No competitor prices in this scope.</p>
+              )}
+              {(scopedReady ? scopedCompetitors : data.competitors).map(c => (
                 <DropdownMenuCheckboxItem
                   key={c}
                   checked={(filters.competitor || []).includes(c)}
@@ -288,34 +313,36 @@ function FilterBar({
 
         <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Division</label>
-          <Select
-            value={filters.division || "all"}
-            onValueChange={(v) => onChange({ ...filters, division: v === "all" ? undefined : v })}
-          >
-            <SelectTrigger className="w-full sm:w-[180px] h-8 text-sm bg-background">
-              <SelectValue placeholder="All Divisions" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Divisions</SelectItem>
-              {data.divisions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            aria-label="Division"
+            data-testid="select-analysis-division"
+            widthClass="w-full sm:w-[200px]"
+            triggerClassName="h-8 text-sm bg-background"
+            placeholder="All Divisions"
+            searchPlaceholder="Search divisions…"
+            emptyText="No division matches"
+            allowClear
+            value={filters.division ?? null}
+            onChange={(v) => onChange({ ...filters, division: v ?? undefined })}
+            options={data.divisions.map(d => ({ value: d, label: d }))}
+          />
         </div>
 
         <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider px-1">Category</label>
-          <Select
-            value={filters.category || "all"}
-            onValueChange={(v) => onChange({ ...filters, category: v === "all" ? undefined : v })}
-          >
-            <SelectTrigger className="w-full sm:w-[180px] h-8 text-sm bg-background">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {data.categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            aria-label="Category"
+            data-testid="select-analysis-category"
+            widthClass="w-full sm:w-[220px]"
+            triggerClassName="h-8 text-sm bg-background"
+            placeholder="All Categories"
+            searchPlaceholder="Search categories…"
+            emptyText="No category matches"
+            allowClear
+            value={filters.category ?? null}
+            onChange={(v) => onChange({ ...filters, category: v ?? undefined })}
+            options={data.categories.map(c => ({ value: c, label: c }))}
+          />
         </div>
 
         <div className="min-w-0 space-y-1">

@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -365,14 +366,19 @@ export default function MrpRevisionsPage() {
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
             <div className="min-w-0 space-y-2">
               <Label>Competitor</Label>
-              <Select value={competitor} onValueChange={(value) => { setCompetitor(value); setEffectiveDate(""); setPreview(null); }}>
-                <SelectTrigger><SelectValue placeholder="Choose a competitor" /></SelectTrigger>
-                <SelectContent>
-                  {[...new Set((scopes.data?.competitorPeriods ?? []).map((scope) => scope.competitor))]
-                    .sort((a, b) => a.localeCompare(b))
-                    .map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                aria-label="Competitor"
+                data-testid="select-revision-competitor"
+                widthClass="w-full"
+                placeholder="Choose a competitor"
+                searchPlaceholder="Search competitors…"
+                emptyText="No competitor matches"
+                value={competitor || null}
+                onChange={(value) => { setCompetitor(value ?? ""); setEffectiveDate(""); setPreview(null); }}
+                options={[...new Set((scopes.data?.competitorPeriods ?? []).map((scope) => scope.competitor))]
+                  .sort((a, b) => a.localeCompare(b))
+                  .map((name) => ({ value: name, label: name }))}
+              />
             </div>
             <div className="min-w-0 space-y-2">
               <Label>Existing effective period</Label>

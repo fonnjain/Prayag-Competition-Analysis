@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, ChevronLeft, ChevronRight, Save, Sparkles, Check, Zap, Download, Undo2, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatDisplayDate, formatDisplayDateTime } from "@/lib/date-format";
 import {
@@ -492,17 +493,18 @@ export default function MappingReviewPage() {
           />
         </div>
         
-        <Select value={competitor} onValueChange={setCompetitor}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Competitor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Competitors</SelectItem>
-            {(filters?.competitors ?? []).map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          aria-label="Competitor"
+          data-testid="select-mapping-competitor"
+          widthClass="w-[200px]"
+          placeholder="All Competitors"
+          searchPlaceholder="Search competitors…"
+          emptyText="No competitor matches"
+          allowClear
+          value={competitor === "all" ? null : competitor}
+          onChange={(next) => setCompetitor(next ?? "all")}
+          options={(filters?.competitors ?? []).map((c) => ({ value: c, label: c }))}
+        />
 
         <Select value={confidence} onValueChange={setConfidence}>
           <SelectTrigger className="w-[170px]">

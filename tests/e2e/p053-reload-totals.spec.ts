@@ -26,20 +26,28 @@ test("saved filter scopes the first browse render after a full reload; bearer lo
     await page.addInitScript(token => {
       localStorage.setItem("prayag_sid", token);
       const state = window as unknown as { firstDivisionTotals?: { division: string | null; count: number }[] };
+      // Division picker is a searchable combobox: options mount only when open.
+      // Record the first option set ever rendered after reload so a stale/unscoped
+      // flash would still be caught.
       new MutationObserver(() => {
-        const nodes = document.querySelectorAll('[data-testid="browse-division"]');
+        const nodes = document.querySelectorAll('[data-testid^="select-browse-division-option-"]');
         if (nodes.length && !state.firstDivisionTotals) state.firstDivisionTotals = Array.from(nodes, node => ({
-          division: node.getAttribute("data-division"), count: Number(node.getAttribute("data-count")),
+          division: node.getAttribute("data-value"), count: Number(node.getAttribute("data-count")),
         }));
       }).observe(document, { subtree: true, childList: true });
     }, sid);
     await page.goto("/price-finder/");
-    await expect(page.getByTestId("browse-division")).toHaveCount(expectedCounts.length);
+    await page.getByTestId("select-browse-division").click();
+    await expect(page.locator('[data-testid^="select-browse-division-option-"]')).toHaveCount(expectedCounts.length);
+    await page.keyboard.press("Escape");
     const requests: boolean[] = [];
     page.on("request", r => {
       if (new URL(r.url()).pathname === "/api/price-finder/browse") requests.push(Boolean(r.headers().authorization));
     });
     await page.reload();
+    // Trigger stays disabled until scoped divisions load; open as soon as it is usable.
+    await expect(page.getByTestId("select-browse-division")).toBeEnabled();
+    await page.getByTestId("select-browse-division").click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { firstDivisionTotals?: unknown }).firstDivisionTotals)).toEqual(expectedCounts);
     expect(requests.length).toBeGreaterThan(0);
     expect(requests.every(Boolean)).toBeTruthy();

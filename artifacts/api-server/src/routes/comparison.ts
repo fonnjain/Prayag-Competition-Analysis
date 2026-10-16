@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { bucketSql, bucketCompetitorSql, filterBucketRows, bucketExportRows } from "../lib/bucketFilter";
 import { sql, eq, ne, asc, desc, and, inArray } from "drizzle-orm";
 import * as XLSX from "xlsx";
+import { finderAsOf, finderScope, scopedFinderCompetitors } from "../lib/priceFinderCompetitors";
 import { applyIndianNumberFormats } from "@workspace/formatting";
 import {
   db,
@@ -1637,12 +1638,9 @@ router.get("/catalog/comparison/by-product", async (req, res) => {
 // Optional ?competitor= scopes the returned periods to that competitor's rows only.
 router.get("/catalog/comparison/filters", async (req, res) => {
   const competitor = strParam(req.query.competitor);
-
-  const compRows = await db
-    .selectDistinct({ competitor: competitorPricesTable.competitor })
-    .from(competitorPricesTable)
-    .where(bucketCompetitorSql(sql`${competitorPricesTable.competitor}`, sql`${competitorPricesTable.matchedPrayagCode}`))
-    .orderBy(asc(competitorPricesTable.competitor));
+  let coverage;
+  try { coverage = await scopedFinderCompetitors(finderScope(req.query), finderAsOf(req.query.asOf)); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Invalid filter scope" }); return; }
   const catRows = await db
     .selectDistinct({ category: competitorPricesTable.category })
     .from(competitorPricesTable)
@@ -1684,7 +1682,7 @@ router.get("/catalog/comparison/filters", async (req, res) => {
     });
 
   res.json({
-    competitors: compRows.map((r) => r.competitor).filter((c): c is string => !!c),
+    competitors: coverage.competitors.map(c => c.competitor),
     categories: catRows.map((r) => r.category).filter((c): c is string => !!c),
     matchStatuses: statusRows
       .map((r) => r.matchStatus)

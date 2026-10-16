@@ -115,6 +115,7 @@ import type {
   GetAnalysisByBrandParams,
   GetAnalysisByCategoryParams,
   GetAnalysisCoverageMatrixParams,
+  GetAnalysisFiltersParams,
   GetAnalysisOpportunitiesParams,
   GetAnalysisOverviewParams,
   GetAnalysisPositioningParams,
@@ -136,6 +137,7 @@ import type {
   GetPriceEditorProductParams,
   GetPriceFinderBrowseParams,
   GetPriceFinderComparisonParams,
+  GetPriceFinderCompetitorsParams,
   GetPriceFinderProductParams,
   GetPriceFinderSearchParams,
   GetPriceHistoryParams,
@@ -218,6 +220,7 @@ import type {
   PriceEditorUndoResponse,
   PriceFinderBrowseResponse,
   PriceFinderComparisonResponse,
+  PriceFinderCoverage,
   PriceFinderProductResponse,
   PriceFinderSearchResponse,
   PriceHistory,
@@ -2086,6 +2089,98 @@ export function useGetPriceFinderBrowse<TData = Awaited<ReturnType<typeof getPri
 
 
 
+export const getGetPriceFinderCompetitorsUrl = (params?: GetPriceFinderCompetitorsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["itemCode"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/competitors?${stringifiedParams}` : `/api/price-finder/competitors`
+}
+
+/**
+ * @summary Currently priced competitor coverage inside the selected product scope
+ */
+export const getPriceFinderCompetitors = async (params?: GetPriceFinderCompetitorsParams, options?: RequestInit): Promise<PriceFinderCoverage> => {
+
+  return customFetch<PriceFinderCoverage>(getGetPriceFinderCompetitorsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderCompetitorsQueryKey = (params?: GetPriceFinderCompetitorsParams,) => {
+    return [
+    `/api/price-finder/competitors`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceFinderCompetitorsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderCompetitors>>, TError = ErrorType<void>>(params?: GetPriceFinderCompetitorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderCompetitors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderCompetitorsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderCompetitors>>> = ({ signal }) => getPriceFinderCompetitors(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderCompetitors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderCompetitorsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderCompetitors>>>
+export type GetPriceFinderCompetitorsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Currently priced competitor coverage inside the selected product scope
+ */
+
+export function useGetPriceFinderCompetitors<TData = Awaited<ReturnType<typeof getPriceFinderCompetitors>>, TError = ErrorType<void>>(
+ params?: GetPriceFinderCompetitorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderCompetitors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderCompetitorsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetPriceFinderProductUrl = (params: GetPriceFinderProductParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -3071,6 +3166,14 @@ export const getGetComparisonFiltersUrl = (params?: GetComparisonFiltersParams,)
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["itemCode"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
 
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : value.toString())
@@ -4304,21 +4407,36 @@ export const useDeleteCompetitorPeriod = <TError = ErrorType<ErrorResponse>,
       return useMutation(getDeleteCompetitorPeriodMutationOptions(options));
     }
 
-export const getGetAnalysisFiltersUrl = () => {
+export const getGetAnalysisFiltersUrl = (params?: GetAnalysisFiltersParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["itemCode"];
 
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
-  return `/api/analysis/filters`
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/analysis/filters?${stringifiedParams}` : `/api/analysis/filters`
 }
 
 /**
  * Distinct competitors, Prayag divisions/categories, match confidences and statuses for the analysis filter bar.
  * @summary Available filter options
  */
-export const getAnalysisFilters = async ( options?: RequestInit): Promise<AnalysisFilters> => {
+export const getAnalysisFilters = async (params?: GetAnalysisFiltersParams, options?: RequestInit): Promise<AnalysisFilters> => {
 
-  return customFetch<AnalysisFilters>(getGetAnalysisFiltersUrl(),
+  return customFetch<AnalysisFilters>(getGetAnalysisFiltersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4331,23 +4449,23 @@ export const getAnalysisFilters = async ( options?: RequestInit): Promise<Analys
 
 
 
-export const getGetAnalysisFiltersQueryKey = () => {
+export const getGetAnalysisFiltersQueryKey = (params?: GetAnalysisFiltersParams,) => {
     return [
-    `/api/analysis/filters`
+    `/api/analysis/filters`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAnalysisFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getAnalysisFilters>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalysisFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAnalysisFiltersQueryOptions = <TData = Awaited<ReturnType<typeof getAnalysisFilters>>, TError = ErrorType<unknown>>(params?: GetAnalysisFiltersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalysisFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAnalysisFiltersQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetAnalysisFiltersQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisFilters>>> = ({ signal }) => getAnalysisFilters({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnalysisFilters>>> = ({ signal }) => getAnalysisFilters(params, { signal, ...requestOptions });
 
 
 
@@ -4365,11 +4483,11 @@ export type GetAnalysisFiltersQueryError = ErrorType<unknown>
  */
 
 export function useGetAnalysisFilters<TData = Awaited<ReturnType<typeof getAnalysisFilters>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalysisFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetAnalysisFiltersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAnalysisFilters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetAnalysisFiltersQueryOptions(options)
+  const queryOptions = getGetAnalysisFiltersQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

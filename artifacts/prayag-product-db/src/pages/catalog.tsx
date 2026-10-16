@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Download, ChevronLeft, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatDisplayDate } from "@/lib/date-format";
 import { productDetailHref } from "@/lib/product-links";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -254,39 +255,34 @@ export default function CatalogPage() {
           />
         </div>
 
-        <Select
-          value={division}
-          onValueChange={(v) => {
-            setDivision(v);
+        <SearchableSelect
+          aria-label="Division"
+          data-testid="select-catalog-division"
+          widthClass="w-full lg:w-[200px]"
+          placeholder="All Divisions"
+          searchPlaceholder="Search divisions…"
+          emptyText="No division matches"
+          allowClear
+          value={division === "all" ? null : division}
+          onChange={(next) => {
+            setDivision(next ?? "all");
             setCategory("all");
           }}
-        >
-          <SelectTrigger className="w-full lg:w-[180px]">
-            <SelectValue placeholder="Division" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Divisions</SelectItem>
-            {(filters?.divisions ?? []).map((d) => (
-              <SelectItem key={d} value={d}>
-                {d}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={(filters?.divisions ?? []).map((d) => ({ value: d, label: d }))}
+        />
 
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-full lg:w-[200px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {visibleCategories.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          aria-label="Category"
+          data-testid="select-catalog-category"
+          widthClass="w-full lg:w-[240px]"
+          placeholder="All Categories"
+          searchPlaceholder="Search categories…"
+          emptyText="No category matches"
+          allowClear
+          value={category === "all" ? null : category}
+          onChange={(next) => setCategory(next ?? "all")}
+          options={visibleCategories.map((c) => ({ value: c, label: c }))}
+        />
 
         <Select value={priceStatus} onValueChange={setPriceStatus}>
           <SelectTrigger className="w-full lg:w-[180px]">

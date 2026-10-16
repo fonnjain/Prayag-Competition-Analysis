@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
@@ -987,33 +988,55 @@ export default function PriceFinderPage() {
           )}
         </div>
 
-        {!browseDivision ? (
-          /* Division grid */
-          isDivisionsLoading ? (
-            <p className="text-sm text-muted-foreground">Loading catalogue…</p>
-          ) : (
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              {(divisionsData?.divisions ?? []).map((item) => (
-                <button
-                  key={item.division}
-                  data-testid="browse-division"
-                  data-division={item.division}
-                  data-count={item.count}
-                  type="button"
-                  onClick={() => {
-                    selectDivision(item.division);
-                    setSelectedItemCode(null);
-                  }}
-                  className="flex items-center justify-between rounded-md border px-3 py-2.5 text-left text-sm transition-colors hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <span className="font-medium">{item.division}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{item.count}</span>
-                </button>
-              ))}
-            </div>
-          )
-        ) : (
-          /* Category tabs + product list */
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <SearchableSelect
+            aria-label="Division"
+            data-testid="select-browse-division"
+            widthClass="w-full sm:w-[260px]"
+            placeholder={isDivisionsLoading ? "Loading divisions…" : "Choose a division"}
+            searchPlaceholder="Search divisions…"
+            emptyText="No division matches"
+            disabled={isDivisionsLoading}
+            allowClear
+            value={browseDivision}
+            options={(divisionsData?.divisions ?? []).map((item) => ({
+              value: item.division,
+              label: item.division,
+              count: item.count,
+            }))}
+            onChange={(next) => {
+              selectDivision(next);
+              setSelectedItemCode(null);
+            }}
+          />
+          <SearchableSelect
+            aria-label="Category"
+            data-testid="select-browse-category"
+            widthClass="w-full sm:w-[300px]"
+            placeholder={
+              !browseDivision
+                ? "Pick a division first"
+                : isCategoriesLoading
+                  ? "Loading categories…"
+                  : "Choose a category"
+            }
+            searchPlaceholder="Search categories…"
+            emptyText="No category matches in this division"
+            disabled={!browseDivision || isCategoriesLoading}
+            value={browseCategory}
+            options={(categoriesData?.categories ?? []).map((item) => ({
+              value: item.category ?? "__uncategorised__",
+              label: item.label,
+              count: item.count,
+            }))}
+            onChange={(next) => {
+              selectCategory(next);
+              setSelectedItemCode(null);
+            }}
+          />
+        </div>
+
+        {browseDivision && (
           <div>
             {/* Product list for selected category */}
             {browseCategory && (
@@ -1022,7 +1045,7 @@ export default function PriceFinderPage() {
               ) : (productsData?.products ?? []).length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">No products in this category.</p>
               ) : (
-                <div className="divide-y rounded-lg border">
+                <div className="max-h-[60vh] overflow-y-auto overscroll-contain divide-y rounded-lg border" data-testid="list-browse-products">
                   {(productsData?.products ?? []).map((item) => (
                     <div
                       key={item.itemCode}

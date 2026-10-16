@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import XLSX from "xlsx";
+import { finderAsOf, finderScope, exactQueryCodes, scopedFinderCompetitors } from "../lib/priceFinderCompetitors";
 import { bucketCodeAllowed, bucketCompetitorAllowed, bucketCompetitorSql, bucketSql, bucketExportRows } from "../lib/bucketFilter";
 import {
   priceChangePct,
@@ -15,8 +16,25 @@ import {
 
 const router: IRouter = Router();
 
-const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Ashirvad", "Prince", "Vectus"] as const;
-type PriceFinderCompetitor = (typeof PRICE_FINDER_COMPETITORS)[number];
+type PriceFinderCompetitor = string;
+
+router.get("/price-finder/competitors", async (req, res) => {
+  try {
+    res.json(await scopedFinderCompetitors(finderScope(req.query), finderAsOf(req.query.asOf)));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Competitor scope could not be loaded." });
+  }
+});
+
+async function comparisonScope(query: Record<string, unknown>) {
+  const codes = exactQueryCodes(query.code ?? query.codes);
+  if (!codes.length) throw new Error("Select between 1 and 50 products.");
+  const asOf = finderAsOf(query.asOf);
+  const coverage = await scopedFinderCompetitors({ itemCodes: codes, division: null, category: null }, asOf);
+  const available = coverage.competitors.map(c => c.competitor);
+  const requested = queryArray(query.competitor);
+  return { codes, asOf, competitors: requested.length ? requested.filter(c => available.includes(c)) : available };
+}
 
 function queryArray(value: unknown): string[] {
   const values = Array.isArray(value) ? value : value == null ? [] : [value];
@@ -1065,30 +1083,8 @@ router.get("/price-finder/product", getPriceFinderProduct);
 router.get("/price-finder/product/:itemCode", getPriceFinderProduct);
 
 router.get("/price-finder/comparison", async (req, res) => {
-  const codes = [...new Set(queryArray(req.query.code ?? req.query.codes))];
-  const requestedCompetitors = [...new Set(queryArray(req.query.competitor))];
-  const competitors = (
-    requestedCompetitors.length > 0 ? requestedCompetitors : ["Sparsh Pearl"]
-  ) as PriceFinderCompetitor[];
-
-  if (codes.length === 0 || codes.length > 50) {
-    res.status(400).json({ error: "Select between 1 and 50 products." });
-    return;
-  }
-  if (
-    competitors.some(
-      (competitor) =>
-        !PRICE_FINDER_COMPETITORS.includes(competitor as PriceFinderCompetitor),
-    )
-  ) {
-    res.status(400).json({
-      error: `Competitor must be one of: ${PRICE_FINDER_COMPETITORS.join(", ")}.`,
-    });
-    return;
-  }
-
   try {
-    const asOf = comparisonAsOf(req.query.asOf);
+    const { codes, competitors, asOf } = await comparisonScope(req.query);
     res.json(await buildPriceFinderComparison(codes, competitors, asOf));
   } catch (error) {
     res.status(400).json({
@@ -1098,30 +1094,8 @@ router.get("/price-finder/comparison", async (req, res) => {
 });
 
 router.get("/price-finder/comparison/export", async (req, res) => {
-  const codes = [...new Set(queryArray(req.query.code ?? req.query.codes))];
-  const requestedCompetitors = [...new Set(queryArray(req.query.competitor))];
-  const competitors = (
-    requestedCompetitors.length > 0 ? requestedCompetitors : ["Sparsh Pearl"]
-  ) as PriceFinderCompetitor[];
-
-  if (codes.length === 0 || codes.length > 50) {
-    res.status(400).json({ error: "Select between 1 and 50 products." });
-    return;
-  }
-  if (
-    competitors.some(
-      (competitor) =>
-        !PRICE_FINDER_COMPETITORS.includes(competitor as PriceFinderCompetitor),
-    )
-  ) {
-    res.status(400).json({
-      error: `Competitor must be one of: ${PRICE_FINDER_COMPETITORS.join(", ")}.`,
-    });
-    return;
-  }
-
   try {
-    const asOf = comparisonAsOf(req.query.asOf);
+    const { codes, competitors, asOf } = await comparisonScope(req.query);
     const comparison = await buildPriceFinderComparison(codes, competitors, asOf);
     const exportRows = comparison.rows.flatMap((row) =>
       row.competitors.map((competitor) => ({

@@ -1109,6 +1109,38 @@ export const GetPriceFinderBrowseResponse = zod.object({
 
 
 /**
+ * @summary Currently priced competitor coverage inside the selected product scope
+ */
+export const getPriceFinderCompetitorsQueryItemCodeMax = 50;
+
+
+
+export const GetPriceFinderCompetitorsQueryParams = zod.object({
+  "itemCode": zod.array(zod.coerce.string()).max(getPriceFinderCompetitorsQueryItemCodeMax).optional(),
+  "division": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "asOf": zod.date().optional()
+})
+
+export const GetPriceFinderCompetitorsResponse = zod.object({
+  "asOfDate": zod.string(),
+  "scope": zod.object({
+  "itemCodes": zod.array(zod.string()),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable()
+}),
+  "productsInScope": zod.number(),
+  "productsWithNoCompetitorPrice": zod.number(),
+  "competitors": zod.array(zod.object({
+  "competitor": zod.string(),
+  "pricedProducts": zod.number(),
+  "coveragePct": zod.number(),
+  "effectiveDate": zod.string().nullable()
+}))
+})
+
+
+/**
  * @summary Get current Prayag and competitor prices for one product
  */
 export const GetPriceFinderProductQueryParams = zod.object({
@@ -1169,13 +1201,13 @@ export const getPriceFinderComparisonQueryCodeMax = 50;
 
 export const GetPriceFinderComparisonQueryParams = zod.object({
   "code": zod.array(zod.coerce.string()).min(1).max(getPriceFinderComparisonQueryCodeMax).describe('One or more selected Prayag item codes, maximum 50.'),
-  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Ashirvad', 'Prince', 'Vectus'])).optional().describe('Competitor brands to include. Defaults to Sparsh Pearl. Missing competitor data is returned as no data, never as zero.'),
+  "competitor": zod.array(zod.coerce.string()).optional().describe('Competitor brands to include. Defaults to Sparsh Pearl. Missing competitor data is returned as no data, never as zero.'),
   "asOf": zod.date().optional().describe('Resolve both sides as of this date (YYYY-MM-DD). Defaults to today.')
 })
 
 export const GetPriceFinderComparisonResponse = zod.object({
   "asOfDate": zod.coerce.date(),
-  "competitors": zod.array(zod.enum(['Sparsh Pearl', 'Vectus'])),
+  "competitors": zod.array(zod.string()),
   "rows": zod.array(zod.object({
   "itemCode": zod.string(),
   "productName": zod.string().nullable(),
@@ -1195,7 +1227,7 @@ export const GetPriceFinderComparisonResponse = zod.object({
   "upcomingPrice": zod.number().nullable(),
   "upcomingEffectiveDate": zod.coerce.date().nullable()
 }).and(zod.object({
-  "competitor": zod.enum(['Sparsh Pearl', 'Vectus']),
+  "competitor": zod.string(),
   "difference": zod.number().nullable().describe('Competitor price minus Prayag MRP.'),
   "differencePct": zod.number().nullable().describe('Difference relative to Prayag MRP.'),
   "cheaperSide": zod.string().nullable().describe('Prayag, the competitor name, parity, or null when no dated price is available.'),
@@ -1219,7 +1251,7 @@ export const exportPriceFinderComparisonQueryCodeMax = 50;
 
 export const ExportPriceFinderComparisonQueryParams = zod.object({
   "code": zod.array(zod.coerce.string()).min(1).max(exportPriceFinderComparisonQueryCodeMax),
-  "competitor": zod.array(zod.enum(['Sparsh Pearl', 'Ashirvad', 'Prince', 'Vectus'])).optional(),
+  "competitor": zod.array(zod.coerce.string()).optional(),
   "asOf": zod.date().optional()
 })
 
@@ -1521,6 +1553,10 @@ export const GetComparisonByProductResponse = zod.object({
  * @summary Available competitors, categories, match statuses, and price periods for filtering
  */
 export const GetComparisonFiltersQueryParams = zod.object({
+  "division": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "itemCode": zod.array(zod.coerce.string()).optional(),
+  "asOf": zod.date().optional(),
   "competitor": zod.coerce.string().optional().describe('When set, scopes the returned periods to rows for that competitor only.')
 })
 
@@ -1934,6 +1970,13 @@ export const DeleteCompetitorPeriodResponse = zod.object({
  * Distinct competitors, Prayag divisions/categories, match confidences and statuses for the analysis filter bar.
  * @summary Available filter options
  */
+export const GetAnalysisFiltersQueryParams = zod.object({
+  "division": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "itemCode": zod.array(zod.coerce.string()).optional(),
+  "asOf": zod.date().optional()
+})
+
 export const GetAnalysisFiltersResponse = zod.object({
   "competitors": zod.array(zod.string()),
   "divisions": zod.array(zod.string()),

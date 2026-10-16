@@ -3,8 +3,22 @@ import {
   writeSelectedCodes,
 } from "./selectionState.ts";
 
-export const PRICE_FINDER_COMPETITORS = ["Sparsh Pearl", "Ashirvad", "Prince", "Vectus"] as const;
-export type PriceFinderCompetitor = (typeof PRICE_FINDER_COMPETITORS)[number];
+/**
+ * Competitor brands are dynamic: the offered set comes from
+ * GET /price-finder/competitors for the current selection. URL values are
+ * carried through verbatim here and validated against the fetched list on
+ * the comparison page (unknown / uncovered brands are dropped silently there).
+ */
+export type PriceFinderCompetitor = string;
+
+/** Keep only URL competitors present in the fetched, covered list. */
+export function filterAvailableCompetitors(
+  requested: readonly string[],
+  available: readonly string[],
+): string[] {
+  const allowed = new Set(available);
+  return requested.filter((value) => allowed.has(value));
+}
 
 const KNOWN_PARAMS = new Set(["code", "filter", "competitor", "asOf"]);
 
@@ -32,14 +46,11 @@ export function comparisonStateFromParams(params: URLSearchParams): {
   competitors: PriceFinderCompetitor[];
   asOf: string;
 } {
-  const competitors = uniqueTrimmed(params.getAll("competitor")).filter(
-    (value): value is PriceFinderCompetitor =>
-      PRICE_FINDER_COMPETITORS.includes(value as PriceFinderCompetitor),
-  );
+  const competitors = uniqueTrimmed(params.getAll("competitor"));
   const asOf = params.get("asOf")?.trim() ?? "";
 
   return {
-    competitors: competitors.length ? competitors : ["Sparsh Pearl"],
+    competitors,
     asOf: isValidDate(asOf) ? asOf : "",
   };
 }

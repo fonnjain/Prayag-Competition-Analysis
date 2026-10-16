@@ -3264,16 +3264,8 @@ export interface PriceFinderComparisonPrice {
   upcomingEffectiveDate: string | null;
 }
 
-export type PriceFinderComparisonCompetitorCompetitor = typeof PriceFinderComparisonCompetitorCompetitor[keyof typeof PriceFinderComparisonCompetitorCompetitor];
-
-
-export const PriceFinderComparisonCompetitorCompetitor = {
-  Sparsh_Pearl: 'Sparsh Pearl',
-  Vectus: 'Vectus',
-} as const;
-
 export type PriceFinderComparisonCompetitor = PriceFinderComparisonPrice & ({
-  competitor: PriceFinderComparisonCompetitorCompetitor;
+  competitor: string;
   /**
      * Competitor price minus Prayag MRP.
      * @nullable
@@ -3320,18 +3312,34 @@ export interface PriceFinderComparisonRow {
   competitors: PriceFinderComparisonCompetitor[];
 }
 
-export type PriceFinderComparisonResponseCompetitorsItem = typeof PriceFinderComparisonResponseCompetitorsItem[keyof typeof PriceFinderComparisonResponseCompetitorsItem];
-
-
-export const PriceFinderComparisonResponseCompetitorsItem = {
-  Sparsh_Pearl: 'Sparsh Pearl',
-  Vectus: 'Vectus',
-} as const;
-
 export interface PriceFinderComparisonResponse {
   asOfDate: string;
-  competitors: PriceFinderComparisonResponseCompetitorsItem[];
+  competitors: string[];
   rows: PriceFinderComparisonRow[];
+}
+
+export type PriceFinderCoverageScope = {
+  itemCodes: string[];
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+};
+
+export type PriceFinderCoverageCompetitorsItem = {
+  competitor: string;
+  pricedProducts: number;
+  coveragePct: number;
+  /** @nullable */
+  effectiveDate: string | null;
+};
+
+export interface PriceFinderCoverage {
+  asOfDate: string;
+  scope: PriceFinderCoverageScope;
+  productsInScope: number;
+  productsWithNoCompetitorPrice: number;
+  competitors: PriceFinderCoverageCompetitorsItem[];
 }
 
 export interface PriceFinderProduct {
@@ -5180,6 +5188,16 @@ category?: string;
 limit?: number;
 };
 
+export type GetPriceFinderCompetitorsParams = {
+/**
+ * @maxItems 50
+ */
+itemCode?: string[];
+division?: string;
+category?: string;
+asOf?: string;
+};
+
 export type GetPriceFinderProductParams = {
 itemCode: string;
 };
@@ -5194,22 +5212,12 @@ code: string[];
 /**
  * Competitor brands to include. Defaults to Sparsh Pearl. Missing competitor data is returned as no data, never as zero.
  */
-competitor?: GetPriceFinderComparisonCompetitorItem[];
+competitor?: string[];
 /**
  * Resolve both sides as of this date (YYYY-MM-DD). Defaults to today.
  */
 asOf?: string;
 };
-
-export type GetPriceFinderComparisonCompetitorItem = typeof GetPriceFinderComparisonCompetitorItem[keyof typeof GetPriceFinderComparisonCompetitorItem];
-
-
-export const GetPriceFinderComparisonCompetitorItem = {
-  Sparsh_Pearl: 'Sparsh Pearl',
-  Ashirvad: 'Ashirvad',
-  Prince: 'Prince',
-  Vectus: 'Vectus',
-} as const;
 
 export type ExportPriceFinderComparisonParams = {
 /**
@@ -5217,19 +5225,9 @@ export type ExportPriceFinderComparisonParams = {
  * @maxItems 50
  */
 code: string[];
-competitor?: ExportPriceFinderComparisonCompetitorItem[];
+competitor?: string[];
 asOf?: string;
 };
-
-export type ExportPriceFinderComparisonCompetitorItem = typeof ExportPriceFinderComparisonCompetitorItem[keyof typeof ExportPriceFinderComparisonCompetitorItem];
-
-
-export const ExportPriceFinderComparisonCompetitorItem = {
-  Sparsh_Pearl: 'Sparsh Pearl',
-  Ashirvad: 'Ashirvad',
-  Prince: 'Prince',
-  Vectus: 'Vectus',
-} as const;
 
 export type PatchCatalogProductMrpParams = {
 itemCode: string;
@@ -5310,6 +5308,10 @@ pageSize?: number;
 };
 
 export type GetComparisonFiltersParams = {
+division?: string;
+category?: string;
+itemCode?: string[];
+asOf?: string;
 /**
  * When set, scopes the returned periods to rows for that competitor only.
  */
@@ -5350,6 +5352,13 @@ confidence?: string;
  */
 period?: string;
 search?: string;
+};
+
+export type GetAnalysisFiltersParams = {
+division?: string;
+category?: string;
+itemCode?: string[];
+asOf?: string;
 };
 
 export type GetAnalysisOverviewParams = {

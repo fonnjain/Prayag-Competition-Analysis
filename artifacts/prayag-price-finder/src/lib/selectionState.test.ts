@@ -8,6 +8,7 @@ import {
 } from "./selectionState.ts";
 import {
   comparisonStateFromParams,
+  filterAvailableCompetitors,
   localPriceFinderUrl,
   normalizePriceFinderParams,
   updateComparisonParams,
@@ -44,7 +45,8 @@ test("comparison URLs normalize duplicate, blank, excessive, and unsupported val
 
   const normalized = normalizePriceFinderParams(params, "comparison");
   assert.equal(normalized.getAll("code").length, PRICE_FINDER_SELECTION_LIMIT);
-  assert.deepEqual(normalized.getAll("competitor"), ["Sparsh Pearl"]);
+  // Brands are validated against the fetched competitor list on the page, not a hardcoded union.
+  assert.deepEqual(normalized.getAll("competitor"), ["Unknown"]);
   assert.equal(normalized.get("asOf"), null);
   assert.equal(normalized.get("extra"), null);
   assert.equal(localPriceFinderUrl("/comparison", normalized).startsWith("/comparison?"), true);
@@ -72,4 +74,11 @@ test("comparison route state preserves Prince alongside existing competitors", (
     "competitor=Sparsh%20Pearl&competitor=Ashirvad&competitor=Prince&competitor=Vectus",
   ));
   assert.deepEqual(state.competitors, ["Sparsh Pearl", "Ashirvad", "Prince", "Vectus"]);
+});
+test("URL competitors are validated against the fetched competitor list", () => {
+  assert.deepEqual(
+    filterAvailableCompetitors(["Vectus", "Gone Brand", "Prince"], ["Prince", "Vectus", "Ashirvad"]),
+    ["Vectus", "Prince"],
+  );
+  assert.deepEqual(filterAvailableCompetitors(["Vectus"], []), []);
 });

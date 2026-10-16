@@ -1,8 +1,13 @@
 import { formatMoney } from "@workspace/formatting";
 import { BucketPageHeader } from "@/components/BucketSlot";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearch, useLocation, Link } from "wouter";
-import { useGetPriceFinderComparison, getExportPriceFinderComparisonUrl } from "@workspace/api-client-react";
+import {
+  useGetPriceFinderComparison,
+  getExportPriceFinderComparisonUrl,
+  useGetPriceFinderCompetitors,
+  getGetPriceFinderCompetitorsQueryKey,
+} from "@workspace/api-client-react";
 import { ChevronLeft, Download, Info, AlertCircle, TrendingDown, TrendingUp, Minus, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +21,7 @@ import {
   hasUnsupportedParams,
   localPriceFinderUrl,
   normalizePriceFinderParams,
-  PRICE_FINDER_COMPETITORS,
+  filterAvailableCompetitors,
   type PriceFinderCompetitor,
   updateComparisonParams,
 } from "@/lib/priceFinderRouteState";
@@ -27,7 +32,31 @@ export default function ComparisonPage() {
   const { codes, removeCode } = useSelection();
   const { user } = useAuth();
   const params = new URLSearchParams(searchString);
-  const { competitors: activeCompetitors, asOf } = comparisonStateFromParams(params);
+  const { competitors: requestedCompetitors, asOf } = comparisonStateFromParams(params);
+
+  // Offered brands come from the server, scoped to the exact selected codes.
+  const competitorParams = { itemCode: codes, asOf: asOf || undefined };
+  const competitorsQuery = useGetPriceFinderCompetitors(competitorParams, {
+    query: {
+      queryKey: getGetPriceFinderCompetitorsQueryKey(competitorParams),
+      enabled: codes.length > 0,
+    },
+  });
+  const coveredCompetitors = useMemo(
+    () => (competitorsQuery.data?.competitors ?? []).filter((c) => c.pricedProducts > 0),
+    [competitorsQuery.data],
+  );
+  const coveredNamesKey = coveredCompetitors.map((c) => c.competitor).join("\u0000");
+  const requestedKey = requestedCompetitors.join("\u0000");
+  // Unknown / uncovered URL brands are dropped silently. With nothing valid
+  // requested, every covered brand is shown (no hardcoded default brand).
+  const activeCompetitors = useMemo<PriceFinderCompetitor[]>(() => {
+    const names = coveredCompetitors.map((c) => c.competitor);
+    const valid = filterAvailableCompetitors(requestedCompetitors, names);
+    return valid.length ? valid : names;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coveredNamesKey, requestedKey]);
+  const competitorsReady = competitorsQuery.isSuccess;
   const normalizedParams = normalizePriceFinderParams(params, "comparison");
   const normalizedSearch = normalizedParams.toString();
 
@@ -54,26 +83,26 @@ export default function ComparisonPage() {
       current.delete(comp);
     }
     else current.add(comp);
-    updateFilters(Array.from(current) as PriceFinderCompetitor[], asOf);
+    updateFilters(Array.from(current), asOf);
   };
 
   const { data, isLoading, isError } = useGetPriceFinderComparison(
     { 
       code: codes, 
-      competitor: activeCompetitors as any,
+      competitor: activeCompetitors,
       asOf: asOf || undefined 
     },
     {
       query: {
         queryKey: ["price-finder-comparison", codes, activeCompetitors, asOf],
-        enabled: codes.length > 0,
+        enabled: codes.length > 0 && competitorsReady && activeCompetitors.length > 0,
       }
     }
   );
 
   const exportUrl = getExportPriceFinderComparisonUrl({
     code: codes,
-    competitor: activeCompetitors as any,
+    competitor: activeCompetitors,
     asOf: asOf || undefined
   });
 
@@ -113,17 +142,38 @@ export default function ComparisonPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3 bg-slate-800/80 p-2 rounded-lg border border-white/10 shadow-sm">
-            <div className="flex items-center gap-3 border-r border-white/10 pr-3">
-               {PRICE_FINDER_COMPETITORS.map(comp => (
-                <label key={comp} className="flex items-center gap-1.5 cursor-pointer group text-xs font-semibold text-slate-200 hover:text-white transition-colors">
-                  <Checkbox 
-                    checked={activeCompetitors.includes(comp)}
-                    onCheckedChange={() => handleCompetitorToggle(comp)}
-                    className="h-3.5 w-3.5 border-indigo-400/50 data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500 rounded"
-                  />
-                  {comp}
-                </label>
-              ))}
+            <div className="flex flex-wrap items-center gap-3 border-r border-white/10 pr-3" data-testid="row-competitor-filters">
+              {competitorsQuery.isLoading ? (
+                <span className="flex items-center gap-2" aria-busy="true">
+                  <span className="h-3.5 w-20 rounded bg-white/10 animate-pulse" />
+                  <span className="h-3.5 w-16 rounded bg-white/10 animate-pulse" />
+                </span>
+              ) : competitorsQuery.isError ? (
+                <button
+                  type="button"
+                  onClick={() => competitorsQuery.refetch()}
+                  className="text-xs font-semibold text-rose-200 hover:text-white underline underline-offset-2"
+                  data-testid="button-retry-competitors"
+                >
+                  Could not load competitors. Retry
+                </button>
+              ) : coveredCompetitors.length === 0 ? (
+                <span className="text-xs font-semibold text-slate-300" data-testid="text-no-competitors">
+                  No competitor prices recorded for this selection.
+                </span>
+              ) : (
+                coveredCompetitors.map(({ competitor: comp, pricedProducts }) => (
+                  <label key={comp} className="flex items-center gap-1.5 cursor-pointer group text-xs font-semibold text-slate-200 hover:text-white transition-colors" data-testid={`checkbox-competitor-${comp}`}>
+                    <Checkbox
+                      checked={activeCompetitors.includes(comp)}
+                      onCheckedChange={() => handleCompetitorToggle(comp)}
+                      className="h-3.5 w-3.5 border-indigo-400/50 data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500 rounded"
+                    />
+                    <span>{comp}</span>
+                    <span className="tabular-nums text-indigo-300/80">({pricedProducts})</span>
+                  </label>
+                ))
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Label htmlFor="asOf" className="text-xs font-semibold text-slate-300">As of</Label>
@@ -155,11 +205,16 @@ export default function ComparisonPage() {
       </div>
 
       <div className="flex-1 w-full mx-auto p-2.5 md:p-3.5 overflow-hidden flex flex-col bg-slate-50 dark:bg-background">
-        {isLoading ? (
+        {competitorsReady && coveredCompetitors.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-3 bg-white dark:bg-card rounded-xl border shadow-sm">
+            <Info className="w-10 h-10 opacity-50" />
+            <p className="font-medium">No competitor prices recorded for this selection.</p>
+          </div>
+        ) : isLoading || competitorsQuery.isLoading ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground animate-pulse font-medium">
             <Search className="w-5 h-5 mr-2 opacity-50" /> Loading comparison data...
           </div>
-        ) : isError ? (
+        ) : isError || competitorsQuery.isError ? (
           <div className="flex-1 flex flex-col items-center justify-center text-destructive gap-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30">
             <AlertCircle className="w-10 h-10" />
             <p className="font-bold">Failed to load comparison</p>

@@ -1,12 +1,13 @@
 import { formatMoney } from "@workspace/formatting";
 import { BucketPageHeader } from "@/components/BucketSlot";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   useGetComparison, 
   useGetComparisonByProduct,
   useGetComparisonSummary, 
   useGetComparisonFilters,
+  getGetComparisonFiltersQueryKey,
   getGetComparisonQueryKey,
   getGetComparisonByProductQueryKey,
   getGetComparisonSummaryQueryKey
@@ -14,10 +15,9 @@ import {
 import { Link } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler, Clock3, ChevronDown } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, TrendingDown, Scale, Rows3, Columns3, Trophy, Download, AlertTriangle, Ruler, Clock3, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -180,6 +180,21 @@ export default function ComparisonPage() {
   }, [view, ambiguousOnly]);
 
   const { data: filters } = useGetComparisonFilters();
+  // Competitors offered are narrowed to the current category scope (P057 C.4).
+  const competitorScope = { category: category === "all" ? undefined : category };
+  const { data: scopedFilters, isSuccess: scopedFiltersReady } = useGetComparisonFilters(competitorScope, {
+    query: { queryKey: getGetComparisonFiltersQueryKey(competitorScope) },
+  });
+  const scopedCompetitors = useMemo(() => scopedFilters?.competitors ?? [], [scopedFilters]);
+  // Drop selected brands that have no prices in the new scope.
+  useEffect(() => {
+    if (!scopedFiltersReady) return;
+    const available = new Set(scopedCompetitors);
+    setCompetitor((current) => {
+      const next = current.filter((c) => available.has(c));
+      return next.length === current.length ? current : next;
+    });
+  }, [scopedFiltersReady, scopedCompetitors]);
   const { data: provenance } = useQuery<{
     snapshotDate: string | null;
     sources: { downloadedAt: string | null }[];
@@ -448,56 +463,55 @@ export default function ComparisonPage() {
             />
           </div>
           
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[180px] justify-between font-normal">
-                <span className="truncate">
-                  {competitor.length === 0 ? "All Competitors" : competitor.join(", ")}
-                </span>
-                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="group-comparison-competitors">
+            <SearchableSelect
+              aria-label="Add competitor"
+              data-testid="select-comparison-competitor"
+              widthClass="w-[200px]"
+              placeholder={competitor.length === 0 ? "All Competitors" : "Add competitor"}
+              searchPlaceholder="Search competitors…"
+              emptyText={scopedFiltersReady && scopedCompetitors.length === 0 ? "No competitor prices in this category" : "No more competitors to add"}
+              value={null}
+              onChange={(next) => {
+                if (next && !competitor.includes(next)) setCompetitor([...competitor, next]);
+              }}
+              options={scopedCompetitors
+                .filter((c) => !competitor.includes(c))
+                .map((c) => ({ value: c, label: c }))}
+            />
+            {competitor.map((c) => (
+              <span key={c} className="inline-flex h-8 items-center gap-1 rounded-md border bg-muted/40 pl-2.5 pr-1 text-sm" data-testid={`chip-comparison-competitor-${c}`}>
+                {c}
+                <button
+                  type="button"
+                  onClick={() => setCompetitor(competitor.filter((x) => x !== c))}
+                  aria-label={`Remove ${c}`}
+                  data-testid={`button-remove-competitor-${c}`}
+                  className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+            {competitor.length > 0 && (
+              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setCompetitor([])} data-testid="button-all-competitors">
+                All competitors
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[180px] p-0" align="start">
-              <div className="p-1 flex flex-col gap-0.5">
-                <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded-sm cursor-pointer">
-                  <Checkbox
-                    checked={competitor.length === 0}
-                    onCheckedChange={(c) => {
-                      if (c) setCompetitor([]);
-                    }}
-                  />
-                  <span className="text-sm">All Competitors</span>
-                </label>
-                {(filters?.competitors ?? []).map(c => (
-                  <label key={c} className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted rounded-sm cursor-pointer">
-                    <Checkbox
-                      checked={competitor.includes(c)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setCompetitor([...competitor, c]);
-                        } else {
-                          setCompetitor(competitor.filter(x => x !== c));
-                        }
-                      }}
-                    />
-                    <span className="text-sm">{c}</span>
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+            )}
+          </div>
 
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {(filters?.categories ?? []).map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            aria-label="Category"
+            data-testid="select-comparison-category"
+            widthClass="w-[220px]"
+            placeholder="All Categories"
+            searchPlaceholder="Search categories…"
+            emptyText="No category matches"
+            allowClear
+            value={category === "all" ? null : category}
+            onChange={(next) => setCategory(next ?? "all")}
+            options={(filters?.categories ?? []).map((c) => ({ value: c, label: c }))}
+          />
 
           {view === "byCompetitor" && (
             <>
