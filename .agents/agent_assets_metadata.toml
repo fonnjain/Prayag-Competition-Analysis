@@ -1671,3 +1671,17 @@ mtime_ms = 1792136151852
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8a539273-14ab-49ef-afa1-79411beab799/6d6a81b7-3604-4ae0-aa4a-1f05b54c23f8"
 storage_version_token = "1792136159629239"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "JyScOt-fzgPvmrs8Drbcs"
+uri = "file://generated-artifacts/p061/P061_Production_Read_Only_Validation.md"
+type = "text"
+title = "P061 — Full Production Validation (Markdown)"
+description = "Read-only v2 report with all 1,762 unmapped codes, all 479 proposed changes, full cross-tab and purity, saved-scope impact, 26 overrides, 301 variant rows, and the three spaced-TTS blockers. No apply performed."
+logical_id = "6d1c2e08-8b71-4799-b395-eb92ca1272d1"
+content_hash = "sha256:f225f325215be8b06eb67946bf9912b50017101d3e4e12c2970bed459246e1fd"
+size = 178644
+mtime_ms = 1792137413599
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/6d1c2e08-8b71-4799-b395-eb92ca1272d1/c8c3d89b-125c-48cf-8248-86d401f02f73"
+storage_version_token = "1792137453525306"
+content_type = "text/markdown"

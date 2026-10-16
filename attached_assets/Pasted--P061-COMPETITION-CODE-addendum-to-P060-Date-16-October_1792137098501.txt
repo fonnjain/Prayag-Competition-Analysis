@@ -1,0 +1,113 @@
+# P061 · COMPETITION · CODE — addendum to P060
+
+**Date:** 16 October 2026
+**Data file:** `Division_Mapping_from_ERP_RateList_v2.xlsx` — **use this, not v1**
+**Status of P060:** structure unchanged and still correct. The validation report was accepted. This
+addendum only replaces the data file and records three override decisions.
+
+---
+
+## 0. What the validation found, and what changed
+
+The production read-only validation was right to stop. It found:
+
+- the mapping covered **54 of 57** composite products, so 3 composite values and an 8th division
+  would have survived the apply;
+- only **5,125 of 7,191** production codes matched.
+
+Both are addressed in v2.
+
+| Change | Rows |
+|---|---|
+| Added `501N`, `503N`, `701N` | 3 |
+| Added punctuation / case variants found in production | 301 |
+| Overrides where the ERP proposal is rejected and the current division kept | 26 |
+| **Total codes in v2** | **10,880** (was 10,576) |
+
+Expected after apply: **0 composite divisions, exactly 7 divisions, residual disagreements down from
+28 to 2.**
+
+---
+
+## 1. The three composites — resolved
+
+| Code | Product | Division | Why |
+|---|---|---|---|
+| `501N` | Aquifer Flush Cistern with Center Push | PTMT & Plastic Fittings | Outside the 4xx ceramic range, so the CISTERN rule applies. ERP carries the same product as `501-N` (CISTERN, Master Group PTMT). |
+| `503N` | Glecy Flush Cistern with Center Push | PTMT & Plastic Fittings | Same, against `503-N`. |
+| `701N` | Gala Flush Cistern with Center Push | PTMT & Plastic Fittings | Same, against `701-N`. |
+
+Each was added as **an explicit single row**, not by a normalisation rule.
+
+---
+
+## 2. The 301 variant matches — read this before using them
+
+304 of the 2,066 unmapped production codes are the same code as an ERP entry differing only in
+punctuation or case — `7991 F` / `7991-F`, `DB-52-3IN-N` / `DB-52-3 IN-N`, `QPR-22` / `Qpr-22`. Three
+of those were the composites above; the remaining **301 are in the `variant_matches` sheet**.
+
+**Zero of them are ambiguous** — no production code matches two ERP entries that disagree on division.
+That was checked explicitly.
+
+> ### ⚠️ These are listed PER CODE. They are not a normalisation rule and must not be generalised.
+> Do **not** add punctuation-insensitive matching to the loader, the matcher, or anything else on the
+> strength of this. `TTS-01` and `TTS - 01` are **different products** in this catalogue, as are
+> `DB-02L` and `DB-02 L`. This batch happens to be clean; the general rule is not safe. P057 A.3(a)
+> and P060 §0.2 still stand.
+
+Coverage goes from 5,125 to about 5,429 of 7,191. The remaining ~1,762 production codes are genuinely
+absent from the ERP file and **keep their current division** — silence in the mapping is not a
+correction.
+
+---
+
+## 3. The 26 overrides — ERP rejected, current division kept
+
+Of the 28 residual disagreements the validation surfaced, **26 are ERP classification noise.** They
+are listed in the new `overrides` sheet with the reasoning on every row.
+
+**`FR-36`, `FR-37`, `FR-40` → stay in `CP (QUAA / FERN)`**
+The FERN line. 9 of the 12 `FR-` codes in the ERP are Item Type `QUAA`; these three are the only ones
+typed `PTMT`. Three outliers against nine siblings reads as ERP noise, and production already has them
+correctly in CP (QUAA / FERN).
+
+**`MHC-01` … `MHC-10` → stay in `Pipes & Fittings`**
+Manhole covers — a drainage product. The ERP types them `SANITARYWARE`, but production and the MRP
+workbooks both place them in Pipes & Fittings, and a manhole cover is not ceramic sanitaryware. Two
+sources against one, and the odd one out is the one furthest from the product.
+
+**`I-151` … `I-175` (13 ball-cock codes) → stay in `PTMT & Plastic Fittings`**
+Cistern internals. The ERP splits this single family across three Item Types — 11 `C P`, 2
+`CP ACCESSORIES`, 2 `PTMT` — with identical "Ball Cock Rod Brass" items landing in two different
+types. The ERP is internally inconsistent here; production and the older backfill are consistent on
+PTMT. Splitting one product family 13/2 on a noisy signal is worse than leaving it alone.
+
+**Accepted, not overridden — `492-W`, `493-W`** (ABS Soap Dispenser Oval / Round 400ml White) move
+from PTMT to CP Fittings / Faucets. ERP Item Group is `CP ACCESSORIES`, and a soap dispenser is a
+bathroom accessory. These are the 2 residual disagreements that remain by design.
+
+---
+
+## 4. What to do now
+
+1. Swap the data file for `Division_Mapping_from_ERP_RateList_v2.xlsx`.
+2. **Re-run P060 Part B.2** in full against live production and report it. Expect:
+   - composite coverage **57 of 57**;
+   - matched production codes ~5,429, unmatched ~1,762;
+   - residual disagreements **2** (`492-W`, `493-W`);
+   - projected distinct divisions **7**, projected composites **0**.
+3. If B.2 comes back as expected, **proceed to P060 Part B.3** (preview → apply) and Parts A and C.
+4. If any number differs materially from the above, stop and report rather than adjusting the file.
+
+Everything else in P060 is unchanged: no price touched, no item code changed or merged, the 28
+`EXCLUDE` rows reported and left alone, category untouched.
+
+---
+
+## Done criteria (replaces P060's first two lines, rest unchanged)
+
+- [ ] v2 file in use; B.2 re-run and reported; 57/57 composite coverage confirmed
+- [ ] Residual disagreements = 2, and they are `492-W` and `493-W`
+- [ ] No punctuation-insensitive matching added anywhere in the codebase
+- [ ] …then P060 Parts A, B.3 and C as written

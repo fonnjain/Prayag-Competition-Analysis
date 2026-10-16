@@ -28,3 +28,18 @@ dates and its figures disagree with authoritative dated workbooks.
 sources. Division remediation must not read or change prices, change categories,
 or act on EXCLUDE rows. Check saved division scopes before apply; require the
 reviewed preview, provenance batch and guarded undo workflow.
+
+The approved ERP exceptions retain the FERN line in CP (QUAA / FERN), manhole
+covers in Pipes & Fittings, and the ball-cock/cistern-internals family in PTMT &
+Plastic Fittings.
+
+**Why:** The user rejected inconsistent ERP typing within these families.
+Manhole covers are drainage products, not ceramic sanitaryware; the FERN and
+ball-cock classifications follow consistent family identity and the existing
+catalogue rather than isolated ERP outliers.
+
+**How to apply:** Preserve these business exceptions when reviewing future ERP
+mappings. Explicitly enumerated punctuation/case variants do not establish that
+two stored products are identical. In particular, a mapping row calling a spaced
+TTS code the same as an unspaced code must not override the known product-identity
+distinction or silently expand an approved reclassification scope.
