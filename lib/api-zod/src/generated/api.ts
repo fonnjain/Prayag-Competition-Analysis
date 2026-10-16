@@ -1132,6 +1132,8 @@ export const GetPriceFinderCalculatorRowsResponse = zod.object({
   "division": zod.string().nullable(),
   "category": zod.string().nullable(),
   "priceBasis": zod.string(),
+  "basis": zod.string().nullish().describe('Raw price basis of the selected current Standard MRP row, not a unit or display label.'),
+  "unit": zod.string().nullish(),
   "hasRecordedCompetitorPrice": zod.boolean().optional().describe('Presence only, before quote exclusions, to distinguish never-recorded prices from filtered-out quotes without exposing a restricted brand or price.'),
   "prayag": zod.object({
   "price": zod.number().nullable(),
@@ -1141,7 +1143,8 @@ export const GetPriceFinderCalculatorRowsResponse = zod.object({
   "price": zod.number().nullable(),
   "effectiveDate": zod.string().nullable()
 }).and(zod.object({
-  "variant": zod.string()
+  "variant": zod.string(),
+  "basis": zod.string().nullish()
 }))),
   "competitors": zod.array(zod.object({
   "price": zod.number().nullable(),
@@ -1149,7 +1152,12 @@ export const GetPriceFinderCalculatorRowsResponse = zod.object({
 }).and(zod.object({
   "competitor": zod.string(),
   "priceBasis": zod.string(),
-  "basisMismatch": zod.boolean()
+  "basisMismatch": zod.boolean(),
+  "basis": zod.string().nullish(),
+  "unit": zod.string().nullish(),
+  "unitMismatch": zod.boolean().optional(),
+  "basisWarning": zod.string().nullish(),
+  "unitWarning": zod.string().nullish()
 })))
 }))
 })

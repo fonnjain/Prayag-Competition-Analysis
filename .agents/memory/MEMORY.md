@@ -56,3 +56,4 @@
 - [Catalogue code identity](catalogue-code-identity.md) — case, spaces and punctuation distinguish products; normalized identity fallbacks are forbidden, not merely ambiguity-checked.
 - [Presentation compatibility](presentation-compatibility.md) — XML/ZIP checks do not prove PPTX files open; use a standard serializer and verify an actual office render.
 - [ERP division policy](erp-division-policy.md) — composites are source-sheet provenance, not membership; Sink includes floor traps/plate racks and retains PTMT as its MRP source.
+- [Calculator comparability](calculator-comparability.md) — compare basis and unit separately; misplaced basis tokens in unit fields are data-shape problems, not basis mismatches.

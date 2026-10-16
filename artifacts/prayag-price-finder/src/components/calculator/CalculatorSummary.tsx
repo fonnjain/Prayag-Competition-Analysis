@@ -83,7 +83,7 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
                         <td key={b} className="px-2.5 py-2 text-right font-mono tabular-nums">
                           {c ? (
                             <span className="inline-flex items-center gap-1">
-                              {c.basisMismatch && <AlertTriangle className="h-3 w-3 text-amber-600" aria-label="Different price basis" />}
+                              {!!c.warnings.length && <span title={c.warnings.join(" ")}><AlertTriangle className="h-3 w-3 text-amber-600" aria-label={c.warnings.join(" ")} /></span>}
                               {formatMoney(c.total, "No price")}
                             </span>
                           ) : <span className="text-muted-foreground" aria-label="Not selected">—</span>}

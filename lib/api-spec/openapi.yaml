@@ -5908,6 +5908,10 @@ components:
               division: {type: [string, "null"]}
               category: {type: [string, "null"]}
               priceBasis: {type: string}
+              basis:
+                type: [string, "null"]
+                description: Raw price basis of the selected current Standard MRP row, not a unit or display label.
+              unit: {type: [string, "null"]}
               hasRecordedCompetitorPrice:
                 type: boolean
                 description: Presence only, before quote exclusions, to distinguish never-recorded prices from filtered-out quotes without exposing a restricted brand or price.
@@ -5921,6 +5925,7 @@ components:
                       required: [variant]
                       properties:
                         variant: {type: string}
+                        basis: {type: [string, "null"]}
               competitors:
                 type: array
                 items:
@@ -5932,6 +5937,11 @@ components:
                         competitor: {type: string}
                         priceBasis: {type: string}
                         basisMismatch: {type: boolean}
+                        basis: {type: [string, "null"]}
+                        unit: {type: [string, "null"]}
+                        unitMismatch: {type: boolean}
+                        basisWarning: {type: [string, "null"]}
+                        unitWarning: {type: [string, "null"]}
     CalculatorPrice:
       type: object
       required: [price, effectiveDate]

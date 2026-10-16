@@ -5,7 +5,7 @@ import { db } from "@workspace/db";
 import * as XLSX from "xlsx";
 import {
   resolveCalculator, summarizeCalculator, calculatorDisclosures, discountError, quantityError,
-  type CalculatorEvidence, type CalculatorBlock, applyIndianNumberFormats,
+  type CalculatorEvidence, type CalculatorBlock, applyIndianNumberFormats, compareCalculatorMetadata,
 } from "@workspace/formatting";
 import { requireAuth, requireWorkspaceReadAccess } from "../middlewares/authMiddleware";
 import { bucketExportBanner, bucketExportRows } from "../lib/bucketFilter";
@@ -18,20 +18,20 @@ function scopeDisclosure() {
 }
 export async function calculatorEvidence(codes: string[], asOf: string) {
   const raw = await readFinderEvidence(codes, asOf);
-  const unitKey = (s: string | null) => s?.trim().toLowerCase().replace(/^(nos\.?|pcs\.?|pieces?|each)$/, "each") ?? "";
   const rows: CalculatorEvidence[] = raw.products.map(p => ({
     itemCode: p.item_code, productName: p.product_name, division: p.division, category: p.category,
-    priceBasis: `MRP · ${p.uom || "unit not recorded"}`, hasRecordedCompetitorPrice: p.has_recorded_competitor_price,
+    priceBasis: `${p.current_price_basis || "basis not recorded"} · ${p.uom || "unit not recorded"}`,
+    basis: p.current_price_basis, unit: p.uom, hasRecordedCompetitorPrice: p.has_recorded_competitor_price,
     prayag: { price: p.current_mrp, effectiveDate: p.current_effective_date },
-    variants: [{ variant: "Standard", price: p.current_mrp, effectiveDate: p.current_effective_date },
+    variants: [{ variant: "Standard", price: p.current_mrp, effectiveDate: p.current_effective_date, basis: p.current_price_basis },
       ...raw.variants.filter(v => v.item_code === p.item_code).map(v => ({
-        variant: v.variant, price: v.current_mrp, effectiveDate: v.current_effective_date,
+        variant: v.variant, price: v.current_mrp, effectiveDate: v.current_effective_date, basis: v.current_price_basis,
       }))],
     competitors: raw.competitors.filter(q => q.item_code === p.item_code).map(q => ({
       competitor: q.competitor, price: q.price, effectiveDate: q.effective_date,
+      basis: q.price_basis, unit: q.unit,
       priceBasis: `${q.price_basis || "basis not recorded"} · ${q.unit || "unit not recorded"}${q.price_basis?.toLowerCase() === "ex-gst" ? ` · incl. ${q.gst_pct ?? 18}% GST equivalent` : ""}`,
-      // Unknown unit/tax metadata is not proof of comparability. Do not invent it.
-      basisMismatch: q.price_basis?.toLowerCase() !== "mrp" || !q.unit || unitKey(q.unit) !== unitKey(p.uom),
+      ...compareCalculatorMetadata({ basis: p.current_price_basis, unit: p.uom }, { basis: q.price_basis, unit: q.unit }),
     })),
   }));
   return { asOfDate: asOf, rows, scopeDisclosure: scopeDisclosure(),
@@ -109,8 +109,8 @@ router.post("/price-finder/calculator/export", async (req, res) => {
         r.our.netUnit ?? "No price", r.our.quantity, r.our.total ?? "No price", c.competitor,
         c.quote?.price ?? "No price", c.quote?.effectiveDate ?? null, Number(c.discount),
         c.netUnit ?? "No price", c.total ?? "No price", c.position.diffUnit, c.position.diffPct == null ? null : c.position.diffPct / 100,
-        c.diffTotal, c.position.label, c.basisMismatch ? "Different price basis — check before relying on this" : "",
-        r.product.priceBasis, c.quote?.priceBasis ?? "No price",
+        c.diffTotal, c.position.label, c.warnings.join(" "),
+        r.ourPriceBasis, c.quote?.priceBasis ?? "No price",
       ]);
     }
     const summaryRows: Cell[][] = [

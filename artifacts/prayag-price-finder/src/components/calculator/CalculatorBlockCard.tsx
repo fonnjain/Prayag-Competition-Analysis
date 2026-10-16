@@ -37,7 +37,6 @@ export type BlockCardProps = {
 };
 
 const QTY_TOOLTIP = "Quantity follows the Prayag row so the comparison stays like-for-like.";
-const BASIS_TEXT = "Different price basis — check before relying on this";
 
 export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(function CalculatorBlockCard(props, ref) {
   const { block, index, asOf, resolved, product, evidenceLoading, unavailable } = props;
@@ -227,9 +226,9 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
                       options={options}
                       onChange={(next) => next && props.onCompetitorBrand(c.id, next)}
                     />
-                    {r?.basisMismatch && (
+                    {!!r?.warnings.length && (
                       <span className="mt-1.5 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" data-testid={`badge-basis-${c.id}`}>
-                        <AlertTriangle className="h-3 w-3 shrink-0" /> {BASIS_TEXT}
+                        <AlertTriangle className="h-3 w-3 shrink-0" /> {r.warnings.join(" ")}
                       </span>
                     )}
                   </Cell>

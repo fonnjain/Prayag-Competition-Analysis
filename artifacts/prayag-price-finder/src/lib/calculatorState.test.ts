@@ -5,6 +5,7 @@ import {
   resolveCalculator, summarizeCalculator, calculatorDisclosures, bestCalculatorCompetitor,
   encodeCalculator, decodeCalculator, type CalculatorBlock, type CalculatorEvidence,
   isCalculatorDate,
+  compareCalculatorMetadata,
 } from "./calculatorState.ts";
 const block = (id: string, code: string, brand: string | null = "Alpha"): CalculatorBlock => ({
   id, itemCode: code, variant: "Standard", discount: "20", quantity: "7",
@@ -20,6 +21,43 @@ test("incomplete native date-entry values are not resolvable dates", () => {
   for (const d of ["", "202610-10-16", "2026-02-30", "0000-01-01", "2026-1-01"]) assert.equal(isCalculatorDate(d), false);
   assert.equal(isCalculatorDate("2026-10-15"), true);
   assert.equal(isCalculatorDate("2026-10-16"), true);
+});
+test("basis and unit are independent fields; display strings never determine equivalence", () => {
+  const ours = { basis: "MRP", unit: "NOS" };
+  const same = compareCalculatorMetadata(ours, { basis: " mrp ", unit: " each " });
+  assert.equal(same.basisMismatch, false); assert.equal(same.unitMismatch, false);
+  const basisOnly = compareCalculatorMetadata(ours, { basis: "Ex-GST", unit: "NOS" });
+  assert.equal(basisOnly.basisMismatch, true); assert.equal(basisOnly.unitMismatch, false);
+  const net = compareCalculatorMetadata({ basis: "Net", unit: "PCS" }, { basis: "Net", unit: "each" });
+  assert.equal(net.basisMismatch, false); assert.equal(net.unitMismatch, false);
+});
+test("a basis token misplaced in a unit field is a unit data-shape warning, not a basis mismatch", () => {
+  const check = compareCalculatorMetadata({ basis: "MRP", unit: "NOS" }, { basis: "MRP", unit: "MRP" });
+  assert.equal(check.basisMismatch, false); assert.equal(check.unitMismatch, true);
+  assert.match(check.unitWarning!, /competitor unit field contains price basis "MRP"/);
+  const bothMalformed = compareCalculatorMetadata({ basis: "MRP", unit: "MRP" }, { basis: "MRP", unit: "MRP" });
+  assert.equal(bothMalformed.unitMismatch, true);
+});
+test("missing units and generic NOS versus a specified pipe length remain unconfirmed", () => {
+  for (const unit of [null, "", "per 3-m pipe", "per 6-m pipe"]) {
+    const check = compareCalculatorMetadata({ basis: "MRP", unit: "NOS" }, { basis: "MRP", unit });
+    assert.equal(check.basisMismatch, false); assert.equal(check.unitMismatch, true);
+  }
+  const noBasis = compareCalculatorMetadata({ basis: "Verify", unit: "NOS" }, { basis: "Verify", unit: "each" });
+  assert.equal(noBasis.basisMismatch, true); assert.equal(noBasis.unitMismatch, false);
+});
+test("variant evidence warnings remain separate from price-basis and unit checks", () => {
+  const ev = evidence("A"); ev.basis = "MRP"; ev.unit = "NOS";
+  Object.assign(ev.competitors[0], { basis: "MRP", unit: "each" });
+  const b = block("a", "A"); b.variant = "Ivory";
+  const rows = resolveCalculator([b], [ev]), c = rows[0].competitors[0];
+  assert.equal(c.basisMismatch, false); assert.equal(c.unitMismatch, false); assert.equal(c.variantMismatch, true);
+  const s = summarizeCalculator(rows);
+  assert.equal(s.basisMismatchRows, 0); assert.equal(s.unitMismatchRows, 0); assert.equal(s.variantMismatchRows, 1);
+  assert.match(calculatorDisclosures(s, "2026-10-16", []).join(" "), /colour variant/);
+  ev.variants[1].basis = "Net";
+  assert.equal(resolveCalculator([b], [ev])[0].competitors[0].basisMismatch, true);
+  assert.equal(resolveCalculator([b], [ev])[0].ourPriceBasis, "Net · NOS");
 });
 test("invoice arithmetic rounds the discounted unit first, not the extended line", () => {
   assert.equal(calculatorRow(92, "20", "1").netUnit, 73.60);
@@ -92,7 +130,7 @@ test("best competitor uses selected usable totals, basis warnings are counted", 
   assert.equal(s.basisMismatchRows, 1);
   const d = calculatorDisclosures(s, "2026-10-16", ["Bucket lists: none applied."]);
   assert.ok(d.includes("Prices resolved as of 16-10-2026."));
-  assert.ok(d.some(s => s.includes("different price basis")));
+  assert.ok(d.some(s => s.includes("different or unconfirmed price basis")));
   assert.ok(!d.some(s => s.startsWith("0 products")));
 });
 test("share round-trip preserves exact codes, variants, decimals, quantities, competitors and date", () => {

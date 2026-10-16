@@ -3343,15 +3343,26 @@ export interface CalculatorPrice {
   effectiveDate: string | null;
 }
 
-export type PriceFinderCalculatorResponseRowsItemVariantsItem = CalculatorPrice & {
+export type PriceFinderCalculatorResponseRowsItemVariantsItem = CalculatorPrice & ({
   variant: string;
-};
+  /** @nullable */
+  basis?: string | null;
+});
 
-export type PriceFinderCalculatorResponseRowsItemCompetitorsItem = CalculatorPrice & {
+export type PriceFinderCalculatorResponseRowsItemCompetitorsItem = CalculatorPrice & ({
   competitor: string;
   priceBasis: string;
   basisMismatch: boolean;
-};
+  /** @nullable */
+  basis?: string | null;
+  /** @nullable */
+  unit?: string | null;
+  unitMismatch?: boolean;
+  /** @nullable */
+  basisWarning?: string | null;
+  /** @nullable */
+  unitWarning?: string | null;
+});
 
 export type PriceFinderCalculatorResponseRowsItem = {
   itemCode: string;
@@ -3362,6 +3373,13 @@ export type PriceFinderCalculatorResponseRowsItem = {
   /** @nullable */
   category: string | null;
   priceBasis: string;
+  /**
+     * Raw price basis of the selected current Standard MRP row, not a unit or display label.
+     * @nullable
+     */
+  basis?: string | null;
+  /** @nullable */
+  unit?: string | null;
   /** Presence only, before quote exclusions, to distinguish never-recorded prices from filtered-out quotes without exposing a restricted brand or price. */
   hasRecordedCompetitorPrice?: boolean;
   prayag: CalculatorPrice;
