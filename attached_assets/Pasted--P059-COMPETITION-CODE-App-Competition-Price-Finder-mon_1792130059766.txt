@@ -1,0 +1,333 @@
+# P059 · COMPETITION · CODE
+
+**App:** Competition / Price Finder — monorepo `fonnjain/Prayag-Competition-Analysis`
+**Type:** CODE + supervised DATA remediation
+**Date:** 16 October 2026
+**Follows:** P057 Part A Step 1 (read-only diagnostic — complete, output reviewed)
+**Amends:** P057 Part A.3(a) — see §0.1. **Read that first.**
+
+---
+
+## 0. What the diagnostic changed
+
+The Step-1 output is accepted. It changed three things about the plan, and one of them is a stop.
+
+### 0.1 STOP — the item-code backfill in P057 A.3(a) must not run
+
+P057 said: consolidate `normCode`, re-point `authoritativeCode` at it, "do not backfill existing rows
+here." That is no longer sufficient. **Making the loader write the canonical form would violate the
+unique index on `catalog_products.item_code`**, because the catalogue already contains pairs that
+differ only by internal whitespace:
+
+| Existing code | Existing code | Both normalise to |
+|---|---|---|
+| `TTS-01` | `TTS - 01` | `TTS-01` |
+| `TTS-02` | `TTS - 02` | `TTS-02` |
+| `TTS-03` | `TTS - 03` | `TTS-03` |
+| `DB-02L` | `DB-02 L` | `DB-02L` |
+
+Those four were found from the handful of codes that happened to appear elsewhere in the Step-1
+output. The full collision set across all 7,191 products has not been measured — **§3.1 measures it
+before anything else happens.**
+
+Also decisive: **0 orphan matched competitor rows, 0 recoverable by normalisation.** The item-code
+spelling differences are *not* breaking any join today. So the correct action is a **code-consistency
+fix with no change to stored codes at all**. See §3.
+
+**Amendment to P057 A.3(a):** keep the `normCode` consolidation and the `matchKey` rename. **Do not**
+re-point `authoritativeCode` at the canonical `normCode` yet, and do not change what any loader
+*stores*. `normCode` is for *comparison and lookup* only until §3 is resolved.
+
+### 0.2 The composite divisions are source data, not a code bug
+
+No pipe-joining code exists. The values arrive already joined inside
+`Prayag_MRP_Authoritative_v2_01Sep2026.xlsx`, are read at
+`artifacts/api-server/src/lib/authoritativeMrpMaster.ts:345` and written at `:691`, under load batch
+17 / `mrp_sources` row 428.
+
+That means the workbook is telling us something true: **these 57 products genuinely sell into more
+than one division.** Look at what they are — plastic cisterns, toilet seat covers, cistern internals,
+rag bolt assemblies, concealed stop cocks, teflon tape. Of course they appear in two price books.
+
+So **Option 1 (force a single primary division) is the wrong answer.** It would make each of these
+products vanish from the other division's browse — which is the same defect that was reported, just
+pointed the other way. **Go with Option 2.** §2 implements it.
+
+### 0.3 A defect the diagnostic found that P057 did not ask about
+
+**20 category groups are stored under two spellings each**, differing only by case:
+
+| Category | Products |
+|---|---|
+| `SWR PIPE` / `SWR Pipe` | 240 |
+| `SILENT FITTINGS` / `Silent Fittings` | 110 |
+| `UPVC PIPE` / `UPVC Pipe` | 64 |
+| `ASPIRE 52` / `Aspire 52` | 56 |
+| …16 more (`AQUA 54`, `BLAZE 62`, `CYGNUS 71`, `EUROPA 90`, `EVIAN 87`, `LAGUNA 93`, `MACASA 76`, `MARCUS 68`, `NIAGARA 81`, `OCEAN 55`, `ORBIT 53`, `POLO 60`, `SAGA 79F`, `URBONA 78`, `VINCENT 66`, `VIRGO P66`) | |
+
+**1,131 products — 15.7% of the catalogue — sit in a category that appears twice in every dropdown.**
+Picking one spelling silently hides the other half. §4 fixes it.
+
+### 0.4 Nothing unexplained in the count change
+
+Production shows 7,191 products; the 11 Oct browse screen showed 6,122. The gap reconciles exactly:
+
+```
+Pipes & Fittings          +462
+CP Fittings / Faucets     +334
+PTMT & Plastic Fittings   +273
+Hardware                    +3
+Test                        -3   (removed from production since)
+                          ------
+                          +1,069   = 7,191 − 6,122
+```
+
+The browse screen filters out inactive and discontinued products; the diagnostic SQL does not. No
+catalogue growth, no anomaly. **No action needed — recorded so nobody re-investigates it.**
+
+---
+
+## 1. Decisions needed from the team before §2 runs
+
+**Decision 1 — which division is primary for the 57?**
+
+Default rule: **the first division listed in the composite string.** It holds up for 52 of the 57,
+and the stored category agrees with it:
+
+| Composite | Products | First-listed | Category says | Agrees? |
+|---|---|---|---|---|
+| `Ceramic Sanitaryware \| PTMT & Plastic Fittings` | 50 | Ceramic Sanitaryware | Cistern, Toilet Seat Covers, Cistern's & Seat Cover's Accessories, Mute Series, Concealed Cistern | **yes** |
+| `CP Fittings / Faucets \| PTMT & Plastic Fittings` | 2 | CP Fittings / Faucets | Allied (concealed stop cocks) | **yes** |
+| `CP Fittings / Faucets \| Ceramic Sanitaryware` | 2 | CP Fittings / Faucets | Accessories (rag bolt assemblies — these fix a WC pan to the floor) | **questionable** |
+| `CP Fittings / Faucets \| PTMT & Plastic Fittings \| Pipes & Fittings` | 3 | CP Fittings / Faucets | CPVC Fittings (teflon tape) | **questionable — category points at Pipes & Fittings** |
+
+So: **apply first-listed to the 52, and have the business confirm these 5 by hand** —
+`RB-45`, `RB-46`, `TTS-01`, `TTS-02`, `TTS-03`. Five products, one minute of someone's time. Do not
+guess them.
+
+**Decision 2 — category case-folding (§4).** Confirm the Title Case form is the one to keep
+(`SWR Pipe`, not `SWR PIPE`), and confirm no saved bucket list stores a category string that would
+break. §4.1 checks the second half; the first half is a business call.
+
+**Do not start §2 or §4 until both are answered in writing.**
+
+---
+
+## 2. Composite divisions → primary + membership (Option 2)
+
+### 2.1 Schema
+
+```sql
+CREATE TABLE product_divisions (
+  id          serial PRIMARY KEY,
+  item_code   text NOT NULL,
+  division    text NOT NULL,
+  is_primary  boolean NOT NULL DEFAULT false,
+  source      text,                      -- 'authoritative-master-batch-17' etc.
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX product_divisions_item_division_idx ON product_divisions (item_code, division);
+CREATE INDEX        product_divisions_division_idx      ON product_divisions (division);
+CREATE UNIQUE INDEX product_divisions_one_primary_idx   ON product_divisions (item_code)
+  WHERE is_primary;
+```
+
+Add it to `lib/db/src/schema/catalog.ts` next to `catalogProductsTable`, following the existing
+drizzle conventions in that file. No FK to `catalog_products` — the rest of the schema does not use
+them and this is not the prompt to change that.
+
+### 2.2 Backfill (dry-run first, apply only on approval)
+
+1. For **every** product (all 7,191, not just the 57), insert one row:
+   `(item_code, division, is_primary = true)` from the current `catalog_products.division`.
+2. For the 57 composites, **split the stored string on `|`**, trim each part, and insert one
+   membership row per part. The primary is per Decision 1; the others get `is_primary = false`.
+3. Then set `catalog_products.division` for those 57 to the **primary alone** — this is the only
+   write to `catalog_products` in this prompt.
+4. Assert afterwards:
+   - `SELECT count(*) FROM catalog_products WHERE division LIKE '%|%'` → **0**
+   - every `catalog_products.item_code` has exactly one `is_primary` row
+   - `SELECT count(DISTINCT item_code) FROM product_divisions` = `SELECT count(*) FROM catalog_products`
+   - the 57 composites produce **119 membership rows** — 57 primary + 62 non-primary
+     (50×2 + 2×2 + 2×2 + 3×3 = 100 + 4 + 4 + 9 = 119)
+   - `product_divisions` totals **7,253 rows** — 7,134 single-division products + 119
+   - show the before/after per-division counts alongside these assertions
+
+Produce the dry-run report as a table of every affected item code with its old composite value, its
+new primary, and its membership rows. **Show it and wait.**
+
+### 2.3 Loader change
+
+`artifacts/api-server/src/lib/authoritativeMrpMaster.ts` — at the point where the workbook division is
+read (`:345`) and written (`:691`):
+
+- Split the incoming value on `|`, trim.
+- Write the first part (or the mapped primary) to `catalog_products.division`.
+- Write all parts to `product_divisions`.
+- **Never store a `|` in `catalog_products.division` again.** Add a guard that throws on a composite
+  reaching the insert, so this cannot silently come back with the next workbook.
+
+Also surface it in the loader preview: *"3 products in this workbook belong to more than one division
+— they will be filed under <primary> and listed in all of them."*
+
+### 2.4 Query changes
+
+Browse and filter must union through the membership table so a product appears under **every**
+division it belongs to:
+
+- `GET /price-finder/browse` (`artifacts/api-server/src/routes/priceFinder.ts` ~`:639-687`) — division
+  counts and the product list both resolve through `product_divisions`, not
+  `catalog_products.division`.
+- `GET /catalog/filters` and `GET /catalog/products`
+  (`artifacts/api-server/src/routes/catalog.ts` ~`:146-261`) — same.
+- `GET /analysis/filters` (`artifacts/api-server/src/routes/analysis.ts` ~`:396`) — same, **and**
+  pick up the `is_active` / `discontinued_from` predicate and the division-scoped categories from
+  P057 A.3(c) and A.3(d) if those have not already merged.
+
+Division counts will now sum to **more** than the product total, because 57 products are counted in
+two or three divisions. That is correct and expected. Add a one-line note under the browse division
+list: *"Some products sell into more than one division and appear in each."*
+
+Exports, the comparison screens and the MRP Generator keep using the **primary** division only — do
+not multiply rows in any report. State this explicitly in the code comment so nobody "fixes" it later.
+
+---
+
+## 3. Item codes — code fix only, no rewrite
+
+### 3.1 First: measure the full collision set (read-only)
+
+```sql
+-- Every group of existing codes that would merge under canonical normalisation
+SELECT upper(regexp_replace(regexp_replace(btrim(item_code),'\s+','','g'),'\.0$','')) AS canonical,
+       count(*)                 AS n,
+       array_agg(item_code ORDER BY item_code) AS variants
+FROM catalog_products
+GROUP BY 1
+HAVING count(*) > 1
+ORDER BY n DESC, canonical;
+```
+
+For every group returned, also report: product names, divisions, categories, whether each has MRP
+history, and whether each has matched competitor rows. **This tells us whether they are genuine
+duplicate products or two different items whose codes happen to collapse.**
+
+### 3.2 Then: the code fix, with stored codes untouched
+
+- Keep the P057 A.3(a) consolidation: one canonical `normCode` in
+  `artifacts/api-server/src/lib/catalog.ts`, `catalogueMatcher.ts`'s aggressive variant renamed
+  `matchKey` and confined to fuzzy matching, the duplicates in `import-parse.ts`, `pdfExtractor.ts`
+  and `priceHistoryStatus.ts` deleted.
+- **`normCode` is used for comparison and lookup only.** No loader changes what it stores.
+  Revert/skip the `authoritativeCode` re-point from P057 A.3(a).
+- Add a regression test asserting that `TTS-01` and `TTS - 01` are *recognised as the same lookup key*
+  while both continue to exist as distinct stored rows. That is the actual current state and the test
+  should lock it until §3.3 resolves it.
+
+### 3.3 Duplicate resolution — separate, later, business-led
+
+The `TTS-01` / `TTS - 01` pairs are a **data-quality question, not a normalisation question**: are
+they one product entered twice, or two products? Merging them means choosing which MRP history
+survives. That is a Preeti-and-team decision with price consequences, and it does not belong in this
+prompt. Produce the §3.1 report, hand it over, stop.
+
+### 3.4 Junk rows — flag, do not delete
+
+Three rows in the 262 look like they are not products:
+
+- **`ITEM CODE`** — almost certainly a header row loaded as a product. Report its division, category,
+  MRP history and load batch.
+- **`Cistern`** — a category name sitting in the item-code column.
+- **`EP-Ganesha`** — may be legitimate; report it so someone can confirm.
+
+Report all three with full provenance. **Delete nothing.** Note that `Test` (3 products) has already
+disappeared from production since 11 October — confirm with the team that this was intentional and
+that those were the 3 codes previously marked "Invalid Input".
+
+---
+
+## 4. Category clean-up
+
+### 4.1 Pre-flight (read-only)
+
+```sql
+-- Does any saved bucket list, discount setting or scenario store a category string?
+-- Report every table and column holding a category predicate, and its distinct values,
+-- so case-folding cannot silently break a saved scope.
+```
+
+Search `lib/db/src/schema/**` for any column holding a category filter value (bucket-list definitions,
+MRP Generator scenario scope, discount settings). Report what you find **before** changing any
+category string. If a saved scope stores `SWR PIPE`, the fold must update it in the same transaction.
+
+### 4.2 The fold
+
+For each of the 20 groups, collapse to the **Title Case** form (Decision 2):
+
+```
+SWR PIPE        → SWR Pipe
+SILENT FITTINGS → Silent Fittings
+UPVC PIPE       → UPVC Pipe
+ASPIRE 52       → Aspire 52
+AQUA 54 → Aqua 54,  BLAZE 62 → Blaze 62,  CYGNUS 71 → Cygnus 71,  EUROPA 90 → Europa 90,
+EVIAN 87 → Evian 87,  LAGUNA 93 → Laguna 93,  MACASA 76 → Macasa 76,  MARCUS 68 → Marcus 68,
+NIAGARA 81 → Niagara 81,  OCEAN 55 → Ocean 55,  ORBIT 53 → Orbit 53,  POLO 60 → Polo 60,
+SAGA 79F → Saga 79F,  URBONA 78 → Urbona 78,  VINCENT 66 → Vincent 66,  VIRGO P66 → Virgo P66
+```
+
+Dry-run first: show rows affected per group and the before/after distinct category count.
+Expect the distinct count to fall by exactly 20.
+
+### 4.3 Stop it recurring
+
+`artifacts/api-server/src/routes/catalogImportExport.ts:447` stores `norm(row[categoryCol])` where
+`norm` is only `String(s ?? "").trim()` — trim, no case handling. That is why both spellings exist.
+
+Add a **canonical-category reuse step** on import, modelled on the competitor-name reuse that already
+exists: if an incoming category matches an existing one case-insensitively after trimming, **reuse the
+stored spelling** and disclose it in the preview — *"Category 'SWR PIPE' matched existing 'SWR Pipe';
+the stored spelling will be used."* Do not silently rewrite, and do not auto-create a second spelling.
+
+### 4.4 Report only — do not act
+
+Two things to surface for a later decision:
+
+- **394 products have a blank or null category** — the second-largest bucket in the whole catalogue.
+  Report them by division so the team can see whether it is one workbook or spread across all of them.
+- **`category` is being written from `series`.** `authoritativeMrpMaster.ts:442-444` writes the same
+  source column into both `category` and `series_range`. That is why the category list has ~400 values,
+  200+ of them with a single product, and why they read like model names (`Lavish (Matt Black)`,
+  `Orissa Pan 23"`, `Nexa (Matt Khaki)`) rather than categories. It is also why
+  `priceFinder.ts:598` labels the field **"Series"** while five other screens label it **"Category"**.
+
+  **This is the root cause of the category dropdown being unusable, and it is a bigger decision than
+  this prompt.** Either stop writing `series` into `category` and source a real category, or rename
+  the field to Series everywhere and accept there is no category level. Quantify it — how many
+  products would have no category at all if the `series` write were removed — and hand it over.
+
+  P057 Part B's searchable dropdown makes a 400-entry list survivable. It does not make it correct.
+
+---
+
+## 5. Order of work
+
+1. Get Decisions 1 and 2 in writing.
+2. §3.1 collision report + §3.4 junk-row report + §4.1 pre-flight — **all read-only, all at once**.
+3. §3.2 code-only item-code fix (safe, no data change).
+4. §2 composite-division work: schema → dry-run → approval → apply → query changes.
+5. §4.2 category fold: dry-run → approval → apply. §4.3 import guard.
+6. §4.4 report. Stop.
+
+## Done criteria
+
+- [ ] Decisions 1 and 2 recorded
+- [ ] Collision, junk-row and category pre-flight reports produced
+- [ ] `normCode` consolidated; **no stored item code changed**; `authoritativeCode` left alone
+- [ ] `product_divisions` live; `catalog_products.division` contains no `|`; loader guard in place
+- [ ] Browse/filter/analysis resolve divisions through membership; exports still use primary only
+- [ ] 20 category groups folded; import-time canonical reuse added
+- [ ] `pnpm typecheck` and `pnpm test` clean
+- [ ] One clean commit
+
+**Report back with:** the §3.1 collision table, the §2.2 dry-run, and the §4.4 quantification of how
+many products would lose their category if the `series` write were removed.
