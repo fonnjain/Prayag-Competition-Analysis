@@ -106,6 +106,7 @@ import type {
   ErrorResponse,
   ExportAdminActivityPdfParams,
   ExportAnalysisParams,
+  ExportPriceFinderCalculatorBody,
   ExportPriceFinderComparisonParams,
   ExternalGetComparisonParams,
   ExternalGetProductParams,
@@ -136,8 +137,10 @@ import type {
   GetPriceEditorEditsParams,
   GetPriceEditorProductParams,
   GetPriceFinderBrowseParams,
+  GetPriceFinderCalculatorRowsParams,
   GetPriceFinderComparisonParams,
   GetPriceFinderCompetitorsParams,
+  GetPriceFinderDiscountDefaults200Item,
   GetPriceFinderProductParams,
   GetPriceFinderSearchParams,
   GetPriceHistoryParams,
@@ -219,6 +222,7 @@ import type {
   PriceEditorSeriesResponse,
   PriceEditorUndoResponse,
   PriceFinderBrowseResponse,
+  PriceFinderCalculatorResponse,
   PriceFinderComparisonResponse,
   PriceFinderCoverage,
   PriceFinderProductResponse,
@@ -2088,6 +2092,246 @@ export function useGetPriceFinderBrowse<TData = Awaited<ReturnType<typeof getPri
 
 
 
+
+export const getGetPriceFinderCalculatorRowsUrl = (params: GetPriceFinderCalculatorRowsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["code"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : v.toString());
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/calculator/rows?${stringifiedParams}` : `/api/price-finder/calculator/rows`
+}
+
+/**
+ * @summary Public, read-only batch price evidence resolved at the selected date
+ */
+export const getPriceFinderCalculatorRows = async (params: GetPriceFinderCalculatorRowsParams, options?: RequestInit): Promise<PriceFinderCalculatorResponse> => {
+
+  return customFetch<PriceFinderCalculatorResponse>(getGetPriceFinderCalculatorRowsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderCalculatorRowsQueryKey = (params?: GetPriceFinderCalculatorRowsParams,) => {
+    return [
+    `/api/price-finder/calculator/rows`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceFinderCalculatorRowsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>, TError = ErrorType<void>>(params: GetPriceFinderCalculatorRowsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderCalculatorRowsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>> = ({ signal }) => getPriceFinderCalculatorRows(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderCalculatorRowsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>>
+export type GetPriceFinderCalculatorRowsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Public, read-only batch price evidence resolved at the selected date
+ */
+
+export function useGetPriceFinderCalculatorRows<TData = Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>, TError = ErrorType<void>>(
+ params: GetPriceFinderCalculatorRowsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderCalculatorRows>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderCalculatorRowsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPriceFinderDiscountDefaultsUrl = () => {
+
+
+
+
+  return `/api/price-finder/discount-defaults`
+}
+
+/**
+ * @summary Authenticated read-only saved discounts; never creates defaults
+ */
+export const getPriceFinderDiscountDefaults = async ( options?: RequestInit): Promise<GetPriceFinderDiscountDefaults200Item[]> => {
+
+  return customFetch<GetPriceFinderDiscountDefaults200Item[]>(getGetPriceFinderDiscountDefaultsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceFinderDiscountDefaultsQueryKey = () => {
+    return [
+    `/api/price-finder/discount-defaults`
+    ] as const;
+    }
+
+
+export const getGetPriceFinderDiscountDefaultsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceFinderDiscountDefaultsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>> = ({ signal }) => getPriceFinderDiscountDefaults({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceFinderDiscountDefaultsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>>
+export type GetPriceFinderDiscountDefaultsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Authenticated read-only saved discounts; never creates defaults
+ */
+
+export function useGetPriceFinderDiscountDefaults<TData = Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceFinderDiscountDefaults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceFinderDiscountDefaultsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportPriceFinderCalculatorUrl = () => {
+
+
+
+
+  return `/api/price-finder/calculator/export`
+}
+
+/**
+ * @summary Read-only in-memory Excel calculation; re-resolves all source prices
+ */
+export const exportPriceFinderCalculator = async (exportPriceFinderCalculatorBody: ExportPriceFinderCalculatorBody, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportPriceFinderCalculatorUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      exportPriceFinderCalculatorBody,)
+  }
+);}
+
+
+
+
+export const getExportPriceFinderCalculatorMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportPriceFinderCalculator>>, TError,{data: BodyType<ExportPriceFinderCalculatorBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof exportPriceFinderCalculator>>, TError,{data: BodyType<ExportPriceFinderCalculatorBody>}, TContext> => {
+
+const mutationKey = ['exportPriceFinderCalculator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exportPriceFinderCalculator>>, {data: BodyType<ExportPriceFinderCalculatorBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  exportPriceFinderCalculator(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExportPriceFinderCalculatorMutationResult = NonNullable<Awaited<ReturnType<typeof exportPriceFinderCalculator>>>
+    export type ExportPriceFinderCalculatorMutationBody = BodyType<ExportPriceFinderCalculatorBody>
+    export type ExportPriceFinderCalculatorMutationError = ErrorType<void>
+
+    /**
+ * @summary Read-only in-memory Excel calculation; re-resolves all source prices
+ */
+export const useExportPriceFinderCalculator = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportPriceFinderCalculator>>, TError,{data: BodyType<ExportPriceFinderCalculatorBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof exportPriceFinderCalculator>>,
+        TError,
+        {data: BodyType<ExportPriceFinderCalculatorBody>},
+        TContext
+      > => {
+      return useMutation(getExportPriceFinderCalculatorMutationOptions(options));
+    }
 
 export const getGetPriceFinderCompetitorsUrl = (params?: GetPriceFinderCompetitorsParams,) => {
   const normalizedParams = new URLSearchParams();

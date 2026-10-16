@@ -208,3 +208,14 @@ or lose removable local chips when its combined rule list is treated as ownershi
 **How to apply:** Derive removal controls from local definitions, inherited
 labels from a real parent, and counts from the resolved union. Semantic
 fingerprints must not be reused as positional rendering guards.
+
+Read-only exports must receive the full bucket context even when they use POST.
+
+**Why:** A calculator may exceed the share-link size limit and therefore submit
+its in-memory inputs by POST. That is not a domain mutation, but a GET-only
+scope allowlist would let its exported prices escape the visible restrictions.
+
+**How to apply:** Explicitly include the method of each read-only export in
+scope middleware, and resolve its prices server-side rather than trusting
+submitted prices. Distinguish prices never recorded from prices hidden by the
+current filter; do not describe filtered-out quotes as absent from the source.

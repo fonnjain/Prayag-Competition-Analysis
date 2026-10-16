@@ -3,6 +3,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import XLSX from "xlsx";
 import { finderAsOf, finderScope, exactQueryCodes, scopedFinderCompetitors } from "../lib/priceFinderCompetitors";
+import { readFinderEvidence } from "../lib/priceFinderEvidence";
+import priceCalculatorRouter from "./priceCalculator";
 import { bucketCodeAllowed, bucketCompetitorAllowed, bucketCompetitorSql, bucketSql, bucketExportRows } from "../lib/bucketFilter";
 import {
   priceChangePct,
@@ -15,6 +17,7 @@ import {
 } from "../lib/analysis.js";
 
 const router: IRouter = Router();
+router.use(priceCalculatorRouter);
 
 type PriceFinderCompetitor = string;
 
@@ -498,7 +501,7 @@ function searchScore(row: SearchRow, query: string): number {
   );
 }
 
-async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
+async function findSearchRows(filters: string[], asOf = finderAsOf(undefined)): Promise<SearchRow[]> {
   const filterConditions = filters.map(filterCondition);
   const result = await db.execute<SearchRow>(sql`
     SELECT
@@ -518,7 +521,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         WHERE cp.matched_prayag_code = p.item_code
           AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.price IS NOT NULL
-          AND cp.effective_date <= CURRENT_DATE
+          AND cp.effective_date <= ${asOf}::date
       ) AS has_competitor_data,
       best_comp.competitor AS best_competitor_brand,
       best_comp.normalized_price AS best_competitor_price,
@@ -528,7 +531,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
         WHERE h2.item_code = p.item_code
           AND h2.variant != 'Standard'
           AND h2.mrp IS NOT NULL
-          AND h2.effective_date <= CURRENT_DATE
+          AND h2.effective_date <= ${asOf}::date
           AND h2.review_status = 'approved'
       ) AS colour_variant_count
     FROM catalog_products p
@@ -536,7 +539,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       SELECT h.mrp, h.effective_date
       FROM mrp_price_history h
       WHERE h.item_code = p.item_code
-        AND h.effective_date <= CURRENT_DATE
+        AND h.effective_date <= ${asOf}::date
         AND h.mrp IS NOT NULL
         AND h.review_status = 'approved'
         AND h.variant = 'Standard'
@@ -547,7 +550,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       SELECT h.mrp, h.effective_date
       FROM mrp_price_history h
       WHERE h.item_code = p.item_code
-        AND h.effective_date > CURRENT_DATE
+        AND h.effective_date > ${asOf}::date
         AND h.mrp IS NOT NULL
         AND h.review_status = 'approved'
         AND h.variant = 'Standard'
@@ -567,7 +570,7 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
       WHERE cp.matched_prayag_code = p.item_code
         AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
         AND cp.price IS NOT NULL
-        AND cp.effective_date <= CURRENT_DATE
+        AND cp.effective_date <= ${asOf}::date
       ORDER BY ABS(
         CASE
           WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
@@ -579,13 +582,16 @@ async function findSearchRows(filters: string[]): Promise<SearchRow[]> {
     ) best_comp ON true
     WHERE p.is_active IS TRUE
       AND ${bucketSql(sql`p.item_code`)}
-      AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf}::date)
       AND ${sql.join(filterConditions, sql` AND `)}
   `);
   return result.rows;
 }
 
 router.get("/price-finder/search", async (req, res) => {
+  let asOf: string;
+  try { asOf = finderAsOf(req.query.asOf); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Invalid date" }); return; }
   const filters = getFilterTerms(req);
   if (filters.length === 0) {
     res.json({ results: [], totalCount: 0, filterSuggestions: [], unmatchedFilters: [] });
@@ -598,7 +604,7 @@ router.get("/price-finder/search", async (req, res) => {
   let searchRows: SearchRow[] = [];
   const unmatchedFilters: string[] = [];
   for (const filter of filters) {
-    const narrowedRows = await findSearchRows([...acceptedFilters, filter]);
+    const narrowedRows = await findSearchRows([...acceptedFilters, filter], asOf);
     if (narrowedRows.length === 0) {
       unmatchedFilters.push(filter);
       break;
@@ -657,6 +663,9 @@ router.get("/price-finder/search", async (req, res) => {
 });
 
 router.get("/price-finder/browse", async (req, res) => {
+  let asOf: string;
+  try { asOf = finderAsOf(req.query.asOf); }
+  catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Invalid date" }); return; }
   const division =
     typeof req.query.division === "string" && req.query.division.trim()
       ? req.query.division.trim()
@@ -675,12 +684,12 @@ router.get("/price-finder/browse", async (req, res) => {
     FROM catalog_products p
     WHERE p.is_active IS TRUE
       AND ${bucketSql(sql`p.item_code`)}
-      AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+      AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf}::date)
       AND EXISTS (
         SELECT 1
         FROM mrp_price_history h
         WHERE h.item_code = p.item_code
-          AND h.effective_date <= CURRENT_DATE
+          AND h.effective_date <= ${asOf}::date
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
       )
@@ -701,12 +710,12 @@ router.get("/price-finder/browse", async (req, res) => {
       WHERE coalesce(nullif(trim(p.division), ''), 'Uncategorised') = ${division}
         AND ${bucketSql(sql`p.item_code`)}
         AND p.is_active IS TRUE
-        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf}::date)
         AND EXISTS (
           SELECT 1
           FROM mrp_price_history h
           WHERE h.item_code = p.item_code
-            AND h.effective_date <= CURRENT_DATE
+            AND h.effective_date <= ${asOf}::date
             AND h.mrp IS NOT NULL
             AND h.review_status = 'approved'
         )
@@ -744,7 +753,7 @@ router.get("/price-finder/browse", async (req, res) => {
           WHERE cp.matched_prayag_code = p.item_code
             AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
             AND cp.price IS NOT NULL
-            AND cp.effective_date <= CURRENT_DATE
+            AND cp.effective_date <= ${asOf}::date
         ) AS has_competitor_data,
         best_comp.competitor AS best_competitor_brand,
         best_comp.normalized_price AS best_competitor_price,
@@ -754,7 +763,7 @@ router.get("/price-finder/browse", async (req, res) => {
           WHERE h2.item_code = p.item_code
             AND h2.variant != 'Standard'
             AND h2.mrp IS NOT NULL
-            AND h2.effective_date <= CURRENT_DATE
+            AND h2.effective_date <= ${asOf}::date
             AND h2.review_status = 'approved'
         ) AS colour_variant_count
       FROM catalog_products p
@@ -762,7 +771,7 @@ router.get("/price-finder/browse", async (req, res) => {
         SELECT h.mrp, h.effective_date
         FROM mrp_price_history h
         WHERE h.item_code = p.item_code
-          AND h.effective_date <= CURRENT_DATE
+          AND h.effective_date <= ${asOf}::date
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
           AND h.variant = 'Standard'
@@ -773,7 +782,7 @@ router.get("/price-finder/browse", async (req, res) => {
         SELECT h.mrp, h.effective_date
         FROM mrp_price_history h
         WHERE h.item_code = p.item_code
-          AND h.effective_date > CURRENT_DATE
+          AND h.effective_date > ${asOf}::date
           AND h.mrp IS NOT NULL
           AND h.review_status = 'approved'
           AND h.variant = 'Standard'
@@ -793,7 +802,7 @@ router.get("/price-finder/browse", async (req, res) => {
         WHERE cp.matched_prayag_code = p.item_code
           AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
           AND cp.price IS NOT NULL
-          AND cp.effective_date <= CURRENT_DATE
+          AND cp.effective_date <= ${asOf}::date
         ORDER BY ABS(
           CASE
             WHEN lower(coalesce(cp.price_basis, '')) = 'ex-gst'
@@ -807,7 +816,7 @@ router.get("/price-finder/browse", async (req, res) => {
         AND ${bucketSql(sql`p.item_code`)}
         AND ${categoryCondition}
         AND p.is_active IS TRUE
-        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
+        AND (p.discontinued_from IS NULL OR p.discontinued_from > ${asOf}::date)
       ORDER BY p.item_code
       LIMIT ${limit}
     `);
@@ -849,57 +858,17 @@ type CompetitorRow = {
 async function getPriceFinderProduct(req: Request, res: Response) {
     const itemCode =
       typeof req.query.itemCode === "string"
-        ? req.query.itemCode.trim()
+        ? req.query.itemCode
         : typeof req.params.itemCode === "string"
-          ? req.params.itemCode.trim()
+          ? req.params.itemCode
           : "";
     if (!itemCode) {
       res.status(400).json({ error: "itemCode required" });
       return;
     }
-    const products = await db.execute<ProductRow>(sql`
-      SELECT
-        p.item_code,
-        p.product_name,
-        p.division,
-        p.category,
-        p.discontinued_from,
-        current_price.mrp AS current_mrp,
-        current_price.effective_date AS current_effective_date,
-        upcoming_price.mrp AS upcoming_mrp,
-        upcoming_price.effective_date AS upcoming_effective_date
-      FROM catalog_products p
-      JOIN LATERAL (
-        SELECT h.mrp, h.effective_date
-        FROM mrp_price_history h
-        WHERE h.item_code = p.item_code
-          AND h.effective_date <= CURRENT_DATE
-          AND h.mrp IS NOT NULL
-          AND h.review_status = 'approved'
-          AND h.variant = 'Standard'
-        ORDER BY h.effective_date DESC, h.id DESC
-        LIMIT 1
-      ) current_price ON true
-      LEFT JOIN LATERAL (
-        SELECT h.mrp, h.effective_date
-        FROM mrp_price_history h
-        WHERE h.item_code = p.item_code
-          AND h.effective_date > CURRENT_DATE
-          AND h.mrp IS NOT NULL
-          AND h.review_status = 'approved'
-          AND h.variant = 'Standard'
-          AND (p.discontinued_from IS NULL OR h.effective_date < p.discontinued_from)
-        ORDER BY h.effective_date ASC, h.id DESC
-        LIMIT 1
-      ) upcoming_price ON true
-      WHERE p.item_code = ${itemCode}
-        AND p.is_active IS TRUE
-        AND (p.discontinued_from IS NULL OR p.discontinued_from > CURRENT_DATE)
-      LIMIT 1
-    `);
-
-    const product = products.rows[0];
-    if (!product) {
+    const evidence = await readFinderEvidence([itemCode], finderAsOf(undefined));
+    const product = evidence.products[0];
+    if (!product || product.current_mrp == null) {
       res.status(404).json({ error: "Product not found" });
       return;
     }
@@ -911,45 +880,7 @@ async function getPriceFinderProduct(req: Request, res: Response) {
       upcoming_mrp: number | null;
       upcoming_effective_date: string | null;
     };
-    const variantRows = await db.execute<VariantRow>(sql`
-      SELECT
-        v.variant,
-        cur.mrp AS current_mrp,
-        cur.effective_date AS current_effective_date,
-        upc.mrp AS upcoming_mrp,
-        upc.effective_date AS upcoming_effective_date
-      FROM (
-        SELECT DISTINCT variant
-        FROM mrp_price_history
-        WHERE item_code = ${product.item_code}
-          AND variant != 'Standard'
-          AND mrp IS NOT NULL
-          AND review_status = 'approved'
-      ) v
-      JOIN LATERAL (
-        SELECT mrp, effective_date
-        FROM mrp_price_history
-        WHERE item_code = ${product.item_code}
-          AND variant = v.variant
-          AND effective_date <= CURRENT_DATE
-          AND mrp IS NOT NULL
-          AND review_status = 'approved'
-        ORDER BY effective_date DESC, id DESC
-        LIMIT 1
-      ) cur ON true
-      LEFT JOIN LATERAL (
-        SELECT mrp, effective_date
-        FROM mrp_price_history
-        WHERE item_code = ${product.item_code}
-          AND variant = v.variant
-          AND effective_date > CURRENT_DATE
-          AND mrp IS NOT NULL
-          AND review_status = 'approved'
-        ORDER BY effective_date ASC, id DESC
-        LIMIT 1
-      ) upc ON true
-      ORDER BY v.variant
-    `);
+    const variantRows = { rows: evidence.variants };
 
     const variantItems = variantRows.rows.map((row) => ({
       variant: row.variant,
@@ -960,58 +891,7 @@ async function getPriceFinderProduct(req: Request, res: Response) {
       upcomingChangePct: priceChangePct(row.current_mrp, row.upcoming_mrp),
     }));
 
-    const competitors = await db.execute<CompetitorRow>(sql`
-      SELECT
-        brands.competitor,
-        CASE
-          WHEN lower(coalesce(current_price.price_basis, '')) = 'ex-gst'
-            THEN current_price.price * (1 + coalesce(current_price.gst_pct, 18) / 100.0)
-          ELSE current_price.price
-        END AS price,
-        current_price.effective_date,
-        current_price.price_basis,
-        current_price.gst_pct,
-        CASE
-          WHEN lower(coalesce(upcoming_price.price_basis, '')) = 'ex-gst'
-            THEN upcoming_price.price * (1 + coalesce(upcoming_price.gst_pct, 18) / 100.0)
-          ELSE upcoming_price.price
-        END AS upcoming_price,
-        upcoming_price.effective_date AS upcoming_effective_date
-      FROM (
-        SELECT DISTINCT cp.competitor
-        FROM competitor_prices cp
-        WHERE cp.matched_prayag_code = ${product.item_code}
-          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
-          AND cp.match_status = 'matched'
-          AND cp.price IS NOT NULL
-          AND cp.effective_date <= CURRENT_DATE
-      ) brands
-      JOIN LATERAL (
-        SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
-        FROM competitor_prices cp
-        WHERE cp.competitor = brands.competitor
-          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
-          AND cp.matched_prayag_code = ${product.item_code}
-          AND cp.match_status = 'matched'
-          AND cp.price IS NOT NULL
-          AND cp.effective_date <= CURRENT_DATE
-        ORDER BY cp.effective_date DESC, cp.id DESC
-        LIMIT 1
-      ) current_price ON true
-      LEFT JOIN LATERAL (
-        SELECT cp.price, cp.effective_date, cp.price_basis, cp.gst_pct
-        FROM competitor_prices cp
-        WHERE cp.competitor = brands.competitor
-          AND ${bucketCompetitorSql(sql`cp.competitor`, sql`cp.matched_prayag_code`)}
-          AND cp.matched_prayag_code = ${product.item_code}
-          AND cp.match_status = 'matched'
-          AND cp.price IS NOT NULL
-          AND cp.effective_date > CURRENT_DATE
-        ORDER BY cp.effective_date ASC, cp.id DESC
-        LIMIT 1
-      ) upcoming_price ON true
-      ORDER BY brands.competitor
-    `);
+    const competitors = { rows: evidence.competitors };
 
     const prayagMrp = product.current_mrp;
     const competitorItems = competitors.rows

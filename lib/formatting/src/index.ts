@@ -1,3 +1,5 @@
+export * from "./priceCalculator.ts";
+
 const money = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",

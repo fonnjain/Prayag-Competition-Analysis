@@ -3318,6 +3318,64 @@ export interface PriceFinderComparisonResponse {
   rows: PriceFinderComparisonRow[];
 }
 
+export type PriceCalculatorBlockCompetitorsItem = {
+  id: string;
+  /** @nullable */
+  competitor: string | null;
+  discount: string;
+};
+
+export interface PriceCalculatorBlock {
+  id: string;
+  /** @nullable */
+  itemCode: string | null;
+  variant: string;
+  discount: string;
+  quantity: string;
+  /** @maxItems 10 */
+  competitors: PriceCalculatorBlockCompetitorsItem[];
+}
+
+export interface CalculatorPrice {
+  /** @nullable */
+  price: number | null;
+  /** @nullable */
+  effectiveDate: string | null;
+}
+
+export type PriceFinderCalculatorResponseRowsItemVariantsItem = CalculatorPrice & {
+  variant: string;
+};
+
+export type PriceFinderCalculatorResponseRowsItemCompetitorsItem = CalculatorPrice & {
+  competitor: string;
+  priceBasis: string;
+  basisMismatch: boolean;
+};
+
+export type PriceFinderCalculatorResponseRowsItem = {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+  priceBasis: string;
+  /** Presence only, before quote exclusions, to distinguish never-recorded prices from filtered-out quotes without exposing a restricted brand or price. */
+  hasRecordedCompetitorPrice?: boolean;
+  prayag: CalculatorPrice;
+  variants: PriceFinderCalculatorResponseRowsItemVariantsItem[];
+  competitors: PriceFinderCalculatorResponseRowsItemCompetitorsItem[];
+};
+
+export interface PriceFinderCalculatorResponse {
+  asOfDate: string;
+  scopeDisclosure: string[];
+  unavailableCodes: string[];
+  rows: PriceFinderCalculatorResponseRowsItem[];
+}
+
 export type PriceFinderCoverageScope = {
   itemCodes: string[];
   /** @nullable */
@@ -5160,6 +5218,7 @@ asOf?: string;
 };
 
 export type GetPriceFinderSearchParams = {
+asOf?: string;
 /**
  * Backwards-compatible single filter term.
  */
@@ -5176,6 +5235,7 @@ limit?: number;
 };
 
 export type GetPriceFinderBrowseParams = {
+asOf?: string;
 division?: string;
 /**
  * Use "__uncategorised__" for blank categories.
@@ -5186,6 +5246,29 @@ category?: string;
  * @maximum 300
  */
 limit?: number;
+};
+
+export type GetPriceFinderCalculatorRowsParams = {
+/**
+ * @minItems 1
+ * @maxItems 50
+ */
+code: string[];
+asOf?: string;
+};
+
+export type GetPriceFinderDiscountDefaults200Item = {
+  scope: string;
+  discountPct: number;
+};
+
+export type ExportPriceFinderCalculatorBody = {
+  asOf: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  blocks: PriceCalculatorBlock[];
 };
 
 export type GetPriceFinderCompetitorsParams = {

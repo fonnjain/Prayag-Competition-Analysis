@@ -17,6 +17,8 @@ export type SearchableSelectOption = {
   label: string;
   count?: number;
   disabled?: boolean;
+  /** Secondary muted text under the label (e.g. an effective date). */
+  hint?: string;
 };
 
 export type SearchableSelectProps = {
@@ -34,6 +36,14 @@ export type SearchableSelectProps = {
   "data-testid"?: string;
   /** Max options rendered at once; the list only mounts while open. */
   renderLimit?: number;
+  /** Called with the raw search text, for server-side search. */
+  onSearchChange?: (query: string) => void;
+  /** Options are already filtered by the server; skip local filtering. */
+  serverFiltered?: boolean;
+  loading?: boolean;
+  /** Trigger label when the selected value is not in the current options. */
+  selectedLabel?: string;
+  triggerId?: string;
 };
 
 /**
@@ -54,28 +64,38 @@ export function SearchableSelect({
   widthClass = "w-[280px]",
   triggerClassName,
   renderLimit = 200,
+  onSearchChange,
+  serverFiltered = false,
+  loading = false,
+  selectedLabel,
+  triggerId,
   ...rest
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const selected = value == null ? undefined : options.find((o) => o.value === value);
+  const selected =
+    value == null
+      ? undefined
+      : options.find((o) => o.value === value) ??
+        (selectedLabel != null ? { value, label: selectedLabel } as SearchableSelectOption : undefined);
   const label = rest["aria-label"] ?? placeholder;
   const testId = rest["data-testid"] ?? "select-searchable";
 
   const matches = useMemo(() => {
     if (!open) return [];
     const q = query.trim().toLowerCase();
-    if (!q) return options;
+    if (!q || serverFiltered) return options;
     return options.filter(
       (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
     );
-  }, [open, options, query]);
+  }, [open, options, query, serverFiltered]);
   const shown = matches.length > renderLimit ? matches.slice(0, renderLimit) : matches;
 
   const choose = (next: string | null) => {
     onChange(next);
     setOpen(false);
     setQuery("");
+    onSearchChange?.("");
   };
 
   return (
@@ -83,7 +103,10 @@ export function SearchableSelect({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setQuery("");
+        if (!next) {
+          setQuery("");
+          onSearchChange?.("");
+        }
       }}
     >
       <div className={cn("relative", widthClass, "max-w-full")}>
@@ -91,6 +114,7 @@ export function SearchableSelect({
           <Button
             type="button"
             variant="outline"
+            id={triggerId}
             role="combobox"
             aria-expanded={open}
             aria-label={selected ? `${label}: ${selected.label}` : label}
@@ -132,14 +156,24 @@ export function SearchableSelect({
         <Command shouldFilter={false} loop>
           <CommandInput
             value={query}
-            onValueChange={setQuery}
+            onValueChange={(next) => {
+              setQuery(next);
+              onSearchChange?.(next);
+            }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
             data-testid={`${testId}-search`}
           />
           <CommandList className="max-h-[min(300px,calc(var(--radix-popover-content-available-height)-3rem))]">
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            {shown.length > 0 && (
+            {loading ? (
+              <div className="space-y-1.5 p-2" aria-busy="true">
+                <div className="h-6 rounded bg-muted animate-pulse" />
+                <div className="h-6 w-4/5 rounded bg-muted animate-pulse" />
+              </div>
+            ) : (
+              <CommandEmpty>{emptyText}</CommandEmpty>
+            )}
+            {!loading && shown.length > 0 && (
               <CommandGroup>
                 {shown.map((o, i) => (
                   <CommandItem
@@ -155,7 +189,10 @@ export function SearchableSelect({
                     <Check
                       className={cn("h-3.5 w-3.5 shrink-0", o.value === value ? "opacity-100" : "opacity-0")}
                     />
-                    <span className="flex-1 truncate">{o.label}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{o.label}</span>
+                      {o.hint && <span className="block truncate text-[11px] text-muted-foreground">{o.hint}</span>}
+                    </span>
                     {o.count != null && (
                       <span className="ml-auto text-xs tabular-nums text-muted-foreground">{o.count}</span>
                     )}

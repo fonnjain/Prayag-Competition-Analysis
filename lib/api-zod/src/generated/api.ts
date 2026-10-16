@@ -1026,6 +1026,7 @@ export const getPriceFinderSearchQueryLimitMax = 3000;
 
 
 export const GetPriceFinderSearchQueryParams = zod.object({
+  "asOf": zod.date().optional(),
   "q": zod.coerce.string().optional().describe('Backwards-compatible single filter term.'),
   "filters": zod.array(zod.coerce.string()).optional().describe('Accumulating filter phrases. Each must match a product field.'),
   "limit": zod.coerce.number().min(1).max(getPriceFinderSearchQueryLimitMax).default(getPriceFinderSearchQueryLimitDefault)
@@ -1072,6 +1073,7 @@ export const getPriceFinderBrowseQueryLimitMax = 300;
 
 
 export const GetPriceFinderBrowseQueryParams = zod.object({
+  "asOf": zod.date().optional(),
   "division": zod.coerce.string().optional(),
   "category": zod.coerce.string().optional().describe('Use \"__uncategorised__\" for blank categories.'),
   "limit": zod.coerce.number().min(1).max(getPriceFinderBrowseQueryLimitMax).default(getPriceFinderBrowseQueryLimitDefault)
@@ -1105,6 +1107,87 @@ export const GetPriceFinderBrowseResponse = zod.object({
   "colourVariantCount": zod.number().optional().describe('Number of non-Standard colour variants with a current price. 0 when no colour options exist.'),
   "discontinuedFrom": zod.coerce.date().nullable()
 }))
+})
+
+
+/**
+ * @summary Public, read-only batch price evidence resolved at the selected date
+ */
+export const getPriceFinderCalculatorRowsQueryCodeMax = 50;
+
+
+
+export const GetPriceFinderCalculatorRowsQueryParams = zod.object({
+  "code": zod.array(zod.coerce.string()).min(1).max(getPriceFinderCalculatorRowsQueryCodeMax),
+  "asOf": zod.date().optional()
+})
+
+export const GetPriceFinderCalculatorRowsResponse = zod.object({
+  "asOfDate": zod.string(),
+  "scopeDisclosure": zod.array(zod.string()),
+  "unavailableCodes": zod.array(zod.string()),
+  "rows": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "priceBasis": zod.string(),
+  "hasRecordedCompetitorPrice": zod.boolean().optional().describe('Presence only, before quote exclusions, to distinguish never-recorded prices from filtered-out quotes without exposing a restricted brand or price.'),
+  "prayag": zod.object({
+  "price": zod.number().nullable(),
+  "effectiveDate": zod.string().nullable()
+}),
+  "variants": zod.array(zod.object({
+  "price": zod.number().nullable(),
+  "effectiveDate": zod.string().nullable()
+}).and(zod.object({
+  "variant": zod.string()
+}))),
+  "competitors": zod.array(zod.object({
+  "price": zod.number().nullable(),
+  "effectiveDate": zod.string().nullable()
+}).and(zod.object({
+  "competitor": zod.string(),
+  "priceBasis": zod.string(),
+  "basisMismatch": zod.boolean()
+})))
+}))
+})
+
+
+/**
+ * @summary Authenticated read-only saved discounts; never creates defaults
+ */
+export const GetPriceFinderDiscountDefaultsResponseItem = zod.object({
+  "scope": zod.string(),
+  "discountPct": zod.number()
+})
+export const GetPriceFinderDiscountDefaultsResponse = zod.array(GetPriceFinderDiscountDefaultsResponseItem)
+
+
+/**
+ * @summary Read-only in-memory Excel calculation; re-resolves all source prices
+ */
+export const exportPriceFinderCalculatorBodyBlocksItemCompetitorsMax = 10;
+
+export const exportPriceFinderCalculatorBodyBlocksMax = 50;
+
+
+
+export const ExportPriceFinderCalculatorBody = zod.object({
+  "asOf": zod.coerce.date(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "itemCode": zod.string().nullable(),
+  "variant": zod.string(),
+  "discount": zod.string(),
+  "quantity": zod.string(),
+  "competitors": zod.array(zod.object({
+  "id": zod.string(),
+  "competitor": zod.string().nullable(),
+  "discount": zod.string()
+})).max(exportPriceFinderCalculatorBodyBlocksItemCompetitorsMax)
+})).min(1).max(exportPriceFinderCalculatorBodyBlocksMax)
 })
 
 

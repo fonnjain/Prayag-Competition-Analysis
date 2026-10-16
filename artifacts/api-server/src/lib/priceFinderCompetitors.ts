@@ -6,7 +6,7 @@ export function finderAsOf(value: unknown): string {
   if (value == null || value === "") return new Date().toISOString().slice(0, 10);
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("asOf must be YYYY-MM-DD.");
   const date = new Date(`${value}T00:00:00Z`);
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error("Invalid asOf date.");
+  if (value.startsWith("0000") || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error("Invalid asOf date.");
   return value;
 }
 
@@ -30,6 +30,8 @@ export function finderScope(query: Record<string, unknown>) {
 }
 
 export async function scopedFinderCompetitors(scope: ReturnType<typeof finderScope>, asOf: string) {
+  // Competitors are text on price rows, not a brand master. Distinct stored
+  // spellings are the picker authority; never offer a free-text brand entry.
   const codes = scope.itemCodes;
   const result = await db.execute<{
     products: number; without_price: number;

@@ -9,6 +9,7 @@ import {
   Menu,
   Search,
   Scale,
+  Calculator,
   X,
   PanelLeftClose,
   PanelLeftOpen,
@@ -70,6 +71,7 @@ export function Layout({ children }: LayoutProps) {
   const FINDER_NAV = [
     { path: "/", href: searchHref, label: "Search products", icon: Search },
     { path: "/comparison", href: comparisonHref, label: "Compare", icon: Scale },
+    { path: "/calculator", href: "/calculator", label: "Calculator", icon: Calculator },
     ...(user ? [{ path: "/bucket-lists", href: "/bucket-lists", label: "Bucket lists", icon: Bookmark }] : []),
   ];
 
@@ -397,7 +399,7 @@ export function Layout({ children }: LayoutProps) {
               Catalogue
             </button>
             <span className="ml-auto text-sm text-muted-foreground truncate">
-              {isComparison ? "Compare" : "Search products"}
+              {isComparison ? "Compare" : location === "/calculator" ? "Calculator" : "Search products"}
             </span>
           </header>
 

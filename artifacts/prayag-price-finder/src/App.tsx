@@ -15,6 +15,7 @@ import { Layout } from '@/components/layout';
 import { BrowseProvider } from '@/lib/browseContext';
 import PriceFinderPage from '@/pages/home';
 import ComparisonPage from '@/pages/comparison';
+import CalculatorPage from '@/pages/calculator';
 
 import BucketListsPage from '@/pages/bucket-lists';
 import BucketEditorPage from '@/pages/bucket-editor';
@@ -29,6 +30,7 @@ function Router() {
           <Switch>
             <Route path="/" component={PriceFinderPage} />
             <Route path="/comparison" component={ComparisonPage} />
+            <Route path="/calculator" component={CalculatorPage} />
             <Route path="/bucket-lists" component={BucketListsPage} />
             <Route path="/bucket-lists/edit" component={BucketEditorPage} />
             <Route component={NotFound} />

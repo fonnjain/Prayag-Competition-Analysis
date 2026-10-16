@@ -555,6 +555,7 @@ paths:
       tags: [catalog]
       summary: Progressively filter Price Finder products by spoken or typed terms
       parameters:
+        - {name: asOf, in: query, schema: {type: string, format: date}}
         - name: q
           in: query
           required: false
@@ -592,6 +593,7 @@ paths:
       tags: [catalog]
       summary: Browse the catalogue by division and category
       parameters:
+        - {name: asOf, in: query, schema: {type: string, format: date}}
         - name: division
           in: query
           required: false
@@ -618,6 +620,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PriceFinderBrowseResponse"
+  /price-finder/calculator/rows:
+    get:
+      operationId: getPriceFinderCalculatorRows
+      tags: [catalog]
+      summary: Public, read-only batch price evidence resolved at the selected date
+      parameters:
+        - {name: code, in: query, required: true, style: form, explode: true, schema: {type: array, minItems: 1, maxItems: 50, items: {type: string}}}
+        - {name: asOf, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Prices within current company and personal scope
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceFinderCalculatorResponse"}
+        "400": {description: Invalid date or more than fifty codes}
+  /price-finder/discount-defaults:
+    get:
+      operationId: getPriceFinderDiscountDefaults
+      tags: [catalog]
+      summary: Authenticated read-only saved discounts; never creates defaults
+      responses:
+        "200":
+          description: Stored defaults
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [scope, discountPct]
+                  properties:
+                    scope: {type: string}
+                    discountPct: {type: number}
+        "401": {description: Authentication required}
+  /price-finder/calculator/export:
+    post:
+      operationId: exportPriceFinderCalculator
+      tags: [catalog]
+      summary: Read-only in-memory Excel calculation; re-resolves all source prices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [asOf, blocks]
+              properties:
+                asOf: {type: string, format: date}
+                blocks:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: {$ref: "#/components/schemas/PriceCalculatorBlock"}
+      responses:
+        "200":
+          description: Calculator detail and Summary worksheets
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "400": {description: Invalid calculation}
   /price-finder/competitors:
     get:
       operationId: getPriceFinderCompetitors
@@ -5809,6 +5871,73 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PriceFinderComparisonRow"
+    PriceCalculatorBlock:
+      type: object
+      required: [id, itemCode, variant, discount, quantity, competitors]
+      properties:
+        id: {type: string}
+        itemCode: {type: [string, "null"]}
+        variant: {type: string}
+        discount: {type: string}
+        quantity: {type: string}
+        competitors:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [id, competitor, discount]
+            properties:
+              id: {type: string}
+              competitor: {type: [string, "null"]}
+              discount: {type: string}
+    PriceFinderCalculatorResponse:
+      type: object
+      required: [asOfDate, rows, scopeDisclosure, unavailableCodes]
+      properties:
+        asOfDate: {type: string}
+        scopeDisclosure: {type: array, items: {type: string}}
+        unavailableCodes: {type: array, items: {type: string}}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [itemCode, productName, division, category, priceBasis, prayag, variants, competitors]
+            properties:
+              itemCode: {type: string}
+              productName: {type: [string, "null"]}
+              division: {type: [string, "null"]}
+              category: {type: [string, "null"]}
+              priceBasis: {type: string}
+              hasRecordedCompetitorPrice:
+                type: boolean
+                description: Presence only, before quote exclusions, to distinguish never-recorded prices from filtered-out quotes without exposing a restricted brand or price.
+              prayag: {$ref: "#/components/schemas/CalculatorPrice"}
+              variants:
+                type: array
+                items:
+                  allOf:
+                    - {$ref: "#/components/schemas/CalculatorPrice"}
+                    - type: object
+                      required: [variant]
+                      properties:
+                        variant: {type: string}
+              competitors:
+                type: array
+                items:
+                  allOf:
+                    - {$ref: "#/components/schemas/CalculatorPrice"}
+                    - type: object
+                      required: [competitor, priceBasis, basisMismatch]
+                      properties:
+                        competitor: {type: string}
+                        priceBasis: {type: string}
+                        basisMismatch: {type: boolean}
+    CalculatorPrice:
+      type: object
+      required: [price, effectiveDate]
+      properties:
+        price: {type: [number, "null"]}
+        effectiveDate: {type: [string, "null"]}
     PriceFinderCoverage:
       type: object
       required: [asOfDate, scope, competitors, productsInScope, productsWithNoCompetitorPrice]
