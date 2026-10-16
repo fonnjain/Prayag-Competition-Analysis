@@ -1,0 +1,118 @@
+# P065 · COMPETITION · CODE — re-scope the Apply guard
+
+**Date:** 16 October 2026
+**Supersedes:** the "distinct divisions = exactly seven" acceptance line in P060 §B.4, and the
+"do not change the guard" instruction in P064.
+**Do not:** touch the 38 development fixtures. Do not relax the composite rule.
+
+---
+
+## 0. What happened and why the guard is wrong
+
+The real development Apply was refused: **HTTP 409, transaction rolled back, 6,948 rows verified
+byte-identical afterwards.** That part worked exactly as it should, and the evidence package is
+sound.
+
+The refusal was caused by 38 pre-existing test fixtures sitting in three junk divisions — `PTMT` (32),
+`Sanitaryware` (1), `Test` (5). Note these are *near-misses* of real division names, not the real ones.
+The mapping is silent about them, so the post-apply state would show 10 distinct divisions, and the
+guard demands exactly seven.
+
+**The guard is mis-specified, and that is my error.** I wrote "distinct divisions = exactly the seven"
+in P060 as a production *acceptance assertion*, and it was reasonably implemented as a *blocking
+precondition inside Apply*. The consequence is that Apply is held hostage by the state of rows it does
+not touch.
+
+That has two bad effects:
+
+1. **It blocks its own verification.** The Undo proof cannot be obtained in development without either
+   mutating test fixtures — which risks breaking the MRP Generator and price-editor suites — or going
+   to production unproven, which is the exact thing this gate exists to prevent.
+2. **It conflates two different questions:** "did this operation write only valid values?" and "is the
+   entire catalogue clean?" Only the first is Apply's business.
+
+The agent was right to refuse to resolve this by editing fixtures. The guard changes instead.
+
+---
+
+## 1. The re-scoped guard
+
+### Blocking — all must hold, or roll back
+
+1. **Every division value this operation would write** is in `PRODUCT_DIVISIONS` (the seven).
+2. **No value this operation would write contains `|`.**
+3. **The change set at Apply equals the change set at Preview** — same item codes, same from→to pairs,
+   same count. Re-verify at apply time; refuse on any drift.
+4. **The source file's content fingerprint matches the preview's.** (Existing behaviour — keep it.)
+
+These are all properties of the operation itself, which is what Apply can actually be responsible for.
+Note this is *stricter* than before in one respect: rule 1 now checks every written value individually,
+rather than inferring correctness from a global count.
+
+### Reported, never blocking
+
+Show at preview, and again in the post-apply report:
+
+- distinct divisions across the whole table, before and after, with counts;
+- **any division present that is not in `PRODUCT_DIVISIONS`**, listed with its item codes and counts —
+  prominently, not buried;
+- composite (`|`) values remaining anywhere after apply.
+
+Wording for the non-blocking warning, so it cannot be mistaken for a pass:
+
+> ⚠ 38 products sit in divisions outside the seven: `PTMT` (32), `Sanitaryware` (1), `Test` (5).
+> This operation did not create them and does not change them. They need separate attention.
+
+This matches how the rest of this application already behaves: coverage gaps and excluded rows are
+disclosed rather than silently tolerated or silently blocking.
+
+### Keep unchanged
+
+The composite-load rejection from P060 Part C stays exactly as it is — a workbook carrying a `|`
+division value is still refused outright.
+
+---
+
+## 2. Re-run the proof
+
+With the re-scoped guard, in **development**:
+
+1. Preview. Expect **294 changes** again, identical groups to preview #195.
+2. **Apply.** Expect success this time, plus the warning naming the 38 fixture rows.
+3. Verify: 294 rows changed, 0 composites among the changed rows, batch written with provenance.
+4. **Undo the batch.**
+5. Verify row by row that all 294 are back to their exact prior values, composite strings character
+   for character, batch marked reversed, nothing else moved.
+
+### ⛔ Stop condition
+If Undo does not restore all 294 exactly, stop and report. Do not proceed to production.
+
+---
+
+## 3. Then production, unchanged
+
+P064 Step 2 (export the restore sheet from production first) and P063 Steps 3–5 stand as written.
+Production has no junk divisions, so the warning in §1 should be empty there — **if it is not, stop
+and report before applying.**
+
+---
+
+## 4. The 38 fixtures — separate, later, read-only first
+
+Do not change them as part of this work. They are `__`-prefixed test fixtures belonging to the MRP
+Generator and price-editor suites; reclassifying or deleting them to make a guard pass would be
+exactly the wrong reason to touch test data.
+
+A read-only plan identifying which suites own them, and whether they need a division at all, is
+welcome as a separate piece of work. Not now.
+
+---
+
+## Done criteria
+
+- [ ] Guard re-scoped per §1: four blocking operation-scoped rules, global state reported not enforced
+- [ ] Composite-load rejection (P060 Part C) unchanged
+- [ ] No development fixture altered
+- [ ] Development Apply succeeds, warning lists the 38, Undo restores all 294 exactly
+- [ ] `pnpm typecheck` and targeted tests pass; commit pushed
+- [ ] Then P064 Step 2 and P063 Steps 3–5 in production
