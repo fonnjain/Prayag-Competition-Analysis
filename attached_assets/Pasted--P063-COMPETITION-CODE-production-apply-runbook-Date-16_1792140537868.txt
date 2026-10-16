@@ -1,0 +1,128 @@
+# P063 · COMPETITION · CODE — production apply runbook
+
+**Date:** 16 October 2026
+**Prerequisite:** P062 validation passed; loader published (commit `c4c518f`).
+**Data file:** `Division_Mapping_from_ERP_RateList_v3.xlsx`
+
+Short prompt. Five steps, two stop conditions.
+
+---
+
+## Step 0 — confirm two things before touching data
+
+1. **P060 Part A landed?** Confirm `PRODUCT_DIVISIONS` (7 divisions) is split from
+   `OFFICIAL_MRP_SOURCES` (6 MRP workbooks) in `artifacts/api-server/src/lib/mrpProvenance.ts`, and
+   that a comment records why Sink's product division has no matching MRP source division. The P062
+   report confirmed Part C (composite-load rejection) but never mentioned Part A. **If it did not
+   land, stop and do it first** — applying Sink into a six-division vocabulary will break the next
+   MRP load.
+2. **Is `c4c518f` pushed to GitHub?** If not, push it now, before any production write.
+
+---
+
+## Step 1 — canary apply: three codes only
+
+Undo has only ever been exercised with mocked writes. Prove it on the smallest possible real batch
+before writing 294 rows.
+
+Apply **only** these three, through the published loader:
+
+| Code | From | To |
+|---|---|---|
+| `501N` | `Ceramic Sanitaryware \| PTMT & Plastic Fittings` | `PTMT & Plastic Fittings` |
+| `503N` | `Ceramic Sanitaryware \| PTMT & Plastic Fittings` | `PTMT & Plastic Fittings` |
+| `701N` | `Ceramic Sanitaryware \| PTMT & Plastic Fittings` | `PTMT & Plastic Fittings` |
+
+Before applying, record the exact current `division` value for all three. They are listed above, but
+read them from the database and paste what you actually see — do not copy from this prompt.
+
+Confirm after apply: three rows changed, a provenance batch row exists naming the source file and the
+operator, and the batch appears in history.
+
+---
+
+## Step 2 — undo the canary and verify
+
+Run the guarded Undo on that batch. Then verify, by querying:
+
+- all three codes are back to their exact original composite string, character for character;
+- the batch is marked reversed in history;
+- no other row changed.
+
+### ⛔ Stop condition 1
+**If undo does not restore all three exactly, stop.** Restore the three by hand from the values
+recorded in Step 1, report what undo did instead, and do not proceed to Step 3. A 294-row apply with
+a broken undo is not acceptable.
+
+---
+
+## Step 3 — full apply
+
+Only once Step 2 passes.
+
+Apply the full mapping through the loader: **294 changes expected.** Preview first; if the preview
+does not say 294, stop and report.
+
+Expected shape of the change set:
+
+| From | To | Rows |
+|---|---|---|
+| PTMT & Plastic Fittings | Sink | 235 |
+| Ceramic Sanitaryware \| PTMT & Plastic Fittings | PTMT & Plastic Fittings | 45 |
+| Ceramic Sanitaryware \| PTMT & Plastic Fittings | Ceramic Sanitaryware | 5 |
+| CP Fittings / Faucets \| PTMT & Plastic Fittings \| Pipes & Fittings | CP Fittings / Faucets | 3 |
+| CP Fittings / Faucets \| PTMT & Plastic Fittings | CP Fittings / Faucets | 2 |
+| CP Fittings / Faucets \| Ceramic Sanitaryware | CP Fittings / Faucets | 2 |
+| PTMT & Plastic Fittings | CP Fittings / Faucets | 2 (`492-W`, `493-W`) |
+| **Total** | | **294** |
+
+### ⛔ Stop condition 2
+If any row would change a division **not** in that table, stop. In particular nothing should move out
+of `CP (QUAA / FERN)` and nothing should move out of `Pipes & Fittings` — those were the FR- and MHC-
+overrides.
+
+---
+
+## Step 4 — post-apply assertions
+
+Run and report all of these:
+
+```sql
+-- 1. no composites left
+SELECT count(*) FROM catalog_products WHERE division LIKE '%|%';               -- expect 0
+
+-- 2. exactly seven divisions, with counts
+SELECT division, count(*) FROM catalog_products GROUP BY division ORDER BY 2 DESC;
+-- expect: Pipes & Fittings 2740 · PTMT & Plastic Fittings 2152 · CP Fittings / Faucets 1379
+--         Hardware 288 · Sink 235 · Ceramic Sanitaryware 236 · CP (QUAA / FERN) 161
+--         (total 7,191 — report actuals, do not force them to match)
+
+-- 3. the overrides held
+SELECT item_code, division FROM catalog_products
+WHERE item_code IN ('FR-36','FR-37','FR-40')                                   -- expect CP (QUAA / FERN)
+   OR item_code LIKE 'MHC-%'                                                   -- expect Pipes & Fittings
+   OR item_code IN ('I-151','I-152','I-153','I-155','I-161','I-162','I-163',
+                    'I-167','I-168','I-169','I-171','I-174','I-175');          -- expect PTMT & Plastic Fittings
+
+-- 4. the spaced TTS products are untouched
+SELECT item_code, division FROM catalog_products
+WHERE item_code IN ('TTS - 01','TTS - 02','TTS - 03');                         -- expect PTMT & Plastic Fittings
+
+-- 5. nothing else moved
+SELECT count(*) FROM catalog_products;                                          -- expect 7,191
+```
+
+Also confirm, explicitly: **no `item_code` changed, no row in `mrp_price_history` or
+`competitor_prices` changed, no `category` changed.**
+
+---
+
+## Step 5 — report back
+
+- Step 1 before-values as read from the database
+- Step 2 undo result
+- Step 3 preview count and the change-set table as the preview actually reported it
+- Step 4 output in full
+- The batch id, so the apply can be reversed later if needed
+
+Leave the 28 `EXCLUDE` rows alone. Leave category alone.

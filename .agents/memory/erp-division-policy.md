@@ -43,3 +43,15 @@ mappings. Explicitly enumerated punctuation/case variants do not establish that
 two stored products are identical. In particular, a mapping row calling a spaced
 TTS code the same as an unspaced code must not override the known product-identity
 distinction or silently expand an approved reclassification scope.
+
+Production division remediation requires a real, explicitly scoped canary apply
+and guarded Undo before the bulk apply. Push the reviewed code to GitHub before
+production writes.
+
+**Why:** The user requires exact production restoration and proof that no other
+row changed; mocked browser writes alone are not production Undo evidence.
+
+**How to apply:** Record the actual original values, apply only the authorized
+canary codes through the app, then verify exact restoration and reversed history.
+If the published loader cannot express that scope, stop rather than applying the
+full mapping or bypassing its global final-state guards.
