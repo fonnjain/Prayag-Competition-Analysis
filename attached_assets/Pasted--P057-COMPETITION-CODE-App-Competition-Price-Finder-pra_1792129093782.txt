@@ -1,0 +1,458 @@
+# P057 · COMPETITION · CODE
+
+**App:** Competition / Price Finder (prayag-price.com) — monorepo `fonnjain/Prayag-Competition-Analysis`
+**Type:** CODE — this prompt changes application code
+**Date:** 16 October 2026
+**Depends on:** nothing. P058 (Price Calculator) depends on Part C of this prompt.
+
+---
+
+## 0. Read this before you start
+
+**Three separate defects are reported. Do them in the order below.** Part A is the data-integrity one
+and is split into a read-only diagnostic and a fix, because the fix needs a human decision.
+
+**Hard rules for this prompt:**
+
+1. **No production data writes in Part A Step 1.** It is a read-only report. Stop and show the output.
+2. **No destructive migration anywhere in this prompt.** No `UPDATE catalog_products SET division = …`
+   until the team has read the Step-1 report and replied with a decision.
+3. Do not change `mrp_price_history`, `competitor_prices` prices, or any import/apply route behaviour.
+4. When you finish each Part, state exactly which files you changed and run the type-check and tests.
+5. If anything in this prompt does not match what is actually in the repo, **stop and report the
+   difference** rather than improvising. The analysis below was done against commit `56e9caa`
+   (2026-08-31) and the live app has moved on since — treat every file:line reference as a
+   starting point to verify, not as gospel.
+
+---
+
+## Part A — Division / Category / Item-code mapping is wrong in places
+
+### A.1 The evidence
+
+The Price Finder "Browse the catalogue" screen currently lists these as divisions:
+
+| Division as shown | Products |
+|---|---|
+| CP (QUAA / FERN) | 161 |
+| CP Fittings / Faucets | 1040 |
+| **CP Fittings / Faucets \| Ceramic Sanitaryware** | **2** |
+| **CP Fittings / Faucets \| PTMT & Plastic Fittings** | **2** |
+| **CP Fittings / Faucets \| PTMT & Plastic Fittings \| Pipes & Fittings** | **3** |
+| Ceramic Sanitaryware | 217 |
+| **Ceramic Sanitaryware \| PTMT & Plastic Fittings** | **50** |
+| Hardware | 285 |
+| PTMT & Plastic Fittings | 2071 |
+| Pipes & Fittings | 2288 |
+| **Test** | **3** |
+
+Four of those are **pipe-joined composites**, not divisions. They hold **57 products between them**,
+and those 57 products are **invisible** when a user picks the real division — the 50 products under
+`Ceramic Sanitaryware | PTMT & Plastic Fittings` do not appear under `Ceramic Sanitaryware` (217)
+and do not appear under `PTMT & Plastic Fittings` (2071). A user browsing a division is silently
+shown an incomplete catalogue. There is also a junk `Test` division with 3 products.
+
+### A.2 Step 1 — read-only diagnostic (DO THIS FIRST, WRITE NOTHING)
+
+Run and output, verbatim, the results of:
+
+```sql
+-- 1. Every division value and its product count
+SELECT division, count(*) AS products
+FROM catalog_products
+GROUP BY division
+ORDER BY products DESC;
+
+-- 2. The composite rows in full — which products, and where they came from
+SELECT item_code, product_name, division, category, series_range
+FROM catalog_products
+WHERE division LIKE '%|%'
+ORDER BY division, item_code;
+
+-- 3. The junk division
+SELECT item_code, product_name, division, category, is_active, discontinued_from
+FROM catalog_products
+WHERE division = 'Test';
+
+-- 4. Same question for category
+SELECT category, count(*) AS products
+FROM catalog_products
+GROUP BY category
+ORDER BY products DESC;
+
+SELECT item_code, division, category
+FROM catalog_products
+WHERE category LIKE '%|%'
+ORDER BY category, item_code;
+
+-- 5. Case/whitespace near-duplicates in both columns
+SELECT lower(btrim(division)) AS norm, count(DISTINCT division) AS spellings,
+       array_agg(DISTINCT division) AS variants, count(*) AS products
+FROM catalog_products GROUP BY 1 HAVING count(DISTINCT division) > 1;
+
+SELECT lower(btrim(category)) AS norm, count(DISTINCT category) AS spellings,
+       array_agg(DISTINCT category) AS variants, count(*) AS products
+FROM catalog_products GROUP BY 1 HAVING count(DISTINCT category) > 1;
+
+-- 6. Item codes that are not in canonical form (the join-key problem, see A.4)
+SELECT item_code
+FROM catalog_products
+WHERE item_code <> upper(regexp_replace(regexp_replace(btrim(item_code), '\s+', '', 'g'), '\.0$', ''))
+ORDER BY item_code;
+
+-- 7. Competitor rows whose matched code does not literally join to a product
+SELECT count(*) AS orphan_competitor_rows
+FROM competitor_prices cp
+LEFT JOIN catalog_products p ON p.item_code = cp.matched_prayag_code
+WHERE cp.match_status = 'matched' AND cp.matched_prayag_code IS NOT NULL AND p.item_code IS NULL;
+
+-- 8. …and how many of those WOULD join if both sides were normalised
+SELECT count(*) AS recoverable_by_normalisation
+FROM competitor_prices cp
+JOIN catalog_products p
+  ON upper(regexp_replace(regexp_replace(btrim(p.item_code),'\s+','','g'),'\.0$',''))
+   = upper(regexp_replace(regexp_replace(btrim(cp.matched_prayag_code),'\s+','','g'),'\.0$',''))
+LEFT JOIN catalog_products p2 ON p2.item_code = cp.matched_prayag_code
+WHERE cp.match_status = 'matched' AND p2.item_code IS NULL;
+```
+
+Then **find and report the write path that produced the pipe-joined values.** Search the repo for
+`' | '`, `" | "`, `join(' | ')`, `join(" | ")`, `string_agg`, and `array_to_string` in
+`artifacts/api-server/src/**` and `scripts/src/**`. Report the exact file:line that builds a division
+string by joining. If no such code exists, the concatenation came in from the source workbook — say so,
+and report which `import_batches` / `mrp_sources` row those 57 products trace back to.
+
+**Output a short written report and STOP. Do not fix the data yet.**
+
+### A.3 Step 2 — code fixes that are unambiguous (do these now, they are safe)
+
+These are real bugs regardless of what the team decides about the 57 products.
+
+**(a) One `normCode`, not four.** There are four divergent implementations of the same item-code
+normaliser, exported under the same name from different modules:
+
+| File | Behaviour on `WMP-188 (A)` |
+|---|---|
+| `artifacts/api-server/src/lib/catalog.ts:90` | `WMP-188(A)` |
+| `artifacts/api-server/src/lib/catalogueMatcher.ts:59` | `WMP188` |
+| `artifacts/api-server/src/lib/import-parse.ts:26` | `WMP-188(A)` |
+| `artifacts/api-server/src/lib/pdfExtractor.ts:140` | `WMP-188(A)` |
+
+plus `artifacts/api-server/src/lib/priceHistoryStatus.ts:16` (`normalizeCode`, byte-identical to
+`catalog.ts`) and `artifacts/api-server/src/lib/authoritativeMrpMaster.ts:87` (`authoritativeCode`,
+which does **not** strip internal whitespace).
+
+Do this:
+- Keep `catalog.ts:90` `normCode` as the single canonical implementation and export it.
+- `catalogueMatcher.ts` genuinely needs its more aggressive form for *fuzzy matching* — **rename it
+  `matchKey`** and leave its behaviour and its tests (`catalogueMatcher.test.ts:64-79`) alone. It must
+  never be used as a storage or join key.
+- Delete `import-parse.ts:26`, `pdfExtractor.ts:140`, `priceHistoryStatus.ts:16` and re-point them at
+  the canonical `normCode`.
+- Re-point `authoritativeCode` at the canonical `normCode`. **Note this changes what the authoritative
+  loader writes** — call that out explicitly in your summary; do not backfill existing rows here.
+- Add a unit test asserting all storage/join call sites agree on a fixture set that includes
+  `"WMP-188 (A)"`, `"12345.0"`, `" u21 "`, `"RPS-2285"`.
+
+**(b) The Price Finder division filter is dead for 4 of the 6 divisions.**
+`artifacts/api-server/src/routes/priceFinder.ts` builds the search needle with `normalise()`
+(line ~294) which keeps `/ & ( )`, then matches it against a SQL column stripped of *all*
+non-alphanumerics (line ~428-434):
+
+```ts
+// needle:  "cpfittings/faucets"     ← keeps the slash
+// haystack: regexp_replace(lower(...), '[^a-z0-9]', '', 'g')  → "cpfittingsfaucets"
+```
+
+So the branch never matches for `CP Fittings / Faucets`, `CP (QUAA / FERN)`,
+`PTMT & Plastic Fittings` or `Pipes & Fittings`. **Fix:** make `normalise()` use the same
+`[^a-z0-9]` class as the SQL, and add a test that each of the six live division strings round-trips.
+
+**(c) `/analysis/filters` returns a different option set from `/catalog/filters`.**
+In `artifacts/api-server/src/routes/analysis.ts` (~line 396) the distinct division/category query has
+**no `is_active` / `discontinued_from` predicate**, while `catalog.ts:234-261` has one. The Analysis
+dashboard therefore offers divisions and categories that only exist on inactive or discontinued
+products. Add the same predicate.
+
+**(d) Category is not scoped by the selected division on the Analysis dashboard.**
+`/analysis/filters` returns `categories: string[]` with the division dropped (~line 420-426), and
+`artifacts/prayag-analysis/src/pages/dashboard.tsx:309` renders it unscoped. Picking Division A plus a
+Category that only exists in Division B silently returns zero rows.
+**Fix:** return `{ category, division }[]` from `/analysis/filters`, scope the Category select by the
+selected division, and reset `category` to `"all"` when `division` changes — mirror exactly what
+`artifacts/prayag-product-db/src/pages/catalog.tsx:185-191` and `:230-233` already do correctly.
+
+**(e) Two spellings of the same sentinel.** `priceFinder.ts` emits `'Uncategorised'` (en-GB) and
+`comparison.ts:785` emits `'Uncategorized'` (en-US). Worse, `/price-finder/browse` round-trips
+`'Uncategorised'` as a division value but `/catalog/products` does a literal
+`eq(division, 'Uncategorised')` which matches no row.
+**Fix:** stop sending a sentinel from the API. Return `null` and render the label
+`"Uncategorised"` in the UI only. Where the sentinel is used as a round-trip filter value, use an
+explicit `?division=__none__` flag that the handler translates to `IS NULL`.
+
+**(f) `QUAA & FERN` vs `CP (QUAA / FERN)`.** `FILENAME_DIVISION_MAP`
+(`artifacts/api-server/src/routes/catalogImportExport.ts:817-831`) maps `/quaa|fern/i` to
+`"QUAA & FERN"`, but the live division value is `"CP (QUAA / FERN)"` and `OFFICIAL_MRP_SOURCES`
+(`artifacts/api-server/src/lib/mrpProvenance.ts:37-76`) also uses `"CP (QUAA / FERN)"`.
+`FILENAME_DIVISION_MAP` also has **no `/hardware/i` pattern**, so a Hardware workbook loaded through
+that path lands with `division = null`.
+**Fix:** export the six canonical division strings from one module, derive `FILENAME_DIVISION_MAP`
+from it, add the Hardware pattern, and make the `anomalyReasons` regex at
+`catalogImportExport.ts:707` use the same source instead of its own fourth spelling set.
+
+**(g) Delete the stale merge artefacts** at the repo root: `comparison.ts.ours`, `comparison.ts.theirs`,
+`comparison.ts.common`. They contain live-looking category logic and will mislead the next person
+grepping for it. Confirm nothing imports them first.
+
+### A.4 Step 3 — data remediation (DO NOT RUN WITHOUT A WRITTEN GO-AHEAD)
+
+Once the Step-1 report is read, the team will decide one of:
+
+- **Option 1 — single primary division.** Assign each of the 57 composite products one primary
+  division and drop the composite values. Simple, but loses the fact that the product sells into more
+  than one division.
+- **Option 2 — primary division + membership table.** Keep `catalog_products.division` as the single
+  primary, add a `product_divisions (item_code, division)` join table for the real multi-division
+  cases, and make browse/filter queries union through it.
+
+Prepare a **migration script plus a dry-run report** for whichever option is chosen, show the
+before/after counts, and wait for explicit approval before applying. `Test` (3 products) is almost
+certainly junk — confirm against the 3 codes the Prayag team previously marked "Invalid Input" before
+deleting or re-assigning anything.
+
+---
+
+## Part B — Dropdowns: no scroll, and no search
+
+### B.1 What is actually wrong
+
+The complaint splits in two, and only one half is what it sounds like.
+
+**The Radix `Select` dropdowns do already scroll.** `src/components/ui/select.tsx` (duplicated in all
+five apps) sets `max-h-[--radix-select-content-available-height] … overflow-y-auto` on `SelectContent`.
+The real problems are:
+
+1. **`max-h` is the whole available viewport height.** On a large monitor a long list renders a panel
+   the full height of the window with every option mounted — Radix Select does not virtualise. With
+   4,500+ SKUs that is a hard freeze.
+2. **`PopoverContent` (`src/components/ui/popover.tsx:22`) has `w-72` and no `max-h`, no `overflow`.**
+   Anything list-shaped dropped into it renders unbounded.
+3. **Price Finder's division and category pickers are not dropdowns at all.** In
+   `artifacts/prayag-price-finder/src/pages/home.tsx`:
+   - the division picker (~line 1004) is a `grid gap-1.5 sm:grid-cols-2` of buttons with **no height
+     bound and no scroll**;
+   - the category picker (~line 1029) is a horizontal pill row with
+     `overflow-x-auto … [scrollbar-width:none] [&::-webkit-scrollbar]:hidden` — it scrolls sideways
+     **with the scrollbar deliberately hidden**, so most categories are off-screen with only a faint
+     gradient hint that they exist. **This is almost certainly the "dropdown does not have scroll"
+     report.**
+   - the product list (~line 1076) has no vertical bound either; it is only survivable because the API
+     clamps `limit` to 300 (`priceFinder.ts:637`).
+4. **Not one dropdown in the entire repo has a text-search input.**
+
+### B.2 The fix
+
+**Build one shared searchable combobox and use it everywhere.** The primitive is already vendored and
+currently imported by **zero** pages: `src/components/ui/command.tsx` (cmdk). Its `CommandList` is
+already `max-h-[300px] overflow-y-auto` (line 63) and `CommandInput` (line 38) is the search box.
+
+1. Create `src/components/ui/searchable-select.tsx` in **`prayag-price-finder` first**, then copy to
+   `prayag-product-db` and `prayag-analysis`. (There is no shared `lib/ui` package — if you want to
+   create one, propose it separately; do not restructure the workspace inside this prompt.)
+
+   ```tsx
+   // Props
+   type SearchableSelectProps<T> = {
+     options: { value: string; label: string; count?: number; disabled?: boolean }[];
+     value: string | null;
+     onChange: (value: string | null) => void;
+     placeholder?: string;        // trigger text when nothing selected
+     searchPlaceholder?: string;  // e.g. "Search item code or name…"
+     emptyText?: string;          // e.g. "No products with competitor prices here"
+     allowClear?: boolean;
+     disabled?: boolean;
+     widthClass?: string;         // default "w-[280px]"
+   };
+   ```
+
+   Implementation: `Popover` → `PopoverTrigger` (a `Button variant="outline"` showing the selected
+   label, with a chevron) → `PopoverContent className="p-0 w-[--radix-popover-trigger-width]"` →
+   `Command` → `CommandInput` → `CommandList` → `CommandEmpty` + `CommandGroup` + `CommandItem`s.
+   Show `count` right-aligned and muted when present. Keyboard: type to filter, ↑/↓ to move, Enter to
+   select, Esc to close. `aria-label` on the trigger.
+
+2. **Fix the primitives while you are there:**
+   - `ui/popover.tsx:22` — add `max-h-[min(24rem,var(--radix-popover-content-available-height))]
+     overflow-y-auto`.
+   - `ui/select.tsx` `SelectContent` — clamp to
+     `max-h-[min(18rem,var(--radix-select-content-available-height))]`.
+   - `ui/dropdown-menu.tsx` `DropdownMenuContent` — same clamp.
+
+3. **Replace these call sites with `SearchableSelect`** (search is the point; keep plain `Select` for
+   lists of 2-4 static options):
+
+   | File | Control |
+   |---|---|
+   | `prayag-price-finder/src/pages/home.tsx` ~1004 | Division — becomes a real dropdown |
+   | `prayag-price-finder/src/pages/home.tsx` ~1029 | Category — becomes a real dropdown, scoped to the chosen division |
+   | `prayag-product-db/src/pages/catalog.tsx:227` | Division |
+   | `prayag-product-db/src/pages/catalog.tsx:248` | Category |
+   | `prayag-product-db/src/pages/comparison.tsx:405` | Competitor |
+   | `prayag-product-db/src/pages/comparison.tsx:418` | Category |
+   | `prayag-product-db/src/pages/mapping-review.tsx:477` | Competitor |
+   | `prayag-product-db/src/pages/mrp-revisions.tsx:319` | Competitor |
+   | `prayag-analysis/src/pages/dashboard.tsx:284` | Division |
+   | `prayag-analysis/src/pages/dashboard.tsx:300` | Category |
+
+4. **Product list in Price Finder** (`home.tsx` ~1076): wrap in
+   `max-h-[60vh] overflow-y-auto` so it scrolls inside the card instead of growing the page.
+
+5. **Delete the dead directory** `artifacts/prayag-price-finder/src/components/ui/ui/` — 55 duplicate
+   files with zero import references. Verify with a grep for `ui/ui` across
+   `artifacts/**/*.{ts,tsx,json}` before deleting.
+
+### B.3 Acceptance
+
+- Typing `wmp` into the product dropdown filters to matching item codes and names within one keystroke.
+- A division list of 11 entries and a category list of 100+ both show a scrollbar and never exceed
+  ~300px tall.
+- Keyboard-only operation works end to end on every converted dropdown.
+- No dropdown panel can grow taller than the viewport.
+
+---
+
+## Part C — Competitors must be scoped to the selection
+
+### C.1 What is wrong
+
+The Price Finder comparison page shows a **hardcoded row of brand checkboxes** — currently
+Sparsh Pearl, Ashirvad, Prince, Vectus — on every product, whether or not that product has a price
+from that brand. A user comparing a PVC Connection sees four brands and gets one column of data. Vectus
+in particular is supported in the app but **has no price data at all**.
+
+The brand list is hardcoded in **two files that must be edited in lockstep**:
+
+- `artifacts/prayag-price-finder/src/lib/priceFinderRouteState.ts:6`
+  `export const PRICE_FINDER_COMPETITORS = [...] as const;`
+- `artifacts/api-server/src/routes/priceFinder.ts:17`
+  a second, separate literal copy, enforced as a 400 at ~`:1041` and ~`:1074`.
+
+Every other competitor list in the app is the **global** distinct `competitor_prices.competitor`
+set, unscoped by division, category or product:
+
+| Route | File |
+|---|---|
+| `GET /catalog/comparison/filters` | `comparison.ts:1512` — no `.where()`; `?competitor=` narrows only `periods` |
+| `GET /analysis/filters` | `analysis.ts:387` — handler signature is `(_req, res)`, it cannot read a query param at all |
+| `GET /catalog/competitor-brands` | `catalogImportExport.ts:2160` — `(_req, res)`, no `.where()` |
+| `GET /analysis/discount-settings` | `analysis.ts:914` → `getDiscounts()` at `:293` |
+
+The one thing that already does it right is `GET /price-finder/product/:itemCode`
+(`priceFinder.ts:806`), whose brands subquery at `:930-937` is exactly the shape we want:
+
+```sql
+SELECT DISTINCT cp.competitor
+FROM competitor_prices cp
+WHERE cp.matched_prayag_code = $1
+  AND cp.match_status = 'matched'
+  AND cp.price IS NOT NULL
+  AND cp.effective_date <= CURRENT_DATE
+```
+
+### C.2 The fix
+
+**1. Delete both hardcoded arrays.** Drive the competitor set from data.
+
+**2. Add one new endpoint** — `GET /price-finder/competitors`:
+
+```
+GET /price-finder/competitors
+  ?itemCode=U76                 (repeatable — scope to these products)
+  |  ?division=…&category=…     (scope to a classification)
+  &asOf=YYYY-MM-DD              (optional, defaults to today)
+```
+
+Returns only competitors that actually have a usable current price in scope:
+
+```jsonc
+{
+  "asOfDate": "2026-10-16",
+  "scope": { "itemCodes": ["U76"], "division": null, "category": null },
+  "competitors": [
+    { "competitor": "Sparsh Pearl", "pricedProducts": 1, "coveragePct": 100 }
+  ],
+  "productsInScope": 1,
+  "productsWithNoCompetitorPrice": 0
+}
+```
+
+Query shape — note the join must go through `catalog_products` because `competitor_prices` has **no
+division column**:
+
+```sql
+SELECT cp.competitor,
+       count(DISTINCT cp.matched_prayag_code) AS priced_products
+FROM competitor_prices cp
+JOIN catalog_products p ON p.item_code = cp.matched_prayag_code
+WHERE cp.match_status = 'matched'
+  AND cp.price IS NOT NULL
+  AND cp.effective_date <= $asOf
+  AND ( $itemCodes::text[] IS NULL OR cp.matched_prayag_code = ANY($itemCodes) )
+  AND ( $division IS NULL OR p.division  = $division )
+  AND ( $category IS NULL OR p.category  = $category )
+GROUP BY cp.competitor
+ORDER BY priced_products DESC, cp.competitor ASC;
+```
+
+Use `normCode` (Part A.3a) on both sides of the join key once that work is merged. Existing indexes
+`competitor_prices_matched_code_idx`, `competitor_prices_competitor_idx` and
+`competitor_prices_current_idx` cover this; add a `(category, competitor)` composite only if the
+explain plan asks for it.
+
+**3. Wire the comparison page to it.**
+`artifacts/prayag-price-finder/src/pages/comparison.tsx:107-119` renders the checkbox row from
+`PRICE_FINDER_COMPETITORS`. Render it from `GET /price-finder/competitors` keyed on the current
+selection instead.
+
+- A brand with **zero** priced products in scope is **not rendered**. (Not greyed out — not rendered.
+  That is what was asked for.)
+- Each checkbox shows the coverage count, e.g. `Brand A (12)`, so the user can see depth before
+  selecting.
+- If the scope yields **no** competitors at all, replace the row with
+  *"No competitor prices recorded for this selection."* — do not show an empty checkbox strip.
+- Preserve the current URL-param round-trip, but validate the param against the **fetched** list
+  rather than a hardcoded union. An unknown or now-uncovered brand in the URL is dropped silently
+  rather than 400-ing the page.
+
+**4. Apply the same scoping to the division/category dropdowns on the Analysis dashboard and the
+Product DB comparison page.** `/catalog/comparison/filters` and `/analysis/filters` should accept
+optional `division`, `category` and `itemCode` params and narrow `competitors` accordingly.
+`analysis.ts:387` must stop using `(_req, res)`.
+
+**5. Do not change** what counts as a valid comparison row. Reuse the existing predicates
+(`match_status = 'matched'`, `price IS NOT NULL`, `effective_date <= asOf`,
+`isAvailableComparisonRow`). This prompt changes *which brands are offered*, never *which prices are
+comparable*.
+
+### C.3 Acceptance
+
+- Opening the comparison for a product that only Brand A prices shows exactly one checkbox.
+- Selecting Division = Ceramic Sanitaryware shows only brands with sanitaryware prices.
+- A brand with no data anywhere never appears in any picker.
+- Every brand shown has at least one real price behind it, and the count next to it is correct.
+
+---
+
+## Done criteria for P057
+
+- [ ] Part A Step 1 report produced and pasted back; **no data written**
+- [ ] Part A Step 2 code fixes (a)–(g) merged, with the new `normCode` test passing
+- [ ] Part A Step 3 **not started** without a written decision
+- [ ] `SearchableSelect` built and wired into all ten call sites in Part B.3
+- [ ] `ui/ui/` dead directory deleted; popover/select/dropdown clamps applied
+- [ ] `GET /price-finder/competitors` live; both hardcoded brand arrays deleted
+- [ ] `pnpm typecheck` and `pnpm test` clean
+- [ ] One clean commit, with a message that lists the three parts separately
+
+**Report back with:** the Step-1 SQL output, the file:line of whatever builds the pipe-joined division
+string, and the list of files changed.
