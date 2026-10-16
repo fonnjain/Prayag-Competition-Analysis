@@ -1685,3 +1685,17 @@ mtime_ms = 1792137413599
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/6d1c2e08-8b71-4799-b395-eb92ca1272d1/c8c3d89b-125c-48cf-8248-86d401f02f73"
 storage_version_token = "1792137453525306"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Oda9WldUslc9cu8f7Fza3"
+uri = "file://generated-artifacts/p062/P062-v3-validation-and-implementation.md"
+type = "text"
+title = "P062 — complete validation and implementation report (.md)"
+description = "All 294 proposed changes, 2,063 unmapped products, 28 EXCLUDE rows, live purity/cross-tabs, scope impacts, files changed, commit and verification limits. Production has not been applied."
+logical_id = "454c819a-83a0-4342-b4f2-e1c5f822694a"
+content_hash = "sha256:36629c9cd23c4298bcc0d313636674e93b0447c8f7e60c61e05ee204b12e5534"
+size = 220029
+mtime_ms = 1792139951016
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/454c819a-83a0-4342-b4f2-e1c5f822694a/facc2795-0e17-4b3d-866d-9128149f999c"
+storage_version_token = "1792139997776261"
+content_type = "text/markdown"
