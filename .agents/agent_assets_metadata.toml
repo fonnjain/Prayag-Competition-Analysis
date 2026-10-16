@@ -1642,3 +1642,32 @@ uri = "file://artifacts/pricing-app-animation/public/audio/bg_music.mp3"
 type = "audio"
 title = "background music"
 description = "Generated music: Minimal driving electronic instrumental scoring a software product walkthrough. Muted plucks, warm sub bass, crisp light percussion, 118 BPM, confident and precise. Short intro, stea…"
+logical_id = "83d8a61b-29d4-4849-af80-4bd05b05db81"
+
+[[outputs]]
+id = "vdSKLx5LA_Jj483VBmgon"
+uri = "file://generated-artifacts/p060/P060_Production_Read_Only_Validation.xlsx"
+type = "table"
+title = "P060 — Full production validation report"
+description = "Read-only audit: all 2,066 unmapped codes grouped by division, all 317 disagreements, complete cross-tab, Item-Type purity, 57 composite products, 28 EXCLUDE rows, saved-scope impact and projected counts. No apply performed."
+logical_id = "bc364b8c-7869-4a49-ba6c-50f602dda803"
+content_hash = "sha256:206faad5ade89c54d75db6edf0c9759f994deefe03a66dc0cdd61f81a7e390ae"
+size = 82944
+mtime_ms = 1792136010548
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/bc364b8c-7869-4a49-ba6c-50f602dda803/eea517f3-4541-4bec-9ca4-a1b85b177af5"
+storage_version_token = "1792136064490954"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "qcGZdpp3YRYf6UoHbAcUb"
+uri = "file://generated-artifacts/p060/P060_Production_Read_Only_Validation.md"
+type = "text"
+title = "P060 — Validation Report (Markdown)"
+description = "The production read-only validation report, including mapping coverage, blockers, disagreements, purity, saved-scope impact and projected division counts."
+logical_id = "8a539273-14ab-49ef-afa1-79411beab799"
+content_hash = "sha256:0afd0f496a060876a23f6c776ec92a49401df257229a19b66a0b49a208c2b2d4"
+size = 7939
+mtime_ms = 1792136151852
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8a539273-14ab-49ef-afa1-79411beab799/6d6a81b7-3604-4ae0-aa4a-1f05b54c23f8"
+storage_version_token = "1792136159629239"
+content_type = "text/markdown"

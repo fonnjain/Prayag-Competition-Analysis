@@ -1,0 +1,214 @@
+# P060 · COMPETITION · CODE
+
+**App:** Competition / Price Finder (prayag-price.com) — monorepo `fonnjain/Prayag-Competition-Analysis`
+**Type:** CODE + supervised DATA remediation
+**Date:** 16 October 2026
+**Data file:** `Division_Mapping_from_ERP_RateList.xlsx` (upload to the Repl before starting)
+
+---
+
+## 0. Read this first
+
+### 0.1 This prompt SUPERSEDES P059. Do not run P059.
+
+P059 proposed a `product_divisions` membership table on the theory that the 57 pipe-joined products
+genuinely sell into several divisions. **That theory was wrong.** The `source_sheets` column in
+`Prayag_Allowed_Codes_Master` shows the composite string is just *which workbook sheets the code was
+found on* — provenance that leaked into the division field, not commercial membership.
+
+So: **no membership table, no browse/filter query rewrites.** Each product gets exactly one division,
+taken from the attached mapping file. That is a far smaller and safer change.
+
+### 0.2 Amendment to P057 Part A.3(a) — the item-code backfill must NOT run
+
+Keep the `normCode` consolidation and the `matchKey` rename. **Do not** re-point `authoritativeCode`
+at the canonical `normCode`, and **do not** change what any loader stores.
+
+Reason: the catalogue contains pairs that differ only by internal whitespace and are **genuinely
+different products**:
+
+| Code | Product | Division |
+|---|---|---|
+| `TTS-01` | TEFELON TAPE | CP Fittings / Faucets |
+| `TTS - 01` | Teflon Thread Seal (10 mtr. L) 12mm | PTMT & Plastic Fittings |
+| `DB-02L` | Ball **Long** Cock+Ball (ISI) | Ceramic Sanitaryware |
+| `DB-02 L` | Ball Cock+Ball (ISI) | PTMT & Plastic Fittings |
+
+Canonical normalisation would merge them. **Whitespace is significant in this catalogue's item codes.**
+`normCode` is for comparison and fuzzy lookup only, never as an equality test between two stored codes.
+
+### 0.3 The source rate list's prices are NOT to be used, anywhere, for anything
+
+The mapping file was derived from `rate_list.xlsx`, an ERP export. **That file has no effective-date
+column at all**, and its MRP disagrees with the authoritative workbooks:
+
+| Code | ERP rate list | Authoritative |
+|---|---|---|
+| `321` | ₹62 | ₹92 w.e.f. 01-09-2026 |
+| `U21` | ₹84 | ₹78 |
+
+Nothing in this prompt touches `mrp_price_history`, `competitor_prices`, or any price field. If you
+find yourself writing a price, you have gone off-script — stop.
+
+---
+
+## Part A — Sink becomes a seventh division
+
+Business instruction, 16 October 2026. The app currently has six divisions; it will have seven.
+
+**Definition (already applied in the mapping file):** Sink = ERP Master Group `SINK`, which is exactly
+Item Type ∈ {`SINK`, `FLOOR TRAP`, `PLATE RACK`} — **656 codes**. Floor traps and plate racks are
+included deliberately; the ERP files all of them under Master Group SINK.
+
+All 656 currently sit under **PTMT & Plastic Fittings**, which drops accordingly.
+
+### A.1 Code changes
+
+1. **`artifacts/api-server/src/lib/mrpProvenance.ts`** — `OFFICIAL_MRP_SOURCES` (~L37-76) is a
+   six-division list used as the canonical division vocabulary **and** as the MRP workbook list.
+   Those are now two different things. Split them:
+   - `PRODUCT_DIVISIONS` — the seven product divisions, exported as the single source of truth.
+   - `OFFICIAL_MRP_SOURCES` — unchanged, still the six MRP workbooks.
+   - **There is no Sink MRP workbook.** Sink items price from the PTMT book, so for them
+     `productDivision` ≠ `sourceDivision`. `mrpProvenance.ts` already distinguishes these two
+     concepts — make sure the Sink case flows through that distinction rather than breaking it.
+     Add a code comment saying why, so nobody "fixes" it later.
+2. **`artifacts/api-server/src/routes/catalogImportExport.ts`** — derive `FILENAME_DIVISION_MAP`
+   (~L817-831) from `OFFICIAL_MRP_SOURCES`, not its own literals, and add the missing `/hardware/i`
+   pattern (per P057 A.3f). Do **not** add a Sink filename pattern — there is no Sink workbook.
+3. **`catalogImportExport.ts:707`** — the `anomalyReasons` regex is a fourth spelling set. Point it at
+   the shared constant too.
+4. **UI** — the division appears in Price Finder browse, Product DB catalog, and the Analysis
+   dashboard. All three read divisions from the API, so no hardcoded list should need editing.
+   **Verify that** — grep the front-ends for any literal division array and report what you find.
+
+### A.2 Before applying — check what Sink breaks
+
+**Saved bucket lists scoped to `PTMT & Plastic Fittings` will silently lose 656 products** the moment
+this applies. Run, read-only, and report:
+
+```sql
+-- any saved scope that references a division value
+SELECT id, name, owner_id, visibility, definition
+FROM bucket_lists                       -- adjust to the real table/column names
+WHERE definition::text ILIKE '%PTMT%' OR definition::text ILIKE '%division%';
+```
+
+Report every bucket list, MRP Generator scenario scope, and discount setting that stores a division
+string. **If any of them would change meaning, stop and report before applying Part B.**
+
+---
+
+## Part B — Apply the division mapping
+
+### B.1 The data file
+
+`Division_Mapping_from_ERP_RateList.xlsx`, sheet **`mapping`**, one row per item code:
+
+| Column | Meaning |
+|---|---|
+| `item_code` | ERP item code (10,576 distinct, deduped; the 766 repeats never disagreed on classification) |
+| `erp_item_type`, `erp_item_group`, `erp_master_group` | the ERP fields the division was derived from |
+| `proposed_division` | the division to apply — or `EXCLUDE - not a catalogue product` |
+| `confidence` | `HIGH` (9,752) · `BUSINESS RULE` (656, Sink) · `RESOLVED` (53) · `LOW` (87) · `EXCLUDE` (28) |
+| `basis` | why, in words — carry this into the preview UI |
+| `current_app_division` | what the older Category Backfill said, where it had a value |
+| `conflict` | `YES` where `proposed_division` differs from `current_app_division` |
+
+Other sheets: `rules` (Item Type → division with purity), `conflicts_vs_backfill` (274 rows),
+`excluded_and_unmapped` (28), `summary`.
+
+### B.2 Step 1 — read-only validation against LIVE production (DO THIS FIRST)
+
+**The purity figures in the file were computed against a 6,330-row backfill, not production's 7,191.**
+Re-measure before trusting anything:
+
+1. How many of production's `catalog_products.item_code` appear in the mapping file?
+2. How many do **not**? List them by current division. **These keep their current division — the
+   mapping is silent about them, which is not the same as saying they are wrong.**
+3. For codes in both, cross-tab `proposed_division` against the live `catalog_products.division`.
+   Report every disagreement, grouped, with counts.
+4. Re-run the per-Item-Type purity against live data and report any type that drops below 95%.
+5. Confirm all 57 composite (`division LIKE '%|%'`) products are covered by the mapping.
+
+**Produce the report and STOP.** Do not write anything yet.
+
+### B.3 Step 2 — preview and apply
+
+Follow the existing preview → apply → batch → undo pattern. Do not invent a new one.
+
+- **Preview** shows: rows to change, grouped by `from division → to division`, with counts and the
+  `basis` text; rows unchanged; production codes absent from the file; and the `EXCLUDE` rows listed
+  separately with **no action taken on them**.
+- **Apply** writes `catalog_products.division` only. It must be:
+  - guarded to administrators,
+  - recorded as a load batch with full provenance,
+  - reversible through the existing guarded undo.
+- **Do not delete, deactivate or reclassify the 28 `EXCLUDE` rows.** Report them and leave them
+  exactly as they are — that is a separate decision.
+- **Do not touch `category`.** See Part D.
+
+### B.4 Assertions after apply
+
+- `SELECT count(*) FROM catalog_products WHERE division LIKE '%|%'` → **0**
+- distinct divisions = exactly the seven in `PRODUCT_DIVISIONS`
+- `Sink` count matches the number of Sink codes actually present in production (≤ 656)
+- no row's `item_code` changed
+- no row in `mrp_price_history` or `competitor_prices` changed
+- before/after division counts reported side by side
+
+---
+
+## Part C — Stop composites coming back
+
+1. **`artifacts/api-server/src/lib/authoritativeMrpMaster.ts`** — the workbook division is read at
+   ~L345 and written at ~L691. Add a guard that **throws** if a value containing `|` reaches the
+   insert, naming the item code and the offending string.
+2. In the loader preview, surface it: *"N rows in this workbook carry a multi-sheet division value and
+   will be rejected — resolve them in the mapping first."*
+3. Add a unit test that feeds a composite division through the loader and asserts it is refused.
+
+---
+
+## Part D — What this prompt does NOT do
+
+State these in your summary so nobody assumes they were handled:
+
+- **Category is untouched.** The ERP's `Item Category` is 3,341× "FG" plus Trading / Spare Parts — an
+  accounting classification, not a product category. It cannot populate this field.
+- **The 20 split-spelling category groups are untouched** (`SWR PIPE`/`SWR Pipe` 240 products,
+  `SILENT FITTINGS`/`Silent Fittings` 110, and 18 more — 1,131 products in total). Held pending a
+  separate decision.
+- **The 394 blank categories are untouched.**
+- **`category` is still being written from `series`** (`authoritativeMrpMaster.ts:442-444`), which is
+  why the category list has ~400 values reading like model names. Unresolved by design.
+- **No item code is changed or merged.**
+- **No price is read, written or validated.**
+
+---
+
+## Part E — Report back
+
+1. The Part B.2 validation report, in full.
+2. The Part A.2 bucket-list / scenario-scope impact report.
+3. Before/after division counts.
+4. The live-data disagreements between `proposed_division` and current `catalog_products.division`,
+   grouped. Expect roughly: QUAA codes moving to `CP (QUAA / FERN)`, 656 moving to `Sink`, and a small
+   genuine remainder — against the 6,330-row backfill that remainder was **27 codes (0.6%)**; report
+   what it actually is against production.
+5. Files changed.
+
+---
+
+## Done criteria
+
+- [ ] Part B.2 validation report produced and reviewed; **no writes before it**
+- [ ] Bucket-list impact checked; any scope that changes meaning reported before apply
+- [ ] `PRODUCT_DIVISIONS` (7) split from `OFFICIAL_MRP_SOURCES` (6); Sink's product ≠ source division documented
+- [ ] `FILENAME_DIVISION_MAP` and the `anomalyReasons` regex both derive from the shared constant
+- [ ] Division mapping applied through preview → apply → batch, reversible
+- [ ] Zero `|` in `catalog_products.division`; loader guard + test in place
+- [ ] 28 `EXCLUDE` rows reported, untouched
+- [ ] No item code, price or category changed
+- [ ] `pnpm typecheck` and `pnpm test` clean
+- [ ] One clean commit
