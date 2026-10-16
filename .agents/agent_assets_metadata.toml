@@ -1699,3 +1699,31 @@ mtime_ms = 1792139951016
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/454c819a-83a0-4342-b4f2-e1c5f822694a/facc2795-0e17-4b3d-866d-9128149f999c"
 storage_version_token = "1792139997776261"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "LEpjgu8O252TPOSM2Dnap"
+uri = "file://generated-artifacts/p064/P064-development-proof-blocked.md"
+type = "text"
+title = "P064 — real development attempt and rollback verification"
+description = "Actual 294-row preview, HTTP 409 refusal, pending batch #1837, row-by-row unchanged-state proof, 38 fixture blockers and logged follow-up. Production was not attempted."
+logical_id = "6607a5e2-36d1-48f7-bcf7-266f882aac77"
+content_hash = "sha256:e4165f4efeeafa22a9e9460364a4b223a6ddcea1eab2e089bc46489e3c7f6fb3"
+size = 9625
+mtime_ms = 1792141796680
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/6607a5e2-36d1-48f7-bcf7-266f882aac77/73ab2e57-60ff-4b36-a7bd-3d1e93f9cd3f"
+storage_version_token = "1792141882091484"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "7O4izx_yYyG2PDEZBSAmx"
+uri = "file://generated-artifacts/p064/P064-development-evidence.zip"
+type = "unspecified"
+title = "P064 — development audit evidence"
+description = "Before/after catalogue snapshots, real loader responses, provenance proof, unchanged price-table DML counters and the 38 unmapped fixture rows. No credentials or session cookies."
+logical_id = "66aa1778-bbe5-4ab3-98c1-3ee44a090bc7"
+content_hash = "sha256:ff0fb1a273ae6f6d621d5b489fd5e01b81d7ea6f1fa67f8e3904c11f3631ac98"
+size = 358122
+mtime_ms = 1792141856728
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/66aa1778-bbe5-4ab3-98c1-3ee44a090bc7/13574d85-fb24-492b-b44b-bdb720429d56"
+storage_version_token = "1792141883459765"
+content_type = "application/octet-stream"

@@ -44,14 +44,18 @@ two stored products are identical. In particular, a mapping row calling a spaced
 TTS code the same as an unspaced code must not override the known product-identity
 distinction or silently expand an approved reclassification scope.
 
-Production division remediation requires a real, explicitly scoped canary apply
-and guarded Undo before the bulk apply. Push the reviewed code to GitHub before
-production writes.
+Before bulk production division remediation, prove the full Apply and Undo
+through the unchanged development administrator app, not an integration suite
+or mocked browser responses. Do not add a canary mode. Push reviewed code to
+GitHub before production writes.
 
-**Why:** The user requires exact production restoration and proof that no other
-row changed; mocked browser writes alone are not production Undo evidence.
+**Why:** The user withdrew the partial production canary because the loader is
+deliberately all-or-nothing. Its zero-composite guard is correct; adding an
+unproven partial write path merely to test the existing path is not acceptable.
 
-**How to apply:** Record the actual original values, apply only the authorized
-canary codes through the app, then verify exact restoration and reversed history.
-If the published loader cannot express that scope, stop rather than applying the
-full mapping or bypassing its global final-state guards.
+**How to apply:** Record every affected development row and verify exact,
+row-by-row restoration, including composite strings, plus unchanged non-target
+metadata. Stop on any Undo discrepancy. Before production Apply, export an
+independent restore sheet with exact code, original division and proposed
+division for every target; keep it with the batch evidence. Preserve the
+blocking zero-composite rule unless the user separately approves a change.
