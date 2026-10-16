@@ -21,6 +21,7 @@ import activityRouter from "./activity";
 import priceEditorRouter from "./priceEditor";
 import mrpGeneratorRouter from "./mrpGenerator";
 import catalogNameChangesRouter from "./catalogNameChanges";
+import divisionMappingRouter from "./divisionMapping";
 import mrpProvenanceBackfillRouter from "./mrpProvenanceBackfill";
 import productRetirementRouter from "./productRetirement";
 import apolloStagedLoadRouter from "./apolloStagedLoad";
@@ -61,6 +62,7 @@ router.use(comparisonRouter);
 router.use(analysisRouter);
 router.use(priceEditorRouter);
 router.use(catalogNameChangesRouter);
+router.use(divisionMappingRouter);
 router.use(mrpGeneratorRouter);
 router.use(mrpProvenanceBackfillRouter);
 // Only the reversible Retire path is mounted. Product deletion remains blocked

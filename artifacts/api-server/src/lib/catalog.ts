@@ -88,9 +88,8 @@ export async function recomputeCompetitorCurrentFlags(
 }
 
 export function normCode(s: unknown): string {
-  return String(s ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .replace(/\.0$/, "");
+  // Historical name retained for callers. This is now an exact identity key.
+  // Punctuation, case and all whitespace distinguish stored products.
+  // Fuzzy ranking may have a separate text signal, never an identity key.
+  return String(s ?? "");
 }

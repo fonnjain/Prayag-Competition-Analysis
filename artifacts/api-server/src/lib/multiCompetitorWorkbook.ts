@@ -7,7 +7,7 @@ export const PROTECTED_WORKBOOK_BRANDS = ["Apollo", "Ashirvad", "Prince", "Spars
 export const WORKBOOK_LOADER_KIND = "multi-competitor-workbook-v1";
 export const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const text = (v: unknown) => String(v ?? "").normalize("NFKC").trim().replace(/\s+/g, " ");
-export const codeKey = (v: unknown) => text(v).replace(/\s+/g, "").toUpperCase();
+export const codeKey = (v: unknown) => String(v ?? "");
 const brandKey = (v: string) => {
   const key = normalizeVocabularyKey(v);
   return key === normalizeVocabularyKey("Ashirwad") ? normalizeVocabularyKey("Ashirvad") : key;
@@ -130,7 +130,7 @@ export function parseMultiCompetitorWorkbook(buffer: Buffer, selected: string[],
           const v = cell(r, c)?.v;
           if (typeof v === "number" && v > 0 && v <= 100) length = v;
         }
-        const pc = text(cell(r, prayag.start)?.v), cc = text(cell(r, g.start)?.v);
+        const pc = String(cell(r, prayag.start)?.v ?? ""), cc = String(cell(r, g.start)?.v ?? "");
         if (!pc && !cc) continue;
         for (const d of dated) {
           const priceCell = cell(r, d.column), value = priceCell?.v;

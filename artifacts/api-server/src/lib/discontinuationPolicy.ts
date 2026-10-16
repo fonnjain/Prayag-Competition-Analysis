@@ -31,9 +31,9 @@ export function deriveConfirmedDiscontinuations(
   >();
 
   for (const row of rows) {
-    const itemCode = row.itemCode.trim();
+    const itemCode = row.itemCode;
     if (!itemCode) continue;
-    const key = itemCode.toUpperCase();
+    const key = itemCode;
     const group = byCode.get(key) ?? {
       itemCode,
       allRemoved: true,

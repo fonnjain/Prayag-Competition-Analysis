@@ -51,7 +51,7 @@ router.get("/admin/product-retirement/sales-check", requireAdmin, async (req, re
   try {
     const evidence = await checkEverSoldForCodes(codes);
     res.json({ action: "read-only-sales-check", results: codes.map((itemCode) => ({
-      itemCode, ...evidence.get(itemCode.toUpperCase())!,
+      itemCode, ...evidence.get(itemCode)!,
     })) });
   } catch {
     res.json({ action: "read-only-sales-check", results: codes.map((itemCode) => ({

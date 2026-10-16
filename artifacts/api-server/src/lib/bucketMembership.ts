@@ -72,18 +72,16 @@ export function classifyBucketUpload(input: { row: number; code: string }[], cat
   const addable = new Set<string>();
   const rows: UploadRow[] = input.map(({ row, code }) => {
     const inputCode = code;
-    const trimmed = code.trim();
-    const exact = byCode.get(trimmed);
-    const product = exact ?? byCode.get(trimmed.replace(/\s+/g, ""));
+    const exact = byCode.get(code);
+    const product = exact;
     let status: UploadRow["status"], reason: string;
     if (!product) { status = "not_found"; reason = "Not found in the catalogue; this row was not added."; }
     else if (seen.has(product.itemCode)) { status = "duplicate"; reason = "Already in this list or repeated in this upload."; }
     else if (!isLiveBucketProduct(product)) { status = "inactive"; reason = "No longer active. You may explicitly retain this code."; }
-    else if (!exact) { status = "space_matched"; reason = `"${inputCode}" matched to "${product.itemCode}" after removing whitespace.`; }
     else { status = "matched"; reason = "Matched to the catalogue."; }
     counts[status]++;
     if (product) seen.add(product.itemCode);
-    if (product && (status === "matched" || status === "space_matched")) addable.add(product.itemCode);
+    if (product && status === "matched") addable.add(product.itemCode);
     return { row, inputCode, itemCode: product?.itemCode ?? null, status, productName: product?.productName ?? null, reason };
   });
   return { rows, counts, addableCodes: [...addable] };

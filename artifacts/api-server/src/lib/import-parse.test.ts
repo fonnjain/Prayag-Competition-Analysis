@@ -97,7 +97,7 @@ describe("parseSheet: code-column overlap detection", () => {
     expect(out.unpricedCodes).toEqual([]);
   });
 
-  it("normalizes whitespace and case so spaced/lowercase codes still match", () => {
+  it("does not turn spaced or lowercase source codes into another identity", () => {
     const known = codes("AB12");
     const map = prayag({ AB12: { net: 10, mrp: 12 } });
     const grid: unknown[][] = [
@@ -105,7 +105,7 @@ describe("parseSheet: code-column overlap detection", () => {
       [" ab 12 ", 9],
     ];
     const out = parseSheet(grid, known, map);
-    expect(out.rows.map((r) => r.itemCode)).toEqual(["AB12"]);
+    expect(out.rows.map((r) => r.itemCode)).toEqual([]);
   });
 });
 

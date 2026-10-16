@@ -41,7 +41,7 @@ describe("P045 Apollo master (pure, read-only)", () => {
     expect(parsed.reservations).toEqual([
       expect.objectContaining({
         code: "APUGD007",
-        owner: "v2|ugd pipe|U11B|110",
+      owner: "v2|ugd pipe|U-11B|110",
         sourceSheet: "UGD PIPE",
         sourceRow: 13,
       }),

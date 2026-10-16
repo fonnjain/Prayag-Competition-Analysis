@@ -9,6 +9,184 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Admin-only division mapping history
+ */
+export const ListDivisionMappingBatchesResponse = zod.object({
+  "batches": zod.array(zod.object({
+  "id": zod.number(),
+  "loadBatchId": zod.number().nullish(),
+  "fileName": zod.string(),
+  "status": zod.string()
+}))
+})
+
+
+export const PreviewDivisionMappingBody = zod.object({
+  "file": zod.instanceof(File),
+  "downloadedAt": zod.coerce.date()
+})
+
+export const PreviewDivisionMappingResponse = zod.object({
+  "id": zod.number().optional(),
+  "loadBatchId": zod.number().nullish(),
+  "status": zod.string().optional(),
+  "preview": zod.object({
+  "matched": zod.number(),
+  "unchanged": zod.number(),
+  "changes": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "basis": zod.string()
+})),
+  "groups": zod.array(zod.object({
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "count": zod.number()
+})),
+  "missing": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "division": zod.string().nullable()
+})),
+  "excluded": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "basis": zod.string(),
+  "present": zod.boolean(),
+  "action": zod.string()
+})),
+  "before": zod.record(zod.string(), zod.number()),
+  "after": zod.record(zod.string(), zod.number())
+}).optional(),
+  "result": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const GetDivisionMappingBatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDivisionMappingBatchResponse = zod.object({
+  "id": zod.number().optional(),
+  "loadBatchId": zod.number().nullish(),
+  "status": zod.string().optional(),
+  "preview": zod.object({
+  "matched": zod.number(),
+  "unchanged": zod.number(),
+  "changes": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "basis": zod.string()
+})),
+  "groups": zod.array(zod.object({
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "count": zod.number()
+})),
+  "missing": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "division": zod.string().nullable()
+})),
+  "excluded": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "basis": zod.string(),
+  "present": zod.boolean(),
+  "action": zod.string()
+})),
+  "before": zod.record(zod.string(), zod.number()),
+  "after": zod.record(zod.string(), zod.number())
+}).optional(),
+  "result": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const ApplyDivisionMappingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApplyDivisionMappingBody = zod.object({
+  "confirm": zod.boolean()
+})
+
+export const ApplyDivisionMappingResponse = zod.object({
+  "id": zod.number().optional(),
+  "loadBatchId": zod.number().nullish(),
+  "status": zod.string().optional(),
+  "preview": zod.object({
+  "matched": zod.number(),
+  "unchanged": zod.number(),
+  "changes": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "basis": zod.string()
+})),
+  "groups": zod.array(zod.object({
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "count": zod.number()
+})),
+  "missing": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "division": zod.string().nullable()
+})),
+  "excluded": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "basis": zod.string(),
+  "present": zod.boolean(),
+  "action": zod.string()
+})),
+  "before": zod.record(zod.string(), zod.number()),
+  "after": zod.record(zod.string(), zod.number())
+}).optional(),
+  "result": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+export const UndoDivisionMappingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UndoDivisionMappingBody = zod.object({
+  "confirm": zod.boolean()
+})
+
+export const UndoDivisionMappingResponse = zod.object({
+  "id": zod.number().optional(),
+  "loadBatchId": zod.number().nullish(),
+  "status": zod.string().optional(),
+  "preview": zod.object({
+  "matched": zod.number(),
+  "unchanged": zod.number(),
+  "changes": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "basis": zod.string()
+})),
+  "groups": zod.array(zod.object({
+  "from": zod.string().nullable(),
+  "to": zod.string(),
+  "count": zod.number()
+})),
+  "missing": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "division": zod.string().nullable()
+})),
+  "excluded": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "basis": zod.string(),
+  "present": zod.boolean(),
+  "action": zod.string()
+})),
+  "before": zod.record(zod.string(), zod.number()),
+  "after": zod.record(zod.string(), zod.number())
+}).optional(),
+  "result": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+/**
  * @summary Admin-only multi-brand workbook batch history
  */
 export const ListMultiWorkbookBatchesResponse = zod.object({

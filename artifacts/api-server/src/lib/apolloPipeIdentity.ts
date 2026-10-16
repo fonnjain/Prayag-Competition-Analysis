@@ -200,10 +200,7 @@ export const assertAPUGD007Owner = (
 export const normalizeApolloPipeIdentity = apolloPipeIdentity;
 
 function normalizeCode(value: string | null | undefined): string {
-  return String(value ?? "")
-    .normalize("NFKC")
-    .toLocaleUpperCase("en-US")
-    .replace(/[\s._-]+/gu, "");
+  return String(value ?? "");
 }
 
 /**

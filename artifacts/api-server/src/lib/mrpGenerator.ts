@@ -1046,7 +1046,7 @@ export const assignP011Bands = computeP011Bands;
 export const evaluateP011 = evaluateP011Scenario;
 
 export function canonicalItemCode(value: string): string {
-  return value.trim().toUpperCase().replace(/\s+/g, "").replace(/\.0$/, "");
+  return value;
 }
 
 export function matchesScope(product: GeneratorProduct, scope: GeneratorScope): boolean {

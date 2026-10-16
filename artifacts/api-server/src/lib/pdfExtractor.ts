@@ -142,7 +142,7 @@ function mergeReconciledReads(
 }
 
 function normCode(value: string): string {
-  return value.trim().toUpperCase().replace(/\s+/g, "");
+  return value;
 }
 
 function itemKey(item: { cat_no: string; variant: string | null }): string {

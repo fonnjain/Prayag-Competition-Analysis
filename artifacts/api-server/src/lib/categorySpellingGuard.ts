@@ -72,7 +72,7 @@ export function assertCategorySpellingPreview(expected: unknown, plan: ReturnTyp
 export function planNewProductCategories<T extends CategoryCatalogueRow & { seriesRange?: string | null }>(
   incoming: T[], stored: Array<CategoryCatalogueRow & { seriesRange?: string | null }>,
 ) {
-  const codeKey = (value: string | undefined) => (value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  const codeKey = (value: string | undefined) => value ?? "";
   const exact = new Map(stored.filter(row => row.itemCode).map(row => [row.itemCode, row]));
   const groups = new Map<string, typeof stored>();
   for (const row of stored.filter(row => row.itemCode)) {

@@ -32,7 +32,7 @@ const PAGE_SIZE = 500;
 const MAX_PAGES_PER_YEAR = 200;
 const MAX_SOURCE_RESTARTS = 2;
 const YEAR = /^(20\d{2})-(\d{2})$/;
-const normalise = (code: string) => code.trim().toUpperCase();
+const normalise = (code: string) => code;
 const obj = (value: unknown): Record<string, unknown> | null =>
   value != null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 

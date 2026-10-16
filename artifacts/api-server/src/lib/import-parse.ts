@@ -25,7 +25,7 @@ export function norm(s: unknown): string {
 }
 
 export function normCode(s: unknown): string {
-  return norm(s).toUpperCase().replace(/\s+/g, "");
+  return String(s ?? "");
 }
 
 export function detectBrand(headerText: string, filename: string): string {

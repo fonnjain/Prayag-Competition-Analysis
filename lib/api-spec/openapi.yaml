@@ -17,6 +17,78 @@ tags:
   - name: admin
     description: Workspace user management (admin only).
 paths:
+  /catalog/division-mapping:
+    get:
+      operationId: listDivisionMappingBatches
+      tags: [catalog]
+      summary: Admin-only division mapping history
+      responses:
+        "200":
+          description: Persistent batch history
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DivisionMappingHistory"}
+  /catalog/division-mapping/preview:
+    post:
+      operationId: previewDivisionMapping
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: "#/components/schemas/DivisionMappingUpload"}
+      responses:
+        "200":
+          description: Immutable administrator preview
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DivisionMappingEnvelope"}
+  /catalog/division-mapping/{id}:
+    get:
+      operationId: getDivisionMappingBatch
+      tags: [catalog]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}}
+      responses:
+        "200":
+          description: Persistent preview or applied batch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DivisionMappingEnvelope"}
+  /catalog/division-mapping/{id}/apply:
+    post:
+      operationId: applyDivisionMapping
+      tags: [catalog]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DivisionMappingConfirmation"}
+      responses:
+        "200":
+          description: Atomic division-only apply
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DivisionMappingEnvelope"}
+  /catalog/division-mapping/{id}/undo:
+    post:
+      operationId: undoDivisionMapping
+      tags: [catalog]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DivisionMappingConfirmation"}
+      responses:
+        "200":
+          description: Guarded division-only undo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DivisionMappingEnvelope"}
   /catalog/workbook-loads:
     get:
       operationId: listMultiWorkbookBatches
@@ -3220,6 +3292,88 @@ components:
         type: string
         format: date
   schemas:
+    DivisionMappingUpload:
+      type: object
+      required: [file, downloadedAt]
+      properties:
+        file: {type: string, format: binary}
+        downloadedAt: {type: string, format: date}
+    DivisionMappingConfirmation:
+      type: object
+      required: [confirm]
+      additionalProperties: false
+      properties:
+        confirm: {type: boolean}
+    DivisionMappingChange:
+      type: object
+      required: [itemCode, from, to, basis]
+      properties:
+        itemCode: {type: string}
+        from: {type: [string, "null"]}
+        to: {type: string}
+        basis: {type: string}
+    DivisionMappingPreview:
+      type: object
+      required: [matched, unchanged, changes, groups, missing, excluded, before, after]
+      properties:
+        matched: {type: integer}
+        unchanged: {type: integer}
+        changes:
+          type: array
+          items: {$ref: "#/components/schemas/DivisionMappingChange"}
+        groups:
+          type: array
+          items:
+            type: object
+            required: [from, to, count]
+            properties:
+              from: {type: [string, "null"]}
+              to: {type: string}
+              count: {type: integer}
+        missing:
+          type: array
+          items:
+            type: object
+            required: [itemCode, division]
+            properties:
+              itemCode: {type: string}
+              division: {type: [string, "null"]}
+        excluded:
+          type: array
+          items:
+            type: object
+            required: [itemCode, basis, present, action]
+            properties:
+              itemCode: {type: string}
+              basis: {type: string}
+              present: {type: boolean}
+              action: {type: string}
+        before: {type: object, additionalProperties: {type: integer}}
+        after: {type: object, additionalProperties: {type: integer}}
+    DivisionMappingEnvelope:
+      type: object
+      properties:
+        id: {type: integer}
+        loadBatchId: {type: [integer, "null"]}
+        status: {type: string}
+        preview: {$ref: "#/components/schemas/DivisionMappingPreview"}
+        result:
+          type: [object, "null"]
+          additionalProperties: true
+    DivisionMappingHistory:
+      type: object
+      required: [batches]
+      properties:
+        batches:
+          type: array
+          items:
+            type: object
+            required: [id, status, fileName]
+            properties:
+              id: {type: integer}
+              loadBatchId: {type: [integer, "null"]}
+              fileName: {type: string}
+              status: {type: string}
     BucketActiveSelection:
       type: object
       additionalProperties: true

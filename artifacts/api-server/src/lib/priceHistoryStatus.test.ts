@@ -46,7 +46,7 @@ describe("derivePriceHistoryStatuses", () => {
     expect(statuses.get(4)).toBe("Upcoming");
   });
 
-  it("uses Comparison-equivalent competitor grouping and highest-id same-day winners", () => {
+  it("keeps distinct exact codes on independent competitor timelines", () => {
     const rows = [
       { id: 1, effectiveDate: "2026-07-01", competitor: "Sparsh", matchedPrayagCode: " CCL 60 " },
       { id: 2, effectiveDate: "2026-07-01", competitor: "Sparsh", matchedPrayagCode: "CCL60" },
@@ -59,7 +59,7 @@ describe("derivePriceHistoryStatuses", () => {
       competitorRevisionGroupKey,
     );
 
-    expect(statuses.get(1)).toBe("Superseded");
+    expect(statuses.get(1)).toBe("Current");
     expect(statuses.get(2)).toBe("Current");
     expect(statuses.get(3)).toBe("Upcoming");
   });

@@ -870,11 +870,7 @@ async function getAnalysisPriceHistory(req: Request, res: Response) {
     db.execute<CompRow>(sql`
       SELECT id, competitor, price, unit, effective_date, matched_prayag_code
       FROM competitor_prices
-      WHERE regexp_replace(
-        regexp_replace(upper(trim(matched_prayag_code)), '[[:space:]]+', '', 'g'),
-        '[.]0$',
-        ''
-      ) = ${normCode(itemCode)}
+      WHERE matched_prayag_code = ${normCode(itemCode)}
         AND ${bucketCompetitorSql(sql`competitor`, sql`matched_prayag_code`)}
         AND price IS NOT NULL
         AND effective_date IS NOT NULL

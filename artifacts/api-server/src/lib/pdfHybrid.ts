@@ -9,7 +9,7 @@ export type HybridConflict = {
 };
 
 function keyCode(value: string): string {
-  return value.trim().toUpperCase().replace(/\s+/g, "");
+  return value;
 }
 
 export function princeItemsToExtracted(items: PrincePdfItem[]): ExtractedItem[] {

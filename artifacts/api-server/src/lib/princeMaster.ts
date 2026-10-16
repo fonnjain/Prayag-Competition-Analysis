@@ -6,7 +6,9 @@ export const PRINCE_EFFECTIVE_DATE = "2026-03-01";
 export const PRINCE_MASTER_SHA256 =
   "20a3c363e7d2b8fd3dab54563db8844ea738d492f95d4007da0f6ebb6ae5b89f";
 export const PRINCE_CONTENT_FINGERPRINT =
-  "2b5b79da680b5a9e386811ee3a845a461e91a58d5ea0943fd847609502beb7ff";
+  // Same reviewed source bytes and values; code tokens are now exact rather
+  // than punctuation/case folded. This does not authorize a new price source.
+  "3ee5eafcb688af052a21c972b5a36e98f0ab986ce53aa1babc3f63311c696da1";
 export const PRINCE_MASTER_ROW_COUNT = 950;
 const PRINCE_REQUIRED_SHEETS = new Set([
   "CPVC PIPE", "CPVC FITTINGS", "UPVC PIPE", "UPVC FITTINGS", "AGRI PIPE",
@@ -109,7 +111,7 @@ export function classifyPrinceDuplicateAnomalies(
 
 const clean = (value: unknown): string => String(value ?? "").trim();
 export const normalizePrinceCode = (value: unknown): string =>
-  clean(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  String(value ?? "");
 
 function numberCell(value: unknown): number | null {
   if (value == null || clean(value) === "" || clean(value) === "-") return null;
@@ -265,7 +267,7 @@ export function parsePrinceCompetitorMaster(
     ...rows.map((row) => ({ prayagCode: row.prayagCode, canonical: row.canonicalPrayagCode })),
     ...rejectedRows.map((row) => ({ prayagCode: row.prayagCode, canonical: canonicalCodes.get(normalizePrinceCode(row.prayagCode)) ?? null })),
   ];
-  const exactMatches = classified.filter((row) => row.canonical != null && clean(row.prayagCode).toUpperCase() === clean(row.canonical).toUpperCase()).length;
+  const exactMatches = classified.filter((row) => row.canonical != null && row.prayagCode === row.canonical).length;
   return {
     rows,
     catalogMatchedRows: rows.filter((row) => row.catalogMatched),

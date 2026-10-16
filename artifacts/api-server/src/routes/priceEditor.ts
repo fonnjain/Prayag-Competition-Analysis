@@ -59,7 +59,7 @@ router.get("/catalog/price-editor/category-spelling-check", requireAdmin, async 
 const iso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const today = () => new Date().toISOString().slice(0, 10);
 const actor = (req: Request) => priceEditorActor(req);
-const normalizeNewCode = (value: unknown) => String(value ?? "").toUpperCase().replace(/\s+/g, "").replace(/\.0$/, "");
+const normalizeNewCode = (value: unknown) => String(value ?? "");
 const SALES_KNOWN_DIVISIONS = [
   "Pipes & Fittings",
   "PTMT & Plastic Fittings",

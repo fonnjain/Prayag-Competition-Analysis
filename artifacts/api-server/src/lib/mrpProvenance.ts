@@ -34,6 +34,13 @@ export const HARDWARE_REPLACEMENT_SNAPSHOT = {
     "Verified Hardware slice from the authoritative Prayag-returned 01 Sep 2026 master; replaces the legacy March-only Hardware snapshot.",
 } as const;
 
+// Product classification is not an MRP source. Sink products still price from
+// the PTMT workbook; there is deliberately no Sink workbook or filename rule.
+export const PRODUCT_DIVISIONS = [
+  "Pipes & Fittings", "PTMT & Plastic Fittings", "CP Fittings / Faucets",
+  "Ceramic Sanitaryware", "Hardware", "CP (QUAA / FERN)", "Sink",
+] as const;
+
 export const OFFICIAL_MRP_SOURCES = [
   {
     division: "Pipes & Fittings",
@@ -74,6 +81,21 @@ export const OFFICIAL_MRP_SOURCES = [
     notes: null,
   },
 ] as const;
+
+export function sourceDivisionForProduct(division: string): string {
+  return division === "Sink" ? "PTMT & Plastic Fittings" : division;
+}
+
+const SOURCE_FILENAME_PATTERNS = [
+  /pipe|fitting/i, /ptmt/i, /\bcp\b|chrome/i, /sanitar/i, /hardware/i, /quaa|fern/i,
+];
+export const MRP_FILENAME_DIVISIONS = OFFICIAL_MRP_SOURCES.map((source, index) => ({
+  division: source.division, pattern: SOURCE_FILENAME_PATTERNS[index]!,
+})).sort((a, b) => Number(a.division === "Pipes & Fittings") - Number(b.division === "Pipes & Fittings"));
+
+export function assertSingleProductDivision(itemCode: string, division: string): void {
+  if (division.includes("|")) throw new Error(`Item ${itemCode}: multi-sheet division "${division}" is not a product division; resolve it in the mapping first.`);
+}
 
 const MANUAL_MRP_SOURCE = {
   division: "Manual MRP corrections",

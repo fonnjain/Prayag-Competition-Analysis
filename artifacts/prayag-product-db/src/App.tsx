@@ -19,6 +19,7 @@ import MrpRevisionsPage from "@/pages/mrp-revisions";
 import PriceEditorPage from "@/pages/price-editor";
 import MrpProvenanceBackfillPage from "@/pages/mrp-provenance-backfill";
 import NameChangesPage from "@/pages/name-changes";
+import DivisionMappingPage from "@/pages/division-mapping";
 import { useAuth, AuthProvider, PasswordChangeGate } from "@workspace/replit-auth-web";
 import { useEffect, useState } from "react";
 
@@ -129,6 +130,7 @@ function Router() {
       <Route path="/price-editor" component={PriceEditorPage} />
       <Route path="/mrp-provenance-backfill" component={MrpProvenanceBackfillPage} />
       <Route path="/name-changes" component={NameChangesPage} />
+      <Route path="/division-mapping" component={DivisionMappingPage} />
       <Route component={NotFound} />
     </Switch>
   );

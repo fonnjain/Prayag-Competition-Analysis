@@ -71,7 +71,7 @@ const numberValue = (v: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 const roundCurrency = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
-const normCode = (v: string) => clean(v).toUpperCase().replace(/\s+/g, "");
+const normCode = (v: string) => v;
 
 export function parsePrinceBboxWords(bbox: string): Map<number, PrincePdfWord[]> {
   const pages = new Map<number, PrincePdfWord[]>();

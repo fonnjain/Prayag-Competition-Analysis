@@ -14,11 +14,7 @@ export interface CompetitorRevisionIdentity {
 }
 
 function normalizeCode(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .replace(/\.0$/, "");
+  return String(value ?? "");
 }
 
 /**

@@ -263,7 +263,7 @@ function pick(row: Record<string, unknown>, ...names: string[]): unknown {
 }
 
 function canonicalCode(value: string): string {
-  return value.trim().toUpperCase().replace(/\s+/g, "").replace(/\.0$/, "");
+  return value;
 }
 
 function monthKey(value: string): string {

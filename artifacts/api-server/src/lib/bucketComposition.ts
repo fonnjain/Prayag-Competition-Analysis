@@ -16,7 +16,7 @@ export function composedQuoteAllowed(layers: BucketLayer[], brand: string, code:
   return layers.every(layer => competitorAllowed(layer.type, layer.clauses ?? [], brand, code));
 }
 function canonical(column: SQL) {
-  return sql`regexp_replace(upper(regexp_replace(trim(${column}), '\\s+', '', 'g')), '\\.0$', '')`;
+  return column;
 }
 export function composedProductSql(layers: BucketLayer[], column: SQL): SQL {
   return sql.join([sql`TRUE`, ...layers.map(layer => {

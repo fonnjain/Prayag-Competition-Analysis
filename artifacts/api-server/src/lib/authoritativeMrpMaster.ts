@@ -19,6 +19,7 @@ import {
   AUTHORITATIVE_MASTER_SOURCE,
   isIsoDate,
   sha256ForBuffer,
+  assertSingleProductDivision,
 } from "./mrpProvenance";
 
 export const AUTHORITATIVE_MASTER_SHA256 = AUTHORITATIVE_MASTER_BATCH.fileSha256;
@@ -187,7 +188,7 @@ function nullableText(value: unknown): string | null {
 }
 
 function authoritativeCode(value: unknown): string {
-  return text(value).toUpperCase().replace(/\.0$/, "");
+  return String(value ?? "");
 }
 
 function positiveNumber(value: unknown, label: string): number {
@@ -581,6 +582,9 @@ export async function loadAuthoritativeMaster(input: {
   const loadNotes = `${parsed.loadReason}${namePreservationNote}`;
 
   const load = async (tx: DatabaseTransaction) => {
+    // Refuse before provenance or price operations. Source-sheet provenance
+    // must be resolved to a single business division in the mapping first.
+    for (const row of parsed.productRows) assertSingleProductDivision(row.itemCode, row.division);
     await lockCategorySpellings(tx);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(917_901)`);
     // Serialize catalogue membership with concurrent product creation. Existing
@@ -688,7 +692,7 @@ export async function loadAuthoritativeMaster(input: {
     for (let index = 0; index < newProductRows.length; index += 500) {
       const values = newProductRows.slice(index, index + 500).map((row) => ({
         productName: preservedNamesByCode.get(row.itemCode) ?? row.productName,
-        division: row.division,
+        division: (assertSingleProductDivision(row.itemCode, row.division), row.division),
         ...newClassifications.get(authoritativeCode(row.itemCode))!,
         size: row.size,
         uom: "NOS",

@@ -3,6 +3,7 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
     "jsx": "preserve",
     "resolveJsonModule": true,

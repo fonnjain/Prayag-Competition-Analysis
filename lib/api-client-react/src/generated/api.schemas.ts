@@ -5,6 +5,85 @@
  * Prayag Polymers pricing-intelligence API (product catalog, MRP history, competition analysis)
  * OpenAPI spec version: 0.1.0
  */
+export interface DivisionMappingUpload {
+  file: Blob;
+  downloadedAt: string;
+}
+
+export interface DivisionMappingConfirmation {
+  confirm: boolean;
+}
+
+export interface DivisionMappingChange {
+  itemCode: string;
+  /** @nullable */
+  from: string | null;
+  to: string;
+  basis: string;
+}
+
+export type DivisionMappingPreviewGroupsItem = {
+  /** @nullable */
+  from: string | null;
+  to: string;
+  count: number;
+};
+
+export type DivisionMappingPreviewMissingItem = {
+  itemCode: string;
+  /** @nullable */
+  division: string | null;
+};
+
+export type DivisionMappingPreviewExcludedItem = {
+  itemCode: string;
+  basis: string;
+  present: boolean;
+  action: string;
+};
+
+export type DivisionMappingPreviewBefore = {[key: string]: number};
+
+export type DivisionMappingPreviewAfter = {[key: string]: number};
+
+export interface DivisionMappingPreview {
+  matched: number;
+  unchanged: number;
+  changes: DivisionMappingChange[];
+  groups: DivisionMappingPreviewGroupsItem[];
+  missing: DivisionMappingPreviewMissingItem[];
+  excluded: DivisionMappingPreviewExcludedItem[];
+  before: DivisionMappingPreviewBefore;
+  after: DivisionMappingPreviewAfter;
+}
+
+/**
+ * @nullable
+ */
+export type DivisionMappingEnvelopeResult = { [key: string]: unknown } | null;
+
+export interface DivisionMappingEnvelope {
+  id?: number;
+  /** @nullable */
+  loadBatchId?: number | null;
+  status?: string;
+  preview?: DivisionMappingPreview;
+  /** @nullable */
+  result?: DivisionMappingEnvelopeResult;
+}
+
+export type DivisionMappingHistoryBatchesItem = {
+  id: number;
+  /** @nullable */
+  loadBatchId?: number | null;
+  fileName: string;
+  status: string;
+};
+
+export interface DivisionMappingHistory {
+  batches: DivisionMappingHistoryBatchesItem[];
+}
+
 /**
  * Compatibility primary personal list; use banner for the full effective disclosure.
  * @nullable

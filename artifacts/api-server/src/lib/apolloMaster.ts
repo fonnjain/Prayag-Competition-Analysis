@@ -247,15 +247,15 @@ export function applyApolloPlan(state: ApolloPlanState, parsed: ApolloMasterPars
   let created = 0, updated = 0;
   const existingRows = state.rows.slice();
   for (const incoming of parsed.rows) {
-    const identity = incoming.codeSource === "supplier" ? incoming.competitorCode.toUpperCase() : apolloPipeIdentityV2(incoming.category, incoming.prayagCode, incoming.size);
+    const identity = incoming.codeSource === "supplier" ? incoming.competitorCode : apolloPipeIdentityV2(incoming.category, incoming.prayagCode, incoming.size);
     if (!identity) throw new Error(`Apollo row has no usable identity: ${incoming.sheet}:${incoming.sourceRow}`);
     // Prefer the source code when re-applying the same file.  Locally
     // assigned rows match by V2 category/code/size for revised Apollo files;
     // this prevents duplicate identities within one master from causing a
     // later identical application to rewrite the first matching row.
-    const found = existingRows.find(r => r.competitorCode.toUpperCase() === incoming.competitorCode.toUpperCase() && r.price === incoming.price)
-      ?? existingRows.find(r => r.competitorCode.toUpperCase() === incoming.competitorCode.toUpperCase())
-      ?? existingRows.find(r => (incoming.codeSource === "supplier" ? r.competitorCode.toUpperCase() : apolloPipeIdentityV2(r.category, r.prayagCode, r.size)) === identity);
+    const found = existingRows.find(r => r.competitorCode === incoming.competitorCode && r.price === incoming.price)
+      ?? existingRows.find(r => r.competitorCode === incoming.competitorCode)
+      ?? existingRows.find(r => (incoming.codeSource === "supplier" ? r.competitorCode : apolloPipeIdentityV2(r.category, r.prayagCode, r.size)) === identity);
     if (found) {
       const unchanged = (Object.keys(incoming) as Array<keyof ApolloMasterRow>).every(key => found[key] === incoming[key]);
       if (!unchanged) { Object.assign(found, incoming); updated++; }
@@ -279,6 +279,6 @@ export function assertApolloReservedAssignment(
   size: string | null | undefined,
   reservations: readonly ApolloCodeReservation[],
 ): void {
-  const reservation = reservations.find(r => r.code.toUpperCase() === code.toUpperCase());
+  const reservation = reservations.find(r => r.code === code);
   if (reservation) assertApolloReservationOwner(code, category, prayagCode, size, reservation);
 }

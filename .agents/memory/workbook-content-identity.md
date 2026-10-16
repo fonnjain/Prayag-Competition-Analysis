@@ -15,6 +15,17 @@ When one comparison master holds several competitors, dispatch parsing by the ex
 
 For multi-period previews, distinguish unique products from priced product-period pairs. Compare the requested total with the full period-aware load count, and stop on a discrepancy; never discard older periods to match a stated total.
 
+Code-token canonicalization must respect the standing exact-code identity rule;
+do not fold punctuation, whitespace or case into a workbook authorization token.
+
+**Why:** Changing identity semantics changes the content digest even for the
+same reviewed workbook bytes and unchanged price values. Treating that mismatch
+as a changed price source, or bypassing it with a normalized lookup, is unsafe.
+
+**How to apply:** Verify the exact previously reviewed source bytes before
+reissuing a content digest under an exact-code serialization. Keep the byte
+provenance unchanged; never rewrite historical batch identities or stored codes.
+
 **Why:** A Jindal workbook's stated total matched one period, but its three independently dated columns contained more priced pairs in total.
 
 An absent XLSX formula cache is not proof of an absent price. Use a cached numeric result when present, or explicitly compute only a verified formula from the selected brand's own source cells; otherwise refuse with a formula-specific reason. State when results were recomputed rather than cached.

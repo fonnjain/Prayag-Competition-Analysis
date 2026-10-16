@@ -40,6 +40,8 @@ import {
   isIsoDate,
   sha256ForBuffer,
   AUTHORITATIVE_MASTER_SOURCE,
+  PRODUCT_DIVISIONS,
+  MRP_FILENAME_DIVISIONS,
 } from "../lib/mrpProvenance";
 import {
   isAuthoritativeMasterBuffer,
@@ -458,8 +460,10 @@ export function pendingAuthoritativePreview(
     protectedNameConflicts: parsed.preservedNameDisagreements,
     rejectedRows: classification.rejectedRows,
     rejectedReasonSummary,
-    canApply: acceptedPrices.length > 0,
-    noChangeReason: acceptedPrices.length ? null : classification.rejectedRows[0]?.reason ?? "No valid rows would be written.",
+    canApply: acceptedPrices.length > 0 && !parsed.productRows.some(r => r.division.includes("|")),
+    noChangeReason: parsed.productRows.some(r => r.division.includes("|"))
+      ? `${parsed.productRows.filter(r => r.division.includes("|")).length} rows in this workbook carry a multi-sheet division value and will be rejected — resolve them in the mapping first.`
+      : acceptedPrices.length ? null : classification.rejectedRows[0]?.reason ?? "No valid rows would be written.",
   };
 }
 
@@ -1119,7 +1123,7 @@ export function anomalyReasons(
 ): string[] {
   const reasons: string[] = [];
   if (price < 1) reasons.push("MRP is below ₹1");
-  const guardedDivision = /ptmt|cp fittings|faucet|sanitaryware/i.test(division ?? "");
+  const guardedDivision = PRODUCT_DIVISIONS.filter(d => !["Pipes & Fittings", "Hardware"].includes(d)).some(d => d === division);
   if (price < 50 && guardedDivision) {
     reasons.push(`MRP is below ₹50 for ${division ?? "this guarded division"}`);
   }
@@ -1229,13 +1233,7 @@ export function parseWorkbookBuffer(
 // Infer a product division from the uploaded filename so that products get
 // classified automatically without needing a separate SQL update step.
 // ---------------------------------------------------------------------------
-const FILENAME_DIVISION_MAP: Array<{ pattern: RegExp; division: string }> = [
-  { pattern: /ptmt/i,                          division: "PTMT & Plastic Fittings" },
-  { pattern: /pipe|fitting/i,                  division: "Pipes & Fittings" },
-  { pattern: /\bcp\b|chrome/i,                 division: "CP Fittings / Faucets" },
-  { pattern: /sanitar/i,                       division: "Ceramic Sanitaryware" },
-  { pattern: /quaa|fern/i,                     division: "QUAA & FERN" },
-];
+const FILENAME_DIVISION_MAP = MRP_FILENAME_DIVISIONS;
 
 export function divisionFromFilename(filename: string): string | null {
   const base = filename.replace(/\.[^.]+$/, "").toLowerCase();
@@ -4160,18 +4158,18 @@ router.post(
             );
             const incomingReservations = new Map(
               parsedApollo.reservations.map((reservation) => [
-                reservation.code.toUpperCase(),
+                reservation.code,
                 reservation.owner,
               ]),
             );
             for (const row of parsedApollo.rows) {
               if (row.codeSource === "locally_assigned") {
                 const owner = apolloPipeIdentityV2(row.category, row.prayagCode, row.size);
-                if (owner) incomingReservations.set(row.competitorCode.toUpperCase(), owner);
+                if (owner) incomingReservations.set(row.competitorCode, owner);
               }
             }
             for (const stored of storedReservations) {
-              const incomingOwner = incomingReservations.get(stored.competitorCode.toUpperCase());
+              const incomingOwner = incomingReservations.get(stored.competitorCode);
               if (incomingOwner && incomingOwner !== stored.ownerIdentity) {
                 res.status(409).json({
                   error: `Apollo reserved code ${stored.competitorCode} belongs to ${stored.ownerIdentity}, not ${incomingOwner}`,
@@ -4319,7 +4317,7 @@ router.post(
                 eq(apolloReservationsTable.competitor, APOLLO_COMPETITOR),
               );
               for (const existing of lockedReservations) {
-                const incomingOwner = incomingReservations.get(existing.competitorCode.toUpperCase());
+                const incomingOwner = incomingReservations.get(existing.competitorCode);
                 if (incomingOwner && incomingOwner !== existing.ownerIdentity) {
                   throw Object.assign(
                     new Error(`Apollo reserved code ${existing.competitorCode} belongs to ${existing.ownerIdentity}, not ${incomingOwner}`),
@@ -4329,7 +4327,7 @@ router.post(
               }
               for (const reservation of parsedApollo.reservations) {
                 const existing = lockedReservations.find((row) =>
-                  row.competitorCode.toUpperCase() === reservation.code.toUpperCase());
+                  row.competitorCode === reservation.code);
                 if (existing && existing.ownerIdentity !== reservation.owner) {
                   throw Object.assign(
                     new Error(`Apollo reserved code ${reservation.code} belongs to ${existing.ownerIdentity}, not ${reservation.owner}`),

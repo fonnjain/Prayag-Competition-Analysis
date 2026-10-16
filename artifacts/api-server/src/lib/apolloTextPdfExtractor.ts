@@ -10,7 +10,7 @@ import type { ExtractedItem } from "./pdfExtractor.js";
 const CODE = /^[A-Z]{1,8}[A-Z0-9-]{4,}$/i;
 const SIZE = /^(?=.*\d)[\d¼½¾⅓⅔⅛⅜⅝⅞⁄/.'"’"×xX–-]+$/;
 
-const normCode = (value: string) => value.trim().toUpperCase().replace(/\s+/g, "");
+const normCode = (value: string) => value;
 
 function rowFor(words: PdfJsWord[], code: PdfJsWord): PdfJsWord[] {
   return words

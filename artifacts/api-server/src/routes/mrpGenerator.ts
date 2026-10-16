@@ -2212,8 +2212,7 @@ router.post("/mrp-generator/runs/:runId/handoff", requireAdmin, async (req, res)
         const latest = (await tx.execute<{ id: number; item_code: string; mrp: number | null; effective_date: string }>(sql`
           SELECT id, item_code, mrp, effective_date
           FROM mrp_price_history
-          WHERE regexp_replace(regexp_replace(upper(trim(item_code)), '\\s+', '', 'g'), '\\.0$', '') =
-            regexp_replace(regexp_replace(upper(trim(${item.itemCode})), '\\s+', '', 'g'), '\\.0$', '')
+          WHERE item_code = ${item.itemCode}
             AND variant = 'Standard'
             AND review_status = 'approved'
             AND mrp IS NOT NULL

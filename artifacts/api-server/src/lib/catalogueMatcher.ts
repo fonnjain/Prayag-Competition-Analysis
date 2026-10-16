@@ -58,11 +58,7 @@ export interface StagingRow {
 // ---------------------------------------------------------------------------
 
 export function normCode(v: unknown): string {
-  return String(v ?? "")
-    .toUpperCase()
-    .replace(/[\s\-_.]/g, "")
-    .replace(/\(.*?\)/g, "")
-    .trim();
+  return String(v ?? "");
 }
 
 const SIZE_TOKENS = /\b(\d+(?:\.\d+)?\s*(?:mm|mtr|m|inch|"|ft|ltr|l|pcs|pc)\b|\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?(?:\s*(?:mm|mtr|m|inch|")))/gi;

@@ -60,18 +60,19 @@ function matchOne(
 // ---------------------------------------------------------------------------
 
 describe("normCode", () => {
-  it("uppercases and strips spaces", () => {
-    expect(normCode("wmp 188")).toBe("WMP188");
+  it("preserves case and every space", () => {
+    expect(normCode("wmp 188")).toBe("wmp 188");
+    expect(normCode(" WMP188 ")).toBe(" WMP188 ");
   });
 
-  it("strips hyphens, dots, and underscores", () => {
-    expect(normCode("WMP-188")).toBe("WMP188");
-    expect(normCode("WMP.188")).toBe("WMP188");
-    expect(normCode("WMP_188")).toBe("WMP188");
+  it("preserves hyphens, dots, and underscores as distinct codes", () => {
+    expect(normCode("WMP-188")).toBe("WMP-188");
+    expect(normCode("WMP.188")).toBe("WMP.188");
+    expect(normCode("WMP_188")).toBe("WMP_188");
   });
 
-  it("strips parenthesised suffixes", () => {
-    expect(normCode("WMP-188(A)")).toBe("WMP188");
+  it("preserves parenthesised suffixes", () => {
+    expect(normCode("WMP-188(A)")).toBe("WMP-188(A)");
   });
 
   it("handles null / undefined gracefully", () => {
@@ -95,12 +96,12 @@ describe("exact code match", () => {
     expect(row.reviewReason).toBeNull();
   });
 
-  it("tolerates case and spacing differences in the code", () => {
+  it("does not infer identity from case and spacing differences", () => {
     const { row } = matchOne(
       { competitorCode: "wmp 188" },
       { cat_no: "WMP-188" },
     );
-    expect(row.status).toBe("ok");
+    expect(row.status).toBe("not_found");
   });
 
   it("keeps RPS-2285 as a direct Sink Mixer match", () => {

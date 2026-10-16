@@ -1,0 +1,116 @@
+# P062 · COMPETITION · CODE — addendum to P060, replaces P061
+
+**Date:** 16 October 2026
+**Data file:** `Division_Mapping_from_ERP_RateList_v3.xlsx` — **use this. Discard v1 and v2.**
+**Status:** P060's structure is unchanged and still correct. This withdraws a bad change made in P061.
+
+---
+
+## 0. The validation was right to stop, and the problem is bigger than the three rows it found
+
+P061 added 301 "punctuation / case variant matches" to raise coverage. **That was unsafe and is
+withdrawn in full.** The validation flagged three of them; there are at least thirteen provably
+broken, and the remainder cannot be verified from outside production.
+
+**Failure 1 — the one the validation caught.** `TTS - 01` was matched to ERP `TTS-01`. But `TTS-01`
+is itself a separate production product. The ERP row was claimed twice: once by the exact match, once
+by the variant. The check for this was never written.
+
+**Failure 2 — worse, and not yet reported.** Five ERP rows were each claimed by **two different
+production products**:
+
+| ERP row | Claimed by |
+|---|---|
+| `322-K` | `322 K` **and** `322K` |
+| `323-K` | `323 K` **and** `323K` |
+| `324-K` | `324 K` **and** `324K` |
+| `325-K` | `325 K` **and** `325K` |
+| `326-K` | `326 K` **and** `326K` |
+
+Same pattern in `FT-02M`/`FT-02 M`, `DB-52-3IN-N`/`DB-52-3 IN-N`, `7991F-N`/`7991 F-N`,
+`EP-GANESHA`/`EP-Ganesha`.
+
+The ambiguity test in P061 asked whether one production code matched *two ERP rows that disagree*. It
+should have asked two further questions: whether the ERP row was already claimed by an exact match,
+and whether two production codes claimed the same ERP row. Both go the other direction, and both were
+missed.
+
+**50 of the 301 involve production codes carrying internal spaces** — precisely the codes this project
+has already established are significant. The conclusion from P057 and P060 §0.2 stands and should
+never have been bent: **punctuation and whitespace are significant in these item codes. Exact match
+only, everywhere, always.**
+
+---
+
+## 1. What v3 contains
+
+| | |
+|---|---|
+| ERP codes | 10,576 |
+| Explicit composite additions (`501N`, `503N`, `701N`) | 3 |
+| Variant matches | **0** |
+| **Total** | **10,579** |
+| Overrides retained from P061 (FR-, MHC-, ball cocks) | 26 |
+
+The three composite additions stay, but their justification no longer rests on matching `501-N`.
+They rest on the CISTERN rule alone: 4xx codes go to Ceramic Sanitaryware, everything else to PTMT &
+Plastic Fittings, and these are not 4xx. Three explicit rows, no inference from code shape.
+
+`TTS - 01`, `TTS - 02`, `TTS - 03` are **not in v3**. They stay unmapped and keep their current
+PTMT & Plastic Fittings division, which is correct — they are Teflon Thread Seal, a different product
+from `TTS-01` TEFELON TAPE.
+
+---
+
+## 2. Expected results on re-run
+
+| Check | Expected |
+|---|---|
+| Production codes matched (exact only) | **5,128** |
+| Unmatched, retain current division | **2,063** |
+| Composite coverage | **57 / 57** |
+| Composite divisions remaining | **0** |
+| Distinct divisions | **7** |
+| Sink products in production | **235** |
+| Residual disagreements | **2** — `492-W`, `493-W` only |
+
+Coverage drops from 5,429 back to 5,128. **That is the correct trade.** The 2,063 unmatched products
+keep the division they already have, which is not wrong — merely unimproved. Mis-filing a product
+whose code the business deliberately distinguishes is a real error; leaving a correct division
+untouched is not.
+
+---
+
+## 3. A standing rule to apply from here on
+
+Add this to the project's working rules, not just this prompt:
+
+> **Item codes are matched exactly. Never by normalisation, never by stripping punctuation or
+> whitespace, never case-insensitively.** `TTS-01` ≠ `TTS - 01`. `322K` ≠ `322 K`.
+> `DB-02L` ≠ `DB-02 L`. This applies to mapping files, loaders, matchers and any future data work.
+> Where a normalised form is genuinely needed — fuzzy competitor matching — it is a ranking signal
+> only and must never decide that two stored codes are the same product.
+
+If any earlier prompt, file or instruction of mine conflicts with that, this rule wins.
+
+---
+
+## 4. What to do now
+
+1. Swap the data file for `Division_Mapping_from_ERP_RateList_v3.xlsx`.
+2. **Re-run P060 Part B.2** against live production. Compare against the table in §2.
+3. If it matches, **proceed to P060 Parts A, B.3 and C** as written. P061's stop rule is satisfied.
+4. If any figure differs materially, stop and report rather than adjusting the file.
+
+Unchanged from P060: no price read or written, no item code changed or merged, no normalisation added
+anywhere in the codebase, the 28 `EXCLUDE` rows reported and untouched, category untouched.
+
+---
+
+## Done criteria
+
+- [ ] v3 in use; v1 and v2 discarded
+- [ ] B.2 re-run matches §2; residual disagreements are exactly `492-W` and `493-W`
+- [ ] `TTS - 01/02/03` confirmed unchanged, still PTMT & Plastic Fittings
+- [ ] No punctuation-insensitive or case-insensitive code matching anywhere in the codebase
+- [ ] …then P060 Parts A, B.3 and C

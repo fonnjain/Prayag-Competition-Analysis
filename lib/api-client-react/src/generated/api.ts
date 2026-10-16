@@ -97,6 +97,10 @@ import type {
   DeleteCompetitorResult,
   DiscountSettings,
   DiscountSettingsUpdate,
+  DivisionMappingConfirmation,
+  DivisionMappingEnvelope,
+  DivisionMappingHistory,
+  DivisionMappingUpload,
   DuplicateMrpGeneratorScenarioBody,
   ErrorEnvelope,
   ErrorResponse,
@@ -245,6 +249,354 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getListDivisionMappingBatchesUrl = () => {
+
+
+
+
+  return `/api/catalog/division-mapping`
+}
+
+/**
+ * @summary Admin-only division mapping history
+ */
+export const listDivisionMappingBatches = async ( options?: RequestInit): Promise<DivisionMappingHistory> => {
+
+  return customFetch<DivisionMappingHistory>(getListDivisionMappingBatchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDivisionMappingBatchesQueryKey = () => {
+    return [
+    `/api/catalog/division-mapping`
+    ] as const;
+    }
+
+
+export const getListDivisionMappingBatchesQueryOptions = <TData = Awaited<ReturnType<typeof listDivisionMappingBatches>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDivisionMappingBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDivisionMappingBatchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDivisionMappingBatches>>> = ({ signal }) => listDivisionMappingBatches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDivisionMappingBatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDivisionMappingBatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listDivisionMappingBatches>>>
+export type ListDivisionMappingBatchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Admin-only division mapping history
+ */
+
+export function useListDivisionMappingBatches<TData = Awaited<ReturnType<typeof listDivisionMappingBatches>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDivisionMappingBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDivisionMappingBatchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewDivisionMappingUrl = () => {
+
+
+
+
+  return `/api/catalog/division-mapping/preview`
+}
+
+export const previewDivisionMapping = async (divisionMappingUpload: DivisionMappingUpload, options?: RequestInit): Promise<DivisionMappingEnvelope> => {
+    const formData = new FormData();
+formData.append(`file`, divisionMappingUpload.file);
+formData.append(`downloadedAt`, divisionMappingUpload.downloadedAt);
+
+  return customFetch<DivisionMappingEnvelope>(getPreviewDivisionMappingUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getPreviewDivisionMappingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewDivisionMapping>>, TError,{data: BodyType<DivisionMappingUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewDivisionMapping>>, TError,{data: BodyType<DivisionMappingUpload>}, TContext> => {
+
+const mutationKey = ['previewDivisionMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewDivisionMapping>>, {data: BodyType<DivisionMappingUpload>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewDivisionMapping(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewDivisionMappingMutationResult = NonNullable<Awaited<ReturnType<typeof previewDivisionMapping>>>
+    export type PreviewDivisionMappingMutationBody = BodyType<DivisionMappingUpload>
+    export type PreviewDivisionMappingMutationError = ErrorType<unknown>
+
+    export const usePreviewDivisionMapping = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewDivisionMapping>>, TError,{data: BodyType<DivisionMappingUpload>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewDivisionMapping>>,
+        TError,
+        {data: BodyType<DivisionMappingUpload>},
+        TContext
+      > => {
+      return useMutation(getPreviewDivisionMappingMutationOptions(options));
+    }
+
+export const getGetDivisionMappingBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/division-mapping/${id}`
+}
+
+export const getDivisionMappingBatch = async (id: number, options?: RequestInit): Promise<DivisionMappingEnvelope> => {
+
+  return customFetch<DivisionMappingEnvelope>(getGetDivisionMappingBatchUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDivisionMappingBatchQueryKey = (id: number,) => {
+    return [
+    `/api/catalog/division-mapping/${id}`
+    ] as const;
+    }
+
+
+export const getGetDivisionMappingBatchQueryOptions = <TData = Awaited<ReturnType<typeof getDivisionMappingBatch>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDivisionMappingBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDivisionMappingBatchQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDivisionMappingBatch>>> = ({ signal }) => getDivisionMappingBatch(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDivisionMappingBatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDivisionMappingBatchQueryResult = NonNullable<Awaited<ReturnType<typeof getDivisionMappingBatch>>>
+export type GetDivisionMappingBatchQueryError = ErrorType<unknown>
+
+
+
+export function useGetDivisionMappingBatch<TData = Awaited<ReturnType<typeof getDivisionMappingBatch>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDivisionMappingBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDivisionMappingBatchQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getApplyDivisionMappingUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/division-mapping/${id}/apply`
+}
+
+export const applyDivisionMapping = async (id: number,
+    divisionMappingConfirmation: DivisionMappingConfirmation, options?: RequestInit): Promise<DivisionMappingEnvelope> => {
+
+  return customFetch<DivisionMappingEnvelope>(getApplyDivisionMappingUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      divisionMappingConfirmation,)
+  }
+);}
+
+
+
+
+export const getApplyDivisionMappingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyDivisionMapping>>, TError,{id: number;data: BodyType<DivisionMappingConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyDivisionMapping>>, TError,{id: number;data: BodyType<DivisionMappingConfirmation>}, TContext> => {
+
+const mutationKey = ['applyDivisionMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyDivisionMapping>>, {id: number;data: BodyType<DivisionMappingConfirmation>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  applyDivisionMapping(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyDivisionMappingMutationResult = NonNullable<Awaited<ReturnType<typeof applyDivisionMapping>>>
+    export type ApplyDivisionMappingMutationBody = BodyType<DivisionMappingConfirmation>
+    export type ApplyDivisionMappingMutationError = ErrorType<unknown>
+
+    export const useApplyDivisionMapping = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyDivisionMapping>>, TError,{id: number;data: BodyType<DivisionMappingConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyDivisionMapping>>,
+        TError,
+        {id: number;data: BodyType<DivisionMappingConfirmation>},
+        TContext
+      > => {
+      return useMutation(getApplyDivisionMappingMutationOptions(options));
+    }
+
+export const getUndoDivisionMappingUrl = (id: number,) => {
+
+
+
+
+  return `/api/catalog/division-mapping/${id}/undo`
+}
+
+export const undoDivisionMapping = async (id: number,
+    divisionMappingConfirmation: DivisionMappingConfirmation, options?: RequestInit): Promise<DivisionMappingEnvelope> => {
+
+  return customFetch<DivisionMappingEnvelope>(getUndoDivisionMappingUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      divisionMappingConfirmation,)
+  }
+);}
+
+
+
+
+export const getUndoDivisionMappingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoDivisionMapping>>, TError,{id: number;data: BodyType<DivisionMappingConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof undoDivisionMapping>>, TError,{id: number;data: BodyType<DivisionMappingConfirmation>}, TContext> => {
+
+const mutationKey = ['undoDivisionMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof undoDivisionMapping>>, {id: number;data: BodyType<DivisionMappingConfirmation>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  undoDivisionMapping(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UndoDivisionMappingMutationResult = NonNullable<Awaited<ReturnType<typeof undoDivisionMapping>>>
+    export type UndoDivisionMappingMutationBody = BodyType<DivisionMappingConfirmation>
+    export type UndoDivisionMappingMutationError = ErrorType<unknown>
+
+    export const useUndoDivisionMapping = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoDivisionMapping>>, TError,{id: number;data: BodyType<DivisionMappingConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof undoDivisionMapping>>,
+        TError,
+        {id: number;data: BodyType<DivisionMappingConfirmation>},
+        TContext
+      > => {
+      return useMutation(getUndoDivisionMappingMutationOptions(options));
+    }
 
 export const getListMultiWorkbookBatchesUrl = () => {
 

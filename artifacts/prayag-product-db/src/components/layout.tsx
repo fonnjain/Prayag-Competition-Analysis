@@ -41,6 +41,7 @@ const navItems = [
   { href: "/price-editor", label: "Single Price Editor", icon: PencilLine, adminOnly: true },
   { href: "/mrp-provenance-backfill", label: "MRP Provenance Backfill", icon: Database, adminOnly: true },
   { href: "/name-changes", label: "Product Name Changes", icon: FileSpreadsheet, adminOnly: true },
+  { href: "/division-mapping", label: "Division Mapping", icon: FileSpreadsheet, adminOnly: true },
   { href: "/import-competitor", label: "Import Competitor", icon: FileUp },
   { href: "/data-health", label: "Data Health", icon: Database },
   { href: "/api-keys", label: "API Keys", icon: Key, adminOnly: true },

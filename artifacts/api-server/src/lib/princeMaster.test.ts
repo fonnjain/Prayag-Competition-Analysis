@@ -151,7 +151,7 @@ describe("trusted Prince workbook parser", () => {
     expect(confirmed.get("SIM103500|5712S")).toMatchObject({ status: "ok", confirmedByDecision: true });
     expect(confirmed.get("SIM103501|5111S")).toMatchObject({ status: "ok", confirmedByDecision: true });
     expect(confirmed.get("SIM103501|5112S")).toMatchObject({ status: "ok", confirmedByDecision: true });
-    expect(confirmed.get("SIM100150|A414")).toMatchObject({ status: "needs_review", confirmedByDecision: false });
+    expect(confirmed.get("SIM100150|A-414")).toMatchObject({ status: "needs_review", confirmedByDecision: false });
   });
 
   it("keys anomaly state by normalized pair, not repeated source row numbers across sheets", () => {

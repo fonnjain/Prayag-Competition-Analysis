@@ -42,6 +42,13 @@ A mobile-friendly internal multi-app hub for Prayag Polymers: a master product c
 
 ## Architecture decisions
 
+- Item codes are matched exactly, including case, punctuation and every space.
+  Never normalize, strip punctuation/whitespace, or case-fold codes to establish
+  identity in mapping files, loaders or matchers. `TTS-01` is not `TTS - 01`;
+  `322K` is not `322 K`; `DB-02L` is not `DB-02 L`. Fuzzy competitor ranking
+  may use a normalized signal, but that signal must never identify or merge two
+  stored products. This rule supersedes older normalization instructions.
+
 - Analysis basis: competitor prices are ex-GST; comparisons use ex-GST×1.18 vs Prayag MRP; comparability gate excludes null-price and unmatched rows; green = Prayag cheaper.
 - MRP history is append-only with a unique-index backstop; current price flagged via `is_current`.
 - diff% convention: positive = Prayag cheaper (good).

@@ -85,7 +85,7 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
   }
   const catalogue = await db.select({ itemCode: catalogProductsTable.itemCode }).from(catalogProductsTable);
   const codes = new Set(catalogue.map((x) => normCode(x.itemCode)));
-  const conflictCodes = new Set(parsed.conflicts.map((x) => x.competitorCode.toUpperCase()));
+  const conflictCodes = new Set(parsed.conflicts.map((x) => x.competitorCode));
   const before = await db.select().from(competitorPricesTable).where(eq(competitorPricesTable.competitor, APOLLO)).orderBy(competitorPricesTable.id);
   const periodBefore = before.filter(r => r.effectiveDate === effectiveDate);
   const canonical = new Map(catalogue.map(p => [normCode(p.itemCode), p.itemCode]));
@@ -105,7 +105,7 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
     const row = canonicalPrayag && sameIdentity?.matchedPrayagCode
       ? { ...sourceRow, prayagCode: sameIdentity.matchedPrayagCode }
       : canonicalPrayag ? { ...sourceRow, prayagCode: canonicalPrayag } : sourceRow;
-    const heldReason = conflictCodes.has(row.competitorCode.toUpperCase())
+    const heldReason = conflictCodes.has(row.competitorCode)
       ? "supplier price conflict requires review"
       : (!row.prayagCode || !codes.has(normCode(row.prayagCode)) ? "unmapped Prayag code" : null);
     const evidence = row.prayagCode ? getComparisonEvidence(APOLLO, row.competitorCode, row.prayagCode, effectiveDate) : null;
@@ -136,7 +136,7 @@ router.post("/catalog/apollo-load/preview", requireAdmin, upload.single("file"),
     effectiveDate,
   })));
   const oldByIdentity = new Map(periodBefore.map(r => [`${r.matchedPrayagCode ?? ""}|${r.codeSource}|${normCode(r.competitorCode)}`, r]));
-  const evidenceIssues = new Set(rows.filter(x => x.evidence && x.evidence.kind !== "not-verified").map(x => x.row.competitorCode.toUpperCase()));
+  const evidenceIssues = new Set(rows.filter(x => x.evidence && x.evidence.kind !== "not-verified").map(x => x.row.competitorCode));
   const counts = { total: parsed.rows.length, accepted: rows.filter(x => x.status === "ok").length, held: rows.filter(x => x.status !== "ok").length, local: rows.filter(x => x.status === "ok" && x.row.codeSource === "locally_assigned").length, supplier: rows.filter(x => x.status === "ok" && x.row.codeSource === "supplier").length, reviewIssues: evidenceIssues.size + (parsed.conflicts.length ? 1 : 0), notVerified: rows.filter(x => x.evidence?.kind === "not-verified").length,
     create: rows.filter(x => x.status === "ok" && !oldByIdentity.has(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)).length,
     update: rows.filter(x => x.status === "ok" && oldByIdentity.has(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`) && oldByIdentity.get(`${x.row.prayagCode ?? ""}|${x.row.codeSource}|${normCode(x.row.competitorCode)}`)!.price !== x.row.price).length,
