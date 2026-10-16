@@ -1727,3 +1727,45 @@ mtime_ms = 1792141856728
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/66aa1778-bbe5-4ab3-98c1-3ee44a090bc7/13574d85-fb24-492b-b44b-bdb720429d56"
 storage_version_token = "1792141883459765"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Vp6TMpriUIlsJdFykyWOT"
+uri = "file://generated-artifacts/p065/P065-production-restore-294-before-apply.xlsx"
+type = "table"
+title = "Production restore sheet — 294 products"
+description = "Read-only production export at 14:58:34 IST, 16 October 2026. Exact item_code, current_division and proposed_division. Production Apply has not run."
+logical_id = "751d0898-8676-4a1c-a92b-026028016b4c"
+content_hash = "sha256:4dca4333edcfd7b1ed5b2cf77c17677aa92d985aabc3b505301de8c227057042"
+size = 9948
+mtime_ms = 1792142965569
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/751d0898-8676-4a1c-a92b-026028016b4c/cc534c26-e0c8-49d3-acc5-08ec7f9ae2d0"
+storage_version_token = "1792143216916152"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "79gnvVqIELyS8HtleqKGC"
+uri = "file://generated-artifacts/p065/P065-guard-development-proof-and-production-readiness.md"
+type = "text"
+title = "P065 — verified development proof and production readiness"
+description = "Operation-scoped guard, 24 passing tests, real batch #1838 Apply/Undo, exact restoration proof, pushed commit and production preflight. Production awaits publication."
+logical_id = "e1df509d-a38f-41fa-b613-bc7ac87af2f6"
+content_hash = "sha256:412b85c7d07ecdc8dd51de26c8405afe3c88c55ac97b115105e60ca3a6404fd5"
+size = 10197
+mtime_ms = 1792143179672
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/e1df509d-a38f-41fa-b613-bc7ac87af2f6/ecae8ac3-16f1-4677-a671-80ca4dba4c55"
+storage_version_token = "1792143218267535"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "J8HHk1SlXRnf1cC3lOxuG"
+uri = "file://generated-artifacts/p065/P065-verification-evidence.zip"
+type = "unspecified"
+title = "P065 — complete verification evidence"
+description = "Real loader responses, before/Apply/Undo snapshots, provenance, price-table counters, production restore files and manifest. No credentials or session cookies."
+logical_id = "c30e2c09-cde3-49af-bca1-f71d7a851344"
+content_hash = "sha256:3105a244feccaaf53af3f64c3ea8e843fc3fb1df74442fb246de6af1eae7729d"
+size = 709470
+mtime_ms = 1792143206448
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c30e2c09-cde3-49af-bca1-f71d7a851344/8e77178a-9ec6-436a-b9b3-958254f9206d"
+storage_version_token = "1792143219692840"
+content_type = "application/octet-stream"
