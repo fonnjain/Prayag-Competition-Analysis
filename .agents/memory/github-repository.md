@@ -12,3 +12,12 @@ GitHub `main` can diverge from Replit’s local `main` even when the remote-only
 **Why:** A provenance commit was pushed independently to GitHub while Replit continued on a separate history. A history-only merge preserved both lines without changing the completed application tree.
 
 **How to apply:** When multiple GitHub remotes appear, select the remote pointing to `fonnjain/Prayag-Competition-Analysis`. If push is rejected as non-fast-forward, fetch, inspect the remote-only patch, merge normally, and confirm the resulting tree before pushing.
+
+Ordinary authorized staging and commits may require the command-local
+`DANGEROUSLY_ALLOW_GIT=1` prefix in this workspace.
+
+**Why:** The workspace Git protection can reject even `git add` while opening
+the index lock. This does not justify changing permissions or deleting locks.
+
+**How to apply:** Use the prefix only for the specific Git writes the user has
+authorized. Keep the normal no-force-push and history-preservation rules.

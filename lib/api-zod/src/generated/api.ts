@@ -55,9 +55,74 @@ export const PreviewDivisionMappingResponse = zod.object({
   "action": zod.string()
 })),
   "before": zod.record(zod.string(), zod.number()),
-  "after": zod.record(zod.string(), zod.number())
+  "after": zod.record(zod.string(), zod.number()),
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Full-table disclosure; absent only on legacy previews.'),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Projected full-table disclosure, never an acceptance guard.')
 }).optional(),
-  "result": zod.record(zod.string(), zod.unknown()).nullish()
+  "result": zod.object({
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional(),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional()
+}).nullish()
 })
 
 
@@ -94,9 +159,74 @@ export const GetDivisionMappingBatchResponse = zod.object({
   "action": zod.string()
 })),
   "before": zod.record(zod.string(), zod.number()),
-  "after": zod.record(zod.string(), zod.number())
+  "after": zod.record(zod.string(), zod.number()),
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Full-table disclosure; absent only on legacy previews.'),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Projected full-table disclosure, never an acceptance guard.')
 }).optional(),
-  "result": zod.record(zod.string(), zod.unknown()).nullish()
+  "result": zod.object({
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional(),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional()
+}).nullish()
 })
 
 
@@ -137,9 +267,74 @@ export const ApplyDivisionMappingResponse = zod.object({
   "action": zod.string()
 })),
   "before": zod.record(zod.string(), zod.number()),
-  "after": zod.record(zod.string(), zod.number())
+  "after": zod.record(zod.string(), zod.number()),
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Full-table disclosure; absent only on legacy previews.'),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Projected full-table disclosure, never an acceptance guard.')
 }).optional(),
-  "result": zod.record(zod.string(), zod.unknown()).nullish()
+  "result": zod.object({
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional(),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional()
+}).nullish()
 })
 
 
@@ -180,9 +375,74 @@ export const UndoDivisionMappingResponse = zod.object({
   "action": zod.string()
 })),
   "before": zod.record(zod.string(), zod.number()),
-  "after": zod.record(zod.string(), zod.number())
+  "after": zod.record(zod.string(), zod.number()),
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Full-table disclosure; absent only on legacy previews.'),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional().describe('Projected full-table disclosure, never an acceptance guard.')
 }).optional(),
-  "result": zod.record(zod.string(), zod.unknown()).nullish()
+  "result": zod.object({
+  "catalogueBefore": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional(),
+  "catalogueAfter": zod.object({
+  "counts": zod.record(zod.string(), zod.number()),
+  "distinctDivisions": zod.number(),
+  "outsideDivisionProducts": zod.number(),
+  "outsideDivisions": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+})),
+  "compositeProducts": zod.number(),
+  "composites": zod.array(zod.object({
+  "division": zod.string().nullable(),
+  "count": zod.number(),
+  "itemCodes": zod.array(zod.string())
+}))
+}).optional()
+}).nullish()
 })
 
 

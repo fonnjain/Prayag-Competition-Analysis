@@ -3312,6 +3312,23 @@ components:
         from: {type: [string, "null"]}
         to: {type: string}
         basis: {type: string}
+    DivisionCatalogueGroup:
+      type: object
+      required: [division, count, itemCodes]
+      properties:
+        division: {type: [string, "null"]}
+        count: {type: integer}
+        itemCodes: {type: array, items: {type: string}}
+    DivisionCatalogueState:
+      type: object
+      required: [counts, distinctDivisions, outsideDivisionProducts, outsideDivisions, compositeProducts, composites]
+      properties:
+        counts: {type: object, additionalProperties: {type: integer}}
+        distinctDivisions: {type: integer}
+        outsideDivisionProducts: {type: integer}
+        outsideDivisions: {type: array, items: {$ref: "#/components/schemas/DivisionCatalogueGroup"}}
+        compositeProducts: {type: integer}
+        composites: {type: array, items: {$ref: "#/components/schemas/DivisionCatalogueGroup"}}
     DivisionMappingPreview:
       type: object
       required: [matched, unchanged, changes, groups, missing, excluded, before, after]
@@ -3350,6 +3367,8 @@ components:
               action: {type: string}
         before: {type: object, additionalProperties: {type: integer}}
         after: {type: object, additionalProperties: {type: integer}}
+        catalogueBefore: {$ref: "#/components/schemas/DivisionCatalogueState", description: "Full-table disclosure; absent only on legacy previews."}
+        catalogueAfter: {$ref: "#/components/schemas/DivisionCatalogueState", description: "Projected full-table disclosure, never an acceptance guard."}
     DivisionMappingEnvelope:
       type: object
       properties:
@@ -3360,6 +3379,9 @@ components:
         result:
           type: [object, "null"]
           additionalProperties: true
+          properties:
+            catalogueBefore: {$ref: "#/components/schemas/DivisionCatalogueState"}
+            catalogueAfter: {$ref: "#/components/schemas/DivisionCatalogueState"}
     DivisionMappingHistory:
       type: object
       required: [batches]

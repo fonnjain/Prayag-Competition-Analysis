@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { divisionPreview, validateDivisionRows, parseDivisionMapping, type DivisionRow, type DivisionProduct } from "./divisionMapping";
+import { assertDivisionApplyChanges, divisionCatalogueState, divisionPreview, validateDivisionRows, parseDivisionMapping, type DivisionRow, type DivisionProduct } from "./divisionMapping";
 import { PRODUCT_DIVISIONS, OFFICIAL_MRP_SOURCES, assertSingleProductDivision, sourceDivisionForProduct, MRP_FILENAME_DIVISIONS } from "./mrpProvenance";
 import { normCode } from "./catalog";
 import { normCode as importCode } from "./import-parse";
@@ -25,11 +25,40 @@ describe("exact-code division remediation", () => {
     expect(() => validateDivisionRows([row("A"), row("A")])).toThrow("duplicate");
     expect(() => validateDivisionRows([{ ...row("A"), proposedDivision: "CP | PTMT" }])).toThrow("Invalid division");
   });
-  it("binds preview to names, category, exact code and division, not prices", () => {
+  it("retains metadata audit fingerprints and binds the source payload, not prices", () => {
     const a = divisionPreview([row("A")], [product("A")]);
     expect(a.catalogueFingerprint).not.toBe(divisionPreview([row("A")], [{ ...product("A"), category: "Changed" }]).catalogueFingerprint);
     expect(a.payloadFingerprint).not.toBe(divisionPreview([{ ...row("A"), basis: "Changed" }], [product("A")]).payloadFingerprint);
     expect(a).toMatchObject({ pricesRead: 0, pricesWritten: 0 });
+  });
+  it("reports unmatched invalid and composite divisions without changing them", () => {
+    const products = [product("A"), product("__fixture", "Test"), product("X", "CP | PTMT"), { ...product(" A"), division: null }];
+    const p = divisionPreview([row("A")], products);
+    expect(p.changes).toHaveLength(1);
+    expect(p.catalogueAfter.outsideDivisionProducts).toBe(3);
+    expect(p.catalogueAfter.composites).toEqual([{ division: "CP | PTMT", count: 1, itemCodes: ["X"] }]);
+    expect(p.catalogueAfter.outsideDivisions.find(g => g.division === null)?.itemCodes).toEqual([" A"]);
+    expect(products[1].division).toBe("Test");
+    expect(divisionCatalogueState([product("X")]).outsideDivisions).toEqual([]);
+    expect(() => assertDivisionApplyChanges(p.changes, p.changes)).not.toThrow();
+  });
+  it("checks every target, even when a global count of seven could hide a bad value", () => {
+    for (const to of ["PTMT", "CP | PTMT", "Sink ", "", "Test"]) {
+      const bad = [{ itemCode: "A", from: "Hardware", to }];
+      expect(() => assertDivisionApplyChanges(bad, bad)).toThrow("Invalid division write");
+    }
+  });
+  it("compares exact pairs and count without depending on unrelated metadata or ordering", () => {
+    const p = divisionPreview([row("A"), row("B")], [product("A"), product("B"), product("__fixture", "Test")]);
+    const fresh = divisionPreview([row("A"), row("B")], [product("A"), { ...product("B"), category: "Later category" }, product("__fixture", "Other legacy label")]);
+    expect(() => assertDivisionApplyChanges(p.changes, [...fresh.changes].reverse())).not.toThrow();
+    for (const changes of [
+      p.changes.slice(1), [...p.changes, { ...p.changes[0], itemCode: "C" }],
+      [{ ...p.changes[0], itemCode: " A" }, p.changes[1]],
+      [{ ...p.changes[0], from: null }, p.changes[1]],
+      [{ ...p.changes[0], to: "Hardware" }, p.changes[1]],
+      [p.changes[0], p.changes[0]],
+    ]) expect(() => assertDivisionApplyChanges(p.changes, changes)).toThrow();
   });
   it("separates seven product divisions from six MRP sources, including Hardware", () => {
     expect(PRODUCT_DIVISIONS).toHaveLength(7); expect(OFFICIAL_MRP_SOURCES).toHaveLength(6);

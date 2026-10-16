@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DivisionMappingEnvelope, DivisionMappingHistory } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { DivisionCatalogueDisclosure } from "../components/division-catalogue-disclosure";
 
 export default function DivisionMappingPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -76,7 +77,13 @@ export default function DivisionMappingPage() {
       <h2 className="text-lg font-semibold">Batch #{batch?.loadBatchId} · {batch?.status}</h2>
       <p>Matched: {preview.matched} · Already correct: {preview.unchanged} · Changes: {preview.changes.length} · Unmapped: {preview.missing.length} · EXCLUDE: {preview.excluded.length}</p>
       <div className="overflow-auto"><table className="w-full text-left text-sm"><thead><tr><th>From</th><th>To</th><th>Products</th></tr></thead><tbody>{preview.groups.map((g, i) => <tr key={i} className="border-t"><td className="p-2">{g.from}</td><td>{g.to}</td><td>{g.count}</td></tr>)}</tbody></table></div>
-      <details><summary>Before / projected after division counts</summary><pre className="overflow-auto p-3 text-xs">{JSON.stringify({ before: preview.before, after: preview.after }, null, 2)}</pre></details>
+      {preview.catalogueBefore && preview.catalogueAfter
+        ? <DivisionCatalogueDisclosure before={preview.catalogueBefore} after={preview.catalogueAfter} projected />
+        : <div className="rounded border p-3"><p>Legacy preview: create a new preview for exact-code catalogue warnings.</p><pre className="overflow-auto text-xs">{JSON.stringify({ before: preview.before, after: preview.after }, null, 2)}</pre></div>}
+      {batch?.result?.catalogueBefore && batch.result.catalogueAfter && <section className="space-y-3 rounded border p-4">
+        <h3 className="font-semibold">Actual {batch.status === "undone" ? "Undo" : "Apply"} report</h3>
+        <DivisionCatalogueDisclosure before={batch.result.catalogueBefore} after={batch.result.catalogueAfter} restored={batch.status === "undone"} />
+      </section>}
       <details><summary>All {preview.changes.length} changes and reasons</summary><ul className="max-h-80 space-y-3 overflow-auto p-3 text-sm">{preview.changes.map(c => <li key={c.itemCode}><b>{c.itemCode}</b>: {c.from} → {c.to}<p className="text-muted-foreground">{c.basis}</p></li>)}</ul></details>
       <details><summary>{preview.missing.length} unmapped products — keep current division</summary><ul className="max-h-64 overflow-auto p-3 text-sm">{preview.missing.map(p => <li key={p.itemCode}>{p.itemCode} · {p.division}</li>)}</ul></details>
       <details><summary>{preview.excluded.length} EXCLUDE rows — no action</summary><ul className="max-h-64 space-y-2 overflow-auto p-3 text-sm">{preview.excluded.map(p => <li key={p.itemCode}><b>{p.itemCode}</b> · {p.present ? "Present" : "Absent"} · {p.action}<p>{p.basis}</p></li>)}</ul></details>

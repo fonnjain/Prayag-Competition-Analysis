@@ -3,7 +3,7 @@ import multer from "multer";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, catalogProductsTable, bucketListsTable, mrpGeneratorScenariosTable, mrpSourcesTable, mrpLoadBatchesTable, mrpPendingBatchesTable } from "@workspace/db";
 import { requireAdmin } from "../middlewares/authMiddleware";
-import { digest, divisionPreview, parseDivisionMapping, validateDivisionRows, REVIEWED_DIVISION_SHA256, DIVISION_SOURCE_KEY, type DivisionRow } from "../lib/divisionMapping";
+import { digest, divisionPreview, divisionCatalogueState, assertDivisionApplyChanges, parseDivisionMapping, validateDivisionRows, REVIEWED_DIVISION_SHA256, DIVISION_SOURCE_KEY, type DivisionRow } from "../lib/divisionMapping";
 
 const router: IRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -99,7 +99,7 @@ for (const action of ["apply", "undo"] as const) router.post(`/catalog/division-
       if (digest(rows) !== preview.payloadFingerprint) throw new Error("Staged content fingerprint changed; refused.");
       if (action === "apply") {
         const fresh = divisionPreview(rows, products);
-        if (fresh.catalogueFingerprint !== preview.catalogueFingerprint) throw new Error("Catalogue changed since preview; re-preview required.");
+        assertDivisionApplyChanges(preview.changes, fresh.changes);
         await scopeGuard(tx, fresh);
       } else {
         const byCode = new Map(products.map(p => [p.itemCode, p.division]));
@@ -113,12 +113,19 @@ for (const action of ["apply", "undo"] as const) router.post(`/catalog/division-
         if (changed.length !== 1) throw new Error(`Concurrent change at exact code ${c.itemCode}; rolled back.`);
       }
       const after = await tx.select(fields).from(catalogProductsTable);
-      if (action === "apply" && (after.some(p => p.division?.includes("|")) || new Set(after.map(p => p.division)).size !== 7)) throw new Error("Apply must produce seven divisions and no composites; rolled back.");
+      // Undo intentionally restores captured originals, including composite strings.
+      // Apply may write only its exact reviewed targets, each a single valid division.
+      if (action === "apply") {
+        const byCode = new Map(after.map(p => [p.itemCode, p.division]));
+        if (preview.changes.some(c => !byCode.has(c.itemCode) || byCode.get(c.itemCode) !== c.to))
+          throw new Error("Applied target differs from the reviewed division; rolled back.");
+      }
       const counts = (rows: typeof products) => rows.reduce<Record<string, number>>((out, p) => {
         const key = p.division ?? "(blank)"; out[key] = (out[key] ?? 0) + 1; return out;
       }, {});
       const result = { changed: preview.changes.length, loadBatchId: load.id, status: action === "apply" ? "applied" : "undone", pricesRead: 0, pricesWritten: 0,
-        before: counts(products), after: counts(after) };
+        before: counts(products), after: counts(after),
+        catalogueBefore: divisionCatalogueState(products), catalogueAfter: divisionCatalogueState(after) };
       await tx.update(mrpPendingBatchesTable).set({ status: result.status, result: JSON.stringify(result),
         ...(action === "apply" ? { appliedAt: new Date(), appliedBy: req.user!.id } : { discardedAt: new Date(), discardedBy: req.user!.id }),
       }).where(eq(mrpPendingBatchesTable.id, id));

@@ -45,17 +45,32 @@ TTS code the same as an unspaced code must not override the known product-identi
 distinction or silently expand an approved reclassification scope.
 
 Before bulk production division remediation, prove the full Apply and Undo
-through the unchanged development administrator app, not an integration suite
+through the real development administrator app, not an integration suite
 or mocked browser responses. Do not add a canary mode. Push reviewed code to
 GitHub before production writes.
 
 **Why:** The user withdrew the partial production canary because the loader is
-deliberately all-or-nothing. Its zero-composite guard is correct; adding an
-unproven partial write path merely to test the existing path is not acceptable.
+deliberately all-or-nothing. Adding an unproven partial write path merely to test
+the existing path is not acceptable.
 
 **How to apply:** Record every affected development row and verify exact,
 row-by-row restoration, including composite strings, plus unchanged non-target
 metadata. Stop on any Undo discrepancy. Before production Apply, export an
 independent restore sheet with exact code, original division and proposed
 division for every target; keep it with the batch evidence. Preserve the
-blocking zero-composite rule unless the user separately approves a change.
+workbook composite-load rejection unchanged.
+
+Apply guards are operation-scoped: every written division must be one of the
+seven and non-composite; exact codes, original/target pairs and count must match
+the preview, with the same source fingerprint. Whole-catalogue division counts,
+out-of-vocabulary codes and remaining composites are disclosures, not blockers.
+
+**Why:** The user explicitly superseded the global seven-division acceptance
+guard after unrelated, unmapped development fixtures blocked real Undo proof.
+Those fixtures belong to other suites and must not be changed to obtain a pass.
+
+**How to apply:** Keep legacy rows untouched and disclose their exact codes and
+counts prominently before/after. Undo may restore recorded original composite
+strings. Before production Apply, stop if the production disclosure has any
+out-of-vocabulary divisions. Fixture ownership/cleanup is separate, later work;
+do not undertake it as part of remediation.

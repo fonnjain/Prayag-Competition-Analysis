@@ -7,6 +7,43 @@ export const DIVISION_SOURCE_KEY = "__catalogue_division_mapping__";
 export type DivisionRow = { itemCode: string; proposedDivision: string; confidence: string; basis: string; itemType: string };
 export type DivisionProduct = { itemCode: string; division: string | null; productName: string | null; category: string | null; seriesRange: string | null };
 export const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+type DivisionChange = { itemCode: string; from: string | null; to: string };
+
+/** The write set, not unrelated catalogue dirt, is Apply's blocking boundary. */
+export function assertDivisionApplyChanges(expected: DivisionChange[], actual: DivisionChange[]) {
+  for (const changes of [expected, actual]) {
+    const seen = new Set<string>();
+    for (const c of changes) {
+      if (seen.has(c.itemCode)) throw new Error(`Duplicate write target: ${c.itemCode}`);
+      seen.add(c.itemCode);
+      if (typeof c.to !== "string" || c.to.includes("|") || !(PRODUCT_DIVISIONS as readonly string[]).includes(c.to))
+        throw new Error(`Invalid division write for ${c.itemCode}: ${c.to}`);
+    }
+  }
+  const pairs = (changes: DivisionChange[]) => changes.map(c => [c.itemCode, c.from, c.to])
+    .sort((a, b) => a[0]! < b[0]! ? -1 : a[0]! > b[0]! ? 1 : 0);
+  if (digest(pairs(expected)) !== digest(pairs(actual)))
+    throw new Error("Division change set changed since preview; exact codes, from/to pairs and count must match. Re-preview required.");
+}
+
+/** Read-only catalogue disclosures: legacy values are reported, never repaired. */
+export function divisionCatalogueState(products: Pick<DivisionProduct, "itemCode" | "division">[]) {
+  const counts: Record<string, number> = Object.create(null);
+  const groups = new Map<string | null, string[]>();
+  for (const p of products) {
+    const key = p.division ?? "(blank)";
+    counts[key] = (counts[key] ?? 0) + 1;
+    const codes = groups.get(p.division) ?? [];
+    codes.push(p.itemCode); groups.set(p.division, codes);
+  }
+  const grouped = [...groups].map(([division, itemCodes]) => ({ division, count: itemCodes.length, itemCodes: itemCodes.sort() }))
+    .sort((a, b) => (a.division ?? "").localeCompare(b.division ?? ""));
+  const outsideDivisions = grouped.filter(g => !(PRODUCT_DIVISIONS as readonly (string | null)[]).includes(g.division));
+  const composites = grouped.filter(g => g.division?.includes("|"));
+  return { counts, distinctDivisions: groups.size, outsideDivisions,
+    outsideDivisionProducts: outsideDivisions.reduce((n, g) => n + g.count, 0),
+    compositeProducts: composites.reduce((n, g) => n + g.count, 0), composites };
+}
 
 export function parseDivisionMapping(buffer: Buffer): DivisionRow[] {
   if (createHash("sha256").update(buffer).digest("hex") !== REVIEWED_DIVISION_SHA256) throw new Error("Not the reviewed v3 workbook. v1, v2 and modified files are refused.");
@@ -56,6 +93,11 @@ export function divisionPreview(rows: DivisionRow[], products: DivisionProduct[]
     if (group) group.count++; else groups.push({ from: c.from, to: c.to, count: 1 });
   }
   return { matched, unchanged, changes, groups, missing, excluded, before, after,
+    catalogueBefore: divisionCatalogueState(products),
+    catalogueAfter: divisionCatalogueState(products.map(p => {
+      const row = byCode.get(p.itemCode);
+      return { itemCode: p.itemCode, division: row && row.confidence !== "EXCLUDE" ? row.proposedDivision : p.division };
+    })),
     catalogueFingerprint: digest([...products].sort((a, b) => a.itemCode < b.itemCode ? -1 : a.itemCode > b.itemCode ? 1 : 0)),
     payloadFingerprint: digest(rows), pricesRead: 0, pricesWritten: 0, productsCreated: 0 };
 }

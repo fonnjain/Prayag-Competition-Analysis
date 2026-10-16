@@ -22,6 +22,24 @@ export interface DivisionMappingChange {
   basis: string;
 }
 
+export interface DivisionCatalogueGroup {
+  /** @nullable */
+  division: string | null;
+  count: number;
+  itemCodes: string[];
+}
+
+export type DivisionCatalogueStateCounts = {[key: string]: number};
+
+export interface DivisionCatalogueState {
+  counts: DivisionCatalogueStateCounts;
+  distinctDivisions: number;
+  outsideDivisionProducts: number;
+  outsideDivisions: DivisionCatalogueGroup[];
+  compositeProducts: number;
+  composites: DivisionCatalogueGroup[];
+}
+
 export type DivisionMappingPreviewGroupsItem = {
   /** @nullable */
   from: string | null;
@@ -55,12 +73,20 @@ export interface DivisionMappingPreview {
   excluded: DivisionMappingPreviewExcludedItem[];
   before: DivisionMappingPreviewBefore;
   after: DivisionMappingPreviewAfter;
+  /** Full-table disclosure; absent only on legacy previews. */
+  catalogueBefore?: DivisionCatalogueState;
+  /** Projected full-table disclosure, never an acceptance guard. */
+  catalogueAfter?: DivisionCatalogueState;
 }
 
 /**
  * @nullable
  */
-export type DivisionMappingEnvelopeResult = { [key: string]: unknown } | null;
+export type DivisionMappingEnvelopeResult = {
+  catalogueBefore?: DivisionCatalogueState;
+  catalogueAfter?: DivisionCatalogueState;
+  [key: string]: unknown;
+ } | null;
 
 export interface DivisionMappingEnvelope {
   id?: number;

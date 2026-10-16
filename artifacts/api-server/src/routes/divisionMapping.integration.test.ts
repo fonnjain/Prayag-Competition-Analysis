@@ -79,9 +79,9 @@ describe("division loader, isolated app endpoints", () => {
     expect((await connection.query("SELECT division,category FROM catalog_products WHERE item_code='501N'")).rows[0]).toEqual({ division: "Ceramic Sanitaryware | PTMT & Plastic Fittings", category: "Keep category" });
     expect((await request.get("/catalog/division-mapping")).body.batches[0].status).toBe("undone");
   });
-  it("rejects stale catalogue and modified staged content without partial updates", async () => {
+  it("rejects changed from/to pairs and modified staged content without partial updates", async () => {
     const p = await preview();
-    await connection.query("UPDATE catalog_products SET category='Later category' WHERE item_code='501N'");
+    await connection.query("UPDATE catalog_products SET division='Hardware' WHERE item_code='501N'");
     expect((await action(p.body.id, "apply")).status).toBe(409);
     const q = await preview();
     await connection.query("UPDATE mrp_pending_batches SET payload=replace(payload,'CISTERN','TAMPERED') WHERE id=$1", [q.body.id]);
@@ -100,13 +100,45 @@ describe("division loader, isolated app endpoints", () => {
     const p = await preview(); expect(p.status).toBe(400); expect(p.body.error).toContain("Saved division scope");
     expect((await connection.query("SELECT count(*) FROM mrp_load_batches")).rows[0].count).toBe("0");
   });
-  it("rolls back every division and batch status if final assertions fail", async () => {
-    await connection.query("DELETE FROM catalog_products WHERE item_code='X-CERAMIC'");
+  it("allows unrelated legacy divisions and composites, reports their exact codes, and restores originals", async () => {
+    await connection.query("INSERT INTO catalog_products(item_code,division) VALUES ('__fixture','Test'), ('unmatched composite','CP | PTMT')");
     const p = await preview();
     expect(p.status).toBe(200);
-    expect((await action(p.body.id, "apply")).status).toBe(409);
+    expect(p.body.preview.catalogueAfter.outsideDivisionProducts).toBe(2);
+    await connection.query("UPDATE catalog_products SET category='Later unrelated category' WHERE item_code='X-CERAMIC'");
+    const applied = await action(p.body.id, "apply");
+    expect(applied.status, JSON.stringify(applied.body)).toBe(200);
+    expect(applied.body.result.catalogueAfter.outsideDivisions).toEqual(expect.arrayContaining([
+      { division: "Test", count: 1, itemCodes: ["__fixture"] },
+      { division: "CP | PTMT", count: 1, itemCodes: ["unmatched composite"] },
+    ]));
+    expect(applied.body.result.catalogueAfter.compositeProducts).toBe(1);
+    expect((await action(p.body.id, "undo")).status).toBe(200);
+    expect((await connection.query("SELECT division FROM catalog_products WHERE item_code='501N'")).rows[0].division).toBe("Ceramic Sanitaryware | PTMT & Plastic Fittings");
+    expect((await connection.query("SELECT division FROM catalog_products WHERE item_code='__fixture'")).rows[0].division).toBe("Test");
+    expect((await connection.query("SELECT category FROM catalog_products WHERE item_code='X-CERAMIC'")).rows[0].category).toBe("Later unrelated category");
+  });
+  it.each(["removed", "new", "already-correct", "renamed"])("rejects %s write-set drift atomically", async drift => {
+    const p = await preview();
+    if (drift === "removed") await connection.query("DELETE FROM catalog_products WHERE item_code='501N'");
+    if (drift === "new") await connection.query("INSERT INTO catalog_products(item_code,division) VALUES('503N','Hardware')");
+    if (drift === "already-correct") await connection.query("UPDATE catalog_products SET division='Sink' WHERE item_code='FT-02'");
+    if (drift === "renamed") await connection.query("UPDATE catalog_products SET item_code='501 N' WHERE item_code='501N'");
+    const r = await action(p.body.id, "apply");
+    expect(r.status).toBe(409); expect(r.body.error).toContain("change set changed");
     expect((await connection.query("SELECT division FROM catalog_products WHERE item_code='492-W'")).rows[0].division).toBe("PTMT & Plastic Fittings");
     expect((await connection.query("SELECT status FROM mrp_pending_batches WHERE id=$1", [p.body.id])).rows[0].status).toBe("pending");
+  });
+  it.each(["invalid-target", "changed-target", "file-fingerprint"])("refuses staged %s tampering", async kind => {
+    const p = await preview();
+    if (kind === "file-fingerprint") await connection.query("UPDATE mrp_pending_batches SET file_sha256=repeat('0',64) WHERE id=$1", [p.body.id]);
+    else {
+      const edited = p.body.preview;
+      edited.changes[0].to = kind === "invalid-target" ? "Test" : "Hardware";
+      await connection.query("UPDATE mrp_pending_batches SET preview=$1 WHERE id=$2", [JSON.stringify(edited), p.body.id]);
+    }
+    expect((await action(p.body.id, "apply")).status).toBe(409);
+    expect((await connection.query("SELECT division FROM catalog_products WHERE item_code='492-W'")).rows[0].division).toBe("PTMT & Plastic Fittings");
   });
   it("refuses a composite through the real authoritative loader before any SQL", async () => {
     const { loadAuthoritativeMaster } = await import("../lib/authoritativeMrpMaster.js");
