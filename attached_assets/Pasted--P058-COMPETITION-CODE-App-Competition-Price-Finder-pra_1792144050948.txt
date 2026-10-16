@@ -1,0 +1,389 @@
+# P058 · COMPETITION · CODE
+
+**App:** Competition / Price Finder (prayag-price.com) — monorepo `fonnjain/Prayag-Competition-Analysis`
+**Type:** CODE — this prompt adds a new page
+**Date:** 16 October 2026 (rev B — access decided: no sign-in gate, see §6)
+**Depends on:** **P057 Part B** (the `SearchableSelect` component) and **P057 Part C**
+(`GET /price-finder/competitors`). Do not start this until both are merged — this page is built on
+them, and building it first means building the same dropdown twice.
+
+---
+
+## 1. What we are building
+
+A **Price Calculator** page in the Price Finder app at route `/price-finder/calculator`.
+
+It answers one question a salesperson asks every day: *"At my discount and their discount, for this
+quantity, are we actually cheaper than them — and by how much?"*
+
+MRP-to-MRP comparison already exists. This is **net-to-net at a real order quantity**, built one
+product at a time, with a running total.
+
+### The shape of it
+
+The page is a list of **blocks**. One block = one of our products plus the competitors being compared
+against it.
+
+```
+┌─ 1 ──────────────────────────────────────────────────────────────────────────────────┐
+│  OUR PRODUCT                                                                          │
+│  [ 321 · P.V.C. Connection (Standard Series 1 Pc Packing) 12"/300mm      ▾ ]          │
+│  MRP ₹92.00  (from 01-09-2026)   Disc [ 20.0 ]%   Net ₹73.60   Qty [ 1 ]  Total ₹73.60│
+│                                                                                       │
+│  COMPETITOR                                                                           │
+│  [ Brand A ▾ ]  MRP ₹91.00 (from 01-07-2026)  Disc [ 18.0 ]%  Net ₹74.62              │
+│                 Qty 1 (same as ours)          Total ₹74.62     ▲ 1.4% above us        │
+│                                                                                       │
+│  [ + Add competitor ]                                                      [ Remove ] │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+
+[ + Add product ]                                                     [ Final Summary ]
+```
+
+- **`+ Add competitor`** adds another competitor row **inside the same block**, compared against the
+  same product.
+- **`+ Add product`** starts a **new block**.
+- **`Final Summary`** rolls every block up into one view.
+
+---
+
+## 2. Choosing the product
+
+Two routes into the same thing, both on the block header. The user picks whichever suits them.
+
+**Route A — direct.** One `SearchableSelect` over item code and product name. Typing `321` or
+`pvc connection` filters. This is the fast path and should be the default focus.
+
+**Route B — division → category → product.** Three cascading `SearchableSelect`s:
+
+1. **Division** — from `GET /price-finder/browse`.
+2. **Category** — **scoped to the chosen division** (the browse endpoint already does this correctly;
+   do not use `/analysis/filters`, which does not). Resets when division changes.
+3. **Product** — scoped to division + category. Resets when either changes.
+
+Both routes write to the same block state. Switching route does not clear an already-chosen product.
+
+**Variants.** If the chosen product has colour or price variants (the product endpoint returns
+`variants`), show a variant `SearchableSelect` next to the product. Default to Standard. A variant
+price is distinct price evidence — never silently use the standard price for a variant row, and never
+mix the two.
+
+---
+
+## 3. The row model and the arithmetic
+
+### Our row (one per block)
+
+| Column | Source / behaviour |
+|---|---|
+| Item code | from the selected product, read-only |
+| Product name | read-only, truncate with a tooltip |
+| MRP | current approved price for the chosen variant, as of the page's as-of date. Show the effective date beneath it, small and muted |
+| Discount % | editable. Seeded from `discount_settings` scope `"Our"` (see §6). `0`–`100`, up to 2 decimals |
+| Net | `round(MRP × (1 − disc/100), 2)` — read-only, computed |
+| Qty | editable. Integer ≥ 1. **Default 1** |
+| Total | `round(Net × Qty, 2)` — read-only |
+
+### Competitor rows (zero or more per block)
+
+| Column | Source / behaviour |
+|---|---|
+| Competitor | `SearchableSelect`, **scoped to this product** — see §4 |
+| MRP | that competitor's current price for this item code, with its own effective date beneath |
+| Discount % | editable. Seeded from `discount_settings` scope = the competitor's name |
+| Net | `round(MRP × (1 − disc/100), 2)` |
+| Qty | **mirrors our qty, read-only.** Tooltip: *"Quantity follows the Prayag row so the comparison stays like-for-like."* |
+| Total | `round(Net × Qty, 2)` |
+| Position | `compNet − ourNet` as ₹ and %, with direction |
+
+### Exact arithmetic — follow this, do not improvise
+
+```
+netUnit   = round(mrp * (1 - discountPct / 100), 2)      // round to paise at unit level
+rowTotal  = round(netUnit * qty, 2)
+
+diffUnit  = competitorNetUnit - ourNetUnit
+diffPct   = ourNetUnit === 0 ? null : (diffUnit / ourNetUnit) * 100
+diffTotal = competitorRowTotal - ourRowTotal
+```
+
+- Round at **unit** level first, then multiply by qty. That is what an invoice does; computing at full
+  precision and rounding once at the end gives a different number and the sales team will notice.
+- `diffPct` is relative to **our** net, matching the existing `priceChangePct` convention in
+  `artifacts/api-server/src/routes/priceFinder.ts`.
+- Display: `₹` with Indian digit grouping (`1,23,456.00`), two decimals, via
+  `Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })`.
+- **Position labels:** `diffUnit > 0.005` → *"X% above us"* (▲, amber); `diffUnit < -0.005` →
+  *"X% below us"* (▼, red — they are undercutting us); `|diffUnit| ≤ 0.005` → *"At par"* (grey).
+
+### Things that must never happen
+
+- **No invented prices.** A missing competitor price is never `0` and never blank-as-zero. The
+  competitor cannot be selected at all if there is no usable price (§4), so this should be
+  unreachable — if it happens anyway, show `No price` and exclude the row from every total.
+- **No silent basis mismatch.** If our price basis and the competitor's differ (per-piece vs per-pipe,
+  MRP vs net, different tax treatment), show an amber ⚠ badge on the competitor row reading
+  *"Different price basis — check before relying on this"*. Do not block it, do not hide it, and carry
+  the flag into the export.
+- **No competitor qty edit.** Mirrored, always.
+
+---
+
+## 4. The competitor dropdown
+
+Use `GET /price-finder/competitors?itemCode=<code>&asOf=<date>` from **P057 Part C**.
+
+- Only competitors with a **matched, non-null, currently-effective** price for *that item code* appear.
+- A competitor already chosen in this block is removed from the list (no duplicates within a block).
+- If the product has **no** competitor prices at all, replace `+ Add competitor` with the muted line
+  *"No competitor prices recorded for this product."* and let the block stand on its own — it still
+  contributes its value to the summary.
+- Show the competitor's current effective date in the option row so the user can see how fresh it is.
+
+---
+
+## 5. Buttons and flow
+
+| Control | Where | Behaviour |
+|---|---|---|
+| `+ Add competitor` | bottom of each block | Appends a competitor row to **that** block. Disabled with a tooltip when no un-chosen competitors remain |
+| `+ Add product` | bottom of the page | Appends a new empty block. Scrolls to it and focuses its product picker |
+| `Remove` | per row and per block | Removes that row/block. Removing the our-row removes the block |
+| `Final Summary` | bottom right, sticky | Opens the summary (§7). Disabled until at least one block has a product |
+| `As of` | page header | Date input, as on the existing comparison page. Re-resolves every price. Default today |
+| `Reset` | page header | Clears all blocks after a confirm dialog |
+| `Export Excel` | in the summary | §7 |
+
+**Limits.** Max **50 blocks** (matches the existing `/price-finder/comparison` cap) and max **10
+competitor rows per block**. On hitting either, disable the button with an explanatory tooltip.
+
+**Empty state.** On first load: one empty block, product picker focused, with a one-line explainer —
+*"Pick a product, set your discount and quantity, then add the competitors you want to price against."*
+
+---
+
+## 6. Default discounts
+
+Discount defaults come from the existing `discount_settings` table
+(`lib/db/src/schema/catalog.ts:336` — `scope` text, `discount_pct` double, unique on `scope`).
+
+Add **`GET /price-finder/discount-defaults`** returning `{ scope, discountPct }[]` for our scope plus
+every competitor scope. Do **not** reuse `/analysis/discount-settings` — that route sits behind the
+Analysis app's admin surface and seeds rows as a side effect.
+
+- Seed each new row's discount from this, then let the user override it freely. An override is
+  per-row and never written back to `discount_settings`.
+- If a scope has no stored default, seed `0` and show the field with a muted *"no default set"* hint.
+- Show a small line under the page header: *"Discounts pre-filled from saved settings. Edit any cell
+  to override — nothing here changes the saved settings."*
+
+### Access — DECIDED 16 Oct 2026: the calculator is open to everyone
+
+**`/price-finder/calculator` has no sign-in gate.** Any visitor can open it and use it in full —
+select products, enter discounts and quantities, add competitors, read the summary, export. This is
+a counter and field tool; blocking it behind a login defeats the point.
+
+The one thing that is **not** public is the *stored* discount defaults, because a trade-discount
+table is the company's margin structure:
+
+| Viewer | Calculator | Discount fields |
+|---|---|---|
+| Anonymous | Full access | Start at `0`, typed in by hand. `GET /price-finder/discount-defaults` is **not called** |
+| Signed in (admin / user / counter) | Full access | Pre-filled from `discount_settings`, then editable |
+
+This is not an access control on the calculator — nobody is turned away, and every feature works
+either way. A signed-in user simply gets the convenience of not retyping the standard discount, which
+mirrors how the rest of Price Finder already behaves (current price public, price history behind
+sign-in).
+
+`GET /price-finder/discount-defaults` stays authenticated-only and returns 401 to an anonymous
+caller. Do not add an anonymous fallback that returns zeros from that endpoint — just don't call it.
+
+Show the hint line under the header only when signed in:
+*"Discounts pre-filled from saved settings. Edit any cell to override — nothing here changes the
+saved settings."* Anonymous visitors get:
+*"Enter your discount and the competitor's to compare net prices."*
+
+---
+
+## 7. Final Summary
+
+Opens as a full-width panel below the blocks (not a modal — it must be printable and scrollable).
+
+### 7.1 Per-product table
+
+One row per block:
+
+| Item code | Product | Qty | Our net total | *Brand A* | *Brand B* | Best competitor | Gap vs best |
+|---|---|---|---|---|---|---|---|
+
+- One column per competitor **that appears in at least one block**.
+- A cell is `—` where that competitor was not selected for that product. `—` is **not zero** and must
+  be excluded from that column's total, not counted as nil.
+- *Best competitor* = the lowest competitor net total in that block. *Gap vs best* = our total minus
+  that, as ₹ and %, coloured by the §3 rules.
+
+### 7.2 Overall totals
+
+```
+Products compared          12
+Total quantity             340
+Our net value              ₹ 2,48,610.00
+
+Brand A      compared on  9 of 12 products   ₹ 1,92,440.00   vs our ₹ 1,88,900.00 on the same 9   ▲ 1.9% above us
+Brand B      compared on  4 of 12 products   ₹   62,180.00   vs our ₹   64,050.00 on the same 4   ▼ 2.9% below us
+```
+
+**The denominator discipline is the whole point of this section.** A competitor's total must only ever
+be compared against **our total over the same subset of products**. Never put a competitor's 9-product
+total next to our 12-product total. State the subset size on every line.
+
+### 7.3 Position counts
+
+Per competitor, over the products where it was selected:
+
+```
+Brand A      we are cheaper on 6   at par on 1   higher on 2
+```
+
+### 7.4 Disclosures — always shown, never suppressed
+
+- *"N products in this set have no competitor selected."* (omit when zero)
+- *"N products have no competitor price recorded at all."* (omit when zero)
+- *"Prices resolved as of DD-MM-YYYY."* — always
+- *"N rows have a different price basis from ours — see the ⚠ marks."* (omit when zero)
+- The active bucket-list / head-office scope line, in the same wording the comparison page already
+  uses (see §9)
+
+### 7.5 Export
+
+`Export Excel` produces one workbook with two sheets, following the pattern already in
+`priceFinder.ts` (`XLSX.utils.json_to_sheet` → `book_append_sheet` → buffer → `Content-Disposition`):
+
+- **Sheet `Calculator detail`** — one row per competitor row: item code, product name, division,
+  category, variant, as-of date, our MRP, our effective date, our discount %, our net, qty, our total,
+  competitor, competitor MRP, competitor effective date, competitor discount %, competitor net,
+  competitor total, difference ₹, difference %, position, price-basis flag.
+- **Sheet `Summary`** — §7.2 and §7.3, plus every disclosure line from §7.4 as text rows.
+
+Filename: `prayag-price-calculator-<asOf>.xlsx`.
+
+---
+
+## 8. State and routing
+
+- Add the route in `artifacts/prayag-price-finder/src/App.tsx` next to the existing
+  `<Route path="/comparison" …>`:
+  `<Route path="/calculator" component={CalculatorPage} />`
+- New page file: `artifacts/prayag-price-finder/src/pages/calculator.tsx`
+- New state module: `artifacts/prayag-price-finder/src/lib/calculatorState.ts`, with pure functions
+  for the arithmetic in §3 and **unit tests** alongside it
+  (`calculatorState.test.ts`) — follow the existing `selectionState.ts` / `selectionState.test.ts`
+  pattern in that folder.
+- Add `Calculator` to the Price Finder sidebar in
+  `artifacts/prayag-price-finder/src/components/layout.tsx`, under `Compare`.
+- Encode the set in the URL so a calculation can be shared — codes, discounts, quantities, competitors
+  and as-of date. Cap the encoded length; past the cap keep state in memory and show
+  *"Too large to share by link"* next to a disabled Copy-link button. Follow the existing conventions
+  in `artifacts/prayag-price-finder/src/lib/priceFinderRouteState.ts`.
+
+### One new batch endpoint
+
+To avoid N round trips, add **`GET /price-finder/calculator/rows?code=A&code=B&asOf=…`** returning, per
+code, in one response:
+
+```jsonc
+{
+  "asOfDate": "2026-10-16",
+  "rows": [{
+    "itemCode": "321",
+    "productName": "P.V.C. Connection (Standard Series 1 Pc Packing) 12\"/300mm",
+    "division": "PTMT & Plastic Fittings",
+    "category": "P.V.C. Connections",
+    "priceBasis": "MRP per piece",
+    "prayag": { "price": 92.0, "effectiveDate": "2026-09-01" },
+    "variants": [{ "variant": "Standard", "price": 92.0, "effectiveDate": "2026-09-01" }],
+    "competitors": [
+      { "competitor": "Brand A", "price": 91.0, "effectiveDate": "2026-07-01",
+        "priceBasis": "MRP per piece" }
+    ]
+  }]
+}
+```
+
+This is the existing `GET /price-finder/product/:itemCode` handler
+(`artifacts/api-server/src/routes/priceFinder.ts:806`) generalised to a list — **reuse its brands
+subquery at `:930-937` and its variant logic rather than writing new ones.** Cap at 50 codes and
+return 400 beyond that, consistent with `/price-finder/comparison`.
+
+---
+
+## 9. Rules this page must obey
+
+These are the app's existing commitments. The calculator does not get to opt out of them.
+
+1. **Current price means currently effective**, not the newest row uploaded. Reuse the existing
+   current-price resolution — do not write a new one, and do not read `is_current` as the source of
+   truth.
+2. **Respect bucket-list scope.** Head-office enforcement first, then the user's active Included
+   scope, then their Excluded scopes — exactly as the browse and comparison screens do. The product
+   picker, the competitor picker and the summary all sit inside that scope, and the active scope is
+   disclosed on the page and in the export.
+3. **The calculator is read-only.** It writes nothing: not prices, not discount settings, not
+   mappings, not bucket lists. It is a calculator, not an editor.
+4. **Coverage is disclosed, never papered over.** §7.4 lines are not optional.
+5. **No new competitor name may be typed in.** Competitors come from stored data only.
+
+---
+
+## 10. Acceptance tests
+
+Write these as real tests, not a manual checklist:
+
+1. Product with MRP ₹92.00, disc 20%, qty 1 → net ₹73.60, total ₹73.60. Qty 7 → total ₹515.20.
+2. **Unit-first rounding, the case that actually discriminates.** MRP ₹92.00, disc 33.33%, qty 7:
+   - `netUnit = round(92 × 0.6667, 2) = round(61.3364, 2) = 61.34`
+   - `rowTotal = round(61.34 × 7, 2) = 429.38`  ← **this is the expected value**
+   - computing in one step gives `round(92 × 0.6667 × 7, 2) = round(429.3548, 2) = 429.35`, which is
+     ₹0.03 out. Assert `429.38`, and add a comment saying why, so nobody "simplifies" it later.
+3. Competitor at ₹91.00, disc 18%, qty mirrors 7 → net ₹74.62, total ₹522.34, position *"1.4% above
+   us"* (`(74.62 − 73.60) / 73.60 = 1.386%`, against the test-1 our-row).
+4. Changing our qty to 3 changes the competitor row's qty to 3 without a second user action.
+5. A product with no competitor prices renders the muted no-competitors line and still contributes its
+   value to the overall total.
+6. Summary with Brand A on 9 of 12 products compares against our 9-product subtotal, and the
+   *"compared on 9 of 12"* text is present.
+7. A competitor is never offered for a product it has no current price for.
+8. Discount `-5`, `101`, and non-numeric input are all rejected at the field with a message; qty `0`
+   and `1.5` likewise.
+9. Export detail sheet row count equals the number of competitor rows across all blocks.
+10. Changing the as-of date re-resolves every price and every total.
+
+---
+
+## 11. Out of scope for P058
+
+Do not build these here, even if they seem natural:
+
+- Writing a calculation back as a bucket list or a saved quotation
+- Any PDF quotation output
+- Margin or cost-based calculation (cost data is external and is not in this app)
+- Changing MRP-to-MRP or Net-to-Net behaviour anywhere on the existing Analysis dashboard
+- Anything that writes to `discount_settings`
+
+---
+
+## Done criteria for P058
+
+- [ ] `/price-finder/calculator` reachable from the sidebar, gated per §6
+- [ ] Both product-selection routes working, with variants handled
+- [ ] Competitor dropdown scoped per product via P057's endpoint
+- [ ] Arithmetic matches §3 exactly, with the tests in §10 passing
+- [ ] `+ Add competitor`, `+ Add product`, `Final Summary` all behaving per §5
+- [ ] Summary denominators correct and disclosures present
+- [ ] Excel export with both sheets
+- [ ] `pnpm typecheck` and `pnpm test` clean
+- [ ] One clean commit
+
+**Report back with:** a screenshot of a three-block calculation with its summary open, and the list of
+files added or changed.
