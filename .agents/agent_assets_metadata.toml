@@ -1769,3 +1769,31 @@ mtime_ms = 1792143206448
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/c30e2c09-cde3-49af-bca1-f71d7a851344/8e77178a-9ec6-436a-b9b3-958254f9206d"
 storage_version_token = "1792143219692840"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "p_wYR4dIf3XNLnuTm_93b"
+uri = "file://generated-artifacts/p058/implementation-report.md"
+type = "text"
+title = "Implementation report and complete file list"
+description = "P057/P058 commits, verification results, three-product example, and all added/changed/deleted files."
+logical_id = "43b2d116-0f82-4664-8a6d-926e7b38b9fe"
+content_hash = "sha256:43cc7b0aba2c2ba5e7f4ccb226c82425786b44a3bfc2fb3e55a2329b547ccfa2"
+size = 9573
+mtime_ms = 1792147071268
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/43b2d116-0f82-4664-8a6d-926e7b38b9fe/4f03c83f-f44a-49fa-8659-31b8a61a2cd8"
+storage_version_token = "1792147073075998"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "Z4Mk4WMlVKilgVFBkLYtr"
+uri = "file://generated-artifacts/p058/calculator-three-products.xlsx"
+type = "table"
+title = "Verified three-product calculator export"
+description = "Actual downloaded workbook with Calculator detail and Summary sheets; three products total INR 6,714.76."
+logical_id = "5dc23c25-74b2-4845-8094-5668a02c4669"
+content_hash = "sha256:aa328d3dced4dcc5b1996d3cda3df8aea9803e6eaaa40d608963ce45723d3da2"
+size = 22998
+mtime_ms = 1792146257633
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/5dc23c25-74b2-4845-8094-5668a02c4669/e87df826-162e-4e10-bcc8-3cd84ff0871a"
+storage_version_token = "1792147074361076"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
