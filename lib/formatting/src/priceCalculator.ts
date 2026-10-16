@@ -18,13 +18,19 @@ export function compareCalculatorMetadata(ours: CalculatorMetadata, theirs: Calc
     ? `Price basis not confirmed: ours ${ours.basis?.trim() || "not recorded"}; competitor ${theirs.basis?.trim() || "not recorded"}.`
     : ourBasis !== theirBasis ? `Price basis differs: ours ${ours.basis!.trim()}; competitor ${theirs.basis!.trim()}.` : null;
   const ourUnit = unitKey(ours.unit), theirUnit = unitKey(theirs.unit);
-  const misplaced = (value: string) => knownBases.has(value) || value === "verify";
-  const unitWarning = misplaced(ourUnit) || misplaced(theirUnit)
-    ? `Unit data-shape problem: ${misplaced(ourUnit) ? `our unit field contains price basis "${ours.unit}"` : `competitor unit field contains price basis "${theirs.unit}"`}.`
-    : !ourUnit || !theirUnit
-      ? `Unit not recorded: ours ${ours.unit?.trim() || "not recorded"}; competitor ${theirs.unit?.trim() || "not recorded"}.`
-      : ourUnit !== theirUnit ? `Units not confirmed equivalent: ours ${ours.unit!.trim()}; competitor ${theirs.unit!.trim()}.` : null;
-  return { basisMismatch: basisWarning !== null, unitMismatch: unitWarning !== null, basisWarning, unitWarning };
+  const misplaced = (value: string) => /^(?:mrp|net|verify|ex[\s-]*gst|rate\s*\(\s*ex[\s-]*gst\s*\))$/.test(value);
+  const ourRecorded = !!ourUnit && !misplaced(ourUnit), theirRecorded = !!theirUnit && !misplaced(theirUnit);
+  // Missing/legacy basis-in-unit values are information, not a physical mismatch.
+  // Only two usable, recorded units can produce the amber "units differ" state.
+  const unitStatus: "same" | "not-recorded" | "differs" = !ourRecorded || !theirRecorded
+    ? "not-recorded" : ourUnit !== theirUnit ? "differs" : "same";
+  const unitNote = unitStatus === "not-recorded"
+    ? !ourRecorded && !theirRecorded ? "Our and competitor units not recorded."
+      : !theirRecorded ? "Competitor unit not recorded." : "Our unit not recorded." : null;
+  const unitWarning = unitStatus === "differs"
+    ? `Units differ: competitor ${theirs.unit}; ours ${ours.unit}.` : null;
+  return { basisMismatch: basisWarning !== null, unitMismatch: unitStatus === "differs",
+    unitNotRecorded: unitStatus === "not-recorded", unitStatus, basisWarning, unitWarning, unitNote };
 }
 export type CalculatorEvidence = {
   itemCode: string; productName: string | null; division: string | null; category: string | null;
@@ -33,7 +39,8 @@ export type CalculatorEvidence = {
   hasRecordedCompetitorPrice?: boolean;
   variants: (CalculatorPrice & { variant: string; basis?: string | null })[];
   competitors: (CalculatorPrice & { competitor: string; priceBasis: string; basis?: string | null; unit?: string | null;
-    basisMismatch: boolean; unitMismatch?: boolean; basisWarning?: string | null; unitWarning?: string | null })[];
+    basisMismatch: boolean; unitMismatch?: boolean; unitNotRecorded?: boolean; unitStatus?: "same" | "not-recorded" | "differs";
+    basisWarning?: string | null; unitWarning?: string | null; unitNote?: string | null })[];
 };
 export function discountError(value: string | number): string | null {
   const s = String(value);
@@ -89,18 +96,24 @@ export function resolveCalculator(blocks: CalculatorBlock[], evidence: Calculato
       const checks = product && quote && "basis" in product && "basis" in quote
         ? compareCalculatorMetadata({ basis: price && "basis" in price ? price.basis ?? null : product.basis ?? null, unit: product.unit ?? null },
           { basis: quote.basis ?? null, unit: quote.unit ?? null })
-        : { basisMismatch: !!quote?.basisMismatch, unitMismatch: !!quote?.unitMismatch,
+        : { basisMismatch: !!quote?.basisMismatch, unitMismatch: !!quote?.unitMismatch && !quote?.unitNotRecorded,
+          unitNotRecorded: !!quote?.unitNotRecorded,
           basisWarning: quote?.basisWarning ?? "Different price basis — check before relying on this",
-          unitWarning: quote?.unitWarning ?? "Unit not confirmed — check before relying on this" };
+          unitWarning: quote?.unitWarning ?? "Units differ — check the recorded units",
+          unitNote: quote?.unitNote ?? "Competitor unit not recorded." };
       const variantMismatch = !!quote && block.variant !== "Standard";
+      const variantWarning = variantMismatch ? `Competitor colour variant is not recorded; comparison with ${block.variant} is unconfirmed.` : null;
+      const notes = checks.unitNotRecorded ? [checks.unitNote!] : [];
       const warnings = [
         ...(checks.basisMismatch ? [checks.basisWarning!] : []),
         ...(checks.unitMismatch ? [checks.unitWarning!] : []),
-        ...(variantMismatch ? [`Competitor colour variant is not recorded; comparison with ${block.variant} is unconfirmed.`] : []),
+        ...(variantWarning ? [variantWarning] : []),
       ];
       return { ...c, quote, ...row, position: calculatorPosition(our.netUnit, row.netUnit),
         diffTotal: our.total == null || row.total == null ? null : Math.round((row.total - our.total) * 100) / 100,
-        basisMismatch: checks.basisMismatch, unitMismatch: checks.unitMismatch, variantMismatch, warnings };
+        basisMismatch: checks.basisMismatch, unitMismatch: checks.unitMismatch, unitNotRecorded: checks.unitNotRecorded,
+        basisWarning: checks.basisWarning, unitWarning: checks.unitWarning, variantWarning,
+        variantMismatch, warnings, notes };
     });
     return { block, product, price, our, ourPriceBasis, competitors };
   });
@@ -128,6 +141,7 @@ export function summarizeCalculator(rows: ResolvedCalculator) {
     unavailableProducts: rows.length - available.length,
     basisMismatchRows: available.reduce((n, r) => n + r.competitors.filter(c => c.basisMismatch).length, 0),
     unitMismatchRows: available.reduce((n, r) => n + r.competitors.filter(c => c.unitMismatch).length, 0),
+    unitNotRecordedRows: available.reduce((n, r) => n + r.competitors.filter(c => c.unitNotRecorded).length, 0),
     variantMismatchRows: available.reduce((n, r) => n + r.competitors.filter(c => c.variantMismatch).length, 0),
     brands: brands.map(brand => {
       const pairs = available.flatMap(r => {
@@ -152,7 +166,8 @@ export function calculatorDisclosures(summary: ReturnType<typeof summarizeCalcul
     ...(summary.noCompetitorRecorded ? [`${summary.noCompetitorRecorded} products have no competitor price recorded at all.`] : []),
     `Prices resolved as of ${date}.`,
     ...(summary.basisMismatchRows ? [`${summary.basisMismatchRows} rows have a different or unconfirmed price basis — see the warning marks.`] : []),
-    ...(summary.unitMismatchRows ? [`${summary.unitMismatchRows} rows have missing, malformed or unconfirmed unit evidence — see the warning marks.`] : []),
+    ...(summary.unitMismatchRows ? [`${summary.unitMismatchRows} rows have different recorded units — see the units shown on each row.`] : []),
+    ...(summary.unitNotRecordedRows ? [`${summary.unitNotRecordedRows} rows: unit not recorded (information only).`] : []),
     ...(summary.variantMismatchRows ? [`${summary.variantMismatchRows} rows compare a colour variant without confirmed competitor variant evidence.`] : []),
     ...(summary.noOurPrice ? [`${summary.noOurPrice} products have no usable Prayag price and are excluded from value comparisons.`] : []),
     ...(summary.unavailableProducts ? [`${summary.unavailableProducts} products are unavailable under the current date or scope.`] : []),

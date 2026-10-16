@@ -3349,6 +3349,15 @@ export type PriceFinderCalculatorResponseRowsItemVariantsItem = CalculatorPrice 
   basis?: string | null;
 });
 
+export type PriceFinderCalculatorResponseRowsItemCompetitorsItemUnitStatus = typeof PriceFinderCalculatorResponseRowsItemCompetitorsItemUnitStatus[keyof typeof PriceFinderCalculatorResponseRowsItemCompetitorsItemUnitStatus];
+
+
+export const PriceFinderCalculatorResponseRowsItemCompetitorsItemUnitStatus = {
+  same: 'same',
+  'not-recorded': 'not-recorded',
+  differs: 'differs',
+} as const;
+
 export type PriceFinderCalculatorResponseRowsItemCompetitorsItem = CalculatorPrice & ({
   competitor: string;
   priceBasis: string;
@@ -3358,10 +3367,14 @@ export type PriceFinderCalculatorResponseRowsItemCompetitorsItem = CalculatorPri
   /** @nullable */
   unit?: string | null;
   unitMismatch?: boolean;
+  unitNotRecorded?: boolean;
+  unitStatus?: PriceFinderCalculatorResponseRowsItemCompetitorsItemUnitStatus;
   /** @nullable */
   basisWarning?: string | null;
   /** @nullable */
   unitWarning?: string | null;
+  /** @nullable */
+  unitNote?: string | null;
 });
 
 export type PriceFinderCalculatorResponseRowsItem = {

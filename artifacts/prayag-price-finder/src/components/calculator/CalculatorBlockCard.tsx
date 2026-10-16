@@ -226,9 +226,19 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
                       options={options}
                       onChange={(next) => next && props.onCompetitorBrand(c.id, next)}
                     />
+                    {!!r?.notes.length && (
+                      <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground" data-testid={`note-unit-${c.id}`}>
+                        <Info className="h-3 w-3 shrink-0" /> {r.notes.join(" ")}
+                      </span>
+                    )}
                     {!!r?.warnings.length && (
                       <span className="mt-1.5 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" data-testid={`badge-basis-${c.id}`}>
-                        <AlertTriangle className="h-3 w-3 shrink-0" /> {r.warnings.join(" ")}
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span className="whitespace-pre-wrap">{[
+                          ...(r.basisMismatch ? [r.basisWarning] : []),
+                          ...(r.unitMismatch ? [`Unit: ${r.quote?.unit}`] : []),
+                          ...(r.variantMismatch ? [r.variantWarning] : []),
+                        ].join(" ")}</span>
                       </span>
                     )}
                   </Cell>

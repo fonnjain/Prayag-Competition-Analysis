@@ -5940,8 +5940,11 @@ components:
                         basis: {type: [string, "null"]}
                         unit: {type: [string, "null"]}
                         unitMismatch: {type: boolean}
+                        unitNotRecorded: {type: boolean}
+                        unitStatus: {type: string, enum: [same, not-recorded, differs]}
                         basisWarning: {type: [string, "null"]}
                         unitWarning: {type: [string, "null"]}
+                        unitNote: {type: [string, "null"]}
     CalculatorPrice:
       type: object
       required: [price, effectiveDate]

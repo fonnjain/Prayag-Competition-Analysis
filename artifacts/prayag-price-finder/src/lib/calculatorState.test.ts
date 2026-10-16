@@ -31,20 +31,42 @@ test("basis and unit are independent fields; display strings never determine equ
   const net = compareCalculatorMetadata({ basis: "Net", unit: "PCS" }, { basis: "Net", unit: "each" });
   assert.equal(net.basisMismatch, false); assert.equal(net.unitMismatch, false);
 });
-test("a basis token misplaced in a unit field is a unit data-shape warning, not a basis mismatch", () => {
+test("a basis token in a unit field is neutral not-recorded information, not a mismatch", () => {
   const check = compareCalculatorMetadata({ basis: "MRP", unit: "NOS" }, { basis: "MRP", unit: "MRP" });
-  assert.equal(check.basisMismatch, false); assert.equal(check.unitMismatch, true);
-  assert.match(check.unitWarning!, /competitor unit field contains price basis "MRP"/);
+  assert.equal(check.basisMismatch, false); assert.equal(check.unitMismatch, false);
+  assert.equal(check.unitNotRecorded, true); assert.equal(check.unitNote, "Competitor unit not recorded.");
+  assert.equal(check.unitWarning, null);
   const bothMalformed = compareCalculatorMetadata({ basis: "MRP", unit: "MRP" }, { basis: "MRP", unit: "MRP" });
-  assert.equal(bothMalformed.unitMismatch, true);
+  assert.equal(bothMalformed.unitMismatch, false); assert.equal(bothMalformed.unitNotRecorded, true);
 });
-test("missing units and generic NOS versus a specified pipe length remain unconfirmed", () => {
-  for (const unit of [null, "", "per 3-m pipe", "per 6-m pipe"]) {
+test("missing or basis-token units are neutral; recorded pipe lengths versus NOS are amber", () => {
+  for (const unit of [null, "", "MRP", "Rate (ex-GST)", "Verify"]) {
+    const check = compareCalculatorMetadata({ basis: "MRP", unit: "NOS" }, { basis: "MRP", unit });
+    assert.equal(check.basisMismatch, false); assert.equal(check.unitMismatch, false);
+    assert.equal(check.unitStatus, "not-recorded"); assert.equal(check.unitNotRecorded, true);
+  }
+  for (const unit of ["per 3-m pipe", "per 6-m pipe", " per 3 m "]) {
     const check = compareCalculatorMetadata({ basis: "MRP", unit: "NOS" }, { basis: "MRP", unit });
     assert.equal(check.basisMismatch, false); assert.equal(check.unitMismatch, true);
+    assert.equal(check.unitStatus, "differs"); assert.equal(check.unitNotRecorded, false);
+    assert.ok(check.unitWarning!.includes(unit));
   }
   const noBasis = compareCalculatorMetadata({ basis: "Verify", unit: "NOS" }, { basis: "Verify", unit: "each" });
   assert.equal(noBasis.basisMismatch, true); assert.equal(noBasis.unitMismatch, false);
+});
+test("unit notes do not inflate amber counts or warnings; differing units remain verbatim", () => {
+  const ev = evidence("A"); ev.basis = "MRP"; ev.unit = "NOS";
+  Object.assign(ev.competitors[0], { basis: "MRP", unit: "MRP" });
+  const rows = resolveCalculator([block("a", "A")], [ev]), s = summarizeCalculator(rows);
+  assert.equal(s.unitNotRecordedRows, 1); assert.equal(s.unitMismatchRows, 0);
+  assert.deepEqual(rows[0].competitors[0].warnings, []);
+  assert.deepEqual(rows[0].competitors[0].notes, ["Competitor unit not recorded."]);
+  assert.ok(calculatorDisclosures(s, "2026-10-16", []).some(d => d.includes("information only")));
+  ev.competitors[0].unit = "per 3 m";
+  const differing = resolveCalculator([block("a", "A")], [ev]);
+  assert.equal(summarizeCalculator(differing).unitMismatchRows, 1);
+  assert.equal(differing[0].competitors[0].quote!.unit, "per 3 m");
+  assert.deepEqual(differing[0].competitors[0].notes, []);
 });
 test("variant evidence warnings remain separate from price-basis and unit checks", () => {
   const ev = evidence("A"); ev.basis = "MRP"; ev.unit = "NOS";

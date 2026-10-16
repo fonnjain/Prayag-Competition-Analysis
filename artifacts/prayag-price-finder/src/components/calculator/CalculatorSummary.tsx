@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { AlertTriangle, Download, FileText, Loader2, Printer } from "lucide-react";
+import { AlertTriangle, Info, Download, FileText, Loader2, Printer } from "lucide-react";
 import { formatMoney, formatCount } from "@workspace/formatting";
 import { Button } from "@/components/ui/button";
 import { calculatorPosition, type ResolvedCalculator, type summarizeCalculator } from "@/lib/calculatorState";
@@ -83,10 +83,12 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
                         <td key={b} className="px-2.5 py-2 text-right font-mono tabular-nums">
                           {c ? (
                             <span className="inline-flex items-center gap-1">
+                              {!!c.notes.length && <span title={c.notes.join(" ")}><Info className="h-3 w-3 text-muted-foreground" aria-label={c.notes.join(" ")} /></span>}
                               {!!c.warnings.length && <span title={c.warnings.join(" ")}><AlertTriangle className="h-3 w-3 text-amber-600" aria-label={c.warnings.join(" ")} /></span>}
                               {formatMoney(c.total, "No price")}
                             </span>
                           ) : <span className="text-muted-foreground" aria-label="Not selected">—</span>}
+                          {c?.unitMismatch && <span className="block whitespace-pre-wrap text-[10px] text-amber-700">Unit: {c.quote?.unit}</span>}
                         </td>
                       );
                     })}

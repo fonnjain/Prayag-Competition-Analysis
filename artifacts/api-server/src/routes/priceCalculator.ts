@@ -99,7 +99,7 @@ router.post("/price-finder/calculator/export", async (req, res) => {
       "Our MRP", "Our effective date", "Our discount %", "Our net unit", "Quantity", "Our total",
       "Competitor", "Competitor price", "Competitor effective date", "Competitor discount %",
       "Competitor net unit", "Competitor total", "Difference per unit ₹", "Difference %",
-      "Difference total ₹", "Position", "Basis warning", "Our price basis", "Competitor price basis",
+      "Difference total ₹", "Position", "Evidence warnings", "Our price basis", "Competitor price basis", "Unit information",
     ]];
     for (const r of resolved) {
       if (!r.product) continue;
@@ -110,7 +110,7 @@ router.post("/price-finder/calculator/export", async (req, res) => {
         c.quote?.price ?? "No price", c.quote?.effectiveDate ?? null, Number(c.discount),
         c.netUnit ?? "No price", c.total ?? "No price", c.position.diffUnit, c.position.diffPct == null ? null : c.position.diffPct / 100,
         c.diffTotal, c.position.label, c.warnings.join(" "),
-        r.ourPriceBasis, c.quote?.priceBasis ?? "No price",
+        r.ourPriceBasis, c.quote?.priceBasis ?? "No price", c.notes.join(" "),
       ]);
     }
     const summaryRows: Cell[][] = [

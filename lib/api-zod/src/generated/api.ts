@@ -1156,8 +1156,11 @@ export const GetPriceFinderCalculatorRowsResponse = zod.object({
   "basis": zod.string().nullish(),
   "unit": zod.string().nullish(),
   "unitMismatch": zod.boolean().optional(),
+  "unitNotRecorded": zod.boolean().optional(),
+  "unitStatus": zod.enum(['same', 'not-recorded', 'differs']).optional(),
   "basisWarning": zod.string().nullish(),
-  "unitWarning": zod.string().nullish()
+  "unitWarning": zod.string().nullish(),
+  "unitNote": zod.string().nullish()
 })))
 }))
 })
