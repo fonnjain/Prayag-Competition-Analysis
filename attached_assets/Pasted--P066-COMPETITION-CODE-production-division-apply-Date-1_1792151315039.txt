@@ -1,0 +1,205 @@
+# P066 · COMPETITION · CODE — production division apply
+
+**Date:** 16 October 2026
+**Supersedes and consolidates:** P063 Steps 3–5, P064 Step 2, P065 §3.
+**Prerequisite:** the P065 re-scoped guard is published. P057 B/C and P058 are published.
+**Data file:** `Division_Mapping_from_ERP_RateList_v3.xlsx` (10,579 rows) — this file, no other.
+
+This is the production write. One apply, 294 rows. Everything before it is verification and
+everything after it is assertion. **Do not improvise a repair mid-run — if anything deviates, stop
+and report.**
+
+---
+
+## Step 1 — confirm the published build is the right one
+
+Three one-line confirmations, from the deployed production build, not from development:
+
+1. **The guard is the re-scoped one.** The four blocking rules from P065 §1 are
+   operation-scoped (every written value in `PRODUCT_DIVISIONS`; no written value contains `|`;
+   apply change-set equals preview change-set; source fingerprint matches). Global distinct-division
+   count is **reported, not blocking.**
+2. **P060 Part A landed.** `PRODUCT_DIVISIONS` (7) is separate from `OFFICIAL_MRP_SOURCES` (6) in
+   `artifacts/api-server/src/lib/mrpProvenance.ts`, with the comment recording why Sink has no
+   matching MRP source division.
+3. **The commit is on GitHub.** Report the commit SHA that production is serving.
+
+### ⛔ Stop condition 1
+If production is still serving the old blocking guard, stop. Applying against it will produce the
+same HTTP 409 and tell you nothing.
+
+---
+
+## Step 2 — re-export the restore sheet and compare it to the one already taken
+
+The restore sheet was exported earlier and verified: **294 rows, SHA256 `4dca4333…`**.
+
+Export it again now, from live production: `item_code`, `current_division`, `proposed_division` for
+every product the mapping would change.
+
+- **294 rows and the same SHA256** → production is unchanged since the earlier export. Proceed.
+- **Any difference** → something moved production division data between then and now. **Stop.**
+  Report the diff — which codes, which values, old versus new. Do not apply over an unexplained
+  change.
+
+Keep both files. This is the manual recovery path and it must not be the same artefact you are
+about to depend on without checking it.
+
+---
+
+## Step 3 — preview, and read the non-blocking warning
+
+Preview the full mapping. Report:
+
+1. **The change count. Expect exactly 294.**
+2. **The change-set table**, grouped from→to, as the preview actually reports it:
+
+| From | To | Rows |
+|---|---|---|
+| PTMT & Plastic Fittings | Sink | 235 |
+| Ceramic Sanitaryware \| PTMT & Plastic Fittings | PTMT & Plastic Fittings | 45 |
+| Ceramic Sanitaryware \| PTMT & Plastic Fittings | Ceramic Sanitaryware | 5 |
+| CP Fittings / Faucets \| PTMT & Plastic Fittings \| Pipes & Fittings | CP Fittings / Faucets | 3 |
+| CP Fittings / Faucets \| PTMT & Plastic Fittings | CP Fittings / Faucets | 2 |
+| CP Fittings / Faucets \| Ceramic Sanitaryware | CP Fittings / Faucets | 2 |
+| PTMT & Plastic Fittings | CP Fittings / Faucets | 2 (`492-W`, `493-W`) |
+| **Total** | | **294** |
+
+3. **The P065 §1 non-blocking warning — the list of divisions present but not among the seven.**
+   In production this should be **empty**. Development had 38 fixtures; production has none.
+
+### ⛔ Stop condition 2
+Stop, do not apply, and report if **any** of these hold:
+- the preview count is not 294;
+- any row would change a division not in the table above — in particular nothing moves out of
+  `CP (QUAA / FERN)` and nothing moves out of `Pipes & Fittings`, which were the FR- and MHC- overrides;
+- the non-blocking warning is **not empty** in production.
+
+A non-empty warning here means production holds division values nobody has accounted for. That is
+new information and it is worth more than finishing this run today.
+
+---
+
+## Step 4 — apply, once
+
+Apply. **Record the batch id immediately and put it in the report.**
+
+Do not re-run apply on a non-294 preview, a partial result, or a timeout of unknown outcome. If the
+outcome is ambiguous, go straight to Step 5 and let the assertions tell you what happened — a second
+apply against an already-applied state is how you end up with two batches describing one change.
+
+Then immediately: **preview again. Expect 0 changes.** That is the idempotency check and it is the
+cheapest confirmation that the write completed cleanly.
+
+---
+
+## Step 5 — post-apply assertions
+
+Run all of these and report the output in full, actuals as they come back.
+
+```sql
+-- 1. no composites anywhere
+SELECT count(*) FROM catalog_products WHERE division LIKE '%|%';          -- expect 0
+
+-- 2. the seven divisions with counts
+SELECT division, count(*) FROM catalog_products GROUP BY division ORDER BY 2 DESC;
+
+-- 3. the overrides held
+SELECT item_code, division FROM catalog_products
+WHERE item_code IN ('FR-36','FR-37','FR-40')                             -- expect CP (QUAA / FERN)
+   OR item_code LIKE 'MHC-%'                                             -- expect Pipes & Fittings
+   OR item_code IN ('I-151','I-152','I-153','I-155','I-161','I-162','I-163',
+                    'I-167','I-168','I-169','I-171','I-174','I-175');    -- expect PTMT & Plastic Fittings
+
+-- 4. the spaced TTS products are untouched
+SELECT item_code, division FROM catalog_products
+WHERE item_code IN ('TTS - 01','TTS - 02','TTS - 03');                   -- expect PTMT & Plastic Fittings
+
+-- 5. row count unchanged
+SELECT count(*) FROM catalog_products;                                   -- expect 7,191
+```
+
+Expected distribution for assertion 2 — **these are the corrected figures; the numbers in P063
+Step 4 were wrong except PTMT:**
+
+| Division | Rows |
+|---|---|
+| Pipes & Fittings | 2,750 |
+| PTMT & Plastic Fittings | 2,152 |
+| CP Fittings / Faucets | 1,383 |
+| Hardware | 288 |
+| Sink | 235 |
+| Ceramic Sanitaryware | 222 |
+| CP (QUAA / FERN) | 161 |
+| **Total** | **7,191** |
+
+Report actuals. Do not adjust anything to make them match. The seven figures sum to exactly 7,191,
+so a mismatch in one will show up in the total — say which division differs and by how much.
+
+Also confirm explicitly, each as its own line:
+
+- **no `item_code` changed**
+- **no row in `mrp_price_history` changed**
+- **no row in `competitor_prices` changed**
+- **no `category` changed**
+- the provenance batch exists, names the source file and the operator, and appears in history
+
+### ⛔ Stop condition 3
+If any assertion fails, **stop and report before doing anything else.** Do not undo on your own
+judgement. Both recovery paths exist — the batch undo and the restore sheet — and which one to use
+depends on what actually failed. Report first.
+
+---
+
+## Step 6 — smoke-check the two pages that depend on this
+
+This is the reason the apply happens before the calculator goes in front of users. Read-only, on
+production:
+
+1. **Price Finder** — division dropdown lists exactly the seven, `Sink` among them, no composite
+   strings, scroll and search both work (P057 Part B).
+2. **Calculator** — pick `Sink` → a category → a product; it resolves. Then pick one of the former
+   composites (`501N`, `503N`, `701N`) and confirm it now appears under a single division.
+3. **Competitor scoping** (P057 Part C) — with a division and category chosen, only competitors
+   holding prices for that scope are offered.
+4. Confirm the unit badges still behave: neutral note where the competitor unit is unrecorded, amber
+   only where both units are recorded and disagree.
+
+Nothing here should need a code change. If one of them is wrong, it is a scoping bug exposed by real
+division data, not a data problem — report it separately and do not touch the division table again.
+
+---
+
+## Step 7 — report
+
+- Step 1: the three confirmations and the production commit SHA
+- Step 2: restore sheet row count and SHA256, and whether it matched `4dca4333…`
+- Step 3: preview count, the change-set table as reported, and the warning (expected empty)
+- Step 4: **the batch id**, and the re-preview result (expected 0)
+- Step 5: all five queries' output in full, the distribution table with actuals, and the four
+  no-change confirmations
+- Step 6: the four smoke checks, pass or fail
+
+---
+
+## Out of scope — do not touch in this run
+
+- the 28 `EXCLUDE` rows
+- `category`, in any form — including the 20 split-spelling groups and the 394 blanks
+- the 38 development fixtures
+- the `unit` → `NULL` change at `apolloStagedLoad.ts` and `catalogImportExport.ts`, and its 1,360-row
+  backfill — **explicitly not now;** two open production write paths at once makes attribution
+  impossible if something goes wrong
+- the zero-composite blocking rule (relaxing it to a warning stays logged, not actioned)
+
+---
+
+## Done criteria
+
+- [ ] Production confirmed serving the re-scoped guard; commit SHA reported
+- [ ] Restore sheet re-exported: 294 rows, SHA256 matches `4dca4333…`
+- [ ] Preview = 294, change-set table matches, non-blocking warning empty
+- [ ] Applied once; batch id recorded; re-preview = 0
+- [ ] All five assertions pass; distribution sums to 7,191; four no-change confirmations given
+- [ ] Price Finder and Calculator smoke checks pass on real division data
+- [ ] Nothing in the out-of-scope list touched
