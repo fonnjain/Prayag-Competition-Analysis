@@ -1797,3 +1797,10 @@ mtime_ms = 1792146257633
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/5dc23c25-74b2-4845-8094-5668a02c4669/e87df826-162e-4e10-bcc8-3cd84ff0871a"
 storage_version_token = "1792147074361076"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "lqvXoHouoYRA_tZZ5mg2l"
+uri = "file://artifacts/pricing-logic-film/public/audio/bg_music.mp3"
+type = "audio"
+title = "bg music"
+description = "Generated music: Ambient electronic instrumental scoring a calm explainer about pricing logic. Soft pulsing synths, felt piano, light clicks, 96 BPM, thoughtful and precise, gentle lifts every ~18 se…"

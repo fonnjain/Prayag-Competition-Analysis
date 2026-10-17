@@ -1,0 +1,29 @@
+kind = "video"
+videoAspectRatio = "16:9"
+previewPath = "/pricing-logic-film/"
+title = "MRP Generator & Price Calculator — Explained"
+description = "An unbranded three-minute explanation of the pricing application, focused on MRP Generator logic, Price Calculator, company benefits and the distinction between AI assistance and deterministic calculations."
+version = "1.0.0"
+id = "artifacts/pricing-logic-film"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/pricing-logic-film/" ]
+localPort = 22281
+
+[services.development]
+run = "pnpm --filter @workspace/pricing-logic-film run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pricing-logic-film", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pricing-logic-film/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22281"
+BASE_PATH = "/pricing-logic-film/"
