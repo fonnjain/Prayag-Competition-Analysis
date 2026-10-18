@@ -1139,6 +1139,7 @@ export const GetPriceFinderCalculatorRowsResponse = zod.object({
   "asOfDate": zod.string(),
   "scopeDisclosure": zod.array(zod.string()),
   "unavailableCodes": zod.array(zod.string()),
+  "catalogueCodes": zod.array(zod.string()).optional().describe('Exact known identities, including date-ineligible codes that must never become ad-hoc aliases.'),
   "rows": zod.array(zod.object({
   "itemCode": zod.string(),
   "productName": zod.string().nullable(),
@@ -1180,6 +1181,64 @@ export const GetPriceFinderCalculatorRowsResponse = zod.object({
 
 
 /**
+ * @summary Calculator-only full-catalogue search, browse and exact-code identity
+ */
+export const getPriceCalculatorSearchQueryQMax = 1024;
+
+export const getPriceCalculatorSearchQueryLimitMax = 300;
+
+
+
+export const GetPriceCalculatorSearchQueryParams = zod.object({
+  "q": zod.coerce.string().max(getPriceCalculatorSearchQueryQMax).optional(),
+  "division": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "asOf": zod.date().optional(),
+  "limit": zod.coerce.number().min(1).max(getPriceCalculatorSearchQueryLimitMax).optional()
+})
+
+export const GetPriceCalculatorSearchResponse = zod.object({
+  "results": zod.array(zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable()
+})),
+  "exactProduct": zod.union([zod.object({
+  "itemCode": zod.string(),
+  "productName": zod.string().nullable(),
+  "division": zod.string().nullable(),
+  "category": zod.string().nullable()
+}),zod.null()]),
+  "divisions": zod.array(zod.object({
+  "division": zod.string(),
+  "count": zod.number()
+})),
+  "categories": zod.array(zod.object({
+  "category": zod.string().nullable(),
+  "label": zod.string(),
+  "count": zod.number()
+}))
+})
+
+
+/**
+ * @summary Calculator-only stored competitor spellings, without bucket exclusions
+ */
+export const GetPriceCalculatorCompetitorsQueryParams = zod.object({
+  "asOf": zod.date().optional()
+})
+
+export const GetPriceCalculatorCompetitorsResponse = zod.object({
+  "competitors": zod.array(zod.object({
+  "competitor": zod.string(),
+  "pricedProducts": zod.number(),
+  "effectiveDate": zod.string().nullable()
+}))
+})
+
+
+/**
  * @summary Authenticated read-only saved discounts; never creates defaults
  */
 export const GetPriceFinderDiscountDefaultsResponseItem = zod.object({
@@ -1206,10 +1265,15 @@ export const ExportPriceFinderCalculatorBody = zod.object({
   "variant": zod.string(),
   "discount": zod.string(),
   "quantity": zod.string(),
+  "mrp": zod.string().optional().describe('Basket-only MRP override; absent means use the current app value'),
+  "adHocProduct": zod.boolean().optional(),
+  "description": zod.string().optional(),
   "competitors": zod.array(zod.object({
   "id": zod.string(),
   "competitor": zod.string().nullable(),
-  "discount": zod.string()
+  "discount": zod.string(),
+  "mrp": zod.string().optional(),
+  "adHoc": zod.boolean().optional()
 })).max(exportPriceFinderCalculatorBodyBlocksItemCompetitorsMax)
 })).min(1).max(exportPriceFinderCalculatorBodyBlocksMax)
 })

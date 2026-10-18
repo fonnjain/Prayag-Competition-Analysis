@@ -15,8 +15,10 @@ const storage = new AsyncLocalStorage<Context | null>();
 
 /** Explicit screen-source allowlist. Never infer scope from shared helper calls. */
 export function bucketRouteApplies(method: string, path: string): boolean {
+  // Calculator-only quoting aid. All other Price Finder routes retain enforcement.
+  if (path.startsWith("/price-finder/calculator/")) return false;
   if (path.startsWith("/v1/") || path.startsWith("/bucket-lists")) return false;
-  if (method === "POST") return path === "/mrp-generator/scenarios/preview" || path === "/price-finder/calculator/export";
+  if (method === "POST") return path === "/mrp-generator/scenarios/preview";
   if (method !== "GET") return false;
   return path === "/catalog/products" || path.startsWith("/catalog/products/")
     || path === "/catalog/product" || path === "/catalog/filters" || path === "/catalog/export"

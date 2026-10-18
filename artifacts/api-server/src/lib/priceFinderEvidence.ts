@@ -14,7 +14,11 @@ type FinderQuote = { item_code: string; competitor: string; price: number; effec
 
 /** Shared detail/batch resolver: same approved variant windows and matched brand
  * lateral subqueries, parameterised by exact codes and as-of. Never is_current. */
-export async function readFinderEvidence(codes: string[], asOf: string) {
+export async function readFinderEvidence(codes: string[], asOf: string, options?: { calculatorUnscoped: true }) {
+  // Opt-in belongs only to the basket-local calculator; default Finder behavior is unchanged.
+  const productScope = (code: ReturnType<typeof sql>) => options?.calculatorUnscoped ? sql`TRUE` : bucketSql(code);
+  const quoteScope = (brand: ReturnType<typeof sql>, code: ReturnType<typeof sql>) =>
+    options?.calculatorUnscoped ? sql`TRUE` : bucketCompetitorSql(brand, code);
   const list = codes.length ? sql.join(codes.map(c => sql`${c}`), sql`,`) : sql`NULL`;
   const [products, variants, competitors] = await Promise.all([
     db.execute<FinderProduct>(sql`
@@ -40,7 +44,7 @@ export async function readFinderEvidence(codes: string[], asOf: string) {
       ) upc ON true
       WHERE p.item_code IN (${list}) AND p.is_active IS TRUE
         AND (p.discontinued_from IS NULL OR p.discontinued_from>${asOf}::date)
-        AND ${bucketSql(sql`p.item_code`)}
+        AND ${productScope(sql`p.item_code`)}
     `),
     db.execute<FinderVariant>(sql`
       SELECT v.item_code,v.variant,cur.mrp AS current_mrp,cur.price_basis AS current_price_basis,cur.effective_date::text AS current_effective_date,
@@ -57,7 +61,7 @@ export async function readFinderEvidence(codes: string[], asOf: string) {
           AND h.mrp IS NOT NULL AND h.review_status='approved' AND h.effective_date>${asOf}::date
         ORDER BY h.effective_date ASC,h.id DESC LIMIT 1
       ) upc ON true
-      WHERE ${bucketSql(sql`v.item_code`)}
+      WHERE ${productScope(sql`v.item_code`)}
       ORDER BY v.item_code,v.variant
     `),
     db.execute<FinderQuote>(sql`
@@ -69,19 +73,19 @@ export async function readFinderEvidence(codes: string[], asOf: string) {
       FROM (SELECT DISTINCT cp.matched_prayag_code AS item_code,cp.competitor FROM competitor_prices cp
         WHERE cp.matched_prayag_code IN (${list}) AND cp.match_status='matched'
           AND cp.price IS NOT NULL AND cp.effective_date<=${asOf}::date
-          AND ${bucketCompetitorSql(sql`cp.competitor`,sql`cp.matched_prayag_code`)}) brands
+          AND ${quoteScope(sql`cp.competitor`,sql`cp.matched_prayag_code`)}) brands
       JOIN LATERAL (
         SELECT cp.price,cp.effective_date,cp.price_basis,cp.gst_pct,cp.unit FROM competitor_prices cp
         WHERE cp.matched_prayag_code=brands.item_code AND cp.competitor=brands.competitor AND cp.match_status='matched'
           AND cp.price IS NOT NULL AND cp.effective_date<=${asOf}::date
-          AND ${bucketCompetitorSql(sql`cp.competitor`,sql`cp.matched_prayag_code`)}
+          AND ${quoteScope(sql`cp.competitor`,sql`cp.matched_prayag_code`)}
         ORDER BY cp.effective_date DESC,cp.id DESC LIMIT 1
       ) cur ON true
       LEFT JOIN LATERAL (
         SELECT cp.price,cp.effective_date,cp.price_basis,cp.gst_pct FROM competitor_prices cp
         WHERE cp.matched_prayag_code=brands.item_code AND cp.competitor=brands.competitor AND cp.match_status='matched'
           AND cp.price IS NOT NULL AND cp.effective_date>${asOf}::date
-          AND ${bucketCompetitorSql(sql`cp.competitor`,sql`cp.matched_prayag_code`)}
+          AND ${quoteScope(sql`cp.competitor`,sql`cp.matched_prayag_code`)}
         ORDER BY cp.effective_date ASC,cp.id DESC LIMIT 1
       ) upc ON true ORDER BY brands.item_code,brands.competitor
     `),

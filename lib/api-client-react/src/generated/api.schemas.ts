@@ -3323,6 +3323,8 @@ export type PriceCalculatorBlockCompetitorsItem = {
   /** @nullable */
   competitor: string | null;
   discount: string;
+  mrp?: string;
+  adHoc?: boolean;
 };
 
 export interface PriceCalculatorBlock {
@@ -3332,8 +3334,52 @@ export interface PriceCalculatorBlock {
   variant: string;
   discount: string;
   quantity: string;
+  /** Basket-only MRP override; absent means use the current app value */
+  mrp?: string;
+  adHocProduct?: boolean;
+  description?: string;
   /** @maxItems 10 */
   competitors: PriceCalculatorBlockCompetitorsItem[];
+}
+
+export interface CalculatorProductOption {
+  itemCode: string;
+  /** @nullable */
+  productName: string | null;
+  /** @nullable */
+  division: string | null;
+  /** @nullable */
+  category: string | null;
+}
+
+export type CalculatorSearchResultDivisionsItem = {
+  division: string;
+  count: number;
+};
+
+export type CalculatorSearchResultCategoriesItem = {
+  /** @nullable */
+  category: string | null;
+  label: string;
+  count: number;
+};
+
+export interface CalculatorSearchResult {
+  results: CalculatorProductOption[];
+  exactProduct: CalculatorProductOption | null;
+  divisions: CalculatorSearchResultDivisionsItem[];
+  categories: CalculatorSearchResultCategoriesItem[];
+}
+
+export type CalculatorCompetitorOptionsCompetitorsItem = {
+  competitor: string;
+  pricedProducts: number;
+  /** @nullable */
+  effectiveDate: string | null;
+};
+
+export interface CalculatorCompetitorOptions {
+  competitors: CalculatorCompetitorOptionsCompetitorsItem[];
 }
 
 export interface CalculatorPrice {
@@ -3404,6 +3450,8 @@ export interface PriceFinderCalculatorResponse {
   asOfDate: string;
   scopeDisclosure: string[];
   unavailableCodes: string[];
+  /** Exact known identities, including date-ineligible codes that must never become ad-hoc aliases. */
+  catalogueCodes?: string[];
   rows: PriceFinderCalculatorResponseRowsItem[];
 }
 
@@ -5292,6 +5340,25 @@ export type GetPriceFinderCalculatorRowsParams = {
  * @maxItems 50
  */
 code: string[];
+asOf?: string;
+};
+
+export type GetPriceCalculatorSearchParams = {
+/**
+ * @maxLength 1024
+ */
+q?: string;
+division?: string;
+category?: string;
+asOf?: string;
+/**
+ * @minimum 1
+ * @maximum 300
+ */
+limit?: number;
+};
+
+export type GetPriceCalculatorCompetitorsParams = {
 asOf?: string;
 };
 

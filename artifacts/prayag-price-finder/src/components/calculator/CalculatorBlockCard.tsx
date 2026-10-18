@@ -1,19 +1,24 @@
-import { forwardRef } from "react";
-import { AlertTriangle, Info, Plus, Trash2, X } from "lucide-react";
+import { forwardRef, useState } from "react";
+import { AlertTriangle, Info, PenLine, Plus, Trash2, X } from "lucide-react";
 import { formatMoney } from "@workspace/formatting";
-import { useGetPriceFinderCompetitors, getGetPriceFinderCompetitorsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatPriceDate } from "@/components/price-window";
 import {
   MAX_CALCULATOR_COMPETITORS,
+  competitorIdentity,
   type CalculatorBlock,
   type CalculatorEvidence,
+  type ProductChoice,
   type ResolvedCalculator,
 } from "@/lib/calculatorState";
 import { ProductPicker } from "./ProductPicker";
-import { Cell, NumericField, PositionBadge, PriceWithDate } from "./shared";
+import { CompetitorPicker, type KnownCompetitor } from "./CompetitorPicker";
+import { AdHocBadge, MrpField, type PriceState } from "./MrpField";
+import { Cell, NumericField, PositionBadge } from "./shared";
+
+export const ADHOC_COMPETITOR_NOTE = "price entered by user — basis and unit unverified";
 
 export type BlockCardProps = {
   block: CalculatorBlock;
@@ -23,58 +28,58 @@ export type BlockCardProps = {
   product: CalculatorEvidence | undefined;
   evidenceLoading: boolean;
   unavailable: boolean;
-  scopeKey: readonly unknown[];
-  scopeReady: boolean;
+  knownCompetitors: KnownCompetitor[];
+  competitorsLoading: boolean;
+  competitorsError: boolean;
+  onRetryCompetitors: () => void;
   discountHint: (scope: string, touchedKey: string) => string | null;
   onPatch: (patch: Partial<CalculatorBlock>) => void;
-  onProduct: (itemCode: string | null) => void;
+  onProduct: (choice: ProductChoice | null) => void;
+  onVariant: (variant: string) => void;
+  onMrp: (value: string | undefined) => void;
   onDiscount: (value: string) => void;
   onCompetitorDiscount: (competitorId: string, value: string) => void;
-  onCompetitorBrand: (competitorId: string, brand: string) => void;
+  onCompetitorMrp: (competitorId: string, value: string | undefined) => void;
+  onCompetitorBrand: (competitorId: string, brand: string, adHoc: boolean) => void;
   onAddCompetitor: () => void;
   onRemoveCompetitor: (competitorId: string) => void;
   onRemove: () => void;
 };
 
 const QTY_TOOLTIP = "Quantity follows the Prayag row so the comparison stays like-for-like.";
+const fallbackState = (value: string | undefined, app: number | null): PriceState =>
+  app == null ? "Entered" : value === undefined ? "App" : "Edited";
 
 export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(function CalculatorBlockCard(props, ref) {
   const { block, index, asOf, resolved, product, evidenceLoading, unavailable } = props;
+  const [editingBrand, setEditingBrand] = useState<string | null>(null);
   const code = block.itemCode;
-  const coverageParams = { itemCode: code ? [code] : [], asOf: asOf || undefined };
-  const coverage = useGetPriceFinderCompetitors(coverageParams, {
-    query: {
-      queryKey: [...getGetPriceFinderCompetitorsQueryKey(coverageParams), ...props.scopeKey],
-      enabled: !!code && props.scopeReady,
-    },
-  });
-  const covered = (coverage.data?.competitors ?? []).filter((c) => c.pricedProducts > 0);
-  const chosen = new Set(block.competitors.map((c) => c.competitor).filter(Boolean) as string[]);
-  const remaining = covered.filter((c) => !chosen.has(c.competitor));
+  const adHocProduct = resolved?.adHocProduct ?? !!block.adHocProduct;
+  const taken = new Set(block.competitors.filter((c) => c.competitor).map(competitorIdentity));
   const atCap = block.competitors.length >= MAX_CALCULATOR_COMPETITORS;
-  const noneRecorded = !!code && coverage.isSuccess && covered.length === 0;
 
-  const variants = product?.variants ?? [];
+  const variants = adHocProduct ? [] : product?.variants ?? [];
   const showVariants = variants.length > 1 || variants.some((v) => v.variant !== "Standard");
   const our = resolved?.our;
-  const ourPrice = resolved?.price;
-  const label = product ? `${product.itemCode} · ${product.productName ?? "Unnamed product"}` : undefined;
+  const ourApp = our?.appPrice ?? (adHocProduct ? null : resolved?.price?.price ?? null);
+  const ourState: PriceState = our?.priceState ?? fallbackState(block.mrp, ourApp);
+  const name = adHocProduct ? block.description ?? "" : product?.productName ?? resolved?.product?.productName ?? null;
+  const label = code ? `${code} · ${name || "Unnamed product"}` : undefined;
   const n = index + 1;
+  const productKnown = adHocProduct || !!product;
 
   const addDisabledReason = !code
     ? "Choose a product first."
     : atCap
       ? `A block can compare at most ${MAX_CALCULATOR_COMPETITORS} competitors.`
-      : coverage.isLoading
-        ? "Loading competitors for this product…"
-        : remaining.length === 0 || block.competitors.some((c) => !c.competitor)
-          ? remaining.length === 0 ? "Every competitor with a price for this product is already added." : "Choose a brand in the empty row first."
-          : null;
+      : block.competitors.some((c) => !c.competitor)
+        ? "Choose a competitor in the empty row first."
+        : null;
 
   return (
     <section
       ref={ref}
-      aria-label={`Block ${n}${product ? `: ${product.itemCode}` : ""}`}
+      aria-label={`Block ${n}${code ? `: ${code}` : ""}`}
       data-testid={`block-${block.id}`}
       className="scroll-mt-24 rounded-xl border border-border bg-card shadow-sm break-inside-avoid"
     >
@@ -83,6 +88,7 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
           {n}
         </span>
         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Our product</span>
+        {adHocProduct && <AdHocBadge label="Ad-hoc product" testId={`badge-adhoc-product-${block.id}`} />}
         <Button
           type="button"
           variant="ghost"
@@ -102,11 +108,9 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
             blockId={block.id}
             index={index}
             asOf={asOf}
-            itemCode={code}
-            selectedLabel={label}
+            itemCode={adHocProduct ? null : code}
+            selectedLabel={adHocProduct ? undefined : label}
             onChange={props.onProduct}
-            scopeKey={props.scopeKey}
-            scopeReady={props.scopeReady}
           />
           {showVariants && (
             <SearchableSelect
@@ -122,44 +126,48 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
                 label: v.variant,
                 hint: v.price == null ? "No price" : `${formatMoney(v.price)} from ${formatPriceDate(v.effectiveDate)}`,
               }))}
-              onChange={(next) => next && props.onPatch({ variant: next })}
+              onChange={(next) => next && next !== block.variant && props.onVariant(next)}
             />
           )}
         </div>
 
-        {code && unavailable && (
+        {code && unavailable && !adHocProduct && (
           <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-200" role="status">
-            {code} is not available under the current date or bucket scope. It is excluded from totals.
+            {code} could not be resolved for this date. It is excluded from totals.
           </p>
         )}
 
         {/* Our row */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))]">
           <Cell label="Item" className="col-span-2 sm:col-span-3 lg:col-span-1">
-            {product ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="min-w-0" tabIndex={0}>
-                    <span className="block font-mono text-xs font-black text-primary" data-testid={`text-item-code-${block.id}`}>{product.itemCode}</span>
-                    <span className="block truncate text-sm font-semibold">{product.productName ?? "Unnamed product"}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-sm">{product.productName ?? product.itemCode}</TooltipContent>
-              </Tooltip>
+            {code && productKnown ? (
+              <div className="min-w-0">
+                <span className="block font-mono text-xs font-black text-primary whitespace-pre" data-testid={`text-item-code-${block.id}`}>{code}</span>
+                <span className="block truncate text-sm font-semibold" title={name ?? undefined}>{name || "Unnamed product"}</span>
+                <span className="block text-[10px] text-muted-foreground" data-testid={`text-group-${block.id}`}>
+                  {adHocProduct ? "Ad-hoc · no division or category" : [product?.division, product?.category].filter(Boolean).join(" · ") || "Division not recorded"}
+                </span>
+              </div>
             ) : (
               <span className="text-sm text-muted-foreground">{evidenceLoading && code ? "Loading price…" : "No product chosen"}</span>
             )}
           </Cell>
           <Cell label={block.variant === "Standard" ? "MRP" : `MRP · ${block.variant}`}>
-            {evidenceLoading && code && !product ? (
-              <span className="block h-4 w-16 rounded bg-muted animate-pulse" />
-            ) : (
-              <PriceWithDate
-                price={ourPrice?.price != null ? formatMoney(ourPrice.price) : null}
-                date={ourPrice?.effectiveDate ?? null}
-                missing={product ? (ourPrice ? "No price" : "No price for this variant") : "—"}
+            {evidenceLoading && code && !productKnown ? (
+              <span className="block h-8 w-20 rounded bg-muted animate-pulse" />
+            ) : code && productKnown ? (
+              <MrpField
+                id={`calc-mrp-${block.id}`}
+                value={block.mrp}
+                appPrice={ourApp}
+                state={ourState}
+                error={our?.errors.mrp}
+                onChange={props.onMrp}
+                date={resolved?.price?.effectiveDate ? formatPriceDate(resolved.price.effectiveDate) : null}
+                ariaLabel={`Our MRP, block ${n}`}
+                testId={`input-mrp-${block.id}`}
               />
-            )}
+            ) : <span className="text-sm text-muted-foreground">—</span>}
           </Cell>
           <Cell label="Disc %">
             <NumericField
@@ -200,51 +208,81 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
             <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Competitor</div>
             {block.competitors.map((c) => {
               const r = resolved?.competitors.find((x) => x.id === c.id);
-              const options = covered
-                .filter((o) => o.competitor === c.competitor || !chosen.has(o.competitor))
-                .map((o) => ({
-                  value: o.competitor,
-                  label: o.competitor,
-                  hint: o.effectiveDate ? `Price from ${formatPriceDate(o.effectiveDate)}` : undefined,
-                }));
+              const app = c.adHoc ? null : r?.appPrice ?? r?.quote?.price ?? null;
+              const state: PriceState = r?.priceState ?? fallbackState(c.mrp, app);
+              const picking = !c.competitor || editingBrand === c.id;
+              const notes = (r?.notes ?? []).filter((x) => x.toLowerCase() !== ADHOC_COMPETITOR_NOTE);
+              const warnings = c.adHoc ? [] : [
+                ...(r?.basisMismatch ? [r.basisWarning] : []),
+                ...(r?.unitMismatch ? [`Unit: ${r.quote?.unit}`] : []),
+                ...(r?.variantMismatch ? [r.variantWarning] : []),
+              ].filter(Boolean);
               return (
                 <div
                   key={c.id}
                   data-testid={`row-competitor-${c.id}`}
-                  className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border p-3 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))_auto]"
+                  data-adhoc={c.adHoc ? "true" : undefined}
+                  className={`grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border p-3 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))_auto] ${c.adHoc ? "border-dashed border-fuchsia-300 dark:border-fuchsia-900/60" : ""}`}
                 >
                   <Cell label="Brand" className="col-span-2 sm:col-span-3 lg:col-span-1">
-                    <SearchableSelect
-                      aria-label={`Competitor brand, block ${n}`}
-                      data-testid={`select-competitor-${c.id}`}
-                      widthClass="w-full"
-                      triggerClassName="h-8"
-                      placeholder={coverage.isLoading ? "Loading…" : "Choose competitor"}
-                      searchPlaceholder="Search competitors…"
-                      emptyText="No other competitor has a price for this product"
-                      value={c.competitor}
-                      options={options}
-                      onChange={(next) => next && props.onCompetitorBrand(c.id, next)}
-                    />
-                    {!!r?.notes.length && (
-                      <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground" data-testid={`note-unit-${c.id}`}>
-                        <Info className="h-3 w-3 shrink-0" /> {r.notes.join(" ")}
+                    {picking ? (
+                      <CompetitorPicker
+                        id={c.id}
+                        known={props.knownCompetitors}
+                        loading={props.competitorsLoading}
+                        error={props.competitorsError}
+                        onRetry={props.onRetryCompetitors}
+                        taken={taken}
+                        autoFocus
+                        onPick={(brand, adHoc) => { setEditingBrand(null); props.onCompetitorBrand(c.id, brand, adHoc); }}
+                        onCancel={c.competitor ? () => setEditingBrand(null) : undefined}
+                      />
+                    ) : (
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="truncate text-sm font-bold" data-testid={`text-competitor-name-${c.id}`}>{c.competitor}</span>
+                        {c.adHoc ? <AdHocBadge testId={`badge-adhoc-competitor-${c.id}`} /> : null}
+                        <button type="button" onClick={() => setEditingBrand(c.id)} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground print:hidden" data-testid={`button-change-competitor-${c.id}`}>
+                          <PenLine className="h-3 w-3" /> Change
+                        </button>
+                      </div>
+                    )}
+                    {!picking && !!notes.length && (
+                      <span className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground" data-testid={`note-unit-${c.id}`}>
+                        <Info className="h-3 w-3 shrink-0" /> {notes.join(" ")}
                       </span>
                     )}
-                    {!!r?.warnings.length && (
+                    {!picking && c.adHoc && (
+                      <>
+                        {!notes.length && (
+                          <span className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground" data-testid={`note-unit-${c.id}`}>
+                            <Info className="h-3 w-3 shrink-0" /> Unit not recorded.
+                          </span>
+                        )}
+                        <span className="mt-1 flex items-center gap-1 text-[10px] font-semibold italic text-fuchsia-800 dark:text-fuchsia-300" data-testid={`note-adhoc-${c.id}`}>
+                          <PenLine className="h-3 w-3 shrink-0" /> {ADHOC_COMPETITOR_NOTE}
+                        </span>
+                      </>
+                    )}
+                    {!picking && warnings.length > 0 && (
                       <span className="mt-1.5 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" data-testid={`badge-basis-${c.id}`}>
                         <AlertTriangle className="h-3 w-3 shrink-0" />
-                        <span className="whitespace-pre-wrap">{[
-                          ...(r.basisMismatch ? [r.basisWarning] : []),
-                          ...(r.unitMismatch ? [`Unit: ${r.quote?.unit}`] : []),
-                          ...(r.variantMismatch ? [r.variantWarning] : []),
-                        ].join(" ")}</span>
+                        <span className="whitespace-pre-wrap">{warnings.join(" ")}</span>
                       </span>
                     )}
                   </Cell>
                   <Cell label="MRP">
                     {c.competitor ? (
-                      <PriceWithDate price={r?.quote?.price != null ? formatMoney(r.quote.price) : null} date={r?.quote?.effectiveDate ?? null} />
+                      <MrpField
+                        id={`calc-cmrp-${c.id}`}
+                        value={c.mrp}
+                        appPrice={app}
+                        state={state}
+                        error={r?.errors.mrp}
+                        onChange={(v) => props.onCompetitorMrp(c.id, v)}
+                        date={!c.adHoc && r?.quote?.effectiveDate ? formatPriceDate(r.quote.effectiveDate) : null}
+                        ariaLabel={`${c.competitor} MRP, block ${n}`}
+                        testId={`input-competitor-mrp-${c.id}`}
+                      />
                     ) : <span className="text-sm text-muted-foreground">—</span>}
                   </Cell>
                   <Cell label="Disc %">
@@ -253,7 +291,7 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
                       value={c.discount}
                       onChange={(v) => props.onCompetitorDiscount(c.id, v)}
                       error={r?.errors.discount ?? null}
-                      hint={c.competitor ? props.discountHint(c.competitor, `comp:${c.id}`) : null}
+                      hint={c.competitor && !c.adHoc ? props.discountHint(c.competitor, `comp:${c.id}`) : null}
                       suffix="%"
                       ariaLabel={`${c.competitor ?? "Competitor"} discount percent, block ${n}`}
                       testId={`input-competitor-discount-${c.id}`}
@@ -307,34 +345,29 @@ export const CalculatorBlockCard = forwardRef<HTMLElement, BlockCardProps>(funct
           </div>
         )}
 
-        <div className="print:hidden">
-          {noneRecorded ? (
-            <p className="text-xs italic text-muted-foreground" data-testid={`text-no-competitors-${block.id}`}>
-              No competitor prices recorded for this product.
-            </p>
-          ) : coverage.isError ? (
-            <button type="button" onClick={() => coverage.refetch()} className="text-xs font-semibold text-destructive underline underline-offset-2">
-              Could not load competitors. Retry
-            </button>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={addDisabledReason ? 0 : -1} className="inline-block">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!!addDisabledReason}
-                    onClick={props.onAddCompetitor}
-                    data-testid={`button-add-competitor-${block.id}`}
-                    className="h-8 gap-1.5 text-xs font-semibold"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add competitor
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {addDisabledReason && <TooltipContent>{addDisabledReason}</TooltipContent>}
-            </Tooltip>
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={addDisabledReason ? 0 : -1} className="inline-block">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!!addDisabledReason}
+                  onClick={props.onAddCompetitor}
+                  data-testid={`button-add-competitor-${block.id}`}
+                  className="h-8 gap-1.5 text-xs font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add competitor
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {addDisabledReason && <TooltipContent>{addDisabledReason}</TooltipContent>}
+          </Tooltip>
+          {code && product && !adHocProduct && product.hasRecordedCompetitorPrice === false && (
+            <span className="text-xs italic text-muted-foreground" data-testid={`text-no-competitors-${block.id}`}>
+              No competitor prices recorded for this product. You can still add one and enter its price.
+            </span>
           )}
         </div>
       </div>

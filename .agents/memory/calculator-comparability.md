@@ -13,4 +13,4 @@ Missing physical units and basis tokens in unit fields mean **unit not recorded*
 
 **Why:** The user distinguishes absence of unit evidence from an actual disagreement; otherwise legacy metadata makes amber warnings too dense to be useful.
 
-**How to apply:** Keep neutral notes separate from warning counts in both calculator summaries and exports. Report density under the actual composed company/personal bucket scope, not only across the unrestricted catalogue.
+**How to apply:** Keep neutral notes separate from warning counts in both calculator summaries and exports. The free-entry calculator now deliberately uses the unrestricted catalogue and competitor set; label historical bucket-scoped density audits as historical rather than implying those restrictions still apply here. Price Finder remains bucket-scoped.

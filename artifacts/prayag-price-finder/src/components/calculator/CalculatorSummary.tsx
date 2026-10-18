@@ -1,9 +1,10 @@
 import { forwardRef } from "react";
-import { AlertTriangle, Info, Download, FileText, Loader2, Printer } from "lucide-react";
+import { AlertTriangle, Info, Download, FileText, Loader2, PenLine, Printer } from "lucide-react";
 import { formatMoney, formatCount } from "@workspace/formatting";
 import { Button } from "@/components/ui/button";
-import { calculatorPosition, type ResolvedCalculator, type summarizeCalculator } from "@/lib/calculatorState";
+import { calculatorAssertedBanner, calculatorCompetitorKey, calculatorPosition, type ResolvedCalculator, type summarizeCalculator } from "@/lib/calculatorState";
 import { PositionBadge } from "./shared";
+import { AdHocBadge, PriceStateBadge } from "./MrpField";
 
 type Summary = ReturnType<typeof summarizeCalculator>;
 
@@ -22,7 +23,9 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
   ref,
 ) {
   const available = rows.filter((r) => r.product);
-  const brands = summary.brands.map((b) => b.brand);
+  const brands = summary.brands;
+  const keyOf = (c: { competitor: string | null; adHoc?: boolean }) => calculatorCompetitorKey({ competitor: c.competitor!, adHoc: !!c.adHoc });
+  const asserted = summary.assertedPrices ?? 0;
 
   return (
     <section
@@ -49,6 +52,7 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
       )}
 
       <div className="space-y-6 p-3 md:p-4">
+        {asserted > 0 && <AssertedBanner count={asserted} />}
         {/* 7.1 Per-product table */}
         <div className="overflow-x-auto rounded-lg border" role="region" aria-label="Per-product comparison" tabIndex={0}>
           <table className="w-full min-w-[720px] border-collapse text-left text-xs" data-testid="table-summary-products">
@@ -56,9 +60,15 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
               <tr>
                 <th scope="col" className="px-2.5 py-2 font-bold">Item code</th>
                 <th scope="col" className="px-2.5 py-2 font-bold">Product</th>
+                <th scope="col" className="px-2.5 py-2 font-bold">Group</th>
+                <th scope="col" className="px-2.5 py-2 text-right font-bold">Our MRP</th>
                 <th scope="col" className="px-2.5 py-2 text-right font-bold">Qty</th>
                 <th scope="col" className="bg-indigo-50/80 px-2.5 py-2 text-right font-bold text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">Our net total</th>
-                {brands.map((b) => <th key={b} scope="col" className="px-2.5 py-2 text-right font-bold">{b}</th>)}
+                {brands.map((b) => (
+                  <th key={b.key} scope="col" className="px-2.5 py-2 text-right font-bold">
+                    <span className="inline-flex items-center gap-1">{b.brand}{b.adHoc && <AdHocBadge />}</span>
+                  </th>
+                ))}
                 <th scope="col" className="px-2.5 py-2 font-bold">Best competitor</th>
                 <th scope="col" className="px-2.5 py-2 text-right font-bold">Gap vs best</th>
               </tr>
@@ -70,29 +80,40 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
                 const gap = best ? calculatorPosition(r.our.total, best.total) : null;
                 return (
                   <tr key={r.block.id} data-testid={`row-summary-${r.block.id}`}>
-                    <td className="px-2.5 py-2 font-mono font-black text-primary">{r.block.itemCode}</td>
+                    <td className="whitespace-pre px-2.5 py-2 font-mono font-black text-primary">{r.block.itemCode}{r.adHocProduct && <span className="ml-1 align-middle"><AdHocBadge /></span>}</td>
                     <td className="max-w-[260px] truncate px-2.5 py-2 font-medium" title={r.product?.productName ?? undefined}>
                       {r.product?.productName ?? "Unnamed product"}
                       {r.block.variant !== "Standard" && <span className="ml-1 text-muted-foreground">· {r.block.variant}</span>}
                     </td>
+                    <td className="px-2.5 py-2 text-muted-foreground">{r.adHocProduct ? "Ad-hoc" : [r.product?.division, r.product?.category].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="px-2.5 py-2 text-right">
+                      <span className="inline-flex flex-col items-end gap-0.5">
+                        <span className="font-mono tabular-nums">{formatMoney(r.our.effectivePrice, "—")}</span>
+                        <PriceStateBadge state={r.our.priceState} />
+                        {r.our.priceState === "Edited" && r.our.appPrice != null && <span className="text-[10px] text-muted-foreground">app: {r.our.appPrice.toFixed(2)}</span>}
+                      </span>
+                    </td>
                     <td className="px-2.5 py-2 text-right font-mono tabular-nums">{r.our.quantity ?? "—"}</td>
                     <td className="bg-indigo-50/30 px-2.5 py-2 text-right font-mono font-bold tabular-nums dark:bg-indigo-950/10">{formatMoney(r.our.total)}</td>
                     {brands.map((b) => {
-                      const c = r.competitors.find((x) => x.competitor === b);
+                      const c = r.competitors.find((x) => keyOf(x) === b.key);
                       return (
-                        <td key={b} className="px-2.5 py-2 text-right font-mono tabular-nums">
+                        <td key={b.key} className="px-2.5 py-2 text-right font-mono tabular-nums">
                           {c ? (
                             <span className="inline-flex items-center gap-1">
                               {!!c.notes.length && <span title={c.notes.join(" ")}><Info className="h-3 w-3 text-muted-foreground" aria-label={c.notes.join(" ")} /></span>}
                               {!!c.warnings.length && <span title={c.warnings.join(" ")}><AlertTriangle className="h-3 w-3 text-amber-600" aria-label={c.warnings.join(" ")} /></span>}
                               {formatMoney(c.total, "No price")}
                             </span>
+                          ) : null}
+                          {c ? (
+                            <span className="mt-0.5 flex justify-end gap-1"><PriceStateBadge state={c.priceState} />{c.priceState === "Edited" && c.appPrice != null && <span className="text-[10px] text-muted-foreground">app: {c.appPrice.toFixed(2)}</span>}</span>
                           ) : <span className="text-muted-foreground" aria-label="Not selected">—</span>}
                           {c?.unitMismatch && <span className="block whitespace-pre-wrap text-[10px] text-amber-700">Unit: {c.quote?.unit}</span>}
                         </td>
                       );
                     })}
-                    <td className="px-2.5 py-2 font-semibold">{best?.competitor ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-2.5 py-2 font-semibold">{best ? <span className="inline-flex items-center gap-1">{best.competitor}{best.adHoc && <AdHocBadge />}</span> : <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-2.5 py-2 text-right">
                       {gap ? (
                         <span className="inline-flex flex-col items-end gap-0.5">
@@ -124,12 +145,32 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
                 </div>
               ))}
             </dl>
+            <div className="rounded-lg border p-2.5 text-xs" data-testid="panel-provenance-counts">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Prices</span>
+                {(["App", "Edited", "Entered"] as const).map((st) => (
+                  <span key={st} className="inline-flex items-center gap-1" data-testid={`text-price-count-${st}`}>
+                    <PriceStateBadge state={st} /> <strong className="font-mono tabular-nums">{summary.priceCounts[st]}</strong>
+                  </span>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                <span data-testid="text-adhoc-products">Ad-hoc products: <strong className="text-foreground">{summary.adHocProducts}</strong></span>
+                <span data-testid="text-adhoc-competitors">
+                  Ad-hoc competitors: <strong className="text-foreground">{summary.adHocCompetitors.length}</strong>
+                  {summary.adHocCompetitors.length > 0 && <> ({summary.adHocCompetitors.join(", ")})</>}
+                </span>
+              </div>
+            </div>
             <ul className="divide-y rounded-lg border">
               {summary.brands.length === 0 && <li className="p-3 text-xs text-muted-foreground">No competitors selected yet.</li>}
               {summary.brands.map((b) => (
-                <li key={b.brand} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-xs" data-testid={`row-brand-total-${b.brand}`}>
-                  <span className="min-w-[96px] font-bold">{b.brand}</span>
-                  <span className="text-muted-foreground">compared on <strong className="text-foreground">{b.compared} of {b.products}</strong> products</span>
+                <li key={b.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-xs" data-testid={`row-brand-total-${b.key}`}>
+                  <span className="inline-flex min-w-[96px] items-center gap-1 font-bold">{b.brand}{b.adHoc && <AdHocBadge />}</span>
+                  <span className="text-muted-foreground">
+                    compared on <strong className="text-foreground">{b.compared} of {b.products}</strong> products
+                    {b.adHocProducts > 0 && <>, <strong className="text-fuchsia-800 dark:text-fuchsia-300">{b.adHocProducts}</strong> of which {b.adHocProducts === 1 ? "was" : "were"} hand-entered</>}
+                  </span>
                   {b.compared > 0 ? (
                     <>
                       <span className="font-mono font-semibold tabular-nums">{formatMoney(b.competitorValue)}</span>
@@ -151,8 +192,8 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
               <ul className="divide-y rounded-lg border">
                 {summary.brands.length === 0 && <li className="p-3 text-xs text-muted-foreground">Add competitors to see where we win.</li>}
                 {summary.brands.map((b) => (
-                  <li key={b.brand} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-xs" data-testid={`row-position-counts-${b.brand}`}>
-                    <span className="min-w-[96px] font-bold">{b.brand}</span>
+                  <li key={b.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-xs" data-testid={`row-position-counts-${b.key}`}>
+                    <span className="inline-flex min-w-[96px] items-center gap-1 font-bold">{b.brand}{b.adHoc && <AdHocBadge />}</span>
                     <span>we are cheaper on <strong className="text-amber-700 dark:text-amber-300">{b.cheaper}</strong></span>
                     <span>at par on <strong>{b.par}</strong></span>
                     <span>higher on <strong className="text-rose-700 dark:text-rose-300">{b.higher}</strong></span>
@@ -174,3 +215,12 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
     </section>
   );
 });
+
+export function AssertedBanner({ count }: { count: number }) {
+  return (
+    <div role="status" className="flex items-start gap-2 rounded-lg border border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-xs font-semibold text-fuchsia-900 dark:border-fuchsia-900/60 dark:bg-fuchsia-950/30 dark:text-fuchsia-200" data-testid="banner-asserted-prices">
+      <PenLine className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{calculatorAssertedBanner(count)}</span>
+    </div>
+  );
+}

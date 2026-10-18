@@ -57,3 +57,4 @@
 - [Presentation compatibility](presentation-compatibility.md) — XML/ZIP checks do not prove PPTX files open; use a standard serializer and verify an actual office render.
 - [ERP division policy](erp-division-policy.md) — composites are source-sheet provenance, not membership; Sink includes floor traps/plate racks and retains PTMT as its MRP source.
 - [Calculator comparability](calculator-comparability.md) — compare basis and unit separately; misplaced basis tokens in unit fields are data-shape problems, not basis mismatches.
+- [Calculator assertions](calculator-free-entry.md) — basket-only App/Edited/Entered prices; unscoped quoting is not permission to alter Price Finder or analytics.

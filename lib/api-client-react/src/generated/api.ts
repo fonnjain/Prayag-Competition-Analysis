@@ -62,6 +62,8 @@ import type {
   BucketMoveResult,
   BulkMappingResult,
   BulkMappingUpdate,
+  CalculatorCompetitorOptions,
+  CalculatorSearchResult,
   CatalogDataHealth,
   CatalogFilters,
   CatalogNameChangeApplyResponse,
@@ -135,6 +137,8 @@ import type {
   GetMrpGeneratorFreshnessParams,
   GetMrpIncreasesParams,
   GetMrpMatchingWorkbenchParams,
+  GetPriceCalculatorCompetitorsParams,
+  GetPriceCalculatorSearchParams,
   GetPriceEditorEditsParams,
   GetPriceEditorProductParams,
   GetPriceFinderBrowseParams,
@@ -2251,6 +2255,174 @@ export function useGetPriceFinderCalculatorRows<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPriceFinderCalculatorRowsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPriceCalculatorSearchUrl = (params?: GetPriceCalculatorSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/calculator/search?${stringifiedParams}` : `/api/price-finder/calculator/search`
+}
+
+/**
+ * @summary Calculator-only full-catalogue search, browse and exact-code identity
+ */
+export const getPriceCalculatorSearch = async (params?: GetPriceCalculatorSearchParams, options?: RequestInit): Promise<CalculatorSearchResult> => {
+
+  return customFetch<CalculatorSearchResult>(getGetPriceCalculatorSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceCalculatorSearchQueryKey = (params?: GetPriceCalculatorSearchParams,) => {
+    return [
+    `/api/price-finder/calculator/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceCalculatorSearchQueryOptions = <TData = Awaited<ReturnType<typeof getPriceCalculatorSearch>>, TError = ErrorType<void>>(params?: GetPriceCalculatorSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceCalculatorSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceCalculatorSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceCalculatorSearch>>> = ({ signal }) => getPriceCalculatorSearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceCalculatorSearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceCalculatorSearchQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceCalculatorSearch>>>
+export type GetPriceCalculatorSearchQueryError = ErrorType<void>
+
+
+/**
+ * @summary Calculator-only full-catalogue search, browse and exact-code identity
+ */
+
+export function useGetPriceCalculatorSearch<TData = Awaited<ReturnType<typeof getPriceCalculatorSearch>>, TError = ErrorType<void>>(
+ params?: GetPriceCalculatorSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceCalculatorSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceCalculatorSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPriceCalculatorCompetitorsUrl = (params?: GetPriceCalculatorCompetitorsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/price-finder/calculator/competitors?${stringifiedParams}` : `/api/price-finder/calculator/competitors`
+}
+
+/**
+ * @summary Calculator-only stored competitor spellings, without bucket exclusions
+ */
+export const getPriceCalculatorCompetitors = async (params?: GetPriceCalculatorCompetitorsParams, options?: RequestInit): Promise<CalculatorCompetitorOptions> => {
+
+  return customFetch<CalculatorCompetitorOptions>(getGetPriceCalculatorCompetitorsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPriceCalculatorCompetitorsQueryKey = (params?: GetPriceCalculatorCompetitorsParams,) => {
+    return [
+    `/api/price-finder/calculator/competitors`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPriceCalculatorCompetitorsQueryOptions = <TData = Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>, TError = ErrorType<void>>(params?: GetPriceCalculatorCompetitorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPriceCalculatorCompetitorsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>> = ({ signal }) => getPriceCalculatorCompetitors(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPriceCalculatorCompetitorsQueryResult = NonNullable<Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>>
+export type GetPriceCalculatorCompetitorsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Calculator-only stored competitor spellings, without bucket exclusions
+ */
+
+export function useGetPriceCalculatorCompetitors<TData = Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>, TError = ErrorType<void>>(
+ params?: GetPriceCalculatorCompetitorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPriceCalculatorCompetitors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPriceCalculatorCompetitorsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

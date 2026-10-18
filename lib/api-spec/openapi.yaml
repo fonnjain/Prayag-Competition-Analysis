@@ -647,11 +647,43 @@ paths:
         - {name: asOf, in: query, schema: {type: string, format: date}}
       responses:
         "200":
-          description: Prices within current company and personal scope
+          description: Full-catalogue evidence without company or personal bucket restrictions
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PriceFinderCalculatorResponse"}
         "400": {description: Invalid date or more than fifty codes}
+  /price-finder/calculator/search:
+    get:
+      operationId: getPriceCalculatorSearch
+      tags: [catalog]
+      summary: Calculator-only full-catalogue search, browse and exact-code identity
+      parameters:
+        - {name: q, in: query, schema: {type: string, maxLength: 1024}}
+        - {name: division, in: query, schema: {type: string}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: asOf, in: query, schema: {type: string, format: date}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 300}}
+      responses:
+        "200":
+          description: Unscoped catalogue options; exact identity preserves every character
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CalculatorSearchResult"}
+        "400": {description: Invalid search parameters}
+  /price-finder/calculator/competitors:
+    get:
+      operationId: getPriceCalculatorCompetitors
+      tags: [catalog]
+      summary: Calculator-only stored competitor spellings, without bucket exclusions
+      parameters:
+        - {name: asOf, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: All stored competitor names, including brands without a current price
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CalculatorCompetitorOptions"}
+        "400": {description: Invalid date}
   /price-finder/discount-defaults:
     get:
       operationId: getPriceFinderDiscountDefaults
@@ -5897,6 +5929,9 @@ components:
         variant: {type: string}
         discount: {type: string}
         quantity: {type: string}
+        mrp: {type: string, description: "Basket-only MRP override; absent means use the current app value"}
+        adHocProduct: {type: boolean}
+        description: {type: string}
         competitors:
           type: array
           maxItems: 10
@@ -5907,6 +5942,55 @@ components:
               id: {type: string}
               competitor: {type: [string, "null"]}
               discount: {type: string}
+              mrp: {type: string}
+              adHoc: {type: boolean}
+    CalculatorProductOption:
+      type: object
+      required: [itemCode, productName, division, category]
+      properties:
+        itemCode: {type: string}
+        productName: {type: [string, "null"]}
+        division: {type: [string, "null"]}
+        category: {type: [string, "null"]}
+    CalculatorSearchResult:
+      type: object
+      required: [results, divisions, categories, exactProduct]
+      properties:
+        results: {type: array, items: {$ref: "#/components/schemas/CalculatorProductOption"}}
+        exactProduct:
+          anyOf:
+            - {$ref: "#/components/schemas/CalculatorProductOption"}
+            - {type: "null"}
+        divisions:
+          type: array
+          items:
+            type: object
+            required: [division, count]
+            properties:
+              division: {type: string}
+              count: {type: number}
+        categories:
+          type: array
+          items:
+            type: object
+            required: [category, label, count]
+            properties:
+              category: {type: [string, "null"]}
+              label: {type: string}
+              count: {type: number}
+    CalculatorCompetitorOptions:
+      type: object
+      required: [competitors]
+      properties:
+        competitors:
+          type: array
+          items:
+            type: object
+            required: [competitor, pricedProducts, effectiveDate]
+            properties:
+              competitor: {type: string}
+              pricedProducts: {type: number}
+              effectiveDate: {type: [string, "null"]}
     PriceFinderCalculatorResponse:
       type: object
       required: [asOfDate, rows, scopeDisclosure, unavailableCodes]
@@ -5914,6 +5998,10 @@ components:
         asOfDate: {type: string}
         scopeDisclosure: {type: array, items: {type: string}}
         unavailableCodes: {type: array, items: {type: string}}
+        catalogueCodes:
+          type: array
+          items: {type: string}
+          description: Exact known identities, including date-ineligible codes that must never become ad-hoc aliases.
         rows:
           type: array
           items:

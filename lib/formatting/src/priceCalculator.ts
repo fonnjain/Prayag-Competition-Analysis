@@ -1,8 +1,26 @@
 /** Pure, shared invoice arithmetic. No settings, prices or state are written. */
 export type CalculatorBlock = {
   id: string; itemCode: string | null; variant: string; discount: string; quantity: string;
-  competitors: { id: string; competitor: string | null; discount: string }[];
+  /** Basket-only assertions. Undefined MRP means use the freshly resolved app value. */
+  mrp?: string; adHocProduct?: boolean; description?: string;
+  competitors: { id: string; competitor: string | null; discount: string; mrp?: string; adHoc?: boolean }[];
 };
+export type CalculatorPriceState = "App" | "Edited" | "Entered";
+export const CALCULATOR_SCOPE_DISCLOSURE = "This calculator searches the full product catalogue and all competitors, without bucket or company filters, and allows one-off competitors and products typed in by hand. It is a quoting aid, not a source of record.";
+export const CALCULATOR_AD_HOC_NOTE = "price entered by user — basis and unit unverified";
+export const calculatorAssertedBanner = (count: number) => `This comparison includes ${count} hand-entered or edited prices. These figures are unverified.`;
+/** Deliberate one-off Astral and recorded Astral are different basket identities. */
+export const calculatorCompetitorKey = (c: { competitor: string | null; adHoc?: boolean }) => JSON.stringify([!!c.adHoc, c.competitor]);
+export function mrpError(value: string): string | null {
+  return !/^\d+(\.\d{1,2})?$/.test(value) || !Number.isFinite(Number(value)) || Number(value) <= 0
+    ? "MRP must be a positive number with at most 2 decimal places." : null;
+}
+export function calculatorPriceInput(appPrice: number | null, entered?: string) {
+  const priceState: CalculatorPriceState = appPrice == null ? "Entered"
+    : entered === undefined || (mrpError(entered) === null && Number(entered) === appPrice) ? "App" : "Edited";
+  const error = entered === undefined ? appPrice == null ? mrpError("") : null : mrpError(entered);
+  return { priceState, appPrice, effectivePrice: error ? null : entered === undefined ? appPrice : Number(entered), error };
+}
 export type CalculatorPrice = { price: number | null; effectiveDate: string | null };
 export type CalculatorMetadata = { basis: string | null; unit: string | null };
 const basisKey = (value: string | null) => value?.trim().toLowerCase() ?? "";
@@ -80,20 +98,33 @@ export function calculatorPosition(ours: number | null, theirs: number | null) {
   return { diffUnit, diffPct, direction, label: direction === "missing" ? "No price" : direction === "par" ? "At par"
     : `${diffPct == null ? "Percentage unavailable" : `${Math.abs(diffPct).toFixed(1)}%`} ${direction} us` };
 }
-export function resolveCalculator(blocks: CalculatorBlock[], evidence: CalculatorEvidence[]) {
+export function resolveCalculator(blocks: CalculatorBlock[], evidence: CalculatorEvidence[], catalogueCodes?: readonly string[]) {
   const byCode = new Map(evidence.map(p => [p.itemCode, p]));
+  const knownCodes = new Set(catalogueCodes ?? evidence.map(p => p.itemCode));
   return blocks.filter(b => b.itemCode).map(block => {
-    const product = byCode.get(block.itemCode!);
+    const recorded = byCode.get(block.itemCode!);
+    const adHocProduct = !knownCodes.has(block.itemCode!) && !recorded && block.adHocProduct === true && !!block.description?.trim();
+    const product: CalculatorEvidence | undefined = recorded ?? (adHocProduct ? {
+      itemCode: block.itemCode!, productName: block.description!, division: null, category: null,
+      priceBasis: "basis not recorded · unit not recorded", basis: null, unit: null,
+      prayag: { price: null, effectiveDate: null }, variants: [{ variant: "Standard", price: null, effectiveDate: null, basis: null }],
+      competitors: [], hasRecordedCompetitorPrice: false,
+    } : undefined);
     const price = product?.variants.find(v => v.variant === block.variant);
     // A missing variant is missing evidence, never a Standard-price fallback.
-    const our = calculatorRow(price?.price ?? null, block.discount, block.quantity);
+    const ourInput = calculatorPriceInput(price?.price ?? null, block.mrp);
+    const ourRow = calculatorRow(product ? ourInput.effectivePrice : null, block.discount, block.quantity);
+    const our = { ...ourRow, ...ourInput, errors: { ...ourRow.errors, mrp: product ? ourInput.error : null } };
     const ourPriceBasis = product && "basis" in product
       ? `${(price && "basis" in price ? price.basis : product.basis) || "basis not recorded"} · ${product.unit || "unit not recorded"}`
       : product?.priceBasis ?? "basis not recorded";
     const competitors = block.competitors.filter(c => c.competitor).map(c => {
-      const quote = product?.competitors.find(q => q.competitor === c.competitor);
-      const row = calculatorRow(quote?.price ?? null, c.discount, block.quantity);
-      const checks = product && quote && "basis" in product && "basis" in quote
+      const quote = c.adHoc ? undefined : product?.competitors.find(q => q.competitor === c.competitor);
+      const input = calculatorPriceInput(quote?.price ?? null, c.mrp);
+      const row = calculatorRow(product ? input.effectivePrice : null, c.discount, block.quantity);
+      const checks = c.adHoc ? { basisMismatch: false, unitMismatch: false, unitNotRecorded: true,
+        basisWarning: null, unitWarning: null, unitNote: "Competitor unit not recorded." }
+        : product && quote && "basis" in product && "basis" in quote
         ? compareCalculatorMetadata({ basis: price && "basis" in price ? price.basis ?? null : product.basis ?? null, unit: product.unit ?? null },
           { basis: quote.basis ?? null, unit: quote.unit ?? null })
         : { basisMismatch: !!quote?.basisMismatch, unitMismatch: !!quote?.unitMismatch && !quote?.unitNotRecorded,
@@ -103,19 +134,21 @@ export function resolveCalculator(blocks: CalculatorBlock[], evidence: Calculato
           unitNote: quote?.unitNote ?? "Competitor unit not recorded." };
       const variantMismatch = !!quote && block.variant !== "Standard";
       const variantWarning = variantMismatch ? `Competitor colour variant is not recorded; comparison with ${block.variant} is unconfirmed.` : null;
-      const notes = checks.unitNotRecorded ? [checks.unitNote!] : [];
+      const notes = [...(checks.unitNotRecorded ? [checks.unitNote!] : []),
+        ...(c.adHoc ? [CALCULATOR_AD_HOC_NOTE] : [])];
       const warnings = [
         ...(checks.basisMismatch ? [checks.basisWarning!] : []),
         ...(checks.unitMismatch ? [checks.unitWarning!] : []),
         ...(variantWarning ? [variantWarning] : []),
       ];
-      return { ...c, quote, ...row, position: calculatorPosition(our.netUnit, row.netUnit),
+      return { ...c, quote, ...row, ...input, errors: { ...row.errors, mrp: input.error },
+        position: calculatorPosition(our.netUnit, row.netUnit),
         diffTotal: our.total == null || row.total == null ? null : Math.round((row.total - our.total) * 100) / 100,
         basisMismatch: checks.basisMismatch, unitMismatch: checks.unitMismatch, unitNotRecorded: checks.unitNotRecorded,
         basisWarning: checks.basisWarning, unitWarning: checks.unitWarning, variantWarning,
         variantMismatch, warnings, notes };
     });
-    return { block, product, price, our, ourPriceBasis, competitors };
+    return { block, product, adHocProduct, price, our, ourPriceBasis, competitors };
   });
 }
 export type ResolvedCalculator = ReturnType<typeof resolveCalculator>;
@@ -130,8 +163,15 @@ export function bestCalculatorCompetitor(row: ResolvedCalculator[number]) {
 const addMoney = (a: number, b: number) => (Math.round(a * 100) + Math.round(b * 100)) / 100;
 export function summarizeCalculator(rows: ResolvedCalculator) {
   const available = rows.filter(r => r.product);
-  const brands = [...new Set(available.flatMap(r => r.competitors.map(c => c.competitor!)))].sort();
+  const brands = [...new Map(available.flatMap(r => r.competitors.map(c => [calculatorCompetitorKey(c), c] as const))).entries()]
+    .sort((a, b) => a[1].competitor!.localeCompare(b[1].competitor!) || Number(!!a[1].adHoc) - Number(!!b[1].adHoc));
+  const prices = available.flatMap(r => [r.our, ...r.competitors]).filter(p => p.effectivePrice != null);
+  const priceCounts = { App: 0, Edited: 0, Entered: 0 };
+  prices.forEach(p => { priceCounts[p.priceState]++; });
+  const adHocProducts = available.filter(r => r.adHocProduct).length;
   return {
+    priceCounts, assertedPrices: priceCounts.Edited + priceCounts.Entered, adHocProducts,
+    adHocCompetitors: [...new Set(available.flatMap(r => r.competitors.filter(c => c.adHoc).map(c => c.competitor!)))],
     products: available.length,
     totalQuantity: available.reduce((n, r) => n + (r.our.quantity ?? 0), 0),
     ourValue: available.reduce((n, r) => addMoney(n, r.our.total ?? 0), 0),
@@ -143,14 +183,15 @@ export function summarizeCalculator(rows: ResolvedCalculator) {
     unitMismatchRows: available.reduce((n, r) => n + r.competitors.filter(c => c.unitMismatch).length, 0),
     unitNotRecordedRows: available.reduce((n, r) => n + r.competitors.filter(c => c.unitNotRecorded).length, 0),
     variantMismatchRows: available.reduce((n, r) => n + r.competitors.filter(c => c.variantMismatch).length, 0),
-    brands: brands.map(brand => {
+    brands: brands.map(([key, selected]) => {
+      const brand = selected.competitor!;
       const pairs = available.flatMap(r => {
-        const c = r.competitors.find(c => c.competitor === brand);
+        const c = r.competitors.find(c => calculatorCompetitorKey(c) === key);
         return c?.total != null && r.our.total != null ? [{ r, c }] : [];
       });
       const ourValue = pairs.reduce((n, p) => addMoney(n, p.r.our.total!), 0);
       const competitorValue = pairs.reduce((n, p) => addMoney(n, p.c.total!), 0);
-      return { brand, compared: pairs.length, products: available.length,
+      return { brand, key, adHoc: !!selected.adHoc, adHocProducts, compared: pairs.length, products: available.length,
         ourValue: pairs.length ? ourValue : null, competitorValue: pairs.length ? competitorValue : null,
         position: calculatorPosition(pairs.length ? ourValue : null, pairs.length ? competitorValue : null),
         cheaper: pairs.filter(p => p.c.position.direction === "above").length,
@@ -170,7 +211,7 @@ export function calculatorDisclosures(summary: ReturnType<typeof summarizeCalcul
     ...(summary.unitNotRecordedRows ? [`${summary.unitNotRecordedRows} rows: unit not recorded (information only).`] : []),
     ...(summary.variantMismatchRows ? [`${summary.variantMismatchRows} rows compare a colour variant without confirmed competitor variant evidence.`] : []),
     ...(summary.noOurPrice ? [`${summary.noOurPrice} products have no usable Prayag price and are excluded from value comparisons.`] : []),
-    ...(summary.unavailableProducts ? [`${summary.unavailableProducts} products are unavailable under the current date or scope.`] : []),
-    ...scope,
+    ...(summary.unavailableProducts ? [`${summary.unavailableProducts} products are unavailable under the current date.`] : []),
+    CALCULATOR_SCOPE_DISCLOSURE,
   ];
 }
