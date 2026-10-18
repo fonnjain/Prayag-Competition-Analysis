@@ -74,3 +74,19 @@ counts prominently before/after. Undo may restore recorded original composite
 strings. Before production Apply, stop if the production disclosure has any
 out-of-vocabulary divisions. Fixture ownership/cleanup is separate, later work;
 do not undertake it as part of remediation.
+
+Production division runbooks may identify the live operation through its actual
+preview response and exact reviewed change set; an unavailable serving-commit
+identity is not itself a blocker for this approved remediation.
+
+**Why:** The user replaced the commit/guard-identity precondition with direct
+inspection of 294 exact changes, the seven approved from/to groups, valid targets,
+and the projected outside-seven report. Guard identity was not observable through
+the existing deployment metadata.
+
+**How to apply:** Preserve the fresh restore-sheet comparison and all post-apply
+assertions. If the report field is absent, verify no active/queued MRP load and
+perform Preview/Apply close together. The before report legitimately contains the
+57 approved composites; the projected after report must be empty. Loader Preview
+does not change catalogue rows but does create normal pending/provenance records;
+do not describe that POST as making no database writes.

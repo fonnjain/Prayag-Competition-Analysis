@@ -1804,3 +1804,32 @@ uri = "file://artifacts/pricing-logic-film/public/audio/bg_music.mp3"
 type = "audio"
 title = "bg music"
 description = "Generated music: Ambient electronic instrumental scoring a calm explainer about pricing logic. Soft pulsing synths, felt piano, light clicks, 96 BPM, thoughtful and precise, gentle lifts every ~18 se…"
+logical_id = "ebc577fe-d3f3-4da3-992a-f8385ad72045"
+
+[[outputs]]
+id = "TSSI1xY1vL35AbiMbo6pL"
+uri = "file://generated-artifacts/p068/P068-production-apply-report.md"
+type = "text"
+title = "Production division apply — full report"
+description = "Batch90, all query results, before/after checks, recovery hashes, browser limitations and separate build-info commit."
+logical_id = "15391216-c60d-494a-a4d0-76e25714697c"
+content_hash = "sha256:4f92dcfa7093c244c940070b34dbc0a89a7e1572b283a7e75b7ad697d02cc6a4"
+size = 8929
+mtime_ms = 1792318088328
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/15391216-c60d-494a-a4d0-76e25714697c/573c76de-433a-4831-b6fb-c299bef20ad5"
+storage_version_token = "1792318150428932"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "9XcN8Tr9dK2sNJNU4Dvi5"
+uri = "file://generated-artifacts/p068/P068-recovery-and-verification.zip"
+type = "unspecified"
+title = "Batch90 recovery and verification files"
+description = "Fresh 294-row restore XLSX/CSV, loader receipts and verification evidence. No session credentials included."
+logical_id = "092c409b-d403-4b75-8b2a-ce183040f8e0"
+content_hash = "sha256:4dae0ff175767eb32d1a4179c97398e0e7c18cbfdc252bd9d874d30cdf2c0bf1"
+size = 131477
+mtime_ms = 1792318108468
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/092c409b-d403-4b75-8b2a-ce183040f8e0/b6af2e8f-3891-4368-884f-789f8a9817d5"
+storage_version_token = "1792318151719783"
+content_type = "application/octet-stream"

@@ -1,0 +1,119 @@
+# P068 · COMPETITION · CODE — replaces P066 Step 1
+
+**Date:** 18 October 2026
+**Replaces:** P066 Step 1 and Stop condition 1, in full.
+**Unchanged:** P066 Steps 2–7. Go straight to them once this step clears.
+
+---
+
+## 0. My error
+
+P066 Step 1 demanded "the commit SHA production is serving" and "confirm the backend's four
+operation-scoped guards". **Nothing in this stack can supply either.** Replit's publish status
+returns a deployment id, a status and a URL — no source commit. There is no build-identity endpoint.
+Reading local code proves what is in the repository, not what is deployed, and you were right to say so.
+
+That is the same error I made with the canary and the dev guard: a precondition specified without
+checking that the environment can satisfy it. Third time, same family.
+
+**And the precondition itself was wrong.** Guard identity is not what has to be true before applying.
+What has to be true is that **the change set is correct.** The guard exists to catch a bad change
+set; Preview *produces* the change set, read-only. So inspect it directly instead of trusting an
+unverifiable intermediary.
+
+---
+
+## 1. Preview is the instrument
+
+Preview writes nothing. Run it, and read two things out of the response.
+
+### 1a. Is the §1 non-blocking report present?
+
+The re-scoped guard **added** reporting the old guard did not have: the list of divisions present
+but not among the seven, shown at preview. So:
+
+| In the preview response | Conclusion |
+|---|---|
+| The report field is **present**, even if empty | **Re-scoped guard confirmed.** Positive identification, read-only, free. |
+| The report field is **absent** | Either the old guard, or the new one with reporting unimplemented. Both worth knowing. See §3. |
+
+In production the list itself should be empty — production has no junk divisions, which your
+15:13:44 check is consistent with (7,191 products, 57 composites, 0 Sink is exactly the expected
+pre-apply state).
+
+### 1b. Is the change set correct?
+
+Check the preview output against P066 Step 3: **294 rows, exactly the seven from→to pairs, every
+target among the seven divisions.**
+
+If that holds, then every one of P065's blocking rules is satisfied **by the data, verified by your
+inspection** — not by trusting that the guard is there to catch it:
+
+- rule 1, every written value in `PRODUCT_DIVISIONS` → readable from the seven target values;
+- rule 2, no written value contains `|` → readable from the same;
+- rule 4, source fingerprint → existing behaviour, present in both builds.
+
+---
+
+## 2. Why the commit question is immaterial to *this* operation
+
+Worth being explicit, because it is the reason this is safe rather than merely convenient.
+
+The old guard's blocking rule was **global distinct divisions = exactly seven.** Production has no
+divisions outside the seven and no junk fixtures. The post-apply projection is exactly seven. **So
+the old guard permits this apply too.** The two guards only diverge where out-of-vocabulary
+divisions exist — which was development's 38 fixtures, not production.
+
+And if the old guard is live and does block, the failure mode is already proven: development gave
+**HTTP 409, transaction rolled back, 6,948 rows byte-identical.** A refusal costs one rolled-back
+transaction and tells you immediately which build is running.
+
+So the realistic outcomes are: it applies correctly, or it refuses harmlessly and identifies itself.
+
+---
+
+## 3. If the report field is absent
+
+One rule may genuinely be missing in that case: **rule 3, preview change-set equals apply
+change-set.** Without it, a concurrent write to `catalog_products.division` between preview and apply
+would not be caught at apply time.
+
+The only other writer of that column is the MRP loader (`authoritativeMrpMaster.ts`). So:
+
+- **confirm no MRP load is running or queued**, then run preview and apply back to back, minutes
+  apart, not hours;
+- P066 Step 5's assertions catch drift after the fact — the 294 count, the distribution summing to
+  7,191, and the re-preview returning 0;
+- both recovery paths stand: the batch undo and the restore sheet.
+
+Residual risk: drift occurs, the apply writes a slightly different set, the assertions catch it, you
+undo. Recoverable. **Proceed on that basis** — this is my call, and the reasoning is above so you
+can disagree with it.
+
+### ⛔ Revised stop condition 1
+Stop only if the preview count is not 294, a from→to pair is not in the P066 Step 3 table, a target
+value is outside the seven, or the non-blocking report is present **and not empty**. Guard identity
+being unproven is **no longer a stop condition.**
+
+---
+
+## 4. Separately — close this blocker permanently
+
+Add a build-info endpoint so this never recurs: `GET /api/_build` returning the commit SHA, branch
+and build timestamp, injected at build time. A few lines, no data access, no auth surface.
+
+Every production runbook from here on becomes verifiable in one read-only call, and "which code is
+deployed" stops being an unanswerable question. **Do this as its own commit, after the division
+apply** — not before, and not bundled with it. The apply has been deferred twice already and does not
+need another dependency in front of it.
+
+---
+
+## Done criteria
+
+- [ ] Preview run; report-field presence recorded either way
+- [ ] Change set confirmed: 294 rows, seven known pairs, all targets among the seven
+- [ ] If the report is present, it is empty
+- [ ] No MRP load running; preview and apply done back to back
+- [ ] …then P066 Steps 2–7 exactly as written
+- [ ] Build-info endpoint logged for after the apply
