@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { drizzle } from "drizzle-orm/node-postgres";
 import express from "express";
 import supertest from "supertest";
@@ -11,8 +13,10 @@ vi.mock("@workspace/db", async original => {
 });
 import { pool } from "@workspace/db";
 import router from "./priceCalculator";
+import analysisRouter from "./analysis";
 import { withBucketContext, bucketRouteApplies } from "../lib/bucketFilter";
 import { readFinderEvidence } from "../lib/priceFinderEvidence";
+import { scopedFinderCompetitors } from "../lib/priceFinderCompetitors";
 import { CALCULATOR_SCOPE_DISCLOSURE } from "@workspace/formatting";
 const schema = `pf_calc_${randomUUID().replaceAll("-", "")}`;
 const connect = () => pool.connect();
@@ -46,7 +50,7 @@ function app(role?: "admin" | "user", scope = false) {
       { competitor: "Brand", codes: null },
     ], noCompetitorPriceCount: 1 }, () => next()); else next();
   });
-  a.use(router); return a;
+  a.use(router); a.use(analysisRouter); return a;
 }
 const requestBlock = (code = "A") => ({
   id: "b", itemCode: code, variant: "Standard", discount: "20", quantity: "7",
@@ -150,6 +154,15 @@ describe("public read-only calculator endpoints", () => {
       .query({ q, asOf: "2026-05-01" });
     expect((await search(" A")).body.exactProduct.itemCode).toBe(" A");
     expect((await search("TTS - 01")).body.exactProduct).toBe(null);
+    // Seeing a near-match in the picker is not acceptance of that identity.
+    const unresolved = await supertest(app()).get("/price-finder/calculator/rows")
+      .query({ code: "TTS - 01", asOf: "2026-05-01" }).expect(200);
+    expect(unresolved.body.rows).toEqual([]);
+    expect(unresolved.body.catalogueCodes).toEqual([]);
+    expect(unresolved.body.unavailableCodes).toEqual(["TTS - 01"]);
+    const accepted = await supertest(app()).get("/price-finder/calculator/rows")
+      .query({ code: "TTS-01", asOf: "2026-05-01" }).expect(200);
+    expect(accepted.body.rows[0].itemCode).toBe("TTS-01");
     expect((await search("tts-01")).body.exactProduct).toBe(null);
     expect((await search("TTS-01 ")).body.exactProduct).toBe(null);
     const p = (await search("P")).body.exactProduct;
@@ -182,6 +195,10 @@ describe("public read-only calculator endpoints", () => {
     const summary = XLSX.utils.sheet_to_json<any[]>(book.Sheets.Summary, { header: 1 });
     expect(rows[0][0]).toContain("6 hand-entered or edited prices");
     expect(summary[0][0]).toEqual(rows[0][0]); expect(rows[0][0]).toContain("unverified");
+    for (const sheet of [rows, summary]) {
+      expect(sheet.flat().filter(value => value === CALCULATOR_SCOPE_DISCLOSURE)).toHaveLength(1);
+      expect(sheet.flat()).not.toContain("Company test");
+    }
     const start = rows.findIndex(r => r[0] === "Code");
     const data = rows.slice(start + 1);
     expect(data[0][26]).toBe("Edited"); expect(data[0][27]).toBe(92);
@@ -207,17 +224,40 @@ describe("public read-only calculator endpoints", () => {
     expect(rows.find(r => r[0] === "TTS-01")?.[1]).toBe("Exact code");
     expect(rows.find(r => r[0] === "TTS-01")?.[30]).toBe("No");
   });
-  it("a complete calculator free-entry session leaves all stored source rows and brand spellings byte-identical", async () => {
+  it("a complete free-entry session leaves four stored tables, brand vocabulary, coverage and analytics byte-identical", async () => {
+    const sha256 = (bytes: string) => createHash("sha256").update(bytes).digest("hex");
     const snapshot = async () => {
       const result: Record<string, string> = {};
       for (const table of ["catalog_products", "competitor_prices", "mrp_price_history", "discount_settings"]) {
-        result[table] = (await client.query(`SELECT coalesce(json_agg(row_to_json(t) ORDER BY row_to_json(t)::text),'[]')::text AS bytes FROM ${table} t`)).rows[0].bytes;
+        result[table] = (await client.query(`SELECT coalesce(json_agg(row_to_json(t) ORDER BY row_to_json(t)::text COLLATE "C"),'[]')::text AS bytes FROM ${table} t`)).rows[0].bytes;
       }
       // This app has no competitor master: DISTINCT price-row text is its stored brand vocabulary.
-      result.brandVocabulary = JSON.stringify((await client.query("SELECT DISTINCT competitor FROM competitor_prices ORDER BY competitor")).rows);
+      result.brandVocabulary = JSON.stringify((await client.query('SELECT competitor FROM (SELECT DISTINCT competitor FROM competitor_prices) brands ORDER BY competitor COLLATE "C"')).rows);
       return result;
     };
+    const aggregatePaths = [
+      "/analysis/overview", "/analysis/by-brand", "/analysis/by-category",
+      "/analysis/positioning", "/analysis/coverage-matrix", "/analysis/opportunities",
+    ];
+    const aggregateSnapshot = async () => {
+      const result: Record<string, string> = {
+        finderCoverage: JSON.stringify(await scopedFinderCompetitors({ itemCodes: [], division: null, category: null }, "2026-05-01")),
+      };
+      for (const path of aggregatePaths) {
+        // Use the real pricing-analytics routes, fixed date and MRP mode.
+        // Net-mode default seeding is unrelated to calculator persistence.
+        const response = await supertest(app()).get(path)
+          .query({ effectivePeriod: "2026-05-01", mode: "mrp" }).expect(200);
+        result[path] = response.text;
+      }
+      return result;
+    };
+    const beforeAt = new Date().toISOString();
     const before = await snapshot();
+    const aggregatesBefore = await aggregateSnapshot();
+    // Nonempty official outputs prevent a vacuous unchanged-[] assertion.
+    expect(JSON.parse(aggregatesBefore.finderCoverage).competitors.length).toBeGreaterThan(0);
+    expect(JSON.parse(aggregatesBefore["/analysis/overview"]).comparableSkus).toBeGreaterThan(0);
     await supertest(app()).get("/price-finder/calculator/search").query({ q: "TTS - 01", asOf: "2026-05-01" }).expect(200);
     await supertest(app()).get("/price-finder/calculator/competitors").expect(200);
     await supertest(app()).get("/price-finder/calculator/rows").query({ code: ["A", "P"], asOf: "2026-05-01" }).expect(200);
@@ -231,7 +271,26 @@ describe("public read-only calculator endpoints", () => {
       { ...requestBlock("P"), id: "priced", mrp: "100", competitors: [] },
     ]);
     expect(result.status).toBe(200);
-    expect(await snapshot()).toEqual(before);
+    const aggregatesAfter = await aggregateSnapshot();
+    const after = await snapshot(), afterAt = new Date().toISOString();
+    expect(after).toEqual(before); // Full serialized row bytes, not just counts/hashes.
+    expect(aggregatesAfter).toEqual(aggregatesBefore); // Official output bytes, not basket totals.
+    const storedBrands = JSON.parse(after.brandVocabulary).map((r: { competitor: string }) => r.competitor);
+    for (const brand of ["Retailer brand", "Other typed brand"]) expect(storedBrands).not.toContain(brand);
+    const hashes = (a: Record<string, string>, b: Record<string, string>) => Object.fromEntries(
+      Object.keys(a).map(key => [key, { before: sha256(a[key]), after: sha256(b[key]), byteIdentical: a[key] === b[key] }]));
+    const report = {
+      environment: "disposable private test schema; no public data writes",
+      beforeAt, afterAt, algorithm: "SHA-256 over deterministic full-row JSON bytes",
+      separateBrandMasterTable: null, brandAuthorityTable: "competitor_prices",
+      storedTablesAndVocabulary: hashes(before, after), pricingAggregates: hashes(aggregatesBefore, aggregatesAfter),
+    };
+    console.info("CALCULATOR_NO_WRITE_PROOF", JSON.stringify(report));
+    const reportPath = process.env.CALCULATOR_NO_WRITE_REPORT_PATH;
+    if (reportPath) {
+      await mkdir(dirname(reportPath), { recursive: true });
+      await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
+    }
   });
 });
 

@@ -30,7 +30,7 @@ Price Finder, analytics and administrative loaders retain their existing rules.
 | Check | Result |
 |---|---|
 | Calculator API suite, private disposable schema | **11 passed** |
-| Price Finder tests, including calculator arithmetic and state | **37 passed** |
+| Price Finder tests, including calculator arithmetic and state | **38 passed** |
 | Shared-library typecheck | **Passed** |
 | API package typecheck | **Passed** |
 | Price Finder package typecheck | **Passed** |
@@ -67,6 +67,64 @@ ad-hoc competitors, search/evidence requests and Excel export. Exact serialized
 rows match for catalogue, competitor prices, MRP history and discount settings.
 This application has no separate competitor master; its distinct stored
 price-row brand vocabulary is also asserted unchanged.
+
+### Strengthened automated proof
+
+The no-write proof is an **automated integration test in the calculator API
+suite**, not only a manual observation. It executes calculator search, evidence
+reads and a real Excel export with two new ad-hoc competitor names, an ad-hoc
+product, edited own/recorded competitor MRPs and an entered MRP on an existing
+unpriced product. All four complete serialized tables are compared directly,
+not merely their counts or hashes.
+
+A read-only development schema inventory confirmed there is **no separate
+competitor/brand master table**. The stored brand authority is the text column
+`public.competitor_prices.competitor`. `discount_settings` also stores
+brand-keyed scopes and is independently covered by the fourth table assertion.
+No invented master table was created for testing.
+
+The automated run below used a disposable private schema. These are **test
+fixture hashes, not production hashes**. SHA-256 input is deterministic
+full-row JSON, sorted with the C collation. Checked on 18 October 2026:
+before **17:21:20.143 IST**, after **17:21:20.446 IST**.
+
+| Stored table | Before SHA-256 | After SHA-256 |
+|---|---|---|
+| `catalog_products` | `fc3f870eeaabb85b372346a9e30097e0e34aceb0578484b9d65447a9a4b28a4a` | `fc3f870eeaabb85b372346a9e30097e0e34aceb0578484b9d65447a9a4b28a4a` |
+| `competitor_prices` | `4dfdc771eaee7424805ee2a2ab6c64d85ed2d7cd915a81050d3edd691c75e650` | `4dfdc771eaee7424805ee2a2ab6c64d85ed2d7cd915a81050d3edd691c75e650` |
+| `mrp_price_history` | `68cb3fbbcc0aac4333333ad12a58a84a9b332bbfcfbeb368a4ca13b03393a574` | `68cb3fbbcc0aac4333333ad12a58a84a9b332bbfcfbeb368a4ca13b03393a574` |
+| `discount_settings` | `2832aa6dea16a395cff46d64f6577bbcdacaf65802dd3cc0a2d765172adaf6f9` | `2832aa6dea16a395cff46d64f6577bbcdacaf65802dd3cc0a2d765172adaf6f9` |
+
+The same test invokes the actual Price Finder coverage resolver and the actual
+Analysis GET handlers for overview, by-brand, by-category, positioning,
+coverage-matrix and opportunities, before and after the calculator session.
+All seven response snapshots are byte-identical. These are fixed-date MRP-mode
+pricing analytics, not the calculator's own basket summary; nonempty coverage
+and comparable-price baselines are asserted. There is no stored pricing
+coverage/analytics aggregate table or materialized view to update.
+
+For repeatable machine-readable evidence:
+
+```sh
+CALCULATOR_NO_WRITE_REPORT_PATH="$PWD/generated-artifacts/p067/no-write-verification.json" \
+  pnpm --filter @workspace/api-server exec vitest run src/routes/priceCalculator.test.ts
+```
+
+### Negative exact match and replacement disclosure
+
+The API test fixture contains `TTS-01` but **not** `TTS - 01`. Typing the latter
+returns no exact product, no resolved row and no known catalogue identity.
+Only explicitly selecting `TTS-01` resolves that different code. A companion
+pure calculator test supplies the near-match evidence but asserts that the
+unaccepted spaced code still has no product, app price, net or total. It then
+asserts that explicit picker acceptance resolves the unspaced code. This is
+distinct from the real development case where both codes actually exist.
+
+The old bucket disclosure was **replaced**, not simply removed. The exact new
+wording is displayed by the calculator and is asserted once in generated
+disclosures and once in each Excel sheet:
+
+> This calculator searches the full product catalogue and all competitors, without bucket or company filters, and allows one-off competitors and products typed in by hand. It is a quoting aid, not a source of record.
 
 Independent **development** source-table snapshots around the real browser
 session match:

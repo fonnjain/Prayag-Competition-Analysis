@@ -19,6 +19,16 @@ asserted comparison. A deliberate one-off competitor is distinct from a stored
 competitor with the same name. Item-code identity still preserves every
 character; missing catalogue metadata is not permission to infer it.
 
+No-write acceptance must remain an automated whole-session regression over
+complete stored rows and official pricing coverage/analytics outputs, not only
+manual screenshots, unchanged counts or the calculator's own summary.
+
+**Why:** Future changes could silently register a typed brand or overwrite a
+stored price while leaving counts unchanged.
+
+**How to apply:** If a separate persistent brand authority is introduced later,
+extend the whole-row proof to it; do not substitute a distinct-name count.
+
 The calculator deliberately searches all catalogue products and competitors
 without company/personal bucket filtering. This is a quoting-only exception,
 not a change to Price Finder or any analytical screen.

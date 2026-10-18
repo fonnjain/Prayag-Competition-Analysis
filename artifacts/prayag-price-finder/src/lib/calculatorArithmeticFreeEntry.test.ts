@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   resolveCalculator, summarizeCalculator, calculatorDisclosures, mrpError,
-  CALCULATOR_SCOPE_DISCLOSURE, calculatorCompetitorKey,
+  CALCULATOR_SCOPE_DISCLOSURE, calculatorCompetitorKey, setBlockProduct,
   type CalculatorBlock, type CalculatorEvidence,
 } from "./calculatorState.ts";
 
@@ -43,6 +43,20 @@ test("unknown exact code stays ad-hoc and has no guessed metadata", () => {
   const known = resolveCalculator([{ ...b, itemCode: "TTS-01" }], [product])[0];
   assert.equal(known.adHocProduct, false); assert.equal(known.product?.productName, "Catalogue valve");
 });
+test("an unaccepted TTS-01 suggestion never resolves typed TTS - 01", () => {
+  const typed = { ...block(), itemCode: "TTS - 01" };
+  const unresolved = resolveCalculator([typed], [product])[0];
+  assert.equal(typed.itemCode, "TTS - 01");
+  assert.equal(unresolved.product, undefined);
+  assert.equal(unresolved.our.appPrice, null);
+  assert.equal(unresolved.our.netUnit, null);
+  assert.equal(unresolved.our.total, null);
+  // Only an explicit picker acceptance changes the stored basket identity.
+  const accepted = setBlockProduct(typed, { itemCode: "TTS-01", adHoc: false });
+  const resolved = resolveCalculator([accepted], [product])[0];
+  assert.equal(resolved.product?.itemCode, "TTS-01");
+  assert.equal(resolved.our.appPrice, 92);
+});
 test("deliberate ad-hoc Astral never borrows the app quote, basis or amber unit warning", () => {
   const b = block(); b.competitors.push({ id: "one", competitor: "Astral", adHoc: true, mrp: "90", discount: "0" });
   const r = resolveCalculator([b], [product])[0];
@@ -74,6 +88,7 @@ test("disclosures replace the old bucket claim, rather than silently dropping th
   const s = summarizeCalculator(resolveCalculator([block()], [product]));
   const d = calculatorDisclosures(s, "2026-10-18", ["Old bucket-only claim"]);
   assert.ok(d.includes(CALCULATOR_SCOPE_DISCLOSURE));
+  assert.equal(d.filter(line => line === CALCULATOR_SCOPE_DISCLOSURE).length, 1);
   assert.ok(!d.includes("Old bucket-only claim"));
   assert.ok(d.includes("Prices resolved as of 18-10-2026."));
 });
