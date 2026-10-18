@@ -1833,3 +1833,31 @@ mtime_ms = 1792318108468
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/092c409b-d403-4b75-8b2a-ce183040f8e0/b6af2e8f-3891-4368-884f-789f8a9817d5"
 storage_version_token = "1792318151719783"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "SXY8whWFrbXrPrcC8cbIR"
+uri = "file://generated-artifacts/p069/P069-cleanup-and-history-report.md"
+type = "text"
+title = "P069 — cleanup and history report"
+description = "Pending inventory, ordered discard results, Undo reachability, unchanged-data checks and build-info gate decision."
+logical_id = "8945cd05-6c0e-4d28-9f42-ccfe97ce612a"
+content_hash = "sha256:4ceaa108939223a9e86d3821f1e17c9f1611846d185529817c987c33476a6c4a"
+size = 6086
+mtime_ms = 1792319948968
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/8945cd05-6c0e-4d28-9f42-ccfe97ce612a/5bbe76af-5cbd-422a-9f7d-29238b85a3f8"
+storage_version_token = "1792320000987328"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "0aFw_3txvNVfYQQyj1XA1"
+uri = "file://generated-artifacts/p069/P069-cleanup-evidence.zip"
+type = "unspecified"
+title = "P069 verification evidence"
+description = "Complete inventory and app receipts, including historical records retained rather than treated as pending. No credentials included."
+logical_id = "ed3984d3-2881-48a3-bb66-68dbb549a84c"
+content_hash = "sha256:47d1e9abd4dc2083a4f99a45695fe1be5feeba2e97c90f85a02f68afc48d12b8"
+size = 51394
+mtime_ms = 1792319977076
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/ed3984d3-2881-48a3-bb66-68dbb549a84c/c5c76f30-9cbf-45bd-994e-5aab9701fcb1"
+storage_version_token = "1792320002359345"
+content_type = "application/octet-stream"
