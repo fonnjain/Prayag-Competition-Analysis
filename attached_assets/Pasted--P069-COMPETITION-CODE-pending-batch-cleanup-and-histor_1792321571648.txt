@@ -1,0 +1,143 @@
+# P069 · COMPETITION · CODE — pending batch cleanup and history access
+
+**Date:** 18 October 2026
+**Context:** Division apply complete and verified (batch 90). This closes the two remaining
+acceptance gaps. Small prompt. **Does not block P067.**
+
+---
+
+## 0. My error
+
+P068 §1 said "Preview writes nothing." **Wrong.** Preview stages pending load/provenance records.
+So the zero-change re-preview that P066 Step 4 required created **pending load batch 91**, which is
+still sitting in production. That batch exists because of a step I specified, not because of anything
+you did.
+
+Fourth instance of the same pattern — I asserted a property of the system instead of asking what the
+system actually does. You disclosed it correctly and unprompted, which is why it is a tidy-up rather
+than a surprise in three months.
+
+---
+
+## 1. Inventory the pending batches — read-only
+
+Before changing anything, list every load batch in production that is **not applied and not
+reversed**: batch id, created-at, source file, row count, which preview it belongs to, who created it.
+
+Previews #1–#3 from the earlier stopped runs may have left batches too. Report what is actually
+there rather than assuming it is only 91.
+
+Do not include batch 90 — it is applied, correct, and stays.
+
+---
+
+## 2. Test this hypothesis first, before diagnosing anything
+
+**Hypothesis: the history controls are disabled because an unresolved pending batch exists.**
+
+A loader that is strictly all-or-nothing has a coherent reason to disable undo on batch 90 while
+batch 91 is pending — undoing 90 would leave 91's staged change set stale and no longer verifiable
+against the catalogue.
+
+Test it in this order:
+
+1. Confirm batch 91 is a **zero-change** batch (it should be; the re-preview reported 0).
+2. **Discard / cancel batch 91** through the app's own path for abandoning a pending preview. Not by
+   direct SQL.
+3. Re-check the history view: can you now open batch 90's details, and is an Undo control visible?
+
+| Result | Conclusion |
+|---|---|
+| Controls become available | **That was the cause.** Not a defect — document the behaviour and move on. |
+| Still disabled | Go to §3. |
+
+If other orphaned pending batches from §1 are present, discard those too, and say whether the
+controls changed after each or only once all were cleared.
+
+---
+
+## 3. If still disabled — diagnose, do not guess
+
+Report the **actual** reason, from the code path plus the API response the UI is acting on:
+
+- a permission or role check the authenticated admin does not satisfy;
+- a feature flag or environment difference between development and production;
+- controls disabled by design for applied batches, with undo exposed somewhere else;
+- a frontend bug — the control is rendered disabled regardless of the response.
+
+Give the response body the UI receives and the line that decides the disabled state. "Probably
+permissions" is not a finding.
+
+---
+
+## 4. ⛔ Do not invoke Undo on batch 90
+
+The division data is correct and verified. **This step verifies that the control is reachable, not
+that undo works.**
+
+Undo as a mechanism was already proven in development under P065 §2 against a real 294-row batch,
+row by row, composite strings character for character. That proof stands and does not need repeating
+against good production data.
+
+So: confirm the control exists and is enabled. **Do not press it.** If the only way to confirm it is
+to invoke it, stop and report — that is a different problem and we will solve it another way.
+
+---
+
+## 5. Record permanently, then leave the division work alone
+
+Capture these in the project record, because they are the recovery references:
+
+| | |
+|---|---|
+| Applied batch | **90**, 15:25:25 IST, 18 Oct 2026, 294 changes |
+| Mapping source | `Division_Mapping_from_ERP_RateList_v3.xlsx` |
+| Mapping SHA-256 | `1bf4f5f7069bce442077735c5b5dc86aea3c7bdc0cbbf1b18153db3c89a5da87` |
+| Restore sheet SHA-256 | `4dca4333edcfd7b1ed5b2cf77c17677aa92d985aabc3b505301de8c227057042` |
+
+**Do not apply the division mapping again.** Preview is no longer a free diagnostic — it stages a
+batch — so do not re-run it to "check" the divisions. Query the table instead.
+
+---
+
+## 6. The two partial smoke items
+
+**Scroll:** nothing to fix. Seven options fit the container, `scrollHeight == clientHeight`. Correctly
+not claimed as tested. Re-test it on the category dropdown instead, where there are enough options
+to scroll.
+
+**Competitor scope (PARTIAL):** you were right not to change production bucket preferences to
+complete it. Leave it. Two reasons it is lower value than it looks: P067 removes bucket scope from
+the calculator entirely, so that half resolves itself; and for the Price Finder the scoping logic was
+already verified at the query level. If you want it closed properly, do it in development with
+fixture buckets, not by touching a live user's saved selection.
+
+---
+
+## 7. Build-info — the typecheck decision
+
+`GET /api/_build` at `7c27c16` is sound, and one detail in it is exactly right: **it fails the build
+when `BUILD_COMMIT_SHA` / `BUILD_BRANCH` are absent rather than emitting a guessed identity.** An
+endpoint that guesses would have been worse than no endpoint — it would have answered P066 Step 1
+with a plausible lie.
+
+It is blocked by pre-existing typing errors in unrelated animation/film files. Two options, your call:
+
+1. **Scope the gate** — publish on the API package typecheck, which passes, and track the unrelated
+   errors separately. Defensible: the failing package shares no code with this change.
+2. **Fix the unrelated errors first** — cleaner, but it makes a three-line observability endpoint wait
+   on debt it did not create.
+
+I lean to (1), with the pre-existing errors logged as their own item. Do not disable or loosen the
+workspace typecheck to get there.
+
+---
+
+## Done criteria
+
+- [ ] Pending non-applied batches inventoried and reported
+- [ ] Batch 91 (and any other orphans) discarded through the app, not SQL
+- [ ] History controls re-checked; hypothesis confirmed or §3 diagnosis given
+- [ ] Undo **not** invoked on batch 90
+- [ ] Batch 90, both SHA-256s and the mapping filename recorded in the project record
+- [ ] Build-info typecheck decision made and stated
