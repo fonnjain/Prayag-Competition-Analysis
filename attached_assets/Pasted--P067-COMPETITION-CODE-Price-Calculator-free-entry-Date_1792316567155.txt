@@ -1,0 +1,260 @@
+# P067 · COMPETITION · CODE — Price Calculator free entry
+
+**Date:** 18 October 2026
+**Scope:** `artifacts/prayag-price-finder` Price Calculator page **only**, plus whatever server
+endpoints that page alone calls.
+**Extends:** P058 (calculator) and the unit-badge revisions of 16 October.
+**Depends on:** nothing. Can land before or after P066, but see §10.
+
+---
+
+## 0. Why, and the one rule that does not bend
+
+A sales person is standing in a retailer's shop. The retailer names competitors the app has never
+heard of and quotes prices the app does not hold, and wants a comparison **now**. The calculator has
+to be able to produce one. So: free-typed competitors, free-typed item codes, and every MRP editable.
+
+That means the calculator will contain two kinds of number that look identical on screen:
+
+- **verified** — read from the catalogue or the competitor tables, with provenance behind it;
+- **asserted** — typed by a sales person, often repeating what an interested party in the room told
+  them.
+
+### The rule
+
+> **Nothing typed into the calculator is ever written to `catalog_products`,
+> `competitor_prices`, `mrp_price_history`, the competitor master, or any coverage/analytics
+> aggregate. Not on save, not on export, not on "confirm". Free entry is basket-local, always.**
+
+Everything else in this prompt is detail. This is the part that must not be traded away for
+convenience, and if any instruction below seems to require breaking it, stop and report instead.
+
+The second rule follows from the first: **asserted numbers must be visibly distinguishable from
+verified ones, on screen and in every export.** An export that looks like a company price comparison
+but contains hand-typed competitor prices will be shown to retailers as if it were company data.
+That is the failure mode to design against.
+
+---
+
+## 1. What must not change
+
+- The Price Finder page, its bucket/company enforcement, and its competitor scoping — **untouched.**
+- Coverage statistics, competitor price history, analytics, any dashboard — **untouched** and must
+  not see calculator free entry.
+- The exact item-code matching rule from P062 §3 still applies here in full: **no normalisation, no
+  punctuation-insensitive or case-insensitive matching.** See §4.
+- Unit-first rounding from P058: `netUnit = round(mrp × (1 − disc/100), 2)`, then
+  `rowTotal = round(netUnit × qty, 2)`. Unchanged for asserted prices too.
+- The denominator discipline from P058 §7.2 — a competitor's percentage is computed against the
+  subtotal of the products that competitor was actually compared on, never the whole basket.
+
+---
+
+## 2. Editable MRP
+
+Every MRP field in the calculator becomes editable — ours and every competitor's.
+
+- **Default is the app value**, loaded as today. The field is pre-filled, not blank.
+- Editing it changes the basket row only.
+- **An edited field must show it has been edited** and must offer a one-click revert to the app
+  value. Show the app value alongside, e.g. `28.00 (app: 27.80)` — the sales person needs to see what
+  they overrode.
+- An MRP with no app value behind it (ad-hoc product, ad-hoc competitor) is blank and required
+  before the row can be included in a total.
+- Validate: positive number, two decimals, reject zero and negative. Do not cap the upper bound —
+  some SKUs are genuinely in the thousands.
+
+### Three states, one vocabulary
+
+Use these three states everywhere — screen, summary, export. Do not invent per-surface wording.
+
+| State | Meaning |
+|---|---|
+| **App** | app value, unedited |
+| **Edited** | app value existed, user changed it |
+| **Entered** | no app value; user supplied it |
+
+---
+
+## 3. Ad-hoc competitors
+
+Allow adding a competitor by typing a name that is not in the database.
+
+- The competitor picker gains a free-text path: if the typed name matches no known competitor, offer
+  **"Add '<name>' as a one-off competitor"**.
+- **If the typed name does match a known competitor, offer the known one first and prominently.**
+  A sales person typing "Astral" must not end up with an ad-hoc Astral row sitting next to real
+  Astral data. They may still choose ad-hoc deliberately — allow it, but make the known option the
+  obvious default.
+- An ad-hoc competitor requires a typed MRP. Discount and qty behave exactly as now.
+- **Do not create a competitor record.** No row in the competitor master, no brand id, no
+  auto-registration on save. The name is free text on the basket row, flagged ad-hoc.
+- Ad-hoc competitor names are **not** matched, merged or deduplicated against real brands anywhere.
+  Two sales people typing "Jindal Pipes" and "jindal" produce two unrelated ad-hoc entries, and that
+  is correct — the alternative is guessing.
+
+### Unit and basis for ad-hoc competitors
+
+An ad-hoc competitor has no recorded unit and no recorded basis. So:
+
+- the unit badge is the **neutral "unit not recorded"** state, never amber — there is nothing to
+  disagree with;
+- but add a distinct note on the row: **"price entered by user — basis and unit unverified"**. This
+  is a stronger statement than the existing neutral note and must read differently from it.
+
+The amber "units differ" badge stays reserved for what it was built for: two recorded units that
+disagree, as with the 323 Astral pipe-length rows.
+
+---
+
+## 4. Ad-hoc products / item codes
+
+Allow adding a product whose item code is not in the catalogue, or is in the catalogue but has no
+price.
+
+Two different cases, handled differently:
+
+**4a. Code exists in the catalogue, no price held.** Resolve the product normally — item code,
+description, division, category all come from the catalogue. Only the MRP is **Entered**. This is
+the common case and it keeps full product provenance.
+
+**4b. Code matches nothing.** The user supplies item code (free text), a description, and an MRP.
+The row is a fully ad-hoc product.
+
+- It has **no division and no category.** Do not guess them, do not infer them from the code shape,
+  do not assign a default. Group these under **"Ad-hoc"** in any grouped display.
+- **Match the typed code exactly, or not at all.** If the typed code exactly equals a catalogue
+  `item_code`, resolve to that product (case 4a). Otherwise it is ad-hoc. Never fuzzy-match,
+  never strip whitespace or punctuation to find a candidate. `TTS - 01` typed is `TTS - 01`, not
+  `TTS-01`. You may *suggest* near matches in the picker as a ranking hint, but a suggestion the user
+  does not accept must never silently resolve the row.
+
+---
+
+## 5. Bucket scope — removed here, and disclosed
+
+Correct: bucket/company enforcement does not apply in the calculator. A sales person comparing
+against whatever the retailer names cannot be held to a saved bucket list.
+
+So: **the calculator searches the full catalogue and the full competitor set, with no bucket,
+company-enforcement or saved-selection filtering.**
+
+**But the disclosure line must change, not disappear.** P058 shipped a disclosure stating the
+calculator was bucket-scoped. Leaving that line in place while removing the scope is worse than
+either choice on its own. Replace it with something to this effect:
+
+> This calculator searches the full product catalogue and all competitors, without bucket or company
+> filters, and allows one-off competitors and products typed in by hand. It is a quoting aid, not a
+> source of record.
+
+Keep the other four P058 disclosure lines as they are.
+
+---
+
+## 6. Provenance on screen and in export
+
+### Screen
+
+- Each price cell carries its state from §2 — **App / Edited / Entered**.
+- Ad-hoc competitor and ad-hoc product rows are marked as such, visibly, not only on hover.
+- **If the basket contains any Edited or Entered value, show a banner above the summary**, not
+  buried at the bottom: *"This comparison includes N hand-entered or edited prices."*
+
+### Excel export
+
+- A **provenance column per price**: `App` / `Edited` / `Entered`. Not a footnote — a column.
+- For Edited: a second column holding the app value that was overridden, so the delta is recoverable.
+- Ad-hoc competitors and ad-hoc products flagged in their own columns.
+- **A banner row at the top of both sheets** when any Edited or Entered value is present, stating
+  the count and that those figures are unverified. Above the data, visible without scrolling.
+- The existing neutral/amber unit notes stay, with the §3 ad-hoc note as a third distinct value.
+
+---
+
+## 7. What the Final Summary must say
+
+Keep everything P058 §7 specifies, and add:
+
+- counts: how many prices are **App**, **Edited**, **Entered**;
+- how many competitors in the basket are **ad-hoc**, by name;
+- how many products are **ad-hoc**;
+- and — this one matters — the existing "compared on N of M products" line must **count ad-hoc
+  products in M and say how many of the M are ad-hoc.** "Compared on 3 of 5 products, 2 of which
+  were hand-entered" is honest. "Compared on 3 of 5" is not, when two were typed in the shop.
+
+Percentage differences are still computed against the subtotal of the compared products only. That
+does not change because some of them are asserted.
+
+---
+
+## 8. Hard prohibitions
+
+Do not, under any framing:
+
+- write any calculator value to `catalog_products`, `competitor_prices`, `mrp_price_history`, the
+  competitor master, or any aggregate;
+- create a competitor record, brand id, or product record from calculator input;
+- add a "save this price to the database" or "capture this competitor" action — **not even behind a
+  permission check.** That is a separate piece of work with its own review path (§9);
+- feed calculator free entry into coverage counts, dashboards or the Price Finder;
+- normalise, trim or case-fold an item code to resolve it;
+- infer division or category for an ad-hoc product;
+- apply bucket filtering inside the calculator, or leave the old bucket disclosure line in place.
+
+---
+
+## 9. Logged, explicitly not now
+
+Hand-typed competitor prices from the field are genuinely valuable market intelligence, and it is
+tempting to capture them. **Do not.** Promoting asserted prices into the competitor tables needs a
+review queue, an attribution trail, and a decision about whether a retailer's word is an acceptable
+source — three questions this prompt does not answer. Note it and move on.
+
+Also still logged from earlier, unchanged: `unit` → `NULL` at `apolloStagedLoad.ts` and
+`catalogImportExport.ts` plus the 1,360-row backfill; the 38 development fixtures; relaxing the
+zero-composite block to a warning; the 20 split-spelling category groups and 394 blank categories.
+
+---
+
+## 10. Sequencing with P066
+
+P067 and P066 touch different things — P066 writes division data, P067 changes calculator UI — so
+they do not conflict. But **run P066 first if it has not run yet.** Two unlanded changes on the same
+page makes attribution hard if the smoke check fails, and P066 Step 6 smoke-tests this exact page
+against real division data. Land the data, confirm the page, then add free entry on top.
+
+---
+
+## 11. Tests
+
+Add to the existing calculator suite:
+
+1. Edited MRP: arithmetic uses the edited value, unit-first rounding, revert restores the app value.
+2. Entered MRP on a priceless catalogue product (4a): division and category still come from the
+   catalogue.
+3. Ad-hoc product (4b): no division, no category, groups under Ad-hoc, exact-match rule holds —
+   typing `TTS - 01` does not resolve to `TTS-01`.
+4. Ad-hoc competitor: no competitor record created; neutral unit badge plus the ad-hoc note; never
+   amber.
+5. Typing a name matching a known competitor offers the known one first.
+6. Export: provenance column present and correct for all three states; overridden app value
+   retained; banner row present when any Edited/Entered exists and absent when none.
+7. Summary: App/Edited/Entered counts correct; "N of M" counts ad-hoc products in M and discloses
+   how many were hand-entered.
+8. **A persistence test asserting that a full calculator session with ad-hoc competitors, ad-hoc
+   products and edited MRPs leaves `catalog_products`, `competitor_prices`, `mrp_price_history` and
+   the competitor master byte-identical.** This is the test that protects §0.
+
+---
+
+## Done criteria
+
+- [ ] MRP editable everywhere, app value as default, edit visible, revert available
+- [ ] Ad-hoc competitors supported; known names offered first; no competitor record created
+- [ ] Ad-hoc products supported; no inferred division/category; exact-match rule intact
+- [ ] Bucket scope removed in the calculator only; disclosure line replaced, not deleted
+- [ ] App / Edited / Entered shown on screen and as a column in export, with banner when present
+- [ ] Summary discloses counts and the ad-hoc share of M
+- [ ] Persistence test proves no write reaches any stored table
+- [ ] Price Finder, coverage stats and analytics confirmed unaffected
+- [ ] `pnpm typecheck` and the full calculator suite pass; commit pushed
