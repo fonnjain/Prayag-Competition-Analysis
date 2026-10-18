@@ -66,4 +66,6 @@ _Populate as you build — sharp edges, "always run X before Y" rules._
 
 ## Pointers
 
+- Production division recovery references and the no-reapply boundary: `docs/operations/division-recovery.md`.
+- Scoped build-info acceptance and separately tracked video typing errors: `docs/operations/build-info-validation.md`.
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
