@@ -53,3 +53,21 @@ The post-apply data assertions passed at **15:26:07 IST, 18 October 2026**:
 Composites: **0**. Exact codes, categories, other catalogue metadata, all
 **14,302** MRP-history rows and all **3,770** competitor-price rows were
 unchanged by this division-only operation.
+
+## Pending-preview cleanup and history acceptance
+
+On **18 October 2026**, the existing administrator discard endpoint abandoned
+preview **5 / load batch 91** (zero changes) at **16:02:57 IST**, then expired
+preview **2 / load batch 20** (old name-change v1) at **16:04:25 IST**.
+Both provenance records were retained. Load batch **90 remained applied**;
+load batch **21**, the later name-change v2, also remained applied.
+
+A fresh authenticated production page could open batch 90 **before** either
+discard, so pending previews were not demonstrated to block history.
+The local review acknowledgment enables the Undo button; it was checked and
+unchecked only. **Undo was not invoked.** No history code change was needed.
+
+At **16:07:27 IST**, there were **zero pending previews**, zero composite
+products, and unchanged full-row hashes for catalogue, MRP history and
+competitor prices across the cleanup. The category-picker scroll check also
+passed. Cleanup and browser evidence is under `generated-artifacts/p069/`.
