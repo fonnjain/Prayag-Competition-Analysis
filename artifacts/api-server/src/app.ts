@@ -6,6 +6,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import { earlyCatalogueReplacementBoundary } from "./lib/catalogueMaintenancePolicy";
+import buildInfoRouter from "./routes/buildInfo";
 
 const app: Express = express();
 
@@ -29,6 +30,7 @@ app.use(
   }),
 );
 app.use(cors({ credentials: true, origin: true }));
+app.use("/api", buildInfoRouter);
 app.use(earlyCatalogueReplacementBoundary);
 app.use(cookieParser());
 app.use(express.json());

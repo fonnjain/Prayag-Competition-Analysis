@@ -123,6 +123,7 @@ import type {
   GetAutoAcceptPreviewParams,
   GetBucketCatalogue200,
   GetBucketListsParams,
+  GetBuildInfo200,
   GetCatalogProductParams,
   GetCatalogProductsParams,
   GetComparisonByProductParams,
@@ -254,6 +255,83 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getGetBuildInfoUrl = () => {
+
+
+
+
+  return `/api/_build`
+}
+
+/**
+ * @summary Immutable build-time source identity; no authentication or data access
+ */
+export const getBuildInfo = async ( options?: RequestInit): Promise<GetBuildInfo200> => {
+
+  return customFetch<GetBuildInfo200>(getGetBuildInfoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBuildInfoQueryKey = () => {
+    return [
+    `/api/_build`
+    ] as const;
+    }
+
+
+export const getGetBuildInfoQueryOptions = <TData = Awaited<ReturnType<typeof getBuildInfo>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBuildInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBuildInfoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBuildInfo>>> = ({ signal }) => getBuildInfo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBuildInfo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBuildInfoQueryResult = NonNullable<Awaited<ReturnType<typeof getBuildInfo>>>
+export type GetBuildInfoQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Immutable build-time source identity; no authentication or data access
+ */
+
+export function useGetBuildInfo<TData = Awaited<ReturnType<typeof getBuildInfo>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBuildInfo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBuildInfoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

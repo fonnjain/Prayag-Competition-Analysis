@@ -5163,6 +5163,13 @@ export const CompareModeFilterParameter = {
  */
 export type EffectivePeriodFilterParameter = string;
 
+export type GetBuildInfo200 = {
+  /** @pattern ^[a-f0-9]{40}$ */
+  commitSha: string;
+  branch: string;
+  builtAt: string;
+};
+
 export type ListMultiWorkbookBatches200 = {
   batches: MultiWorkbookBatch[];
 };

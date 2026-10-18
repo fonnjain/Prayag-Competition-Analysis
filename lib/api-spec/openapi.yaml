@@ -17,6 +17,23 @@ tags:
   - name: admin
     description: Workspace user management (admin only).
 paths:
+  /_build:
+    get:
+      operationId: getBuildInfo
+      tags: [health]
+      summary: Immutable build-time source identity; no authentication or data access
+      responses:
+        "200":
+          description: Source revision and timestamp captured while building this server
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [commitSha, branch, builtAt]
+                properties:
+                  commitSha: {type: string, pattern: "^[a-f0-9]{40}$"}
+                  branch: {type: string}
+                  builtAt: {type: string, format: date-time}
   /catalog/division-mapping:
     get:
       operationId: listDivisionMappingBatches

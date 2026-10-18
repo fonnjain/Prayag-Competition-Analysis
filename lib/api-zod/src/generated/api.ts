@@ -9,6 +9,19 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Immutable build-time source identity; no authentication or data access
+ */
+export const getBuildInfoResponseCommitShaRegExp = new RegExp('^[a-f0-9]{40}$');
+
+
+export const GetBuildInfoResponse = zod.object({
+  "commitSha": zod.string().regex(getBuildInfoResponseCommitShaRegExp),
+  "branch": zod.string(),
+  "builtAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Admin-only division mapping history
  */
 export const ListDivisionMappingBatchesResponse = zod.object({
