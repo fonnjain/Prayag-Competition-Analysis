@@ -8,14 +8,11 @@ import {
   FilePlus,
   FileSpreadsheet,
   FileUp,
-  Home,
   Key,
   LayoutGrid,
   Link as LinkIcon,
   LogOut,
   Menu,
-  Search,
-  TrendingUp,
   PencilLine,
   Users,
   X,
@@ -23,7 +20,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader, useWorkspaceNavigation } from "@workspace/replit-auth-web";
 import { BucketBoundary } from "@workspace/api-client-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -70,6 +67,7 @@ export function Layout({ children }: LayoutProps) {
   const hadInAppNavigation = useRef(false);
   const initialLocation = useRef(location);
   const { user, logout } = useAuth();
+  const appLinks = useWorkspaceNavigation("product-database");
   const context = getPageContext(location);
   const isRoot = location === "/";
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "User";
@@ -136,25 +134,23 @@ export function Layout({ children }: LayoutProps) {
   const appSwitcher = (mobile = false) => (
     <div className="space-y-1">
       {(!isCollapsed || mobile) && <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">Switch app</p>}
-      {[
-        { href: "/", icon: Home, label: "Home" },
-        { href: "/analysis/", icon: TrendingUp, label: "Competition Analysis" },
-        { href: "/price-finder/", icon: Search, label: "Price Finder" },
-      ].map((app) => {
+      {appLinks.map((app) => {
         const content = (
           <span
             className={cn(
-              "flex items-center rounded-lg transition-colors text-white/75 hover:bg-white/10 hover:text-white",
+              "flex items-center rounded-lg transition-colors hover:bg-white/10 hover:text-white",
+              app.active ? "bg-white/10 text-white" : "text-white/75",
               !mobile && isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2 text-sm font-medium"
             )}
           >
             <app.icon className="h-5 w-5 shrink-0" />
             {(!isCollapsed || mobile) && <span>{app.label}</span>}
+            {(!isCollapsed || mobile) && app.active && <span className="ml-auto text-[10px] uppercase">Active</span>}
           </span>
         );
 
         const link = (
-          <a key={app.href} href={app.href} onClick={() => mobile && setMobileNavOpen(false)} aria-label={isCollapsed && !mobile ? app.label : undefined}>
+          <a key={app.href} href={app.href} aria-current={app.active ? "page" : undefined} onClick={() => mobile && setMobileNavOpen(false)} aria-label={isCollapsed && !mobile ? app.label : undefined}>
             {content}
           </a>
         );

@@ -3,36 +3,18 @@ import { useLocation, Link } from "wouter";
 import {
   BarChart3,
   ChevronLeft,
-  Database,
   Hexagon,
-  Home,
   LogOut,
   Menu,
-  Search,
   Settings,
   X,
   PanelLeftClose,
   PanelLeftOpen,
   Zap,
 } from "lucide-react";
-import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader, useWorkspaceNavigation } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-// ── App-switcher entries (all cross-app = raw <a> links) ──────────────────────
-type AppSwitcherEntry = {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  active?: boolean;
-};
-
-const APP_SWITCHER: AppSwitcherEntry[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/product-db/", label: "Product Database", icon: Database },
-  { href: "/price-finder/", label: "Price Finder", icon: Search },
-  { href: "/analysis/", label: "Competition Analysis", icon: BarChart3, active: true },
-];
 
 // ── Analysis in-app nav ───────────────────────────────────────────────────────
 const ANALYSIS_NAV = [
@@ -47,6 +29,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "/mrp-generator": "MRP Generator",
   "/mrp-generator/runs/:id": "Run Detail",
   "/mrp-generator/compare": "Compare Runs",
+  "/mrp-generator/matching": "Matching MRP Workbench",
   "/settings/discounts": "Discount Settings",
 };
 
@@ -56,6 +39,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
+  const appLinks = useWorkspaceNavigation("competition-analysis");
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -155,12 +139,13 @@ export function AppShell({ children }: AppShellProps) {
               Switch app
             </p>
           )}
-          {APP_SWITCHER.map((app) => {
+          {appLinks.map((app) => {
             const Icon = app.icon;
             const content = (
               <a
                 key={app.href}
                 href={app.href}
+                aria-current={app.active ? "page" : undefined}
                 onClick={onNavClick}
                 className={cn(
                   "flex items-center rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary w-full",

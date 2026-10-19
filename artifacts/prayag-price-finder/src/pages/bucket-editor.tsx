@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMobilePageTitle } from "@/lib/mobilePageTitle";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -95,6 +96,8 @@ export default function BucketEditorPage() {
   });
   const unsavedChanges = !!detail && definitionFingerprint(draft) !== definitionFingerprint(detail);
   const readOnly = !!editId && (sp.get("view") === "1" || (!!detail && !detail.canEdit));
+  const pageTitle = readOnly ? "View bucket list" : editId ? "Edit bucket list" : "New bucket list";
+  useMobilePageTitle(pageTitle);
 
   // Review panel sizing: bound to the visible viewport from its real top offset.
   const asideRef = useRef<HTMLElement | null>(null);
@@ -276,7 +279,7 @@ export default function BucketEditorPage() {
         <ChevronLeft className="h-3.5 w-3.5" /> Bucket lists
       </Link>
       <h1 className="mb-4 mt-1 text-2xl font-black tracking-tight">
-        {readOnly ? "View bucket list" : editId ? "Edit bucket list" : "New bucket list"}
+        {pageTitle}
       </h1>
       {detail?.visibility === "only_me" && <p className="mb-3 text-sm" data-testid="text-private-owner">Owner: {detail.ownerName}</p>}
       {readOnly && <p className="mb-3 rounded border bg-muted p-3 text-sm" data-testid="text-readonly">{detail?.visibility === "everyone" && !isAdmin

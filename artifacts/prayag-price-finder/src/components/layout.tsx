@@ -1,10 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
-  BarChart3,
-  Database,
   Hexagon,
-  Home,
   LogOut,
   Menu,
   Search,
@@ -14,7 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader, useWorkspaceNavigation } from "@workspace/replit-auth-web";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -23,21 +20,8 @@ import {
   normalizePriceFinderParams,
 } from "@/lib/priceFinderRouteState";
 import { useBrowse } from "@/lib/browseContext";
+import { MobilePageTitleContext } from "@/lib/mobilePageTitle";
 import { Folder, ArrowLeft, Loader2 } from "lucide-react";
-
-type AppSwitcherEntry = {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  active?: boolean;
-};
-
-const APP_SWITCHER: AppSwitcherEntry[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/product-db/", label: "Product Database", icon: Database },
-  { href: "/price-finder/", label: "Price Finder", icon: Search, active: true },
-  { href: "/analysis/", label: "Competition Analysis", icon: BarChart3 },
-];
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -45,10 +29,12 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
+  const appLinks = useWorkspaceNavigation("price-finder");
   const [location] = useLocation();
   const searchString = useSearch();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mobilePageTitle, setMobilePageTitle] = useState<string | null>(null);
 
   const userName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
@@ -256,12 +242,13 @@ export function Layout({ children }: LayoutProps) {
               Switch app
             </p>
           )}
-          {APP_SWITCHER.map((app) => {
+          {appLinks.map((app) => {
             const Icon = app.icon;
             const content = (
               <a
                 key={app.href}
                 href={app.href}
+                aria-current={app.active ? "page" : undefined}
                 onClick={onNavClick}
                 className={cn(
                   "flex items-center rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary w-full",
@@ -336,6 +323,7 @@ export function Layout({ children }: LayoutProps) {
   }
 
   return (
+    <MobilePageTitleContext.Provider value={setMobilePageTitle}>
     <div className="flex min-h-screen flex-col bg-background font-sans text-foreground">
       <WorkspaceHeader activeApp="price-finder" />
       <div className="flex min-h-[calc(100vh-3.5rem)] flex-1 overflow-hidden">
@@ -399,7 +387,7 @@ export function Layout({ children }: LayoutProps) {
               Catalogue
             </button>
             <span className="ml-auto text-sm text-muted-foreground truncate">
-              {isComparison ? "Compare" : location === "/calculator" ? "Calculator" : "Search products"}
+              {mobilePageTitle ?? (isComparison ? "Compare" : location === "/calculator" ? "Calculator" : location === "/bucket-lists" ? "Bucket lists" : location === "/bucket-lists/edit" ? (currentParams.has("id") ? "Edit bucket list" : "New bucket list") : "Search products")}
             </span>
           </header>
 
@@ -410,5 +398,6 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </div>
     </div>
+    </MobilePageTitleContext.Provider>
   );
 }

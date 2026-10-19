@@ -410,7 +410,7 @@ export default function CalculatorPage() {
             {atBlockCap && <TooltipContent>The calculator holds at most {MAX_CALCULATOR_BLOCKS} products, matching the comparison limit.</TooltipContent>}
           </Tooltip>
           <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-block-count">
-            {blocks.length} of {MAX_CALCULATOR_BLOCKS} products
+            {blocks.length} products · {MAX_CALCULATOR_BLOCKS} max
           </span>
           <Tooltip>
             <TooltipTrigger asChild>

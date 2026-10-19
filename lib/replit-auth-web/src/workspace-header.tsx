@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "./auth-context";
+import { getWorkspaceLinks, type WorkspaceApp } from "./workspace-navigation";
+export type { WorkspaceApp } from "./workspace-navigation";
 
 type IconProps = { className?: string; strokeWidth?: number };
 type HeaderIcon = (props: IconProps) => React.JSX.Element;
@@ -88,79 +90,33 @@ const CloseIcon: HeaderIcon = (props) => (
   </IconFrame>
 );
 
-export type WorkspaceApp =
-  | "home"
-  | "product-database"
-  | "competition-analysis"
-  | "mrp-generator"
-  | "price-finder"
-  | "admin";
-
-type WorkspaceLink = {
-  app: WorkspaceApp;
-  href: string;
-  label: string;
-  icon: HeaderIcon;
-  adminOnly?: boolean;
-  restrictedAllowed: boolean;
+const WORKSPACE_ICONS: Record<WorkspaceApp, HeaderIcon> = {
+  home: HomeIcon,
+  "product-database": ProductIcon,
+  "competition-analysis": AnalysisIcon,
+  "mrp-generator": GeneratorIcon,
+  "price-finder": SearchIcon,
+  admin: UsersIcon,
 };
 
-const WORKSPACE_LINKS: WorkspaceLink[] = [
-  { app: "home", href: "/", label: "Home", icon: HomeIcon, restrictedAllowed: false },
-  {
-    app: "product-database",
-    href: "/product-db/",
-    label: "Product Database",
-    icon: ProductIcon,
-    restrictedAllowed: false,
-  },
-  {
-    app: "competition-analysis",
-    href: "/analysis/",
-    label: "Competition Analysis",
-    icon: AnalysisIcon,
-    restrictedAllowed: false,
-  },
-  {
-    app: "mrp-generator",
-    href: "/analysis/mrp-generator",
-    label: "MRP Generator",
-    icon: GeneratorIcon,
-    adminOnly: true,
-    restrictedAllowed: false,
-  },
-  {
-    app: "price-finder",
-    href: "/price-finder/",
-    label: "Price Finder",
-    icon: SearchIcon,
-    restrictedAllowed: true,
-  },
-  {
-    app: "admin",
-    href: "/admin",
-    label: "Admin",
-    icon: UsersIcon,
-    adminOnly: true,
-    restrictedAllowed: false,
-  },
-];
+/** Header and all sidebars use the same ordered, role-filtered list. */
+export function useWorkspaceNavigation(activeApp: WorkspaceApp) {
+  const { user, isLoading } = useAuth();
+  return getWorkspaceLinks(user, isLoading).map((link) => ({
+    ...link,
+    icon: WORKSPACE_ICONS[link.app],
+    active: link.app === activeApp,
+  }));
+}
 
 export function WorkspaceHeader({ activeApp }: { activeApp: WorkspaceApp }) {
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isAdmin = user?.role === "admin";
-  const isRestrictedAccount = user?.role === "counter" || user?.role === "user";
   const userName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     user?.email ||
     "User";
-  const visibleLinks = isLoading
-    ? []
-    : WORKSPACE_LINKS.filter(
-        (link) =>
-          (!link.adminOnly || isAdmin) && (!isRestrictedAccount || link.restrictedAllowed),
-      );
+  const visibleLinks = useWorkspaceNavigation(activeApp);
 
   const navigation = (mobile = false) => (
     <nav

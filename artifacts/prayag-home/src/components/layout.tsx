@@ -1,38 +1,22 @@
 import React, { useState } from "react";
 import { useLocation, Link } from "wouter";
 import {
-  BarChart3,
-  Database,
   Hexagon,
   Home,
   LogOut,
   Menu,
-  Search,
   Users,
   X,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import { useAuth, WorkspaceHeader } from "@workspace/replit-auth-web";
+import { useAuth, WorkspaceHeader, useWorkspaceNavigation } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-type AppSwitcherEntry = {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  active?: boolean;
-};
-
-const APP_SWITCHER: AppSwitcherEntry[] = [
-  { href: "/", label: "Home", icon: Home, active: true },
-  { href: "/product-db/", label: "Product Database", icon: Database },
-  { href: "/price-finder/", label: "Price Finder", icon: Search },
-  { href: "/analysis/", label: "Competition Analysis", icon: BarChart3 },
-];
-
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const appLinks = useWorkspaceNavigation("home");
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -120,12 +104,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
               Switch app
             </p>
           )}
-          {APP_SWITCHER.map((app) => {
+          {appLinks.map((app) => {
             const Icon = app.icon;
             const content = (
               <a
                 key={app.href}
                 href={app.href}
+                aria-current={app.active ? "page" : undefined}
                 onClick={onNavClick}
                 className={cn(
                   "flex items-center rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary w-full",
