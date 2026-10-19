@@ -1861,3 +1861,17 @@ mtime_ms = 1792319977076
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/ed3984d3-2881-48a3-bb66-68dbb549a84c/c5c76f30-9cbf-45bd-994e-5aab9701fcb1"
 storage_version_token = "1792320002359345"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Ts5QSeP4-0xXY1seCUWRG"
+uri = "file://generated-artifacts/P070-page-navigation-inventory.zip"
+type = "unspecified"
+title = "P070 — Page and navigation inventory"
+description = "Development-only inventory for all five apps, 42 rendered structure extracts, four full HTML states, component-copy comparisons, explicit gap notices and credential-check results. Optional screenshot files are not included; README details all limitations."
+logical_id = "ebdf3665-41d6-4d1e-aaee-c500f9a2d0a1"
+content_hash = "sha256:74eb3cd8e925fa2ddcf8b50a838f38f66fa600ec976cb36a9ca5aae1a826c27f"
+size = 380205
+mtime_ms = 1792391249338
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/ebdf3665-41d6-4d1e-aaee-c500f9a2d0a1/a87041c5-7f5f-407d-aaea-447be0e17a73"
+storage_version_token = "1792391261818795"
+content_type = "application/octet-stream"
