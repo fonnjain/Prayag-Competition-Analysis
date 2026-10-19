@@ -1,0 +1,100 @@
+# P070 · COMPETITION — page and navigation inventory
+
+**Date:** 19 October 2026
+**Read-only.** No code change, no data change, no publish. Nothing in this prompt writes anything.
+**Capture from DEVELOPMENT, not production.** See §0.
+
+---
+
+## 0. Two constraints before anything else
+
+**Capture against development data.** A rendered dump of the Price Finder or Calculator against
+production contains real MRPs and competitor prices — the whole commercial dataset in a text file,
+leaving the app's access controls behind. Development fixtures are sufficient for everything asked
+here. If some page only exists meaningfully in production, say so and capture its **structure only**,
+with every price, quantity and total replaced by `0.00`.
+
+**Strip all credentials.** No cookies, `Authorization` headers, session tokens, API keys or signed
+URLs anywhere in the output. Check before zipping.
+
+---
+
+## 1. Route and navigation inventory — one markdown file
+
+This is the most useful part. Cover **all five apps**: `prayag-price-finder`, `prayag-product-db`,
+`prayag-analysis`, `prayag-home`, `mockup-sandbox`.
+
+For each app:
+- artifact name, deployed URL, base path
+- a table of every route:
+
+| Path | Page component (file:line) | Page title as shown | Auth / role required | How a user reaches it |
+|---|---|---|---|---|
+
+"How a user reaches it" means: a named nav item, a link or button on another page (say which), a
+redirect, or **direct URL only**.
+
+Then, for each app's navigation component:
+- the file it lives in
+- every item, in display order, with its label and target
+- any item shown conditionally — state the condition
+- anything in the nav that is **role-gated**, and which role
+
+Finally, two lists I particularly want:
+- **Orphan routes** — routes with no nav item and no inbound link from any page.
+- **Dead or broken links** — nav items or links whose target route does not exist.
+
+---
+
+## 2. Per-page structure — readable extract
+
+For every route in §1, the rendered DOM after the page has loaded and settled, **trimmed**:
+
+**Remove:** `class`, `style`, `aria-*` except `aria-label`, `data-*` except `data-testid`, inline
+SVG path data, `<script>`, `<style>`.
+
+**Keep:** semantic tags and nesting, all headings, `<label>` text, every form control with its
+`type`/`name`/`placeholder`, button and link text, table `<th>` cells, dialog and drawer titles,
+visible helper and disclosure text, empty-state and error text.
+
+**Compress the data:** for any table or list over 5 rows, give the header row, the first 2 rows, then
+`<!-- N rows total -->`. For a `<select>` or listbox over 10 options, the first 5 then
+`<!-- N options total -->`.
+
+One file per page, named for its route, in a folder per app. A page that cannot be reached or
+rendered gets a file saying why.
+
+---
+
+## 3. Full untrimmed HTML — four pages only
+
+For these, also include the complete rendered HTML with nothing stripped:
+
+1. Price Calculator — empty state
+2. Price Calculator — with two of our products, two competitors, one ad-hoc competitor, one ad-hoc
+   product, and one edited MRP (so the App / Edited / Entered states and both unit badges are all
+   present in the markup)
+3. Price Finder — a division and category selected
+4. Division Mapping (admin) — the history view
+
+Development data, prices as they come, since development figures are not commercially sensitive.
+
+---
+
+## 4. Also useful, if cheap
+
+- **Screenshots** of each page at desktop and phone width. HTML tells me structure, not whether
+  something looks broken — these answer different questions and the pair is worth more than either.
+- The **shared component inventory**: which UI components are vendored into more than one app, and
+  which of those have diverged between copies.
+
+---
+
+## 5. Deliver as
+
+One ZIP: the §1 markdown at the root, then `structure/<app>/<route>.html`, `full/`, and
+`screenshots/`. A short README listing what is present and anything that could not be captured.
+
+**Say plainly what is missing or uncertain.** A route you could not reach, a page that needs a role
+you do not have, a component you could not attribute — list it rather than omitting it. An inventory
+with stated gaps is useful; one that silently skips things is not.
