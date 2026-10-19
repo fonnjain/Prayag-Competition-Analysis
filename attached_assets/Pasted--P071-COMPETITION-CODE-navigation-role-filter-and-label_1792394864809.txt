@@ -1,0 +1,125 @@
+# P071 · COMPETITION · CODE — navigation role filter and label fixes
+
+**Date:** 19 October 2026
+**Source:** P070 inventory §1 (line 46), §2 (lines 99, 101), §3 (line 131), §5.
+**Scope:** navigation presentation only. **No backend permission change.** See §0.
+
+---
+
+## 0. What this is and is not
+
+**This is a UI consistency fix, not a security fix.** Hiding a nav item does not restrict anything —
+the P070 inventory says so plainly: *"The backend's general read guard is broader than these UI
+gates; do not infer a server permission solely from a hidden nav item."* That remains true after this
+change. If there is a question about what a restricted role can reach by typing a URL, that is a
+separate backend review and this prompt does not touch it.
+
+What it fixes: **one screen currently gives two contradictory answers about where a user can go.**
+
+---
+
+## 1. The defect
+
+The shared workspace header (`lib/replit-auth-web/src/workspace-header.tsx:108`) filters by role:
+Home, Product Database and Competition Analysis are hidden from `user` / `counter` accounts; MRP
+Generator and Admin are admin-only; Price Finder is shown to everyone.
+
+Each app's sidebar "Switch app" block lists all four apps **unfiltered**:
+
+| App | Sidebar switcher | Note |
+|---|---|---|
+| `prayag-price-finder` | `src/components/layout.tsx:71` block | all four, unfiltered |
+| `prayag-product-db` | `src/components/layout.tsx:136–143` | unfiltered, **and omits its own app** |
+| `prayag-analysis` | `src/components/AppShell.tsx:38` block | all four, unfiltered |
+| `prayag-home` | `src/components/layout.tsx:46` block | all four, unfiltered |
+
+So a sales account in the Price Finder sees Product Database and Competition Analysis **absent from
+the header and present in the sidebar, on the same screen**. Following the sidebar link reaches an
+app that rejects the role.
+
+This matters most for the Price Finder, because the Price Calculator was built for sales people in
+the field, and `user` / `counter` are their roles.
+
+---
+
+## 2. The fix — one source of truth, not four copies
+
+**Do not re-implement the filter in each sidebar.** The header already computes this. Extract its
+visibility logic from `workspace-header.tsx` into a shared export in `lib/replit-auth-web` — a hook
+or a pure function taking the resolved user and returning the permitted app list in display order —
+then have the header and all four sidebars consume it.
+
+Four hand-copied filters will drift, and the P070 component inventory already shows 58 of 59 copied
+component groups differing at byte level. Do not add a fifth thing to keep in sync.
+
+**Preserve the anonymous case exactly as the header handles it today.** Per P070 §5: an anonymous
+resolved user is *not* a restricted account, so links to protected apps stay visible and lead to
+sign-in. That is deliberate and must not become "hidden" — hiding them would strand an anonymous
+Price Finder user with no route to log in.
+
+So the three states are:
+
+| User | Sees |
+|---|---|
+| Anonymous | all non-admin apps; links lead to sign-in |
+| `user` / `counter` | Price Finder only |
+| `admin` | everything, including MRP Generator and Admin |
+
+Also, while in these files: **Product DB's switcher should include Product Database** like the other
+three include their own app, marked as current rather than omitted.
+
+---
+
+## 3. Relabel the calculator's capacity counter
+
+In the Calculator, `3 of 50 products` sits immediately above the **Final Summary** button — exactly
+where P058 §7.2's coverage statement belongs (*"compared on 3 of 5 products, 2 of which were
+hand-entered"*). Two different `N of M` meanings, adjacent, and the one that carries the honesty
+burden is the other one.
+
+Change the capacity reading to **`3 products added`** (or `3 products · 50 max` if the ceiling needs
+showing). Leave the Final Summary's coverage wording alone — it is correct; it just must not have a
+look-alike next to it.
+
+---
+
+## 4. Two label fixes, same area, cheap
+
+1. **Price Finder mobile page label** reads **Search products** on `/price-finder/bucket-lists` and
+   `/bucket-lists/edit`. It should read the bucket-list page's own title.
+2. **Analysis breadcrumb map** omits `/analysis/mrp-generator/matching`, so that page shows a generic
+   **Competition Analysis** crumb against a specific heading. Add the entry.
+
+---
+
+## 5. Tests
+
+1. A `user` account and a `counter` account: the header's app list and the sidebar's app list are
+   **identical**, and contain only Price Finder.
+2. An anonymous visitor: protected-app links are still present in both, and still lead to sign-in.
+3. An `admin`: both lists complete, including MRP Generator and Admin.
+4. The header and every sidebar derive their list from the shared export — assert there is exactly
+   one implementation, so a future app cannot reintroduce an unfiltered copy.
+5. Calculator: capacity label no longer matches `\d+ of \d+ products`; the Final Summary coverage
+   line still does.
+
+---
+
+## 6. Out of scope
+
+Logged from P070, each its own piece of work: the 58 diverging shared-component copies; the Price
+Revisions effective-period selector rendering with no options and firing no request; the mockup
+sandbox prototype defects (Unified's `go()` escaping `/__mockup`, Mobile's handler-less nav buttons).
+
+Do not invoke logout, change any user's role, or alter backend guards as part of this.
+
+---
+
+## Done criteria
+
+- [ ] One shared visibility export in `lib/replit-auth-web`; header and all four sidebars use it
+- [ ] Anonymous behaviour unchanged; `user`/`counter` see Price Finder only; admin sees all
+- [ ] Product DB switcher includes its own app, marked current
+- [ ] Calculator capacity label no longer reads `N of M products`
+- [ ] Two label fixes applied
+- [ ] Changed-package typecheck and tests pass; commit pushed; nothing published without your say-so
