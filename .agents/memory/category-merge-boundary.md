@@ -39,6 +39,15 @@ without bulk rewriting existing spellings. Active CP products with capitalised
 range names in Category and empty Range belong to semantic correction review,
 not an automatic spelling merge.
 
+The Sales check must name the consumer and field, distinguish pass-through or
+discarding from grouping and exact-string joins/filters/mappings, and identify
+which approved spellings are referenced. Distinguish catalogue Category from
+competitor-row Category; they are separate feeds. A repository-source check is
+not proof of the deployed Sales revision.
+
+**Why:** The user requires the actual downstream dependency to decide whether a
+case-only correction is safe or needs a coordinated Sales change.
+
 Spelling prevention applies to newly created product codes only. Loads do not
 fill null Category/division or replace an existing Category/Range/division.
 For new products, match within the exact stored division and prefer the spelling

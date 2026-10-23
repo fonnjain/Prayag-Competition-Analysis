@@ -71,9 +71,9 @@ it("ties stop; changed counts or spellings invalidate a pending approval", () =>
   expect(() => assertCategorySpellingPreview(undefined, preview)).toThrow("Preview again");
   expect(() => assertCategorySpellingPlan(planCategorySpellings([incoming("shower fittings")], [stored[0]!, stored[3]!]))).toThrow("ambiguous");
 });
-it("P049 preserves existing Category, Range and division including nulls and normalised item codes", () => {
+it("P049 preserves existing Category, Range and division including nulls for an exact item code", () => {
   const current = { itemCode: "OLD", division: null, category: null, seriesRange: null, isActive: false };
-  const result = planNewProductCategories([{ itemCode: " old ", division: "Wrong", category: "Wrong", seriesRange: "Wrong", isActive: true }], [current]);
+  const result = planNewProductCategories([{ itemCode: "OLD", division: "Wrong", category: "Wrong", seriesRange: "Wrong", isActive: true }], [current]);
   expect(result.rows[0]).toMatchObject({ division: null, category: null, seriesRange: null, isActive: false });
   expect(result.categorySpellings).toEqual([]);
 });
@@ -82,14 +82,15 @@ it("same-batch equivalent new categories use the first approved spelling", () =>
   expect(result.rows.map(row => row.category)).toEqual(["Drain Fittings", "Drain Fittings"]);
   expect(result.categorySpellings.every(row => row.status === "new")).toBe(true);
 });
-it("exact legacy item-code identity wins over normalised collisions; ambiguous aliases stop", () => {
+it("exact legacy item codes remain distinct; unmatched spelling never inherits classification", () => {
   const current = [
     { itemCode: "Ab", division: "One", category: "First", seriesRange: "First Range" },
     { itemCode: "AB", division: "Two", category: "Second", seriesRange: "Second Range" },
   ];
   const result = planNewProductCategories(current.map(row => ({ ...row, category: "Wrong", division: "Wrong" })), current);
   expect(result.rows).toEqual(current);
-  expect(() => planNewProductCategories([{ ...current[0]!, itemCode: "a b" }], current)).toThrow("Ambiguous existing item code");
+  const unmatched = { ...current[0]!, itemCode: "a b" };
+  expect(planNewProductCategories([unmatched], current).rows[0]).toEqual(unmatched);
 });
 it.each(["apply", "undo"])("signed %s locks correction then vocabulary once, in consistent order", action => {
   const importer = readFileSync(new URL("../routes/catalogImportExport.ts", import.meta.url), "utf8");

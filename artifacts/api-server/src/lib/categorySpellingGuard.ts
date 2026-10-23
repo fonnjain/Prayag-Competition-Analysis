@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { catalogProductsTable, db } from "@workspace/db";
 import { normalizeVocabularyKey, lockPriceEditorVocabulary } from "./priceEditorVocabulary";
+import { reviewedCategorySpelling } from "./reviewedCategorySpellings";
 
 export interface CategoryCatalogueRow {
   itemCode?: string;
@@ -18,7 +19,7 @@ export interface CategorySpellingDecision {
   selectionReason: string;
 }
 const groupKey = (division: string | null, category: string) =>
-  JSON.stringify([division, normalizeVocabularyKey(category)]);
+  JSON.stringify([division, normalizeVocabularyKey(reviewedCategorySpelling(division, category) ?? category)]);
 
 /** P051: exact division boundary, P048's normalizer; never a merge. */
 export function planCategorySpellings<T extends CategoryCatalogueRow>(
@@ -40,14 +41,16 @@ export function planCategorySpellings<T extends CategoryCatalogueRow>(
     const candidates = [...(groups.get(key) ?? [])].map(([category, activeProducts]) => ({ category, activeProducts }))
       .sort((a, b) => b.activeProducts - a.activeProducts || (a.category < b.category ? -1 : a.category > b.category ? 1 : 0));
     const tie = candidates.length > 1 && candidates[0]!.activeProducts === candidates[1]!.activeProducts;
-    const selectedCategory = tie ? null : candidates[0]?.category ?? newSpellings.get(key) ?? row.category;
+    const reviewed = reviewedCategorySpelling(row.division, row.category);
+    const selectedCategory = tie ? null : reviewed ?? candidates[0]?.category ?? newSpellings.get(key) ?? row.category;
     if (!candidates.length && selectedCategory) newSpellings.set(key, selectedCategory);
     categorySpellings.push({
       ...(row.itemCode ? { itemCode: row.itemCode } : {}),
       division: row.division, inputCategory: row.category, selectedCategory,
-      status: tie ? "ambiguous" : candidates.length ? "matched existing spelling" : "new",
+      status: tie ? "ambiguous" : candidates.some(candidate => candidate.category === selectedCategory) ? "matched existing spelling" : "new",
       candidates,
       selectionReason: tie ? "Active-product counts tie; no spelling was selected. Explicit review is required."
+        : reviewed ? "Explicit reviewed Category spelling in this exact division; Category only. Normal administrator approval is still required; existing products are not changed."
         : candidates.length > 1 ? "Selected the stored spelling with more active products; no stored product is changed."
         : candidates.length ? "Same division and shared P048 normalised Category key."
         : "New Category; requires the normal administrator approval. Equivalent new rows use the first previewed spelling.",

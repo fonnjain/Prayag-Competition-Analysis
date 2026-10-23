@@ -60,3 +60,4 @@
 - [Calculator assertions](calculator-free-entry.md) — basket-only App/Edited/Entered prices; unscoped quoting is not permission to alter Price Finder or analytics.
 - [Browser ambient typing](browser-ambient-typing.md) — missing DOM libraries can also cause misleading Framer Motion Variant and callback inference errors.
 - [Document font subsets](document-font-subsets.md) — a Latin font subset may omit ₹; verify glyph coverage, embed fallback subsets and render the result.
+- [Audit notebook limits](audit-notebook-limits.md) — persist large audit payloads to files; a notebook reset does not roll back completed callbacks.
