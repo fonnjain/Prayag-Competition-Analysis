@@ -5954,9 +5954,12 @@ components:
         category: {type: [string, "null"]}
     CalculatorSearchResult:
       type: object
-      required: [results, divisions, categories, exactProduct]
+      required: [results, totalCount, divisions, categories, exactProduct]
       properties:
         results: {type: array, items: {$ref: "#/components/schemas/CalculatorProductOption"}}
+        totalCount:
+          type: integer
+          description: Ranked matches before the server result limit; never a dropdown rendering count.
         exactProduct:
           anyOf:
             - {$ref: "#/components/schemas/CalculatorProductOption"}

@@ -1204,6 +1204,7 @@ export const GetPriceCalculatorSearchResponse = zod.object({
   "division": zod.string().nullable(),
   "category": zod.string().nullable()
 })),
+  "totalCount": zod.number().describe('Ranked matches before the server result limit; never a dropdown rendering count.'),
   "exactProduct": zod.union([zod.object({
   "itemCode": zod.string(),
   "productName": zod.string().nullable(),

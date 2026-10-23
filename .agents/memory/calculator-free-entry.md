@@ -50,3 +50,17 @@ does not currently price.
 
 **How to apply:** Never borrow a similar active code's price or revive
 ineligible MRP evidence merely to make the quote work.
+
+Search ranking is shared with Price Finder, but candidate eligibility and bucket
+scope must remain separate. Preserve Price Finder's established ordering rather
+than inventing a Calculator-only ranker or reordering both screens for a specific
+SKU position.
+
+**Why:** The user accepted class-based search assertions (code-prefix matches
+ahead of name-substring hits), replacing an incorrect request for specific codes
+in the first ten. Shared ranking is not permission to apply Price Finder's
+bucket restrictions to full-catalogue shop quoting.
+
+**How to apply:** Test ranking classes and same-candidate order equivalence,
+alongside an explicit unbucketed Calculator test. Keep raw code equality separate
+from normalized ranking hints.

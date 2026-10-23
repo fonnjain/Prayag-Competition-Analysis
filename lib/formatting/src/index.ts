@@ -1,4 +1,5 @@
 export * from "./priceCalculator.ts";
+export * from "./productSearch.ts";
 
 const money = new Intl.NumberFormat("en-IN", {
   style: "currency",

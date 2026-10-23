@@ -13,6 +13,7 @@ vi.mock("@workspace/db", async original => {
 });
 import { pool } from "@workspace/db";
 import router from "./priceCalculator";
+import finderRouter from "./priceFinder";
 import analysisRouter from "./analysis";
 import { withBucketContext, bucketRouteApplies } from "../lib/bucketFilter";
 import { readFinderEvidence } from "../lib/priceFinderEvidence";
@@ -27,7 +28,7 @@ beforeAll(async () => {
   await client.query(`SET search_path TO "${schema}"`);
   state.database = drizzle(client);
   // Minimal disposable models; search_path contains NO public fallback.
-  await client.query("CREATE TABLE catalog_products(item_code text,product_name text,division text,category text,uom text,is_active boolean,discontinued_from date)");
+  await client.query("CREATE TABLE catalog_products(item_code text,product_name text,division text,category text,uom text,is_active boolean,discontinued_from date,size text)");
   await client.query("CREATE TABLE mrp_price_history(id serial,item_code text,variant text,mrp double precision,review_status text,effective_date date,price_basis text DEFAULT 'MRP')");
   await client.query("CREATE TABLE competitor_prices(id serial,competitor text,matched_prayag_code text,match_status text,price double precision,effective_date date,price_basis text,gst_pct double precision,unit text)");
   await client.query("CREATE TABLE discount_settings(scope text,discount_pct double precision)");
@@ -36,6 +37,15 @@ beforeAll(async () => {
   await client.query("INSERT INTO competitor_prices(competitor,matched_prayag_code,match_status,price,effective_date,price_basis,gst_pct,unit) VALUES ('Brand','A','matched',91,'2026-01-01','MRP',NULL,'NOS'),('Brand','A','matched',101,'2026-09-01','MRP',NULL,'NOS'),('Taxed','A','matched',100,'2026-01-01','Ex-GST',18,NULL),('Future','A','matched',400,'2027-01-01','MRP',NULL,'NOS'),('Missing','A','matched',NULL,'2026-01-01','MRP',NULL,'NOS'),('Wrong','A','unmatched',1,'2026-01-01','MRP',NULL,'NOS')");
   await client.query("INSERT INTO discount_settings VALUES ('Our',20),('Brand',18)");
   await client.query("INSERT INTO catalog_products VALUES ('P','Catalogue without a price','Pipes','PPR','NOS',false,NULL),('TTS-01','Exact code','CP','Valve','NOS',true,NULL)");
+  // Search-only fixtures in this disposable schema, never the real catalogue.
+  await client.query(`INSERT INTO catalog_products(item_code,product_name,division,category,uom,is_active)
+    SELECT 'PS-'||n,'Pipe','Pipes','CPVC','NOS',true FROM generate_series(1,320) n`);
+  await client.query(`INSERT INTO catalog_products(item_code,product_name,division,category,uom,is_active)
+    VALUES ('3272','Collapsible Waste Pipe','PTMT','Waste','NOS',true),
+           ('CPS-15','Concealed Stop Cock','CP','Allied','NOS',true)`);
+  await client.query(`INSERT INTO mrp_price_history(item_code,variant,mrp,review_status,effective_date)
+    SELECT item_code,'Standard',10,'approved','2026-01-01' FROM catalog_products
+    WHERE item_code LIKE 'PS-%' OR item_code IN ('3272','CPS-15')`);
 });
 afterAll(async () => {
   if (client) { await client.query("SET search_path TO public"); await client.query(`DROP SCHEMA "${schema}" CASCADE`); client.release(); }
@@ -50,13 +60,59 @@ function app(role?: "admin" | "user", scope = false) {
       { competitor: "Brand", codes: null },
     ], noCompetitorPriceCount: 1 }, () => next()); else next();
   });
-  a.use(router); a.use(analysisRouter); return a;
+  a.use(router); a.use(finderRouter); a.use(analysisRouter); return a;
 }
 const requestBlock = (code = "A") => ({
   id: "b", itemCode: code, variant: "Standard", discount: "20", quantity: "7",
   competitors: [{ id: "c", competitor: "Brand", discount: "18" }],
 });
 describe("public read-only calculator endpoints", () => {
+  it("ranks PS-prefix codes first (class property, not specific code positions)", async () => {
+    const r = await supertest(app()).get("/price-finder/calculator/search").query({ q: "PS", asOf: "2026-05-01" });
+    expect(r.status).toBe(200);
+    expect(r.body.results).toHaveLength(300);
+    expect(r.body.totalCount).toBe(322);
+    expect(r.body.results[0].itemCode.startsWith("PS")).toBe(true);
+    expect(r.body.results.slice(0,10).every((p: any) => p.itemCode.startsWith("PS"))).toBe(true);
+    // Including the tails proves ALL prefix matches outrank substring matches.
+    const candidates = (await client.query("SELECT item_code,product_name,division,category,size FROM catalog_products WHERE item_code LIKE 'PS-%' OR item_code IN ('3272','CPS-15')")).rows;
+    const { rankProductSearchRows } = await import("@workspace/formatting");
+    const ranked = rankProductSearchRows(candidates, ["PS"]);
+    expect(ranked.slice(0,320).every(p => p.item_code.startsWith("PS"))).toBe(true);
+    expect(ranked.slice(320).map(p => p.item_code).sort()).toEqual(["3272", "CPS-15"]);
+  });
+  it("both actual handlers use identical ranking for the same eligible candidate set", async () => {
+    const calc = await supertest(app()).get("/price-finder/calculator/search").query({ q: "PS", limit: 300, asOf: "2026-05-01" });
+    const finder = await supertest(app()).get("/price-finder/search").query({ filters: "PS", limit: 300, asOf: "2026-05-01" });
+    expect(calc.status).toBe(200); expect(finder.status).toBe(200);
+    expect(finder.body.totalCount).toBe(322);
+    expect(calc.body.results.map((p: any) => p.itemCode)).toEqual(finder.body.results.map((p: any) => p.itemCode));
+  });
+  it("search remains unbucketed for admin and anonymous; Finder still enforces the same exclusion", async () => {
+    const params = { q: " A", limit: 300, asOf: "2026-05-01" };
+    const anonymous = await supertest(app()).get("/price-finder/calculator/search").query(params);
+    const scoped = await supertest(app("admin",true)).get("/price-finder/calculator/search").query(params);
+    expect(scoped.body).toEqual(anonymous.body);
+    expect(scoped.body.results.some((p: any) => p.itemCode === " A")).toBe(true);
+    const finder = await supertest(app("admin",true)).get("/price-finder/search").query({ filters: "Spaced code", asOf: "2026-05-01" });
+    expect(finder.status).toBe(200);
+    expect(finder.body.results).toEqual([]);
+  });
+  it("reports the real pre-cap total and shares field selection beyond code/name", async () => {
+    const capped = await supertest(app()).get("/price-finder/calculator/search").query({ q: "PS", limit: 2 });
+    expect(capped.body.results).toHaveLength(2);
+    expect(capped.body.totalCount).toBe(322);
+    const category = await supertest(app()).get("/price-finder/calculator/search").query({ q: "CPVC", limit: 1 });
+    expect(category.body.totalCount).toBe(320);
+    expect(category.body.results).toHaveLength(1);
+  });
+  it("browse selection on another row cannot affect an identical subsequent direct search", async () => {
+    const params = { q: "PS", limit: 300, asOf: "2026-05-01" };
+    const before = await supertest(app()).get("/price-finder/calculator/search").query(params);
+    await supertest(app()).get("/price-finder/calculator/search").query({ division: "PTMT", category: "Waste", limit: 300 });
+    const after = await supertest(app()).get("/price-finder/calculator/search").query(params);
+    expect(after.body).toEqual(before.body);
+  });
   it("resolves dates, approved Standard and variant prices, current competitors and tax evidence in batch", async () => {
     const r = await supertest(app()).get("/price-finder/calculator/rows").query({ code: ["A", " A", "B"], asOf: "2026-05-01" });
     expect(r.status).toBe(200); expect(r.body.rows).toHaveLength(3);

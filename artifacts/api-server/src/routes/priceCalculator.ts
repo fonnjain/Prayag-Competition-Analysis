@@ -7,10 +7,12 @@ import {
   resolveCalculator, summarizeCalculator, calculatorDisclosures, discountError, quantityError,
   type CalculatorEvidence, type CalculatorBlock, applyIndianNumberFormats, compareCalculatorMetadata,
   CALCULATOR_SCOPE_DISCLOSURE, calculatorCompetitorKey, calculatorAssertedBanner,
+  rankProductSearchRows, type ProductSearchRow, CALCULATOR_SEARCH_LIMIT,
 } from "@workspace/formatting";
 import { requireAuth, requireWorkspaceReadAccess } from "../middlewares/authMiddleware";
 import { exactQueryCodes, finderAsOf } from "../lib/priceFinderCompetitors";
 import { readFinderEvidence, type FinderProduct } from "../lib/priceFinderEvidence";
+import { productSearchCondition } from "../lib/productSearchCondition";
 
 const router = Router();
 export async function calculatorEvidence(codes: string[], asOf: string) {
@@ -51,7 +53,7 @@ export async function calculatorEvidence(codes: string[], asOf: string) {
 const searchQuery = z.object({
   q: z.string().max(1024).optional(), division: z.string().max(1024).optional(),
   category: z.string().max(1024).optional(), asOf: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(300).optional(),
+  limit: z.coerce.number().int().min(1).max(CALCULATOR_SEARCH_LIMIT).optional(),
 }).strict();
 type ProductOption = { itemCode: string; productName: string | null; division: string | null; category: string | null };
 router.get("/price-finder/calculator/search", async (req, res) => {
@@ -65,12 +67,12 @@ router.get("/price-finder/calculator/search", async (req, res) => {
     const division = query.division === undefined ? sql`TRUE` : sql`p.division=${query.division}`;
     const category = query.category === undefined ? sql`TRUE`
       : query.category === "__uncategorised__" ? sql`p.category IS NULL OR p.category=''` : sql`p.category=${query.category}`;
-    const hint = query.q === undefined || query.q === "" ? sql`TRUE`
-      : sql`(p.item_code ILIKE ${`%${query.q}%`} OR p.product_name ILIKE ${`%${query.q}%`})`;
+    const filters = query.q === undefined || query.q === "" ? [] : [query.q];
+    const hint = filters.length ? productSearchCondition(filters[0]) : sql`TRUE`;
     const [results, divisions, categories, exact] = await Promise.all([
-      db.execute<ProductOption>(sql`SELECT p.item_code AS "itemCode",p.product_name AS "productName",p.division,p.category
+      db.execute<ProductSearchRow>(sql`SELECT p.item_code,p.product_name,p.division,p.category,p.size
         FROM catalog_products p WHERE ${available} AND ${division} AND (${category}) AND ${hint}
-        ORDER BY CASE WHEN p.item_code=${query.q ?? ""} THEN 0 ELSE 1 END,p.item_code COLLATE "C" LIMIT ${query.limit ?? 60}`),
+        ORDER BY p.item_code COLLATE "C"`),
       db.execute<{ division: string; count: number }>(sql`SELECT p.division,count(*)::int AS count
         FROM catalog_products p WHERE ${available} AND p.division IS NOT NULL
         GROUP BY p.division ORDER BY p.division`),
@@ -82,7 +84,16 @@ router.get("/price-finder/calculator/search", async (req, res) => {
           FROM catalog_products WHERE item_code=${query.q} LIMIT 1`),
     ]);
     res.setHeader("Cache-Control", "private, no-store");
-    res.json({ results: results.rows, divisions: divisions.rows, categories: categories.rows, exactProduct: exact.rows[0] ?? null });
+    // Rank ALL candidates before limiting. Scope deliberately excludes bucket
+    // conditions, unlike Price Finder. Identity below remains raw SQL equality.
+    const ranked = rankProductSearchRows(results.rows, filters);
+    res.json({
+      results: ranked.slice(0, query.limit ?? CALCULATOR_SEARCH_LIMIT).map(row => ({
+        itemCode: row.item_code, productName: row.product_name, division: row.division, category: row.category,
+      })),
+      totalCount: ranked.length,
+      divisions: divisions.rows, categories: categories.rows, exactProduct: exact.rows[0] ?? null,
+    });
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Search failed." }); }
 });
 router.get("/price-finder/calculator/competitors", async (req, res) => {

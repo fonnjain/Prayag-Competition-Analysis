@@ -3366,6 +3366,8 @@ export type CalculatorSearchResultCategoriesItem = {
 
 export interface CalculatorSearchResult {
   results: CalculatorProductOption[];
+  /** Ranked matches before the server result limit; never a dropdown rendering count. */
+  totalCount: number;
   exactProduct: CalculatorProductOption | null;
   divisions: CalculatorSearchResultDivisionsItem[];
   categories: CalculatorSearchResultCategoriesItem[];

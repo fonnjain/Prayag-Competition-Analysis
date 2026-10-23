@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SearchResultsNotice } from "@/lib/searchResultsNotice";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,8 @@ export type SearchableSelectProps = {
   "data-testid"?: string;
   /** Max options rendered at once; the list only mounts while open. */
   renderLimit?: number;
+  /** Server match total disclosure; independent of the local rendering cap. */
+  resultsNotice?: string;
   /** Called with the raw search text, for server-side search. */
   onSearchChange?: (query: string) => void;
   /** Options are already filtered by the server; skip local filtering. */
@@ -64,6 +67,7 @@ export function SearchableSelect({
   widthClass = "w-[280px]",
   triggerClassName,
   renderLimit = 200,
+  resultsNotice,
   onSearchChange,
   serverFiltered = false,
   loading = false,
@@ -164,6 +168,9 @@ export function SearchableSelect({
             aria-label={searchPlaceholder}
             data-testid={`${testId}-search`}
           />
+          {!loading && resultsNotice && (
+            <SearchResultsNotice text={resultsNotice} testId={`${testId}-results-notice`} />
+          )}
           <CommandList className="max-h-[min(300px,calc(var(--radix-popover-content-available-height)-3rem))]">
             {loading ? (
               <div className="space-y-1.5 p-2" aria-busy="true">

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useCalculatorSearch } from "@/lib/calculatorApi";
 import type { ProductChoice } from "@/lib/calculatorState";
 import { AdHocBadge } from "./MrpField";
+import { CALCULATOR_SEARCH_LIMIT, productSearchResultNotice } from "@workspace/formatting";
 
 type Mode = "direct" | "browse" | "exact";
 
@@ -44,11 +45,11 @@ export function ProductPicker({ blockId, index, asOf, itemCode, selectedLabel, o
   const settledCode = useDebounced(code, 250);
   const asOfParam = asOf || undefined;
 
-  const search = useCalculatorSearch({ q: query, limit: 60, asOf: asOfParam }, mode === "direct" && query.length > 0);
+  const search = useCalculatorSearch({ q: query, limit: CALCULATOR_SEARCH_LIMIT, asOf: asOfParam }, mode === "direct" && query.length > 0);
   const divisions = useCalculatorSearch({ limit: 1, asOf: asOfParam }, mode === "browse");
   const categories = useCalculatorSearch({ division: division ?? undefined, limit: 1, asOf: asOfParam }, mode === "browse" && !!division);
   const products = useCalculatorSearch(
-    { division: division ?? undefined, category: category === UNCATEGORISED ? "__uncategorised__" : category ?? undefined, limit: 300, asOf: asOfParam },
+    { division: division ?? undefined, category: category === UNCATEGORISED ? "__uncategorised__" : category ?? undefined, limit: CALCULATOR_SEARCH_LIMIT, asOf: asOfParam },
     mode === "browse" && !!division && !!category,
   );
   const exact = useCalculatorSearch({ q: settledCode, limit: 8, asOf: asOfParam }, mode === "exact" && settledCode.length > 0);
@@ -100,6 +101,10 @@ export function ProductPicker({ blockId, index, asOf, itemCode, selectedLabel, o
           searchPlaceholder="Type an item code or name…"
           emptyText={query ? (search.isError ? "Search failed. Try again." : "No products match. Use Exact code to add one by hand.") : "Start typing to search"}
           serverFiltered
+          renderLimit={CALCULATOR_SEARCH_LIMIT}
+          resultsNotice={query.length > 0 && search.data
+            ? productSearchResultNotice(search.data.results.length, search.data.totalCount)
+            : undefined}
           loading={rawQuery.length > 0 && (search.isFetching || rawQuery !== query)}
           onSearchChange={setRawQuery}
           value={itemCode}
@@ -139,6 +144,10 @@ export function ProductPicker({ blockId, index, asOf, itemCode, selectedLabel, o
             triggerId={`calc-product-${blockId}`}
             aria-label={`Product for block ${index + 1}`}
             data-testid={`select-browse-product-${blockId}`}
+            renderLimit={CALCULATOR_SEARCH_LIMIT}
+            resultsNotice={products.data
+              ? productSearchResultNotice(products.data.results.length, products.data.totalCount)
+              : undefined}
             widthClass="w-full"
             placeholder={!category ? "Pick a category first" : products.isLoading ? "Loading…" : "Product"}
             searchPlaceholder="Search item code or name…"
