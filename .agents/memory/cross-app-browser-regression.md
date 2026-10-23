@@ -30,6 +30,19 @@ page content to render; an authentication loading frame is not a page capture.
 and the raw cached Chromium lacked libraries that the installed wrapper supplied.
 Cold page loads also briefly showed only the authentication loading state.
 
+For dense dynamic pickers, distinguish browser-observation timeouts from actual
+render latency using standalone Playwright and small browser-side paint markers.
+
+**Why:** The remote observation driver repeatedly timed out during input, while
+the standalone installed Chromium completed the same real dropdown and yielded
+usable timings under CPU/network throttling. The timeout was not proof of a hang.
+
+**How to apply:** Keep the test worker, but change its driver rather than repeating
+the same failing observation action. Use MutationObserver plus animation-frame
+markers, request resource timings and small result JSON. For phone claims record
+viewport, mobile/touch, DPR, CPU slowdown and network settings; width alone is not
+a phone-class performance profile.
+
 **How to apply:** Verify `/repl/tools/bin/chromium` exists and launches before
 using it as a Playwright executable. Use a genuine, approved session, restrict
 business writes, remove branding only in the capture, and revoke the temporary

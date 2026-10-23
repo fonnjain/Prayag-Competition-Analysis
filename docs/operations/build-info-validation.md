@@ -26,3 +26,22 @@ Resolve those video-artifact errors separately, following the video skill's
 ownership rules, without changing the approved film content or weakening the
 workspace gate. No video files or validation configuration were changed as
 part of the build-info endpoint.
+
+## Resolved — 23 October 2026
+
+The full `pnpm typecheck` now passes, including both video artifacts and all
+other workspace packages. The dedicated correction adds
+`"lib": ["ES2022", "DOM", "DOM.Iterable"]` to the browser film's own TypeScript
+configuration. Missing DOM types caused both the browser API errors and the
+misleading Framer Motion `Variant` errors. No animation annotations or assertions
+were necessary; all film source and runtime values remain unchanged.
+
+No root command, exclusions, strictness, or package inclusion was weakened.
+The scoped exception above is historical, not the gate used for this release.
+
+The live `/api/_build` observed before this fix already identified source
+`82b6103e0adc7dc44dd6a701d1c8d43c10071465`, built
+`2026-10-23T07:39:43.740Z`, which includes the earlier calculator, navigation,
+build-info and shared-ranker changes. Artifact production build commands are
+package-scoped; the previous workspace failure was an acceptance-policy
+blocker, not evidence that the publishing service refused those builds.

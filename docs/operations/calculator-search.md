@@ -19,6 +19,18 @@ is above the scrollable options, not hidden after them. Browse uses the same
 ceiling and disclosure. Exact-code suggestions retain their small limit because
 exact identity is returned separately.
 
+Neither production nor development had any one-character item code in the
+read-only catalogue check on 23 October 2026. Direct search and exact-code
+lookup therefore wait for two characters (and nonblank input). Both raw and
+debounced values must pass admission; dropping back to one character hides stale
+cached results and their notice immediately. This does not trim or normalise
+the actual query or identity. Browse remains unchanged.
+
+One-character exact entries still settle locally and can be explicitly added
+as ad-hoc products with a description. Skipped lookups can never borrow a stale
+exact product or near match. Revisit this guard if catalogue policy later admits
+single-character codes.
+
 ## Automated verification
 
 - Formatting tests: ranking classes, retained synonyms/voice variants,
@@ -55,16 +67,31 @@ positions. Preserving the established Finder order was explicitly approved.
   candidate total. That pre-existing candidate-versus-positive-score total
   discrepancy was not changed.
 
-### Unresolved browser verification
+### Resolved large-result browser verification
 
-Read-only API query `1`, limit 300, returned HTTP 200 with 300 results and
-`totalCount=4533`. The browser automation timed out while entering this query,
-including a bounded targeted retry. It could not isolate application input/
-rendering delay from observation-tool overhead. Therefore the 300-option
-large-result UI and live truncation notice are **not browser-verified**.
-Do not claim this state passed or infer a proven application defect from the
-timeout. The API and rendered-notice unit assertions passed independently.
+The earlier observation-tool timeouts did not establish an application hang.
+A standalone Node Playwright run using the installed Nix-aware Chromium wrapper
+successfully measured the real, already-published production dropdown before
+the two-character guard was implemented:
 
-Shared-library and changed API/Finder typechecks pass. Code generation succeeded;
-its appended project-wide check encounters the already-existing animation DOM/
-window/document type errors. No production changes or publishing were performed.
+- Viewport 390×844 CSS pixels; mobile, touch, DPR 2.
+- CDP CPU slowdown 6×; Slow 4G: 150 ms latency, downstream 200,000 B/s,
+  upstream 93,750 B/s. This is an emulated phone-class profile, not a physical
+  handset claim.
+- Live source `82b6103e0adc7dc44dd6a701d1c8d43c10071465`.
+- At 2026-10-23 07:58:20 UTC, query `1` returned 300 of **4,739**; all 300
+  option nodes rendered with the exact server-total disclosure.
+- Input to painted options: **1,485.9 ms**, including debounce and network.
+  Response end to painted options: **644.3 ms**.
+- The former 4,533 total was from development, not production.
+- Production PS also rendered all 176 matches with a first-ten PS-prefix class.
+- Basket-local ad-hoc competitor/product and App / Edited / Entered states
+  passed. Astral showed amber `Unit: per 3-m pipe`; the one-off competitor showed
+  the neutral `Competitor unit not recorded.` note.
+
+Sanitized runtime evidence is in ignored `generated-artifacts/p074/phone-q1.json`
+and accompanying screenshots. No non-GET/HEAD browser requests occurred.
+
+The film DOM type correction separately restores the full workspace
+`pnpm typecheck`. The two-character guard is a subsequent source change; the
+production measurements above are explicitly for the earlier live build.

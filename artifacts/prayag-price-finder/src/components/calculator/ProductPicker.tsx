@@ -8,6 +8,7 @@ import { useCalculatorSearch } from "@/lib/calculatorApi";
 import type { ProductChoice } from "@/lib/calculatorState";
 import { AdHocBadge } from "./MrpField";
 import { CALCULATOR_SEARCH_LIMIT, productSearchResultNotice } from "@workspace/formatting";
+import { CALCULATOR_MIN_QUERY_LENGTH, calculatorExactLookupSettled, calculatorSearchReady } from "@/lib/calculatorSearchPolicy";
 
 type Mode = "direct" | "browse" | "exact";
 
@@ -45,21 +46,23 @@ export function ProductPicker({ blockId, index, asOf, itemCode, selectedLabel, o
   const settledCode = useDebounced(code, 250);
   const asOfParam = asOf || undefined;
 
-  const search = useCalculatorSearch({ q: query, limit: CALCULATOR_SEARCH_LIMIT, asOf: asOfParam }, mode === "direct" && query.length > 0);
+  const directSearchReady = calculatorSearchReady(rawQuery) && calculatorSearchReady(query);
+  const search = useCalculatorSearch({ q: query, limit: CALCULATOR_SEARCH_LIMIT, asOf: asOfParam }, mode === "direct" && directSearchReady);
   const divisions = useCalculatorSearch({ limit: 1, asOf: asOfParam }, mode === "browse");
   const categories = useCalculatorSearch({ division: division ?? undefined, limit: 1, asOf: asOfParam }, mode === "browse" && !!division);
   const products = useCalculatorSearch(
     { division: division ?? undefined, category: category === UNCATEGORISED ? "__uncategorised__" : category ?? undefined, limit: CALCULATOR_SEARCH_LIMIT, asOf: asOfParam },
     mode === "browse" && !!division && !!category,
   );
-  const exact = useCalculatorSearch({ q: settledCode, limit: 8, asOf: asOfParam }, mode === "exact" && settledCode.length > 0);
-  const exactSettled = settledCode === code && code.length > 0 && exact.isSuccess && !exact.isFetching;
-  const exactProduct = exactSettled ? exact.data?.exactProduct ?? null : null;
-  const nearMatches = exactSettled && !exactProduct ? (exact.data?.results ?? []).filter((r) => r.itemCode !== code).slice(0, 4) : [];
+  const exactSearchReady = calculatorSearchReady(code) && calculatorSearchReady(settledCode);
+  const exact = useCalculatorSearch({ q: settledCode, limit: 8, asOf: asOfParam }, mode === "exact" && exactSearchReady);
+  const exactSettled = calculatorExactLookupSettled(code, settledCode, exact.isSuccess, exact.isFetching);
+  const exactProduct = exactSettled && exactSearchReady ? exact.data?.exactProduct ?? null : null;
+  const nearMatches = exactSettled && exactSearchReady && !exactProduct ? (exact.data?.results ?? []).filter((r) => r.itemCode !== code).slice(0, 4) : [];
 
   const descRef = useRef<HTMLInputElement | null>(null);
 
-  const searchOptions = (search.data?.results ?? []).map((r) => ({
+  const searchOptions = (directSearchReady ? search.data?.results ?? [] : []).map((r) => ({
     value: r.itemCode,
     label: productLabel(r.itemCode, r.productName),
     hint: [r.division, r.category].filter(Boolean).join(" · ") || undefined,
@@ -98,14 +101,16 @@ export function ProductPicker({ blockId, index, asOf, itemCode, selectedLabel, o
           data-testid={`select-product-${blockId}`}
           widthClass="w-full"
           placeholder="Search item code or product name…"
-          searchPlaceholder="Type an item code or name…"
-          emptyText={query ? (search.isError ? "Search failed. Try again." : "No products match. Use Exact code to add one by hand.") : "Start typing to search"}
+          searchPlaceholder={`Type at least ${CALCULATOR_MIN_QUERY_LENGTH} characters…`}
+          emptyText={!calculatorSearchReady(rawQuery)
+            ? `Type at least ${CALCULATOR_MIN_QUERY_LENGTH} characters to search`
+            : search.isError ? "Search failed. Try again." : "No products match. Use Exact code to add one by hand."}
           serverFiltered
           renderLimit={CALCULATOR_SEARCH_LIMIT}
-          resultsNotice={query.length > 0 && search.data
+          resultsNotice={directSearchReady && search.data
             ? productSearchResultNotice(search.data.results.length, search.data.totalCount)
             : undefined}
-          loading={rawQuery.length > 0 && (search.isFetching || rawQuery !== query)}
+          loading={calculatorSearchReady(rawQuery) && (search.isFetching || rawQuery !== query)}
           onSearchChange={setRawQuery}
           value={itemCode}
           selectedLabel={selectedLabel ?? itemCode ?? undefined}
@@ -181,10 +186,10 @@ export function ProductPicker({ blockId, index, asOf, itemCode, selectedLabel, o
               Matched character for character. Spaces, dashes and capitals count.
             </p>
           </div>
-          {code.length > 0 && !exactSettled && !exact.isError && (
+          {code.length > 0 && !exactSettled && !(exactSearchReady && exact.isError) && (
             <span className="block h-7 w-2/3 rounded bg-muted animate-pulse" aria-label="Checking the catalogue" />
           )}
-          {exact.isError && (
+          {exactSearchReady && exact.isError && (
             <button type="button" onClick={() => exact.refetch()} className="text-[11px] font-semibold text-destructive underline underline-offset-2">
               Could not check the catalogue. Retry
             </button>

@@ -64,3 +64,13 @@ bucket restrictions to full-catalogue shop quoting.
 **How to apply:** Test ranking classes and same-candidate order equivalence,
 alongside an explicit unbucketed Calculator test. Keep raw code equality separate
 from normalized ranking hints.
+
+Calculator performance acceptance must reflect salespeople using phones in
+retailers' shops, not only desktop development machines.
+
+**Why:** The user explicitly identified this as the intended working environment
+and required a quantified phone-class profile for dropdown timing.
+
+**How to apply:** Measure real result painting under recorded mobile viewport,
+CPU and network settings. Preserve basket-local and exact-identity behavior when
+reducing unnecessary search requests.
