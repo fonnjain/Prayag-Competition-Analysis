@@ -2521,7 +2521,7 @@ export const getExportPriceFinderCalculatorUrl = () => {
 }
 
 /**
- * @summary Read-only in-memory Excel calculation; re-resolves all source prices
+ * @summary Read-only in-memory Excel or PDF calculation; re-resolves all source prices
  */
 export const exportPriceFinderCalculator = async (exportPriceFinderCalculatorBody: ExportPriceFinderCalculatorBody, options?: RequestInit): Promise<Blob> => {
 
@@ -2570,7 +2570,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ExportPriceFinderCalculatorMutationError = ErrorType<void>
 
     /**
- * @summary Read-only in-memory Excel calculation; re-resolves all source prices
+ * @summary Read-only in-memory Excel or PDF calculation; re-resolves all source prices
  */
 export const useExportPriceFinderCalculator = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportPriceFinderCalculator>>, TError,{data: BodyType<ExportPriceFinderCalculatorBody>}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { AlertTriangle, Info, Download, FileText, Loader2, PenLine, Printer } from "lucide-react";
+import { AlertTriangle, Info, Download, FileText, Loader2, PenLine } from "lucide-react";
 import { formatMoney, formatCount } from "@workspace/formatting";
 import { Button } from "@/components/ui/button";
 import { calculatorAssertedBanner, calculatorCompetitorKey, calculatorPosition, type ResolvedCalculator, type summarizeCalculator } from "@/lib/calculatorState";
@@ -13,13 +13,14 @@ export type CalculatorSummaryProps = {
   summary: Summary;
   disclosures: string[];
   onExport: () => void;
+  onPdf: () => void;
   exporting: boolean;
   exportError: string | null;
 };
 
 /** Full-width, printable summary. Every brand total is set against our total over the same subset. */
 export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>(function CalculatorSummary(
-  { rows, summary, disclosures, onExport, exporting, exportError },
+  { rows, summary, disclosures, onExport, onPdf, exporting, exportError },
   ref,
 ) {
   const available = rows.filter((r) => r.product);
@@ -39,8 +40,8 @@ export const CalculatorSummary = forwardRef<HTMLElement, CalculatorSummaryProps>
         <FileText className="h-4 w-4 text-indigo-300" />
         <h2 id="calc-summary-title" className="text-base font-black tracking-tight">Final Summary</h2>
         <div className="ml-auto flex flex-wrap items-center gap-2 print:hidden">
-          <Button type="button" variant="ghost" size="sm" onClick={() => window.print()} className="h-8 gap-1.5 text-xs text-white hover:bg-white/10 hover:text-white" data-testid="button-print-summary">
-            <Printer className="h-3.5 w-3.5" /> Print
+          <Button type="button" variant="ghost" size="sm" onClick={onPdf} disabled={exporting} className="h-8 gap-1.5 text-xs text-white hover:bg-white/10 hover:text-white" data-testid="button-download-calculator-pdf">
+            <FileText className="h-3.5 w-3.5" /> Download PDF
           </Button>
           <Button type="button" size="sm" onClick={onExport} disabled={exporting} className="h-8 gap-1.5 bg-indigo-600 text-xs font-bold hover:bg-indigo-500" data-testid="button-export-calculator">
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Export Excel

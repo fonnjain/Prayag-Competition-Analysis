@@ -1875,3 +1875,45 @@ mtime_ms = 1792391249338
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/ebdf3665-41d6-4d1e-aaee-c500f9a2d0a1/a87041c5-7f5f-407d-aaea-447be0e17a73"
 storage_version_token = "1792391261818795"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "lVd2ShmlGSUnBTtIQgZ_Q"
+uri = "file://generated-artifacts/p075/comparison.xlsx"
+type = "table"
+title = "Reformatted Excel — reference basket"
+description = "Three sheets: Comparison, Summary and Data. Verified against the supplied reference figures."
+logical_id = "0f38501d-3a77-4872-9f0a-e4323108c67e"
+content_hash = "sha256:7d01b8604c00f54cfcf950a0368bcd58e364f050e5beebb131c1ab51fb5574ac"
+size = 12820
+mtime_ms = 1792747142197
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/0f38501d-3a77-4872-9f0a-e4323108c67e/9b178d79-c1aa-4895-b69d-ae8113cc107b"
+storage_version_token = "1792747267087108"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "Ns9X2y1R_lZg5sOL_TFbj"
+uri = "file://generated-artifacts/p075/comparison.pdf"
+type = "pdf"
+title = "Generated PDF — reference basket"
+description = "One-page A4 document, with source labels and disclosures; no app chrome or browser URL."
+logical_id = "2e49c982-64d6-43b3-9f3c-750431d722b9"
+content_hash = "sha256:fecff501f1b0cdfc86e2b8c5f17a9ae74b0fa344f7734980a581ce2ffe1be6aa"
+size = 20340
+mtime_ms = 1792747142197
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/2e49c982-64d6-43b3-9f3c-750431d722b9/cf172cd2-bdd3-47aa-94a3-354e905b47f7"
+storage_version_token = "1792747268449094"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "CXeuKqIgTonf9vvnn3tUB"
+uri = "file://generated-artifacts/p076/Prayag_Full_Catalogue_Prices_2026-10-23.xlsx"
+type = "table"
+title = "Full catalogue price export — production"
+description = "All 7,191 products in 7,341 product/variant rows. Includes README, coverage summary, current/previous/future prices and provenance. Exact item-code round-trip verified."
+logical_id = "77768fa4-b421-4e87-a6a2-156a1715175d"
+content_hash = "sha256:f16f575fc2572e5718f48a5b2926436280b759438f2bf8d42eda0cdb8af3a342"
+size = 1830894
+mtime_ms = 1792748049793
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:71c4ccdf-3125-4a4f-b2d7-7e500f1c7d8d/77768fa4-b421-4e87-a6a2-156a1715175d/924e7682-ece1-4468-9353-6af38ca7977b"
+storage_version_token = "1792748079178807"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

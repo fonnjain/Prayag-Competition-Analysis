@@ -5369,7 +5369,16 @@ export type GetPriceFinderDiscountDefaults200Item = {
   discountPct: number;
 };
 
+export type ExportPriceFinderCalculatorBodyFormat = typeof ExportPriceFinderCalculatorBodyFormat[keyof typeof ExportPriceFinderCalculatorBodyFormat];
+
+
+export const ExportPriceFinderCalculatorBodyFormat = {
+  xlsx: 'xlsx',
+  pdf: 'pdf',
+} as const;
+
 export type ExportPriceFinderCalculatorBody = {
+  format?: ExportPriceFinderCalculatorBodyFormat;
   asOf: string;
   /**
      * @minItems 1

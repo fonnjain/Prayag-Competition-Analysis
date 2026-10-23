@@ -8,7 +8,7 @@ export type CalculatorBlock = {
 export type CalculatorPriceState = "App" | "Edited" | "Entered";
 export const CALCULATOR_SCOPE_DISCLOSURE = "This calculator searches the full product catalogue and all competitors, without bucket or company filters, and allows one-off competitors and products typed in by hand. It is a quoting aid, not a source of record.";
 export const CALCULATOR_AD_HOC_NOTE = "price entered by user — basis and unit unverified";
-export const calculatorAssertedBanner = (count: number) => `This comparison includes ${count} hand-entered or edited prices. These figures are unverified.`;
+export const calculatorAssertedBanner = (count: number) => `This comparison includes ${count} hand-entered or edited ${count === 1 ? "price. This figure is" : "prices. These figures are"} unverified.`;
 /** Deliberate one-off Astral and recorded Astral are different basket identities. */
 export const calculatorCompetitorKey = (c: { competitor: string | null; adHoc?: boolean }) => JSON.stringify([!!c.adHoc, c.competitor]);
 export function mrpError(value: string): string | null {
@@ -207,7 +207,7 @@ export function calculatorDisclosures(summary: ReturnType<typeof summarizeCalcul
     ...(summary.noCompetitorRecorded ? [`${summary.noCompetitorRecorded} products have no competitor price recorded at all.`] : []),
     `Prices resolved as of ${date}.`,
     ...(summary.basisMismatchRows ? [`${summary.basisMismatchRows} rows have a different or unconfirmed price basis — see the warning marks.`] : []),
-    ...(summary.unitMismatchRows ? [`${summary.unitMismatchRows} rows have different recorded units — see the units shown on each row.`] : []),
+    ...(summary.unitMismatchRows ? [`${summary.unitMismatchRows} ${summary.unitMismatchRows === 1 ? "row has a different recorded unit" : "rows have different recorded units"} — see the units shown on each row.`] : []),
     ...(summary.unitNotRecordedRows ? [`${summary.unitNotRecordedRows} rows: unit not recorded (information only).`] : []),
     ...(summary.variantMismatchRows ? [`${summary.variantMismatchRows} rows compare a colour variant without confirmed competitor variant evidence.`] : []),
     ...(summary.noOurPrice ? [`${summary.noOurPrice} products have no usable Prayag price and are excluded from value comparisons.`] : []),

@@ -1250,8 +1250,9 @@ export const GetPriceFinderDiscountDefaultsResponse = zod.array(GetPriceFinderDi
 
 
 /**
- * @summary Read-only in-memory Excel calculation; re-resolves all source prices
+ * @summary Read-only in-memory Excel or PDF calculation; re-resolves all source prices
  */
+export const exportPriceFinderCalculatorBodyFormatDefault = `xlsx`;
 export const exportPriceFinderCalculatorBodyBlocksItemCompetitorsMax = 10;
 
 export const exportPriceFinderCalculatorBodyBlocksMax = 50;
@@ -1259,6 +1260,7 @@ export const exportPriceFinderCalculatorBodyBlocksMax = 50;
 
 
 export const ExportPriceFinderCalculatorBody = zod.object({
+  "format": zod.enum(['xlsx', 'pdf']).default(exportPriceFinderCalculatorBodyFormatDefault),
   "asOf": zod.coerce.date(),
   "blocks": zod.array(zod.object({
   "id": zod.string(),

@@ -6,6 +6,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import express from "express";
 import supertest from "supertest";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { PDFDocument } from "pdf-lib";
+import reference from "../lib/fixtures/calculatorReference.json";
 const state = vi.hoisted(() => ({ database: null as any }));
 vi.mock("@workspace/db", async original => {
   const real = await original<typeof import("@workspace/db")>();
@@ -18,7 +21,7 @@ import analysisRouter from "./analysis";
 import { withBucketContext, bucketRouteApplies } from "../lib/bucketFilter";
 import { readFinderEvidence } from "../lib/priceFinderEvidence";
 import { scopedFinderCompetitors } from "../lib/priceFinderCompetitors";
-import { CALCULATOR_SCOPE_DISCLOSURE } from "@workspace/formatting";
+import { CALCULATOR_SCOPE_DISCLOSURE, calculatorAssertedBanner } from "@workspace/formatting";
 const schema = `pf_calc_${randomUUID().replaceAll("-", "")}`;
 const connect = () => pool.connect();
 let client: Awaited<ReturnType<typeof connect>>;
@@ -174,7 +177,7 @@ describe("public read-only calculator endpoints", () => {
     expect(scoped.products.map(p => p.item_code)).toEqual(["A"]);
     expect(scoped.competitors.map(c => c.competitor)).toEqual(["Taxed"]);
   });
-  it("exports exactly two sheets and one detail row per selected competitor, with unit-first values and disclosures", async () => {
+  it("exports three sheets and one Data row per selected competitor, with unchanged unit-first values and disclosures", async () => {
     const b = requestBlock(); b.discount = "33.33";
     b.competitors.push({ id: "taxed", competitor: "Taxed", discount: "0" });
     const res = await supertest(app()).post("/price-finder/calculator/export").send({ asOf: "2026-05-01", blocks: [b] })
@@ -182,8 +185,8 @@ describe("public read-only calculator endpoints", () => {
     expect(res.status).toBe(200);
     expect(res.headers["content-disposition"]).toContain("prayag-price-calculator-2026-05-01.xlsx");
     const book = XLSX.read(res.body);
-    expect(book.SheetNames).toEqual(["Calculator detail", "Summary"]);
-    const detail = XLSX.utils.sheet_to_json<any[]>(book.Sheets["Calculator detail"], { header: 1 });
+    expect(book.SheetNames).toEqual(["Comparison", "Summary", "Data"]);
+    const detail = XLSX.utils.sheet_to_json<any[]>(book.Sheets.Data, { header: 1 });
     const header = detail.findIndex(row => row[0] === "Code"), first = detail[header + 1], second = detail[header + 2];
     expect(first[9]).toBe(61.34); expect(first[11]).toBe(429.38);
     expect(first[16]).toBe(74.62); expect(first[17]).toBe(522.34);
@@ -247,11 +250,12 @@ describe("public read-only calculator endpoints", () => {
     const result = await exportBook(blocks);
     expect(result.status).toBe(200);
     const book = XLSX.read(result.body);
-    const rows = XLSX.utils.sheet_to_json<any[]>(book.Sheets["Calculator detail"], { header: 1 });
+    const rows = XLSX.utils.sheet_to_json<any[]>(book.Sheets.Data, { header: 1 });
     const summary = XLSX.utils.sheet_to_json<any[]>(book.Sheets.Summary, { header: 1 });
-    expect(rows[0][0]).toContain("6 hand-entered or edited prices");
-    expect(summary[0][0]).toEqual(rows[0][0]); expect(rows[0][0]).toContain("unverified");
-    for (const sheet of [rows, summary]) {
+    const comparison = XLSX.utils.sheet_to_json<any[]>(book.Sheets.Comparison, { header: 1 });
+    expect(comparison[2][0]).toContain("6 hand-entered or edited prices");
+    expect(summary[2][0]).toEqual(comparison[2][0]); expect(comparison[2][0]).toContain("unverified");
+    for (const sheet of [comparison, summary]) {
       expect(sheet.flat().filter(value => value === CALCULATOR_SCOPE_DISCLOSURE)).toHaveLength(1);
       expect(sheet.flat()).not.toContain("Company test");
     }
@@ -267,7 +271,8 @@ describe("public read-only calculator endpoints", () => {
     expect(data[3][30]).toBe("Yes");
     expect(data[4][26]).toBe("App");
     expect(summary.flat()).toContain("compared on 1 of 4 products, 1 of which were hand-entered (Ad-hoc)");
-    expect(summary.flat()).toContain("Our overridden app value");
+    expect(rows[0]).toContain("Our overridden app value");
+    expect(summary.flat()).not.toContain("Our overridden app value");
   });
   it("rejects invalid asserted MRPs and missing ad-hoc descriptions without numeric caps", async () => {
     for (const mrp of ["", "0", "-1", "2.001", "Infinity", "abc"]) {
@@ -276,7 +281,7 @@ describe("public read-only calculator endpoints", () => {
     expect((await exportBook([{ ...requestBlock(), mrp: "1000000.25" }])).status).toBe(200);
     expect((await exportBook([{ ...requestBlock("unknown"), mrp: "25", adHocProduct: true }])).status).toBe(400);
     const fake = await exportBook([{ ...requestBlock("TTS-01"), mrp: "25", adHocProduct: true, description: "Incorrect supplied metadata" }]);
-    const rows = XLSX.utils.sheet_to_json<any[]>(XLSX.read(fake.body).Sheets["Calculator detail"], { header: 1 });
+    const rows = XLSX.utils.sheet_to_json<any[]>(XLSX.read(fake.body).Sheets.Data, { header: 1 });
     expect(rows.find(r => r[0] === "TTS-01")?.[1]).toBe("Exact code");
     expect(rows.find(r => r[0] === "TTS-01")?.[30]).toBe("No");
   });
@@ -327,6 +332,14 @@ describe("public read-only calculator endpoints", () => {
       { ...requestBlock("P"), id: "priced", mrp: "100", competitors: [] },
     ]);
     expect(result.status).toBe(200);
+    // The new document format is the same read-only transport, including when
+    // the session contains local products, brands and edited source MRPs.
+    const pdfResult = await supertest(app(undefined, true)).post("/price-finder/calculator/export")
+      .send({ asOf: "2026-05-01", format: "pdf", blocks: [
+        { ...requestBlock(), mrp: "88", competitors: [{ id: "local", competitor: "PDF-only brand", adHoc: true, mrp: "80", discount: "0" }] },
+        { ...requestBlock("PDF-only product"), adHocProduct: true, description: "Local PDF quote", mrp: "20", competitors: [] },
+      ] });
+    expect(pdfResult.status).toBe(200);
     const aggregatesAfter = await aggregateSnapshot();
     const after = await snapshot(), afterAt = new Date().toISOString();
     expect(after).toEqual(before); // Full serialized row bytes, not just counts/hashes.
@@ -347,6 +360,127 @@ describe("public read-only calculator endpoints", () => {
       await mkdir(dirname(reportPath), { recursive: true });
       await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
     }
+  });
+  it("matches every reference Data field, styled sheets, sign colours and one-page text PDF", async () => {
+    // Source facts and expected output are captured independently from the supplied
+    // 23 October reference, not recalculated using the formatter under test.
+    for (const code of ["PS-1", "PS-2"]) {
+      const r = reference.find(row => row[0] === code)!;
+      await client.query("INSERT INTO catalog_products(item_code,product_name,division,category,uom,is_active) VALUES ($1,$2,$3,$4,'NOS',true)", r.slice(0, 4));
+      await client.query("INSERT INTO mrp_price_history(item_code,variant,mrp,review_status,effective_date) VALUES ($1,'Standard',$2,'approved',$3)", [code, r[6], r[7]]);
+    }
+    for (const r of reference.slice(1).filter(r => r[31] === "No")) {
+      const unit = r[12] === "Astral" ? "per 3-m pipe" : "MRP";
+      await client.query("INSERT INTO competitor_prices(competitor,matched_prayag_code,match_status,price,effective_date,price_basis,unit) VALUES ($1,$2,'matched',$3,$4,'MRP',$5)", [r[12], r[0], r[13], r[14], unit]);
+    }
+    const blocks = ["PS-1", "PS-2"].map(code => ({
+      id: code, itemCode: code, variant: "Standard", discount: "40", quantity: "10",
+      competitors: reference.slice(1).filter(r => r[0] === code).map(r => ({
+        id: String(r[12]), competitor: String(r[12]), discount: "40",
+        ...(r[31] === "Yes" ? { mrp: String(r[13]), adHoc: true } : {}),
+      })),
+    }));
+    const request = (format = "xlsx", input = blocks) => supertest(app()).post("/price-finder/calculator/export")
+      .send({ asOf: "2026-10-23", blocks: input, format }).buffer(true)
+      .parse((r, cb) => { const chunks: Buffer[] = []; r.on("data", c => chunks.push(c)); r.on("end", () => cb(null, Buffer.concat(chunks))); });
+    const output = await request(); expect(output.status).toBe(200);
+    const book = new ExcelJS.Workbook(); await book.xlsx.load(output.body);
+    expect(book.worksheets.map(s => s.name)).toEqual(["Comparison", "Summary", "Data"]);
+    const data = book.getWorksheet("Data")!, comparison = book.getWorksheet("Comparison")!, summary = book.getWorksheet("Summary")!;
+    expect(data.columnCount).toBe(32); expect(comparison.columnCount).toBe(10);
+    for (const sheet of book.worksheets) for (const col of sheet.columns) expect(col.width).toBeGreaterThan(0);
+    for (const sheet of [comparison, data]) {
+      const view = sheet.views[0] as ExcelJS.WorksheetViewFrozen;
+      expect(view.state).toBe("frozen"); expect(sheet.views[0].showGridLines).toBe(false);
+      const cell = sheet.getRow(view.ySplit!).getCell(1);
+      expect(cell.font.bold).toBe(true); expect(cell.font.color?.argb).toMatch(/FFFFFF$/);
+      expect(cell.fill.type).toBe("pattern");
+    }
+    expect(data.autoFilter).toBeTruthy();
+    expect(comparison.pageSetup.orientation).toBe("landscape");
+    expect(comparison.pageSetup.fitToWidth).toBe(1);
+    expect(comparison.pageSetup.printTitlesRow).toBe("5:5");
+    reference.forEach((expected, ri) => expected.forEach((value, ci) => {
+      const actual = data.getCell(ri + 1, ci + 1).value ?? null;
+      if (typeof value === "number") expect(actual, `${ri}:${ci}`).toBeCloseTo(value, 12);
+      else expect(actual === "" ? null : actual, `${ri}:${ci}`).toBe(value);
+    }));
+    const ours = comparison.getRows(1, comparison.rowCount)!.filter(r => r.getCell(8).value === "OUR PRICE");
+    const ourTotal = comparison.getRows(1, comparison.rowCount)!.find(r => r.getCell(1).value === "OUR TOTAL")!;
+    expect(ourTotal.getCell(7).value).toBe(3636);
+    expect(ours.reduce((n, r) => n + Number(r.getCell(7).value), 0)).toBe(ourTotal.getCell(7).value);
+    for (const d of reference.slice(1)) {
+      const line = comparison.getRows(1, comparison.rowCount)!.find(r => r.getCell(2).value === `${d[12]}${d[31] === "Yes" ? " (one-off)" : ""}` && r.getCell(3).value === d[13])!;
+      expect(line.getCell(8).value).toBeCloseTo(Number(d[19]), 12);
+      expect(line.getCell(8).font.color?.argb).toMatch(/216542$/);
+      expect(line.getCell(9).value).toBe(d[28]);
+    }
+    expect(data.getCell("G2").numFmt).toBe("[$₹-en-IN]##,##,##0.00");
+    expect(data.getCell("T2").numFmt).toBe("0.0%");
+    expect(summary.getRows(1, summary.rowCount)!.some(r => r.values?.toString().includes("provenance"))).toBe(false);
+    const summaryRows = summary.getRows(1, summary.rowCount)!;
+    for (const [label, value] of [
+      ["App prices", 6], ["Edited prices", 0], ["Entered prices", 1], ["Ad-hoc products", 0],
+      ["Ad-hoc competitors", 1], ["Products compared", 2], ["Total quantity", 20], ["Our total value", 3636],
+    ]) expect(summaryRows.find(r => r.getCell(1).value === label)?.getCell(2).value).toBe(value);
+    for (const [name, compared, ourSubtotal, theirSubtotal, difference, cheaper] of [
+      ["abc (Ad-hoc)", 1, 1422, 1500, .0548523206751055, 1],
+      ["Apollo", 2, 3636, 4032, .108910891089109, 2],
+      ["Ashirvad", 1, 2214, 2988, .349593495934959, 1],
+      ["Astral", 1, 1422, 2016, .417721518987342, 1],
+    ] as const) {
+      const r = summaryRows.find(r => r.getCell(1).value === name)!;
+      expect(r.getCell(2).value).toBe(`${compared} / 2`);
+      expect(r.getCell(3).value).toBe(ourSubtotal); expect(r.getCell(4).value).toBe(theirSubtotal);
+      expect(r.getCell(5).value).toBeCloseTo(difference, 12);
+      expect(r.getCell(6).value).toBe(cheaper); expect(r.getCell(7).value).toBe(0); expect(r.getCell(8).value).toBe(0);
+      expect(summary.getRow(r.number + 1).getCell(1).value).toBe(`compared on ${compared} of 2 products, 0 of which were hand-entered (Ad-hoc)`);
+    }
+    expect((summaryRows.find(r => r.getCell(1).value === "PS-1")!.values as unknown[]).slice(4, 10)).toEqual([10, 1422, 1500, 1674, "—", 2016]);
+    expect((summaryRows.find(r => r.getCell(1).value === "PS-2")!.values as unknown[]).slice(4, 10)).toEqual([10, 2214, "—", 2358, 2988, "—"]);
+    const below = structuredClone(blocks);
+    below[0].competitors[1].mrp = "100";
+    const lowerOutput = await request("xlsx", below);
+    const lower = new ExcelJS.Workbook(); await lower.xlsx.load(lowerOutput.body);
+    const lowerRow = lower.getWorksheet("Comparison")!.getRows(1, 20)!.find(r => r.getCell(2).value === "abc (one-off)")!;
+    expect(Number(lowerRow.getCell(8).value)).toBeLessThan(0);
+    expect(lowerRow.getCell(8).font.color?.argb).toMatch(/B42332$/);
+    const document = await request("pdf"); expect(document.status).toBe(200);
+    expect(document.headers["content-type"]).toContain("application/pdf");
+    expect((await PDFDocument.load(document.body)).getPageCount()).toBe(1);
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const task = getDocument({ data: new Uint8Array(document.body), useSystemFonts: false });
+    const pdf = await task.promise;
+    const content = (await (await pdf.getPage(1)).getTextContent()).items.map(i => "str" in i ? i.str : "").join(" ");
+    for (const present of ["PS-1", "PS-2", "3,636.00", "Apollo", "Ashirvad", "Astral", "Entered", "App", "per 3-m pipe", "This figure is unverified"]) expect(content).toContain(present);
+    for (const absent of ["http", "calc=", "%7B", "Log out", "Pricing workspace"]) expect(content).not.toContain(absent);
+    expect(calculatorAssertedBanner(1)).toContain("price. This figure is");
+    expect(calculatorAssertedBanner(2)).toContain("prices. These figures are");
+    expect(content).toContain("1 row has a different recorded unit");
+    // Pagination uses measured whole product blocks, not CSS hints. Repeating
+    // this exact basket forces several pages; no code/header is orphaned.
+    const long = Array.from({ length: 10 }, (_, i) => ({ ...blocks[0], id: `copy-${i}`, description: `copy-${i}` }));
+    const multipage = await request("pdf", long);
+    expect(multipage.status).toBe(200);
+    const moreTask = getDocument({ data: new Uint8Array(multipage.body), useSystemFonts: false });
+    const more = await moreTask.promise;
+    expect(more.numPages).toBeGreaterThan(1);
+    let productBlocks = 0;
+    for (let p = 1; p <= more.numPages; p++) {
+      const pageText = (await (await more.getPage(p)).getTextContent()).items.map(i => "str" in i ? i.str : "").join(" ");
+      const starts = pageText.match(/PS-1 ·/g)?.length ?? 0;
+      const tails = pageText.match(/Units differ: competitor per 3-m pipe; ours NOS./g)?.length ?? 0;
+      expect(tails).toBe(starts);
+      productBlocks += starts;
+    }
+    expect(productBlocks).toBe(10); await moreTask.destroy();
+    const dir = process.env.CALCULATOR_DOCUMENT_REPORT_DIR;
+    if (dir) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(`${dir}/comparison.xlsx`, output.body);
+      await writeFile(`${dir}/comparison.pdf`, document.body);
+    }
+    await task.destroy();
   });
 });
 

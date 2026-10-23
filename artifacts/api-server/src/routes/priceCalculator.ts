@@ -2,17 +2,18 @@ import { Router } from "express";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
-import * as XLSX from "xlsx";
 import {
   resolveCalculator, summarizeCalculator, calculatorDisclosures, discountError, quantityError,
-  type CalculatorEvidence, type CalculatorBlock, applyIndianNumberFormats, compareCalculatorMetadata,
-  CALCULATOR_SCOPE_DISCLOSURE, calculatorCompetitorKey, calculatorAssertedBanner,
+  type CalculatorEvidence, type CalculatorBlock, compareCalculatorMetadata,
+  CALCULATOR_SCOPE_DISCLOSURE, calculatorCompetitorKey,
   rankProductSearchRows, type ProductSearchRow, CALCULATOR_SEARCH_LIMIT,
 } from "@workspace/formatting";
 import { requireAuth, requireWorkspaceReadAccess } from "../middlewares/authMiddleware";
 import { exactQueryCodes, finderAsOf } from "../lib/priceFinderCompetitors";
 import { readFinderEvidence, type FinderProduct } from "../lib/priceFinderEvidence";
 import { productSearchCondition } from "../lib/productSearchCondition";
+import { createCalculatorWorkbook } from "../lib/calculatorDocuments";
+import { createCalculatorPdf } from "../lib/calculatorPdf";
 
 const router = Router();
 export async function calculatorEvidence(codes: string[], asOf: string) {
@@ -145,7 +146,7 @@ const block = z.object({
   quantity: z.string().max(24), competitors: z.array(entry).max(10),
   mrp: z.string().max(4096).optional(), adHocProduct: z.boolean().optional(), description: z.string().max(4096).optional(),
 }).strict();
-const exportBody = z.object({ asOf: text, blocks: z.array(block).min(1).max(50) }).strict();
+const exportBody = z.object({ asOf: text, blocks: z.array(block).min(1).max(50), format: z.enum(["xlsx", "pdf"]).default("xlsx") }).strict();
 type Cell = string | number | null;
 
 /** POST is only transport for an in-memory calculation too large for a link.
@@ -181,8 +182,7 @@ router.post("/price-finder/calculator/export", async (req, res) => {
       throw new Error("Correct invalid calculation inputs, including required positive MRPs, before exporting.");
     const summary = summarizeCalculator(resolved);
     const disclosures = calculatorDisclosures(summary, asOf, evidence.scopeDisclosure);
-    const banner = summary.assertedPrices ? [calculatorAssertedBanner(summary.assertedPrices)] : null;
-    const detail: Cell[][] = [...(banner ? [banner] : []), ...disclosures.map(d => [d]), [
+    const detail: Cell[][] = [[
       "Code", "Name", "Division", "Category", "Variant", "As of",
       "Our MRP", "Our effective date", "Our discount %", "Our net unit", "Quantity", "Our total",
       "Competitor", "Competitor price", "Competitor effective date", "Competitor discount %",
@@ -208,53 +208,19 @@ router.post("/price-finder/calculator/export", async (req, res) => {
         r.adHocProduct ? "Yes" : "No", c?.adHoc ? "Yes" : "No",
       ]);
     }
-    const summaryRows: Cell[][] = [
-      ...(banner ? [banner] : []), ["Price calculator summary"], ...disclosures.map(d => [d]), [],
-      ["App prices", summary.priceCounts.App], ["Edited prices", summary.priceCounts.Edited], ["Entered prices", summary.priceCounts.Entered],
-      ["Ad-hoc products", summary.adHocProducts], ["Ad-hoc competitors", summary.adHocCompetitors.length, ...summary.adHocCompetitors], [],
-      ["Products compared", summary.products], ["Total quantity", summary.totalQuantity], ["Our total value", summary.ourValue], [],
-      ["Competitor", "Coverage", "Our subtotal on same products", "Competitor subtotal", "Difference %", "Position", "We are cheaper", "At par", "We are higher"],
-      ...summary.brands.map(b => [b.adHoc ? `${b.brand} (Ad-hoc)` : b.brand,
-        `compared on ${b.compared} of ${b.products} products, ${b.adHocProducts} of which were hand-entered (Ad-hoc)`, b.ourValue, b.competitorValue,
-        b.position.diffPct == null ? null : b.position.diffPct / 100, b.position.label, b.cheaper, b.par, b.higher]),
-      [], ["Product code", "Name", "Variant", "Quantity", "Our total", ...summary.brands.map(b => b.adHoc ? `${b.brand} (Ad-hoc)` : b.brand),
-        "Our provenance", "Our overridden app value", "Ad-hoc product",
-        ...summary.brands.flatMap(b => [`${b.brand}${b.adHoc ? " (Ad-hoc)" : ""} provenance`,
-          `${b.brand}${b.adHoc ? " (Ad-hoc)" : ""} overridden app value`])],
-      ...resolved.filter(r => r.product).map(r => [r.block.itemCode, r.product!.productName, r.block.variant, r.our.quantity,
-        r.our.total ?? "No price", ...summary.brands.map(b => r.competitors.find(c => calculatorCompetitorKey(c) === b.key)?.total ?? "—"),
-        r.our.priceState, r.our.priceState === "Edited" ? r.our.appPrice : null, r.adHocProduct ? "Yes" : "No",
-        ...summary.brands.flatMap(b => {
-          const c = r.competitors.find(c => calculatorCompetitorKey(c) === b.key);
-          return [c?.priceState ?? "—", c?.priceState === "Edited" ? c.appPrice : null];
-        })]),
-    ];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(detail), "Calculator detail");
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "Summary");
-    const detailSheet = workbook.Sheets["Calculator detail"];
-    applyIndianNumberFormats(detailSheet, { moneyColumns: [6, 9, 11, 13, 16, 17, 18, 20], countColumns: [10] });
-    for (let i = 1; i < detail.length; i++) if (detailSheet[`T${i + 1}`]?.t === "n") detailSheet[`T${i + 1}`].z = "0.0%";
-    const summarySheet = workbook.Sheets.Summary;
-    const brandHeader = summaryRows.findIndex(r => r[0] === "Competitor" && r[1] === "Coverage");
-    const productHeader = summaryRows.findIndex(r => r[0] === "Product code");
-    summaryRows.forEach((row, index) => {
-      const columns = row[0] === "Our total value" ? [1]
-        : index > brandHeader && index < productHeader ? [2, 3]
-        : index > productHeader ? [4, ...summary.brands.map((_b, i) => i + 5)] : [];
-      for (const col of columns) {
-        const cell = summarySheet[XLSX.utils.encode_cell({ r: index, c: col })];
-        if (cell?.t === "n") cell.z = "#,##,##0.00";
-      }
-      if (index > brandHeader && index < productHeader) {
-        const percent = summarySheet[XLSX.utils.encode_cell({ r: index, c: 4 })];
-        if (percent?.t === "n") percent.z = "0.0%";
-      }
-    });
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="prayag-price-calculator-${asOf}.xlsx"`);
     res.setHeader("Cache-Control", "private, no-store");
-    res.send(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+    if (body.format === "pdf") {
+      const bytes = await createCalculatorPdf(resolved, asOf, disclosures);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="prayag-price-calculator-${asOf}.pdf"`);
+      res.send(bytes);
+    } else {
+      const workbook = createCalculatorWorkbook(resolved, asOf, disclosures, detail);
+      const bytes = await workbook.xlsx.writeBuffer();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="prayag-price-calculator-${asOf}.xlsx"`);
+      res.send(Buffer.from(bytes));
+    }
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Calculation could not be exported." }); }
 });
 export default router;

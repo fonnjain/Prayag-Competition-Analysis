@@ -225,11 +225,11 @@ export default function CalculatorPage() {
     });
   };
 
-  const runExport = async () => {
+  const runExport = async (format: "xlsx" | "pdf" = "xlsx") => {
     setExporting(true);
     setExportError(null);
     try {
-      await downloadCalculatorExport(asOf, blocks.filter((b) => b.itemCode));
+      await downloadCalculatorExport(asOf, blocks.filter((b) => b.itemCode), format);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Export failed.");
     } finally {
@@ -390,7 +390,8 @@ export default function CalculatorPage() {
             rows={resolved}
             summary={summary}
             disclosures={disclosures}
-            onExport={runExport}
+            onExport={() => runExport("xlsx")}
+            onPdf={() => runExport("pdf")}
             exporting={exporting}
             exportError={exportError}
           />

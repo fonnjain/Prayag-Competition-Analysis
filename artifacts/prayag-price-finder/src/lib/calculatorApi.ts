@@ -62,19 +62,19 @@ export function useDiscountDefaults(userId: string | null, enabled: boolean) {
 }
 
 /** POST transport only: the server re-resolves prices and writes nothing. */
-export async function downloadCalculatorExport(asOf: string, blocks: CalculatorBlock[]): Promise<void> {
+export async function downloadCalculatorExport(asOf: string, blocks: CalculatorBlock[], format: "xlsx" | "pdf" = "xlsx"): Promise<void> {
   const res = await fetch(getExportPriceFinderCalculatorUrl(), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-    body: JSON.stringify({ asOf, blocks }),
+    body: JSON.stringify({ asOf, blocks, format }),
   });
   if (!res.ok) throw new Error(`Export failed (HTTP ${res.status})`);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `prayag-price-calculator-${asOf}.xlsx`;
+  a.download = `prayag-price-calculator-${asOf}.${format}`;
   document.body.appendChild(a);
   a.click();
   a.remove();

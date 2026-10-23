@@ -707,7 +707,7 @@ paths:
     post:
       operationId: exportPriceFinderCalculator
       tags: [catalog]
-      summary: Read-only in-memory Excel calculation; re-resolves all source prices
+      summary: Read-only in-memory Excel or PDF calculation; re-resolves all source prices
       requestBody:
         required: true
         content:
@@ -716,6 +716,7 @@ paths:
               type: object
               required: [asOf, blocks]
               properties:
+                format: {type: string, enum: [xlsx, pdf], default: xlsx}
                 asOf: {type: string, format: date}
                 blocks:
                   type: array
@@ -724,8 +725,10 @@ paths:
                   items: {$ref: "#/components/schemas/PriceCalculatorBlock"}
       responses:
         "200":
-          description: Calculator detail and Summary worksheets
+          description: Comparison, Summary and Data worksheets, or a generated A4 PDF document
           content:
+            application/pdf:
+              schema: {type: string, format: binary}
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema: {type: string, format: binary}
         "400": {description: Invalid calculation}
